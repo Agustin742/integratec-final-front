@@ -23,6 +23,10 @@ Rules describe **how the project must be designed and built**. They are not impl
 - Use examples only to clarify a rule, not to introduce requirements by accident.
 - Keep documents current when the underlying contract changes.
 
+## Rule index
+
+- [Art direction](./direccion-artistica.md) — visual language, palette, avatars, environments, materials, lighting, camera, and acceptance criteria.
+
 ## How to use the rules
 
 Read the relevant rules before designing, implementing, modifying, or reviewing a part of the project. Apply them consistently regardless of whether the work is performed manually or with an AI coding assistant.

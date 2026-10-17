@@ -148,7 +148,7 @@ El bot utiliza un servicio de IA coordinado por NestJS. Las claves del proveedor
 | Tiempo real adicional | **Socket.IO (uso puntual)** | Solo funcionalidades independientes para las que resulte técnicamente necesario; no sustituye a Colyseus. |
 | Base de datos | **Amazon RDS for PostgreSQL** | Persistencia de usuarios, salas, membresías, tareas y mensajes. |
 | Acceso a datos | **Prisma ORM** | Consultas, relaciones y migraciones sobre PostgreSQL alojado en RDS; Prisma **no es** la base de datos. |
-| Monorepo | **pnpm workspaces** | Código compartido entre cliente, API, tiempo real y contratos. |
+| Repositorios | **Frontend:** `Agustin742/integratec-final-front`; **backend:** `Agustin742/integratec-final-back`. | Repositorios independientes, con CI, build y responsabilidad de despliegue propios. La distribución y propiedad de contratos entre repositorios siguen pendientes de decisión. |
 | IA | **Amazon Bedrock + herramientas NestJS** | Inferencia y ejecución de acciones autorizadas por el bot. |
 | Formularios y validación | **React Hook Form + Zod** | Formularios React y validación de entradas; el backend vuelve a validar. |
 | Kanban | **dnd-kit** | Interacciones de arrastrar y soltar en paneles React. |
@@ -179,7 +179,7 @@ El bot utiliza un servicio de IA coordinado por NestJS. Las claves del proveedor
          │ Bot IA / tools │  │ Validación de ingreso   │
          └───────┬────────┘  └──────────┬──────────────┘
                  │                      │
-                 ├── servicios/contratos compartidos ──┤
+                 ├── contratos lógicos dentro del backend ──┤
                  │                      │
                  ▼                      ▼
         RDS PostgreSQL         Estado efímero por Room
@@ -188,7 +188,7 @@ El bot utiliza un servicio de IA coordinado por NestJS. Las claves del proveedor
                  └── Amazon Bedrock desde NestJS
 ```
 
-**Decisión de separación:** NestJS y Colyseus son responsabilidades lógicas distintas y, de inicio, **servicios desplegables separados**. Colyseus no reemplaza la API REST ni PostgreSQL. Para coordinar operaciones persistentes, Colyseus utilizará contratos y servicios de aplicación seguros; nunca confiará en permisos aportados solo por el cliente. La integración específica entre ambos servicios se documentará en `rules/arquitectura.md`.
+**Decisión de separación:** NestJS y Colyseus son responsabilidades lógicas distintas y, de inicio, **servicios desplegables separados**. Colyseus no reemplaza la API REST ni PostgreSQL. Los contratos lógicos entre NestJS y Colyseus pertenecen al backend; la distribución y propiedad de contratos necesarios entre los repositorios frontend y backend siguen sin decidirse. Para coordinar operaciones persistentes, Colyseus utilizará contratos y servicios de aplicación seguros; nunca confiará en permisos aportados solo por el cliente. La integración específica entre ambos servicios se documentará en `rules/arquitectura.md`.
 
 ### 6.2 Canales y propiedad de los datos
 
@@ -287,8 +287,8 @@ AWS aloja y conecta **las mismas tecnologías elegidas para el producto**: el na
 
 ### 7.4 Despliegue, red y operación
 
-- El monorepo produce una **build web** de React/Vite y **dos imágenes Docker** independientes: API NestJS y servidor Colyseus.
-- **GitHub Actions** ejecuta ESLint, Prettier (verificación), Vitest y Playwright; publica el frontend en Amplify y las imágenes en ECR; luego actualiza los servicios de ECS.
+- Los repositorios frontend y backend tienen **CI, build y responsabilidad de despliegue independientes**. El frontend produce su build web de React/Vite; el backend produce imágenes Docker para la API NestJS y el servidor Colyseus.
+- Cada repositorio administra su propio flujo de **GitHub Actions** y sus verificaciones. La publicación del frontend en Amplify y de las imágenes backend en ECR, seguida de la actualización de ECS, corresponde a sus respectivos flujos; la coordinación entre ellos no presupone un workspace compartido.
 - El **ALB** termina TLS con certificado de **AWS Certificate Manager**; dirige `/api/*` a NestJS y una ruta/host reservado al servicio Colyseus. Se configuran explícitamente endpoints de matchmaking, conexiones WebSocket y orígenes permitidos sin mezclar los servicios.
 - Los servicios ECS tienen **Security Groups** específicos. **RDS permanece en subredes privadas**, accesible solo desde los componentes autorizados. Las tareas ECS usan roles IAM de mínimo privilegio; Bedrock se invoca desde NestJS, nunca desde el navegador.
 - Las credenciales, claves de sesión y cadenas de conexión se inyectan por configuración segura. El frontend recibe únicamente valores públicos (por ejemplo, URL de API y URL de Colyseus).
@@ -443,10 +443,10 @@ La implementación seguirá entregas incrementales, con despliegue desde etapas 
 
 ## 13. Organización documental
 
-Este documento será el **índice conceptual y fuente de decisiones generales**. El detalle técnico y funcional se desarrollará en archivos de `rules/`, por ejemplo:
+Este documento es el **índice conceptual y fuente de decisiones generales**. El detalle técnico y funcional podrá desarrollarse en los archivos propuestos de `rules/`, por ejemplo. Los nombres listados a continuación son **planificados, no una afirmación de que esos archivos ya existan**:
 
 ```text
-PROYECTO_GENERAL_ACTUALIZADO.md
+master-document.md
 rules/
   arquitectura.md
   mundo-3d-y-camara.md
