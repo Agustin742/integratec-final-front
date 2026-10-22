@@ -50,6 +50,10 @@ docs(rules): document pull request reviews
 
 ## Current automation boundary
 
-[CI](../.github/workflows/ci.yml) currently checks pull requests into `test` and `main`, and pushes to `develop`. It enforces promotion source branches, but does not run on work pull requests targeting `develop`. Until that gap is addressed, contributors **MUST** run applicable checks locally and attach the results before merge.
+[CI](../.github/workflows/ci.yml) checks pull requests into `develop`, `test`, and `main`, and pushes to `develop`. Work branches may target `develop`; promotion pull requests into `test` must come from `develop`, and those into `main` must come from `test`.
+
+The `checks` job validates tracked Markdown inline internal links/ATX heading anchors, runs CI-tooling regression tests, and validates the workflow with actionlint 1.7.7. External links and code examples are excluded from link validation. Whitespace validation uses `git diff --check` against the PR base SHA or push's previous SHA (empty tree for an initial push), not a retroactive document policy or a clean working-tree comparison. Package/lockfile detection and conditional application install/tests remain separate; an absent package or test script is reported, not treated as a passed application suite.
+
+Contributors **MUST** run applicable [local check commands](../README.md#ci) and attach results, including unavailable tools, before merge. These checks do not configure branch protections or prove GitHub execution.
 
 A merge does not by itself prove a deployment occurred. Review participation is recorded in GitHub; work coordination follows the existing [tracker rules](../changelogs/README.md).

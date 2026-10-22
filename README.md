@@ -1,6 +1,6 @@
 # Frontend repository
 
-This repository currently contains frontend documentation only; it does not yet include an application package or configured tests.
+This repository currently contains frontend documentation and CI tooling only; it does not yet include an application package or application tests.
 
 ## Development rules
 
@@ -8,11 +8,28 @@ Read the [project rules](rules/README.md) before contributing. They cover Git co
 
 ## Promotion flow
 
-Work branches enter `develop` through reviewed pull requests. Changes are promoted by pull request from `develop` to `test`, then from `test` to `main`. See [Git workflow](rules/git-workflow.md) for commit and merge conventions. The current workflow does not run on pull requests targeting `develop`; applicable local checks must be reported before merge. CI runs for pull requests targeting `test` or `main` and pushes to `develop`, and rejects pull requests that do not use the expected source branch.
+Work branches enter `develop` through reviewed pull requests. Changes are promoted by pull request from `develop` to `test`, then from `test` to `main`. See [Git workflow](rules/git-workflow.md) for commit and merge conventions. CI runs for pull requests targeting `develop`, `test`, or `main` and pushes to `develop`. Work branches may target `develop`; only `develop` may target `test`, and only `test` may target `main`.
 
 ## CI
 
-The `checks` workflow job uses Node.js 22 and Corepack/pnpm once both `package.json` and `pnpm-lock.yaml` are present. A package without its lockfile fails clearly. When no test script is configured, CI reports that no tests were run in a GitHub notice and the job summary.
+The `checks` job runs Python standard-library CI regressions and checks tracked Markdown documents for internal inline link paths and ATX (`#`) heading anchors. External URLs are ignored (no network requests); inline code and fenced examples are not links. This limited checker covers the current documentation syntax, not reference-style links, HTML anchors, or all Markdown dialects. It does not enforce document whitespace or final newlines.
+
+CI fetches full history and runs `git diff --check` on proposed changes: PR base SHA to the checked-out merge result, or push `before` SHA to HEAD. An initial push uses the empty tree. Only added/changed lines are checked, preserving unchanged existing whitespace. CI also validates the workflow using actionlint **1.7.7**, installed into the runner's temporary directory using Go.
+
+Run locally from the repository root (Python 3, Git, and Bash required):
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/ci -p 'test_*.py' -v
+python3 scripts/ci/check_docs.py
+# Compare committed and uncommitted tracked changes with the target branch:
+git diff --check "$(git merge-base origin/develop HEAD)" --
+# If actionlint 1.7.7 is already available:
+actionlint .github/workflows/ci.yml
+```
+
+Use the actual target ref (`origin/test` or `origin/main` for promotions) instead of `origin/develop` when appropriate. The diff command includes uncommitted tracked edits; untracked files are not included. For each new file, also run `git diff --no-index --check -- /dev/null path/to/new-file` before staging (`--no-index` exit 1 alone means files differ; whitespace errors include diagnostics). Stage new Markdown files for inclusion in the default tracked-file link check, or pass their paths explicitly to `check_docs.py`. Report unavailable tools honestly; local validation does not prove a GitHub run or branch protection.
+
+The job uses Node.js 22 and Corepack/pnpm once both `package.json` and `pnpm-lock.yaml` are present. A package without its lockfile fails clearly. When no package or test script is configured, CI reports that no application tests were run in a GitHub notice and the job summary; CI-tooling regressions still run.
 
 ## Cross-repository contracts
 

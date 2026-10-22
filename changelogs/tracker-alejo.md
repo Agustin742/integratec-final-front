@@ -1,5 +1,15 @@
 # Tracker — Alejo
 
+## 2026-10-22 — Check work pull requests and documentation
+
+- **Status:** completed
+- **Area / files:** `.github/workflows/ci.yml`, `scripts/ci/`, `README.md`, `rules/git-workflow.md`.
+- **Change:** Add develop pull-request checks, local Markdown link/anchor validation, proposed-diff whitespace checks, CLI regression fixtures, and actionlint pinned to 1.7.7 in CI.
+- **Reason:** Check work before integration without weakening promotion restrictions, rewriting existing whitespace, or introducing an application stack.
+- **Verification:** Observed RED for the develop guard/trigger and missing checker, then GREEN; correction RED reproduced overbroad whitespace/final-newline rejection, then GREEN. Focused and full unittest discovery passed (four methods); all 15 tracked Markdown files passed. Target-base diff and working-tree whitespace checks passed; new-file checks emitted only CRLF conversion warnings (exit 1: differences). Ephemeral differential against 15f5ff6 preserved eight promotion cases exactly and intentionally changed develop feature acceptance; package/install/test steps remained unchanged, with exact notice/summary and stubbed command-invocation checks passing. Real diff fixtures preserved unchanged whitespace and rejected added whitespace; PR/push/initial-push base selection passed. S1–S5 self-review completed. Fixture cleanup and Windows path/newline issues encountered during verification were corrected; no fixtures or caches remain.
+- **Additional verification:** Independent verification found no in-scope code blockers and passed all four regression tests, the 15-document link check, and tracked diff whitespace checks. The authorized temporary actionlint 1.7.7 Windows ZIP was checked against its official SHA-256 manifest; workflow validation exited 0. An initial incorrect archive URL returned HTTP 404 before execution; the release asset listing identified the correct ZIP. All temporary validator files were removed.
+- **Next step:** Commit and push this CI work to `docs/project-development-rules` as explicitly authorized, then observe the existing pull request and its GitHub Actions run. At the time of this entry, GitHub execution and branch protections remain unverified; no GitHub settings changes are included.
+
 ## 2026-10-22 — Standardize English document filenames
 
 - **Status:** completed
