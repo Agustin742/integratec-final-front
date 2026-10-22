@@ -1,5 +1,13 @@
 # Tracker — Alejo
 
+## 2026-10-22 — Preserve literal Markdown in CI summaries
+
+- **Status:** in-progress
+- **Area / files:** `.github/workflows/ci.yml`, `scripts/ci/test_checks.py`.
+- **Change:** Correct two shell quoting warnings without changing the notices or job summaries.
+- **Reason:** GitHub run 39814978244 failed with ShellCheck SC2016; local Windows actionlint did not include ShellCheck.
+- **Next step:** Pin the exact existing notice/summary output, correct the quoting, and verify the targeted fix before publishing.
+
 ## 2026-10-22 — Check work pull requests and documentation
 
 - **Status:** completed

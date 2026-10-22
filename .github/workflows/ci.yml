@@ -98,7 +98,7 @@ jobs:
             echo "::notice title=Tests not configured::No test script is configured; no tests were run."
             {
               echo '## Tests not configured'
-              echo 'No `test` script is configured in `package.json`; no tests were run.'
+              echo "No \`test\` script is configured in \`package.json\`; no tests were run."
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
@@ -109,5 +109,5 @@ jobs:
           echo "::notice title=Tests not configured::No package.json or test script is present; no tests were run."
           {
             echo '## Tests not configured'
-            echo 'This frontend has no `package.json` or test script; no tests were run.'
+            echo "This frontend has no \`package.json\` or test script; no tests were run."
           } >> "$GITHUB_STEP_SUMMARY"

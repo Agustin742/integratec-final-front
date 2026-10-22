@@ -64,6 +64,30 @@ class PackageTests(unittest.TestCase):
                                  (code, '', error))
                 self.assertEqual((folder / 'output').read_text(), output)
 
+    def test_absence_notices(self):
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text()
+        cases = [
+            ('Run tests',
+             '::notice title=Tests not configured::No test script is configured; no tests were run.\n',
+             '## Tests not configured\nNo `test` script is configured in `package.json`; no tests were run.\n'),
+            ('Report docs-only frontend',
+             '::notice title=Tests not configured::No package.json or test script is present; no tests were run.\n',
+             '## Tests not configured\nThis frontend has no `package.json` or test script; no tests were run.\n'),
+        ]
+        for step, notice, summary in cases:
+            script = workflow.split(f'      - name: {step}\n', 1)[1]
+            script = script.split('        run: |\n', 1)[1].split('\n      - name:', 1)[0]
+            with self.subTest(step=step), tempfile.TemporaryDirectory(
+                    prefix='.fixtures-', dir=CHECKER.parent) as scratch:
+                folder = Path(scratch)
+                result = subprocess.run(['bash'], cwd=ROOT,
+                    input=(f'cd {shlex.quote(folder.relative_to(ROOT).as_posix())}\n'
+                           'GITHUB_STEP_SUMMARY=summary\n'
+                           'node() { return 1; }\n' + script).encode(), capture_output=True)
+                self.assertEqual((result.returncode, result.stdout.decode(), result.stderr.decode()),
+                                 (0, notice, ''))
+                self.assertEqual((folder / 'summary').read_text(), summary)
+
 
 class DocumentationTests(unittest.TestCase):
     def test_public_checker_cases(self):
