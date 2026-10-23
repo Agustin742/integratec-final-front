@@ -38,6 +38,31 @@ Rules describe **how the project must be designed and built**. They are not impl
 - [Avatars and customization](./avatars-and-customization.md) — confirmed appearance, persistence, authorized visibility, and fallback integrity.
 - [Realtime and presence](./realtime-and-presence.md) — authoritative sessions, reconnection, stale-state cleanup, and persistence-before-broadcast.
 
+### Coordination and decisions
+
+- [GitHub Projects](./github-projects.md) — work ownership, status, issue/PR traceability, and completion evidence without assuming board configuration.
+- [Documentation and decisions](./documentation-and-decisions.md) — approved choices, proposals, exceptions, and authoritative sources.
+
+### Architecture and integration
+
+- [Architecture](./architecture.md) — responsibility boundaries and the distinction between agreed art direction and undecided rendering technology.
+- [Frontend conventions](./frontend-conventions.md) — modules, TypeScript boundaries, React composition, and lifecycle cleanup.
+- [State management](./state-management.md) — local, server, shared client, and realtime state ownership.
+- [API contracts](./api-contracts.md) — cross-repository ownership, payloads, compatibility, and integration evidence.
+- [Authentication and session](./authentication-and-session.md) — session states, expiration, logout, and account isolation without selecting a session mechanism.
+- [Data and time](./data-and-time.md) — opaque identity, optional values, dates, time zones, and persistence boundaries.
+
+### Experience and operation
+
+- [UI and accessibility](./ui-and-accessibility.md) — consistent controls, keyboard/touch access, focus, responsive behavior, and motion.
+- [Forms and validation](./forms-and-validation.md) — schemas, field/server errors, pending submissions, and safe draft preservation.
+- [Error handling and feedback](./error-handling-and-feedback.md) — visible states, bounded recovery, and uncertain operation outcomes.
+- [Configuration and environments](./configuration-and-environments.md) — public configuration, validation, and environment isolation.
+- [Observability and privacy](./observability-and-privacy.md) — safe diagnostics, collection boundaries, and evidence.
+- [Deployment and operations](./deployment-and-operations.md) — deployment ownership, revision-bound verification, and recovery planning.
+
+### Existing project-wide policies
+
 - [Course requirements and evaluation](./project-requirements.md) — academic minimums, recommendations, documentation, milestones, and evaluation criteria.
 - [Git and GitHub workflow](./git-workflow.md) — branches, English Conventional Commits, pull requests, reviews, and merges.
 - [Code quality and testing](./quality-and-testing.md) — English code, verification, and definition of done.
