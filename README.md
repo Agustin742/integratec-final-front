@@ -6,6 +6,8 @@ This repository currently contains frontend documentation and CI tooling only; i
 
 Read the [project rules](rules/README.md) before contributing. They cover Git collaboration, English Conventional Commits, English code, quality, security, AI usage, and art direction. The [course requirements](rules/project-requirements.md) preserve the academic requirements and evaluation criteria extracted from the temporary course brief; section 10 of [the project document](master-document.md#10-cumplimiento-del-enunciado-integrartec-2026) maps them to the proposed product.
 
+The product rules develop the expected behavior for rooms/permissions, tasks, communication/meetings, the AI briefing, movement, avatars, and realtime presence. Their acceptance checklists describe future implementation evidence, not working features; open domain decisions are explicitly separated from established requirements.
+
 ## Promotion flow
 
 Work branches enter `develop` through reviewed pull requests. Changes are promoted by pull request from `develop` to `test`, then from `test` to `main`. See [Git workflow](rules/git-workflow.md) for commit and merge conventions. CI runs for pull requests targeting `develop`, `test`, or `main` and pushes to `develop`. Work branches may target `develop`; only `develop` may target `test`, and only `test` may target `main`.

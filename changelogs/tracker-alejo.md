@@ -1,5 +1,14 @@
 # Tracker — Alejo
 
+## 2026-10-22 — Develop source-grounded functional rules
+
+- **Status:** in-progress
+- **Area / files:** seven domain rule documents under `rules/`, `rules/README.md`, `master-document.md`, `odd/tasks/domain-rules.md`.
+- **Change:** Develop deep behavior contracts for rooms, productivity, communication, AI, interaction, avatars, and realtime presence.
+- **Reason:** Expand agreed product commitments without choosing a rendering engine or inventing unresolved domain decisions.
+- **Verification:** Seven rules (914 lines) received writer self-review and parent readback. Per-unit link checks passed; one initial accented-anchor error in Unit A was corrected before delivery. The parent seam check passed all 5 existing CI-tooling tests and links/anchors across 37 Markdown files; tracked/new-file whitespace passed and art direction is unchanged. Runtime, RED/GREEN, typecheck, and differential checks are not applicable to passive documentation. Native assessments, including committed slices, were unavailable because the provider requires an explicit declaration for pre-existing untracked files; no review started or approval claimed.
+- **Next step:** Finish recording local slice identities and closure. No push, PR, or merge is authorized; prior general-rule changes remain separate.
+
 ## 2026-10-22 — Preserve literal Markdown in CI summaries
 
 - **Status:** in-progress
