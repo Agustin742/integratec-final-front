@@ -2,12 +2,13 @@
 
 ## 2026-10-22 — Develop source-grounded functional rules
 
-- **Status:** in-progress
+- **Status:** completed
 - **Area / files:** seven domain rule documents under `rules/`, `rules/README.md`, `master-document.md`, `odd/tasks/domain-rules.md`.
 - **Change:** Develop deep behavior contracts for rooms, productivity, communication, AI, interaction, avatars, and realtime presence.
 - **Reason:** Expand agreed product commitments without choosing a rendering engine or inventing unresolved domain decisions.
 - **Verification:** Seven rules (914 lines) received writer self-review and parent readback. Per-unit link checks passed; one initial accented-anchor error in Unit A was corrected before delivery. The parent seam check passed all 5 existing CI-tooling tests and links/anchors across 37 Markdown files; tracked/new-file whitespace passed and art direction is unchanged. Runtime, RED/GREEN, typecheck, and differential checks are not applicable to passive documentation. Native assessments, including committed slices, were unavailable because the provider requires an explicit declaration for pre-existing untracked files; no review started or approval claimed.
-- **Next step:** Finish recording local slice identities and closure. No push, PR, or merge is authorized; prior general-rule changes remain separate.
+- **Commits:** `67104c9` (movement/avatars), `aa28d67` (AI/realtime), `44707e8` (rooms/tasks/communication), `52e013c` (integration), followed by closure bookkeeping on `docs/domain-rules`.
+- **Next step:** Human review of the rules and explicit resolution of open product decisions before their implementation. No push, PR, or merge performed; prior general-rule changes remain uncommitted separately.
 
 ## 2026-10-22 — Preserve literal Markdown in CI summaries
 
