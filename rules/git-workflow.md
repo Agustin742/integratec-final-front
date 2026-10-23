@@ -56,4 +56,4 @@ The `checks` job validates tracked Markdown inline internal links/ATX heading an
 
 Contributors **MUST** run applicable [local check commands](../README.md#ci) and attach results, including unavailable tools, before merge. These checks do not configure branch protections or prove GitHub execution.
 
-A merge does not by itself prove a deployment occurred. Review participation is recorded in GitHub; work coordination follows the existing [tracker rules](../changelogs/README.md).
+A merge does not by itself prove a deployment occurred. Review participation is recorded in GitHub; planning and current work status follow [GitHub Projects](./github-projects.md), while brief contributor context follows the existing [tracker rules](../changelogs/README.md).

@@ -28,6 +28,41 @@ Rules describe **how the project must be designed and built**. They are not impl
 
 ## Rule index
 
+### Product behavior
+
+- [Rooms and permissions](./rooms-and-permissions.md) — room types, durable membership, privacy, invitations, and server-authorized access.
+- [Tasks and productivity](./tasks-and-productivity.md) — persisted CRUD, list/Kanban consistency, validation, and uncertain writes.
+- [Communication and meetings](./communication-and-meetings.md) — authorized history, contextual messaging, announcements, meetings, and attendance.
+- [AI bot and daily briefing](./ai-bot-and-daily-briefing.md) — authorized tools, Argentina-local daily identity, duplicate prevention, and provider failure.
+- [Movement and interactions](./movement-and-interactions.md) — WASD/click/touch navigation, input arbitration, collisions, and accessible interaction.
+- [Avatars and customization](./avatars-and-customization.md) — confirmed appearance, persistence, authorized visibility, and fallback integrity.
+- [Realtime and presence](./realtime-and-presence.md) — authoritative sessions, reconnection, stale-state cleanup, and persistence-before-broadcast.
+
+### Coordination and decisions
+
+- [GitHub Projects](./github-projects.md) — work ownership, status, issue/PR traceability, and completion evidence without assuming board configuration.
+- [Documentation and decisions](./documentation-and-decisions.md) — approved choices, proposals, exceptions, and authoritative sources.
+
+### Architecture and integration
+
+- [Architecture](./architecture.md) — responsibility boundaries and the distinction between agreed art direction and undecided rendering technology.
+- [Frontend conventions](./frontend-conventions.md) — modules, TypeScript boundaries, React composition, and lifecycle cleanup.
+- [State management](./state-management.md) — local, server, shared client, and realtime state ownership.
+- [API contracts](./api-contracts.md) — cross-repository ownership, payloads, compatibility, and integration evidence.
+- [Authentication and session](./authentication-and-session.md) — session states, expiration, logout, and account isolation without selecting a session mechanism.
+- [Data and time](./data-and-time.md) — opaque identity, optional values, dates, time zones, and persistence boundaries.
+
+### Experience and operation
+
+- [UI and accessibility](./ui-and-accessibility.md) — consistent controls, keyboard/touch access, focus, responsive behavior, and motion.
+- [Forms and validation](./forms-and-validation.md) — schemas, field/server errors, pending submissions, and safe draft preservation.
+- [Error handling and feedback](./error-handling-and-feedback.md) — visible states, bounded recovery, and uncertain operation outcomes.
+- [Configuration and environments](./configuration-and-environments.md) — public configuration, validation, and environment isolation.
+- [Observability and privacy](./observability-and-privacy.md) — safe diagnostics, collection boundaries, and evidence.
+- [Deployment and operations](./deployment-and-operations.md) — deployment ownership, revision-bound verification, and recovery planning.
+
+### Existing project-wide policies
+
 - [Course requirements and evaluation](./project-requirements.md) — academic minimums, recommendations, documentation, milestones, and evaluation criteria.
 - [Git and GitHub workflow](./git-workflow.md) — branches, English Conventional Commits, pull requests, reviews, and merges.
 - [Code quality and testing](./quality-and-testing.md) — English code, verification, and definition of done.
@@ -40,6 +75,8 @@ Rules describe **how the project must be designed and built**. They are not impl
 Read the relevant rules before designing, implementing, modifying, or reviewing a part of the project. Apply them consistently regardless of whether the work is performed manually or with an AI coding assistant.
 
 When a rule needs to change, update its source document explicitly rather than silently deviating in code.
+
+The expected art direction is agreed; the rendering engine and its integration are not selected. The product rules develop existing commitments and clearly separate unresolved domain choices from requirements. Engine-specific implementation rules remain deferred. No rule here claims that application code, board automation, or deployed infrastructure already exists.
 
 ## Document template
 

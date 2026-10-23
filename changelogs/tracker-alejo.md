@@ -1,5 +1,25 @@
 # Tracker — Alejo
 
+## 2026-10-22 — Develop source-grounded functional rules
+
+- **Status:** completed
+- **Area / files:** seven domain rule documents under `rules/`, `rules/README.md`, `master-document.md`, `odd/tasks/domain-rules.md`.
+- **Change:** Develop deep behavior contracts for rooms, productivity, communication, AI, interaction, avatars, and realtime presence.
+- **Reason:** Expand agreed product commitments without choosing a rendering engine or inventing unresolved domain decisions.
+- **Verification:** Seven rules (914 lines) received writer self-review and parent readback. Per-unit link checks passed; one initial accented-anchor error in Unit A was corrected before delivery. The parent seam check passed all 5 existing CI-tooling tests and links/anchors across 37 Markdown files; tracked/new-file whitespace passed and art direction is unchanged. Runtime, RED/GREEN, typecheck, and differential checks are not applicable to passive documentation. Native assessments, including committed slices, were unavailable because the provider requires an explicit declaration for pre-existing untracked files; no review started or approval claimed.
+- **Commits:** `67104c9` (movement/avatars), `aa28d67` (AI/realtime), `44707e8` (rooms/tasks/communication), `52e013c` (integration), followed by closure bookkeeping on `docs/domain-rules`.
+- **Next step:** Human review of the rules and explicit resolution of open product decisions before their implementation. No push, PR, or merge performed; prior general-rule changes remain uncommitted separately.
+
+## 2026-10-22 — Define general development and coordination rules
+
+- **Status:** completed
+- **Area / files:** `rules/`, `README.md`, `master-document.md`.
+- **Change:** Add 14 general coordination, architecture, integration, UX, and operational rules; update the index and Git coordination reference. Preserve the agreed art direction while clarifying that the rendering engine remains undecided.
+- **Reason:** Establish reusable team constraints without inventing board configuration, session mechanisms, or engine-specific decisions.
+- **Verification:** Five existing CI-tooling regression tests passed; links/anchors passed across 29 Markdown files including all untracked rules; tracked and new-file whitespace checks passed. Confirmed no diff in `rules/art-direction.md`. Application runtime tests and RED/GREEN are not applicable to passive documentation. Reading GitHub Projects failed because the current CLI token lacks `read:project`; no permissions or remote settings were changed. Native assessment was unassessable because it requires explicit untracked scope; no native review started. An initial assessment invocation through the batching tool was rejected before execution; the direct assessment returned that unavailable result.
+- **Commit follow-up:** The user requested committing the previously separate general-rule changes. Readback confirmed the 14 rule documents and their index/workflow references; all 5 CI-tooling tests, links across 37 documents, and tracked/new-file whitespace checks passed again before staging.
+- **Next step:** Team review of the new policies and mapping to actual Project fields when read access is available. Commit locally as a separate general-rule unit; no push is authorized.
+
 ## 2026-10-22 — Preserve literal Markdown in CI summaries
 
 - **Status:** in-progress
