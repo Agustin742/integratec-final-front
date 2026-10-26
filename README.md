@@ -4,7 +4,9 @@ This repository currently contains frontend documentation and CI tooling only; i
 
 ## Development rules
 
-Read the [project rules](rules/README.md) before contributing. They cover Git collaboration, English Conventional Commits, English code, quality, security, AI usage, and art direction. The [course requirements](rules/project-requirements.md) preserve the academic requirements and evaluation criteria extracted from the temporary course brief; section 10 of [the project document](master-document.md#10-cumplimiento-del-enunciado-integrartec-2026) maps them to the proposed product.
+Read the [project rules](rules/README.md) before contributing. They cover GitHub Projects coordination, Git collaboration, English Conventional Commits and code, architecture, state and API contracts, session handling, accessible UI and forms, data/time conventions, configuration, operations, quality, security, AI usage, and art direction. The visual target is agreed; the rendering engine remains undecided. The [course requirements](rules/project-requirements.md) preserve the academic requirements and evaluation criteria extracted from the temporary course brief; section 10 of [the project document](master-document.md#10-cumplimiento-del-enunciado-integrartec-2026) maps them to the proposed product.
+
+The product rules develop the expected behavior for rooms/permissions, tasks, communication/meetings, the AI briefing, movement, avatars, and realtime presence. Their acceptance checklists describe future implementation evidence, not working features; open domain decisions are explicitly separated from established requirements.
 
 ## Promotion flow
 

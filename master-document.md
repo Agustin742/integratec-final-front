@@ -2,6 +2,8 @@
 
 > **Documento maestro del proyecto** · IntegrarTEC 2026 — Programación Web con IA aplicada  
 > **Alcance documental:** aquí se describe **qué tendrá el producto**, sus decisiones estructurales y cómo se verificará el cumplimiento del proyecto integrador. Las reglas específicas de cada módulo se desarrollarán por separado en `rules/`.
+>
+> **Aclaración de decisiones:** la dirección artística de `rules/art-direction.md` es el diseño esperado y planificado. El motor de representación y su integración técnica todavía no están elegidos: las menciones a Three.js y React Three Fiber en este documento son alternativas de implementación propuestas, no decisiones aprobadas. Las indicaciones de cámara deben interpretarse según la dirección artística, incluidos sus parámetros pendientes de validación. Esta aclaración no reabre las demás tecnologías acordadas.
 
 ## 1. Visión y objetivo
 
@@ -443,7 +445,7 @@ La implementación seguirá entregas incrementales, con despliegue desde etapas 
 
 ## 13. Organización documental
 
-Este documento es el **índice conceptual y fuente de decisiones generales**. El detalle técnico y funcional podrá desarrollarse en los archivos propuestos de `rules/`, por ejemplo. Los nombres listados a continuación son **planificados, no una afirmación de que esos archivos ya existan**:
+Este documento es el **índice conceptual y fuente de decisiones generales**. El [índice de reglas](rules/README.md) identifica los documentos disponibles, incluidos los siete contratos funcionales de salas, tareas, comunicación, bot, movimiento, avatares y presencia. El esquema siguiente combina documentos desarrollados y nombres previstos; no acredita implementación del producto ni la existencia de todos los entregables propuestos. Las decisiones abiertas se mantienen explícitas en cada regla:
 
 ```text
 master-document.md
@@ -453,7 +455,7 @@ rules/
   movement-and-interactions.md
   art-direction.md
   avatars-and-customization.md
-  colyseus-and-multiplayer.md
+  realtime-and-presence.md
   rooms-and-permissions.md
   tasks-and-productivity.md
   communication-and-meetings.md
