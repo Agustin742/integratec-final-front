@@ -4,7 +4,7 @@ Users must be able to enter authorized spaces without confusing a visible room, 
 
 ## Authority and scope
 
-- [Master §2.1](../master-document.md#21-salas) defines room types, automatic personal rooms, invitations, privacy, and persistent room identity.
+- [Master §2.1](../master-document.md#21-oficinas-y-habitaciones) defines room types, automatic personal rooms, invitations, privacy, and persistent room identity.
 - [Master §2.6](../master-document.md#26-acceso-roles-y-permisos) establishes minimum owner/member roles and server-side isolation.
 - [Master §6](../master-document.md#6-arquitectura-general-actualizada) establishes persistence, realtime responsibilities, and authentication boundaries.
 - [Security](./security.md) governs protected operations; [Quality and testing](./quality-and-testing.md) governs evidence.
