@@ -4,7 +4,7 @@ Authorized users MUST see live presence and movement in their shared space witho
 
 ## Authority and scope
 
-- [Master §2.1–2.3](../master-document.md#21-salas) distinguishes persistent product rooms from live sessions and commits to movement, reconnection, disconnected-avatar removal, and remote movement interpolation/adjustment.
+- [Master §2.1–2.3](../master-document.md#21-oficinas-y-habitaciones) distinguishes persistent product rooms from live sessions and commits to movement, reconnection, disconnected-avatar removal, and remote movement interpolation/adjustment.
 - [Master §6](../master-document.md#6-arquitectura-general-actualizada) assigns Colyseus live state, NestJS/PostgreSQL persistent business authority, and confirmed-change notification ordering.
 - [Master §7.4](../master-document.md#74-despliegue-red-y-operación) establishes separate services and an initial single Colyseus service instance; this rule does not choose a distributed presence design.
 - [Security](./security.md) applies to admission and every protected action. [Quality and testing](./quality-and-testing.md) defines verification reporting.
