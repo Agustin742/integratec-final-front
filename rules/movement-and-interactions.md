@@ -5,7 +5,7 @@ Users MUST be able to navigate the shared 3D space and reach authorized tools wi
 ## Authority and scope
 
 - [Master document](../master-document.md), sections 2.2–2.3, 3.2, and 9.1, establishes movement, spatial interactions, alternative access, and the usable product journey.
-- Its header leaves the rendering engine unselected; technology examples elsewhere MUST NOT be treated as approval of an engine or integration pipeline.
+- Master sections 3.1 and 5 confirm React/Three.js/React Three Fiber. The [rendering and authoring decision](../docs/decisions/rendering-and-authoring.md) records Blender authoring; neither choice selects a physics or pathfinding implementation.
 - [Art direction](./art-direction.md), especially Camera and spatial readability, governs the agreed isometric/elevated visual target. Its numeric starting points and open choices remain qualified there.
 - Master sections 5–6 establish NestJS/PostgreSQL business authority and Colyseus live-state authority.
 - [Security](./security.md) governs authorization and untrusted input; [Quality and testing](./quality-and-testing.md) governs verification evidence.

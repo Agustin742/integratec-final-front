@@ -6,7 +6,7 @@ Documentation must distinguish approved requirements, proposals, and observed im
 
 - Course obligations belong to [Course requirements](./project-requirements.md); overall product scope belongs to the [project document](../master-document.md).
 - Permanent engineering constraints belong to [rules](./README.md). Work status belongs to [GitHub Projects](./github-projects.md), not rule documents.
-- The expected visual target in [Art direction](./art-direction.md) is agreed. Selecting the rendering technology is a separate, unresolved decision.
+- The expected visual target in [Art direction](./art-direction.md) is agreed. The [project document](../master-document.md), sections 3.1 and 5, confirms React/Three.js/React Three Fiber; the [rendering and authoring decision](../docs/decisions/rendering-and-authoring.md) records the user's confirmation and Blender choice without asserting a team vote. Detailed implementation choices remain separate.
 - A proposal **MUST NOT** become mandatory because it appears in an example, diagram, generated document, or AI response.
 - Conflicts **MUST** be recorded and resolved with the team before the conflicting implementation proceeds. Contributors **MUST NOT** silently choose whichever source is convenient.
 

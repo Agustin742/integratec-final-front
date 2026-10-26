@@ -5,7 +5,7 @@ Essential product functions must remain understandable and usable beyond a visua
 ## Components and visual boundaries
 
 - Application panels **SHOULD** reuse agreed shadcn/ui components and Tailwind conventions instead of creating competing controls for the same purpose.
-- World appearance follows [Art direction](./art-direction.md); this document does not select a rendering engine or finalize a separate panel theme.
+- World appearance follows [Art direction](./art-direction.md); rendering follows the confirmed stack in [Architecture](./architecture.md#decision-boundaries). This document does not finalize a separate panel theme.
 - Repeated UI patterns **MUST** use consistent labels, states, and interactions.
 - Color, animation, or sound **MUST NOT** be the only way to communicate essential information.
 

@@ -4,9 +4,10 @@ Keep presentation, application behavior, and external integrations separate enou
 
 ## Decision boundaries
 
-- The expected visual design is defined by [Art direction](./art-direction.md). The rendering engine and its integration architecture remain undecided.
-- References to Three.js or React Three Fiber in planning material **MUST NOT** be treated as a confirmed engine selection.
-- Contributors **MUST NOT** introduce a rendering engine, architectural framework, or cross-repository shared package as an incidental implementation choice.
+- The expected visual design is defined by [Art direction](./art-direction.md). The [project document](../master-document.md), sections 3.1 and 5, confirms React, Three.js, and React Three Fiber for the web experience.
+- React owns application interfaces; Three.js owns 3D representation and spatial selection; React Three Fiber composes the Three.js scene declaratively within React. Scene selection communicates intent, not business authorization.
+- Blender is the confirmed model-authoring tool; the [decision record](../docs/decisions/rendering-and-authoring.md) records approval, trade-offs, and unresolved implementation details.
+- Contributors **MUST NOT** replace the confirmed rendering stack or introduce another architectural framework or cross-repository shared package as an incidental implementation choice.
 - Other agreed product and technology decisions remain governed by the [project document](../master-document.md); unresolved choices follow [decision rules](./documentation-and-decisions.md).
 
 ## Responsibilities

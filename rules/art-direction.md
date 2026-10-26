@@ -258,9 +258,11 @@ Validate at actual gameplay size in each of these views:
 - UI SHOULD use clear panels with broad corners, immediately readable text, discreet borders and shadows, generous spacing, and name labels differentiated by color. It MUST feel part of the same visual world without copying another game's UI.
 - World animation MAY include slow, uneven leaf and flower sway, calm water, and a bounce or edge glow on interactive objects. Avoid permanently fast cycles and camera shake.
 
-### Implementation alternatives
+### Implementation guidance
 
-#### If the scene is 3D (Three.js / React Three Fiber)
+#### Confirmed 3D path (Three.js / React Three Fiber)
+
+The [project document](../master-document.md), sections 3.1 and 5, confirms this rendering stack. The [decision record](../docs/decisions/rendering-and-authoring.md) records Blender model authoring. These choices do not finalize the visual starting points or open questions in this guide.
 
 - A shared material library MAY include `stoneWarm`, `grassLight`, `grassDark`, `woodWarm`, `roofCoral`, `glassTeal`, `skinBase`, and `fabricMatte`.
 - Use GLB/glTF for complex avatars and objects, procedural meshes for simple modules, and instancing for repeated elements where appropriate.
@@ -268,14 +270,7 @@ Validate at actual gameplay size in each of these views:
 - Maintain a fixed reference scene to detect lighting or material changes.
 - Prioritize stable frame rate over effects; test LOD and culling on mobile.
 
-#### If using 2D isometric sprites or textures
-
-- All assets MUST use the same angle, lighting, and palette, generated from a common reference scene.
-- Keep contact shadows separate from the sprite.
-- Define base size and anchor (pivot) in relation to module M.
-- Validate readability at actual gameplay scale before batch production.
-
-These are conditional implementation paths, not a decision to replace the established 3D project direction.
+A 2D isometric sprite pipeline is not the current implementation path; replacing the confirmed 3D stack requires an explicit decision under [Documentation and decisions](./documentation-and-decisions.md).
 
 ### Intellectual property
 

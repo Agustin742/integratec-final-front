@@ -9,7 +9,7 @@ Users must be able to enter authorized spaces without confusing a visible room, 
 - [Master §6](../master-document.md#6-arquitectura-general-actualizada) establishes persistence, realtime responsibilities, and authentication boundaries.
 - [Security](./security.md) governs protected operations; [Quality and testing](./quality-and-testing.md) governs evidence.
 - These rules refine established behavior and derived integrity constraints, not an approved permission matrix or database schema.
-- The master header leaves the rendering engine unselected. [Art direction](./art-direction.md) remains the agreed visual target, with its own qualified starting points and open choices.
+- Master sections 3.1 and 5 confirm React/Three.js/React Three Fiber; [Architecture](./architecture.md#decision-boundaries) defines presentation responsibilities. [Art direction](./art-direction.md) remains the agreed visual target, with its own qualified starting points and open choices.
 
 ## Room types and durable identity
 
@@ -108,7 +108,7 @@ Apply [Quality and testing](./quality-and-testing.md); these checks describe req
 - [ ] Disconnect/reconnect preserves room and membership records while presence changes.
 - [ ] Visible objects, frontend stores, and bot requests cannot independently authorize access.
 - [ ] Lost access, logout, and late responses clear or isolate affected private state under [Security](./security.md), without leaking it into another account or room.
-- [ ] Room layouts preserve readable doors, routes, and human avatars under [Art direction](./art-direction.md), without selecting an engine.
+- [ ] Room layouts preserve readable doors, routes, and human avatars under [Art direction](./art-direction.md) within the confirmed rendering stack.
 
 ## Open decisions — not implementation defaults
 
