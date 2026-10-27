@@ -1,13 +1,15 @@
 # Local reception navigation study
 
-The default app view integrates the existing reception and avatar GLBs with T3a's deterministic local navigation core. This is a single-player experiment, not the finished product: objects are not interactable yet; authentication, Colyseus, tasks, chat, business actions and persistence are absent. T2's independent verification remains unresolved. Additional rooms await teammates' feedback.
+The default app view integrates the existing reception and avatar GLBs with T3a's deterministic local navigation core and T5's bounded local object interactions. This is a single-player experiment, not the finished product: authentication, Colyseus, persistent tasks, chat, business actions and server persistence are absent. Additional rooms remain deferred awaiting team review.
 
 ## Try the local study
 
 1. With existing dependencies installed, run `pnpm dev` and open Vite's local URL (WebGL 2 required).
 2. Wait for **Reception ready**, then focus the labelled reception region by Tab or click/tap.
 3. Use WASD, or click/tap an actual clear floor tile. Escape or **Stop navigation** cancels. A new destination replaces the old one; manual movement cancels its route.
-4. Use **Avatar calibration** to open the original preview; **Reception navigation** returns to a fresh local study. Only one view/Canvas is mounted at a time.
+4. Click/tap an interactive reception object in 3D (reception desk/bell, noticeboard, waiting seat, or portal doorway) or activate its keyboard-accessible button in the **Reception local interactions** group below the viewport.
+5. Opening **Inspect noticeboard** displays a modal local-study dialog (`role="dialog"`, `aria-modal="true"`), automatically stops active navigation, and restores focus when closed via **Close noticeboard** or Escape.
+6. Use **Avatar calibration** to open the original preview; **Reception navigation** returns to a fresh local study. Only one view/Canvas is mounted at a time.
 
 Provisional keyboard mapping is world-aligned: W → −Z, S → +Z, A → −X, D → +X, not camera-relative screen arrows. The elevated orthographic camera is fixed and fits room bounds on resize; no free-camera controls are installed. Narrow-screen readability still needs browser acceptance.
 
@@ -15,8 +17,9 @@ Provisional keyboard mapping is world-aligned: W → −Z, S → +Z, A → −X,
 
 | Module | Responsibility |
 | --- | --- |
-| [ReceptionPreview](../../src/features/world/ReceptionPreview.tsx) | Both asset downloads, loading/error/readiness, exclusive resource lifetime, accessible region/help/feedback/stop. |
-| [ReceptionScene](../../src/features/world/ReceptionScene.tsx) | Fixed bounds-fit camera, posed avatar anchoring, exact navigation-to-transform copies, facing, original Idle/Walk selection, nearest-hit floor selection. Reuses the unchanged scene-lifecycle hook. |
+| [ReceptionPreview](../../src/features/world/ReceptionPreview.tsx) | Both asset downloads, loading/error/readiness, exclusive resource lifetime, accessible region/help/feedback/stop, keyboard-accessible interaction toolbar and noticeboard dialog. |
+| [ReceptionScene](../../src/features/world/ReceptionScene.tsx) | Fixed bounds-fit camera, posed avatar anchoring, exact navigation-to-transform copies, facing, original Idle/Walk selection, nearest-hit floor and interactive prop selection. Reuses the unchanged scene-lifecycle hook. |
+| [reception-interactions](../../src/features/world/reception-interactions.ts) | Bounded reception interaction catalog (`counter-bell`, `noticeboard`, `waiting-seat`, `portal-doorway`) and mesh-name hit classification across decorative responses, local dialog preview and unavailable room transition. |
 | [use-navigation-controls](../../src/features/world/use-navigation-controls.ts) | The single navigation snapshot, held keys and pointer-tap arbitration. Frames call core `move`/`advance` with dt capped at 0.1 seconds; no second position or corner-cutting interpolation. |
 | [load-reception](../../src/features/world/load-reception.ts) | One uncached authored room and idempotent geometry/material/texture disposal. Avatar ownership stays in the existing avatar loader/mixer; optional `setMoving` preserves default Idle, reduced motion and final disposal. |
 

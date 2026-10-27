@@ -53,6 +53,11 @@ export function useNavigationControls(active: boolean, radius?: number) {
   };
   return {
     container, feedback, stop, target,
+    consumeTap() {
+      if (!tap.current) return false;
+      tap.current = false;
+      return true;
+    },
     tapTarget(point: Point | null) { if (tap.current) { tap.current = false; target(point); } },
     tick(dt: number) {
       if (!available()) { if (keys.current.size || state.current.path.length) stop(); return state.current; }

@@ -5,12 +5,14 @@ import type { AvatarResource } from '../avatar/load-avatar';
 import { useSceneLifecycle } from '../avatar/use-scene-lifecycle';
 import type { ReceptionResource } from './load-reception';
 import type { NavigationState, Point } from './navigation';
+import { receptionInteractionTarget, type ReceptionInteractionId } from './reception-interactions';
 
 export interface ReceptionSceneProps {
   avatar: AvatarResource;
   room: ReceptionResource;
   tick(dt: number): NavigationState;
   onSelect(point: Point | null): void;
+  onInteract?(id: ReceptionInteractionId): void;
   onReady(): void;
   onFailure(): void;
 }
@@ -23,7 +25,7 @@ export function floorDestination(hit?: Intersection): Point | null {
   return normal.y > 0.99 ? { x: hit.point.x, y: 0, z: hit.point.z } : null;
 }
 
-export function ReceptionScene({ avatar, room, tick, onSelect, onReady, onFailure }: ReceptionSceneProps) {
+export function ReceptionScene({ avatar, room, tick, onSelect, onInteract, onReady, onFailure }: ReceptionSceneProps) {
   useSceneLifecycle(onReady, onFailure);
   const { camera, size } = useThree();
   const root = useMemo(() => new Group(), [avatar]);
@@ -75,6 +77,11 @@ export function ReceptionScene({ avatar, room, tick, onSelect, onReady, onFailur
   });
   const select = (event: ThreeEvent<PointerEvent>) => {
     event.stopPropagation();
+    const interactionId = receptionInteractionTarget(event.intersections[0]);
+    if (interactionId && onInteract) {
+      onInteract(interactionId);
+      return;
+    }
     onSelect(floorDestination(event.intersections[0]));
   };
   return <>

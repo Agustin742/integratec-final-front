@@ -12,11 +12,13 @@ vi.mock('@react-three/fiber', () => ({ Canvas: ({ children, onPointerMissed }: {
   if (renderer.crashes) throw new Error('renderer failed');
   return <div data-testid="canvas" onClick={onPointerMissed}>{children}</div>;
 } }));
-vi.mock('./ReceptionScene', () => ({ ReceptionScene: ({ onReady, onFailure, tick, onSelect }: { onReady(): void; onFailure(): void; tick(dt: number): { position: { z: number } }; onSelect(point: { x: number; y: number; z: number }): void }) => <>
+vi.mock('./ReceptionScene', () => ({ ReceptionScene: ({ onReady, onFailure, tick, onSelect, onInteract }: { onReady(): void; onFailure(): void; tick(dt: number): { position: { z: number } }; onSelect(point: { x: number; y: number; z: number }): void; onInteract?(id: 'counter-bell' | 'noticeboard' | 'waiting-seat' | 'portal-doorway'): void }) => <>
   <button onClick={event => { event.stopPropagation(); onReady(); }}>Rendered</button>
   <button onClick={event => { event.stopPropagation(); onFailure(); }}>Context loss</button>
   <span data-testid="floor" onPointerUp={() => onSelect({ x: 3, y: 0, z: 2 })}>Floor</span>
   <span data-testid="narrow-floor" onPointerUp={() => onSelect({ x: 0, y: 0, z: 0 })}>Narrow floor</span>
+  <span data-testid="prop-bell" onPointerUp={() => onInteract?.('counter-bell')}>Bell 3D</span>
+  <span data-testid="prop-noticeboard" onPointerUp={() => onInteract?.('noticeboard')}>Noticeboard 3D</span>
   <button onClick={event => { event.stopPropagation(); screen.getByTestId('position').textContent = String(tick(0.1).position.z); }}>Tick</button>
   <span data-testid="position" />
 </> }));
@@ -119,4 +121,34 @@ it('accepts a fresh touch tap without hover and does not leak UI pointer events 
   expect(screen.getByText(/Moving to selected floor/)).toBeDefined();
   fireEvent.click(screen.getByRole('button', { name: /Stop navigation/ }));
   expect(screen.queryByText(/Moving to selected floor/)).toBeNull();
+});
+
+it('supports 3D object taps and keyboard-accessible interaction buttons, opens the Noticeboard dialog, pauses navigation and restores focus on close', async () => {
+  render(<ReceptionPreview />); await loaded(); fireEvent.click(screen.getByText('Rendered'));
+  const bell3d = screen.getByTestId('prop-bell');
+  fireEvent.pointerDown(bell3d, { pointerId: 1, button: 0, clientX: 15, clientY: 15 });
+  fireEvent.pointerUp(bell3d, { pointerId: 1, button: 0, clientX: 15, clientY: 15 });
+  expect(screen.getByText(/Reception bell rung/i)).toBeDefined();
+
+  // Start floor movement, then open the Noticeboard via keyboard-accessible button
+  const floor = screen.getByTestId('floor');
+  fireEvent.pointerDown(floor, { pointerId: 2, button: 0, clientX: 20, clientY: 20 });
+  fireEvent.pointerUp(floor, { pointerId: 2, button: 0, clientX: 20, clientY: 20 });
+  expect(screen.getByText(/Moving to selected floor/)).toBeDefined();
+
+  const noticeboardButton = screen.getByRole('button', { name: /Inspect noticeboard/i });
+  noticeboardButton.focus();
+  fireEvent.click(noticeboardButton);
+  const dialog = screen.getByRole('dialog', { name: /Reception noticeboard/i });
+  expect(dialog.getAttribute('aria-modal')).toBe('true');
+  expect(dialog.textContent).toMatch(/local preview|backend authorization/i);
+
+  const closeButton = screen.getByRole('button', { name: /Close noticeboard/i });
+  fireEvent.click(closeButton);
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(document.activeElement).toBe(noticeboardButton);
+
+  // Portal doorway interaction reports unavailable transition without false arrival
+  fireEvent.click(screen.getByRole('button', { name: /Check portal doorway/i }));
+  expect(screen.getByText(/Room transition unavailable/i)).toBeDefined();
 });

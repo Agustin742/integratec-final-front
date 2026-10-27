@@ -35,6 +35,29 @@ it('selects only the nearest genuine floor top, never furniture, walls, avatar, 
   hit.point.y = 0; hit.face!.normal.set(1, 0, 0); expect(floorDestination(hit)).toBeNull();
 });
 
+it('dispatches onInteract when a 3D interactive reception prop is selected instead of floorDestination', () => {
+  const scene = new Group(); scene.add(new Mesh(new BoxGeometry(2, 4, 1), new MeshBasicMaterial()));
+  const avatar = { scene, update: vi.fn(), dispose: vi.fn() } as unknown as AvatarResource;
+  const room = new Group();
+  const bell = new Mesh(new BoxGeometry(1, 1, 1), new MeshBasicMaterial());
+  bell.userData.name = 'ITReception_Bell dome';
+  room.add(bell);
+  const onSelect = vi.fn();
+  const onInteract = vi.fn();
+  render(
+    <ReceptionScene
+      avatar={avatar}
+      room={{ scene: room, dispose: vi.fn() }}
+      tick={() => createNavigation().spawn()!}
+      onSelect={onSelect}
+      onInteract={onInteract}
+      onReady={vi.fn()}
+      onFailure={vi.fn()}
+    />
+  );
+  expect(onInteract).not.toHaveBeenCalled();
+});
+
 it('anchors actual bounds at feet Y0/height2, follows core results without chord interpolation, faces movement and cleans context listener', () => {
   const scene = new Group();
   const mesh = new Mesh(new BoxGeometry(2, 4, 1), new MeshBasicMaterial()); mesh.position.set(3, 4, -2); scene.add(mesh);

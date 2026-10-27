@@ -20,5 +20,13 @@ button:disabled { cursor: default; }
 nav { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 button[aria-pressed='true'] { font-weight: bold; border-width: 2px; }
 :focus-visible { outline: 3px solid #49364b; outline-offset: 3px; }
-.reception + button { margin-top: 1rem; }
+.reception + button, .reception-actions { margin-top: 1rem; }
+.reception-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.reception-dialog {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #fff0d8;
+  border: 2px solid #62cfc7;
+  border-radius: 0.75rem;
+}
 [role='alert'] { border-left: 0.25rem solid #382f3f; padding: 1rem; }
