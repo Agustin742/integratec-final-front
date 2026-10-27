@@ -127,13 +127,15 @@ This document covers visual design: shapes, avatars, environments, props, palett
 - Lighting SHOULD be distributed and warm, with localized hanging bulbs and soft yellow glow.
 - A cozy density MAY include small counter and shelf props, hanging plants, and rugs with circular motifs.
 
-#### Room accents — proposal
+#### Room accents
 
-The proposed rule is a shared warm base plus vegetation green and one accent per room. These room assignments remain proposals and MUST be validated before adoption.
+The existing reception revision uses the user-approved cream/wood base with turquoise accents after team feedback that the previous colors were too pink. This approval changes material assignments, not the authoritative HEX identities below or the existing avatar and room geometry. Final appearance still requires visual review under actual lighting. Additional rooms remain deferred.
+
+The proposed rule for future rooms is a shared warm base plus vegetation green and one accent per room. Assignments other than reception remain proposals and MUST be validated before adoption.
 
 | Room | Proposed accent | Key props |
 |---|---|---|
-| Reception | Coral `#E66861` | Curved or L-shaped counter with colored top, bell, plants. |
+| Reception (approved revision) | Turquoise `#62CFC7` | Existing counter, waiting seat and pendant accents; cream/wood base, bell, plants. |
 | Meeting room | Turquoise `#62CFC7` | Thick table, rounded chairs, rounded-frame screen, board. |
 | Open workspace | Butter `#F7D86B` | Thick wooden desks, monitors, shelves with muted books. |
 | Lounge | Green `#65B96A` | Tufted sofas, benches, hanging plants, circular rug. |

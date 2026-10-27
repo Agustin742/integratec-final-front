@@ -30,6 +30,13 @@ PALETTE = {
 }
 
 
+def reception_material(name, material):
+    """Approved reception revision: remap assignments, never palette identities."""
+    if name.startswith("Tile ") and material == "sand":
+        return "pale"
+    return {"coral": "teal", "peach": "cream", "clay": "wood"}.get(material, material)
+
+
 def linear(hex_value):
     rgb = [int(hex_value[i:i + 2], 16) / 255 for i in (0, 2, 4)]
     return tuple(v / 12.92 if v <= 0.04045 else ((v + .055) / 1.055) ** 2.4
@@ -82,7 +89,7 @@ class Author:
         mesh.update()
         obj = bpy.data.objects.new(PREFIX + name, mesh)
         self.groups[group].objects.link(obj)
-        mesh.materials.append(self.materials[material])
+        mesh.materials.append(self.materials[reception_material(name, material)])
         if bevel:
             modifier = obj.modifiers.new("Soft manufactured edge", "BEVEL")
             modifier.width = bevel
