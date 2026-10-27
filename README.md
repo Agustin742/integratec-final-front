@@ -1,6 +1,34 @@
 # Frontend repository
 
-This repository currently contains frontend documentation and CI tooling only; it does not yet include an application package or application tests.
+A local React/TypeScript/Vite + Three.js/React Three Fiber navigation study loads the existing reception and original `public/models/character.glb`, preserving materials, rig and Idle/Walk clips. Focus the reception for WASD, or click/tap clear floor; Escape or **Stop navigation** cancels. **Avatar calibration** opens the preserved original preview instead of mounting another hidden Canvas.
+
+This is **not the finished product**: objects are not interactable yet; authentication, backend integration, tasks, chat, business actions, persistence and multiplayer are absent. Other rooms await teammates' feedback. See the [navigation guide](docs/development/reception-navigation.md) for provisional world-axis controls, collision ownership, loading/failure behavior and verification limits. The reception uses a conservative effective radius of 1.1 at avatar height 2; narrow passages, the counter recess and portal are deliberately unavailable rather than allowing the larger avatar to clip through.
+
+## Local preview
+
+Prerequisites: Node.js 22 (current patch release) and pnpm **12.15.0**, matching `packageManager`. CI uses Corepack to select that version. No environment variables, credentials or external service endpoints are required. The model is a public static asset; Vite's public base path controls its URL at build time.
+
+```sh
+pnpm install --frozen-lockfile
+pnpm dev
+# Open the local URL printed by Vite; WebGL 2 and hardware acceleration are required.
+pnpm test
+pnpm typecheck
+pnpm build
+pnpm preview
+# Focus only avatar tests:
+pnpm exec vitest run src/features/avatar
+```
+
+`pnpm-workspace.yaml` permits only esbuild's dependency build script. Keep the original GLB read-only. Do not substitute another avatar if loading fails. The study waits for both assets and announces readiness after a rendered frame, with distinct asset/WebGL failures; recovery is a manual reload after resolving the cause. Reduced motion requested at startup suppresses Idle/Walk animation while retaining local navigation.
+
+### Ownership and verification limits
+
+`src/features/avatar/load-avatar.ts` remains the sole avatar scene/mixer/disposal owner, with optional `setMoving` selecting Walk/Idle and default calibration behavior retained. The separate reception loader owns room resources. `ReceptionPreview` owns both downloads/status and disposes obsolete results after errors/unmount; GLTF downloads cannot be aborted. `ReceptionScene` consumes the navigation controller's single state without interpolating across route corners. `AvatarPreview`, its lifecycle hook and existing tests remain unchanged. R3F owns the renderer; asset loaders explicitly release their resources.
+
+Vitest parses the actual GLBs, checks normalized pose/rotation envelopes, navigation, animation/resource contracts and rendered control/status/view arbitration with a simulated renderer. These checks do not prove real GPU rendering, full visual clearance or visual quality. Parent browser verification remains pending for movement/contact, avatar facing/animation, desktop/narrow framing and overflow, reduced motion, and failure/context-loss behavior; hardware touch/performance remain unverified. T2's independent verification remains unresolved and is not accepted by these checks.
+
+For scoped local validation without Vite's bundled-config temporary output, use `pnpm test --configLoader runner` and `pnpm build --configLoader runner`. These supported flags do not change package scripts or prove default CI execution. The generated validation outputs are `dist/` and `node_modules/.vite/`; never commit them.
 
 ## Development rules
 
@@ -31,7 +59,7 @@ actionlint .github/workflows/ci.yml
 
 Use the actual target ref (`origin/test` or `origin/main` for promotions) instead of `origin/develop` when appropriate. The diff command includes uncommitted tracked edits; untracked files are not included. For each new file, also run `git diff --no-index --check -- /dev/null path/to/new-file` before staging (`--no-index` exit 1 alone means files differ; whitespace errors include diagnostics). Stage new Markdown files for inclusion in the default tracked-file link check, or pass their paths explicitly to `check_docs.py`. Report unavailable tools honestly; local validation does not prove a GitHub run or branch protection.
 
-The job uses Node.js 22 and Corepack/pnpm once both `package.json` and `pnpm-lock.yaml` are present. A package without its lockfile fails clearly. When no package or test script is configured, CI reports that no application tests were run in a GitHub notice and the job summary; CI-tooling regressions still run.
+The job uses Node.js 22 and Corepack/pnpm once both `package.json` and `pnpm-lock.yaml` are present. It installs with `pnpm install --frozen-lockfile` and runs `pnpm test`; both are configured for this preview. A package without its lockfile fails clearly. Type checking and production build remain explicit local checks, not existing CI steps. CI-tooling regressions still run.
 
 ## Cross-repository contracts
 

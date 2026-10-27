@@ -1,5 +1,25 @@
 # Tracker — Alejo
 
+## 2026-10-27 — Repair project-local dependency resolution
+
+- **Status:** completed
+- **Area / files:** project-local dependency junctions under `node_modules/`; ignored repair evidence under `odd/artifacts/dependency-repair/`.
+- **Change:** Diagnose and repair dependency links after the user authorized local repair with package versions, lockfile, CI and global installations unchanged. Metadata inspection found `@vitejs/plugin-react` linked to an earlier temporary verification checkout instead of its in-project package.
+- **Reason:** The application verification stopped before tests because Vitest could not resolve the React plugin.
+- **Verification:** The parent repaired seven local junction entries using the audited exact-version targets and retained original junction entries for rollback without traversing their external targets. All 435 dependency junctions now point inside the checkout, and 7,368 protected file hashes are unchanged. Public React-plugin import, 68/68 tests, both TypeScript checks and the Vite build passed in one command chain (exit 0). The build retains a 1,100.38 kB chunk warning. After the `gentle-ai-verify` subagent (`antigravity/claude-sonnet-5-5`) failed (`assistant reported an error`), the parent completed direct audit/code verification per the user's explicit continuation instruction.
+- **Next step:** Proceed with bounded local reception interactions (`T5`) and final browser/CI verification (`T7`).
+
+## 2026-10-27 — Build the interactive reception foundation
+
+- **Status:** blocked
+- **Area / files:** `src/features/avatar/`, `src/features/world/`, application/configuration files, `scripts/blender/`, `assets/blender/reception.blend`, `public/models/rooms/reception.glb`, `docs/art/reception.md`.
+- **Change:** Confirm React/Three.js/React Three Fiber and Blender authoring; create the original reception asset, reuse the existing avatar, and implement local navigation/collisions. Revise reception materials toward the team-approved cream, wood and turquoise palette; additional rooms are explicitly deferred.
+- **Reason:** Establish a navigable local reception and address team feedback about the previous pink/cozy emphasis without replacing the avatar or implying backend integration.
+- **Verification:** Previously recorded navigation/application suite: 68/68 passing, with typecheck/build reported by the writer; this is historical local evidence, not a new run or GitHub CI approval. The palette writer reports observed RED then 7/7 GREEN for its deterministic contract. Parent Blender revision, saved-source/export parity across 144 primitives and desktop/mobile-overview/grayscale inspection passed; room geometry/BIN and original avatar bytes are unchanged. Canonical cream/wood/turquoise source/export promotion passed. The initial fresh application check exited 1 before tests because Vitest could not resolve `@vitejs/plugin-react`; typecheck/build were skipped. After separately authorized local junction repair, public import, 68/68 tests, both TypeScript checks and build passed (exit 0); package versions/lockfile/configuration remained unchanged. The build reports a 1,100.38 kB chunk warning. The `gentle-ai-verify` subagent (`antigravity/claude-sonnet-5-5`) failed across attempts (`assistant reported an error`), so the parent completed direct code/test verification as explicitly authorized by the user ("continualo vos"). Browser gameplay and hardware-mobile performance remain unverified.
+- **Commits:** `454dacc` (rendering/authoring decision), `3129859` (original reception asset), `4b7b966` (cream/wood/turquoise reception palette), `4f25a32` (reception navigation core and collision layout), `b5fddd4` (React Three Fiber avatar preview bootstrap), plus the integrated reception navigation UI slice.
+- **CI:** Existing workflow checks documentation, CI-tooling regressions, whitespace, actionlint and conditional application tests; it has no application typecheck/build steps. Local closure and remote GitHub execution remain unverified for this feature. Workflow changes and publishing are not implied by this entry.
+- **Next step:** Obtain human disposition for the missing independent verifications, define bounded local interactions, complete applicable browser/CI verification, and recover reviewable commit slices before delivery. Palette assets are applied; do not confuse passing local checks with complete feature acceptance or a remote CI result.
+
 ## 2026-10-22 — Develop source-grounded functional rules
 
 - **Status:** completed
@@ -22,11 +42,12 @@
 
 ## 2026-10-22 — Preserve literal Markdown in CI summaries
 
-- **Status:** in-progress
+- **Status:** completed
 - **Area / files:** `.github/workflows/ci.yml`, `scripts/ci/test_checks.py`.
-- **Change:** Correct two shell quoting warnings without changing the notices or job summaries.
+- **Change:** Correct two shell quoting warnings without changing the notices or job summaries; pin their literal output in regression fixtures.
 - **Reason:** GitHub run 39814978244 failed with ShellCheck SC2016; local Windows actionlint did not include ShellCheck.
-- **Next step:** Pin the exact existing notice/summary output, correct the quoting, and verify the targeted fix before publishing.
+- **Evidence:** Repository commit `67dc20c` contains the workflow correction and regression tests. This bookkeeping update does not assert a new test run or a successful remote GitHub run.
+- **Next step:** Check the applicable GitHub run when remote verification is authorized; the local code correction is committed.
 
 ## 2026-10-22 — Check work pull requests and documentation
 

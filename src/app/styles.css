@@ -1,0 +1,24 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #382f3f;
+  background: #fff9eb;
+  line-height: 1.6;
+}
+body { margin: 0; }
+main { max-width: 64rem; margin: auto; padding: clamp(1rem, 4vw, 3rem); }
+h1 { line-height: 1.2; }
+.preview {
+  height: clamp(20rem, 55vh, 36rem);
+  background: #fff0d8;
+  border: 1px solid #af7b52;
+  border-radius: 1rem;
+  overflow: hidden;
+}
+.reception { height: clamp(22rem, 65vh, 44rem); touch-action: none; }
+button { font: inherit; padding: 0.6rem 1rem; border: 1px solid #af7b52; border-radius: 0.6rem; color: inherit; background: #fff0d8; cursor: pointer; }
+button:disabled { cursor: default; }
+nav { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+button[aria-pressed='true'] { font-weight: bold; border-width: 2px; }
+:focus-visible { outline: 3px solid #49364b; outline-offset: 3px; }
+.reception + button { margin-top: 1rem; }
+[role='alert'] { border-left: 0.25rem solid #382f3f; padding: 1rem; }
