@@ -1,3 +1,7 @@
 .codegraph/
 /.vscode/
 /odd/
+/node_modules/
+/dist/
+/coverage/
+/src/test/*.log
