@@ -45,7 +45,8 @@ Rules describe **how the project must be designed and built**. They are not impl
 
 ### Architecture and integration
 
-- [Architecture](./architecture.md) — responsibility boundaries and the distinction between agreed art direction and undecided rendering technology.
+- [Architecture](./architecture.md) — responsibility boundaries and the agreed Three.js and React Three Fiber rendering technology.
+- [3D world and camera](./3d-world-and-camera.md) — React Three Fiber scene boundaries, fixed isometric camera, asset loading, performance, and non-3D alternatives.
 - [Frontend conventions](./frontend-conventions.md) — modules, TypeScript boundaries, React composition, and lifecycle cleanup.
 - [State management](./state-management.md) — local, server, shared client, and realtime state ownership.
 - [API contracts](./api-contracts.md) — cross-repository ownership, payloads, compatibility, and integration evidence.
@@ -76,7 +77,7 @@ Read the relevant rules before designing, implementing, modifying, or reviewing 
 
 When a rule needs to change, update its source document explicitly rather than silently deviating in code.
 
-The expected art direction is agreed; the rendering engine and its integration are not selected. The product rules develop existing commitments and clearly separate unresolved domain choices from requirements. Engine-specific implementation rules remain deferred. No rule here claims that application code, board automation, or deployed infrastructure already exists.
+The expected art direction and the rendering technology (Three.js integrated in React through React Three Fiber) are agreed; scene rules are in [3D world and camera](./3d-world-and-camera.md). The product rules develop existing commitments and clearly separate unresolved domain choices from requirements. No rule here claims that application code, board automation, or deployed infrastructure already exists.
 
 ## Document template
 

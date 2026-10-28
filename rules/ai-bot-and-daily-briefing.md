@@ -7,7 +7,7 @@ The bot MUST help a user organize authorized work and present a daily briefing o
 - [Master §4](../master-document.md#4-bot-con-inteligencia-artificial) establishes conversations, authorized server tools, and the daily routine; §4.1 defines its daily identity and optional provider-outage fallback.
 - [Master §5–6](../master-document.md#5-stack-y-responsabilidades-técnicas) assigns inference and tools to NestJS, persistence to PostgreSQL, and live room state to Colyseus. §7.3 describes the end-to-end daily flow.
 - [Security](./security.md) governs identity, resource isolation, secrets, and safe errors. [Quality and testing](./quality-and-testing.md) governs verification and evidence.
-- The master header leaves the rendering engine unselected. [Art direction](./art-direction.md) is the agreed visual target, with its own qualified starting points and open decisions.
+- The rendering technology is Three.js with React Three Fiber ([3D world and camera](./3d-world-and-camera.md)). [Art direction](./art-direction.md) is the agreed visual target, with its own qualified starting points and open decisions.
 - This rule defines observable domain constraints, not an API schema, database migration, delivery state machine, model selection, or claim of implemented behavior.
 
 ## Ownership
