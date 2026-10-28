@@ -44,16 +44,16 @@ beforeEach(() => {
 });
 async function loaded() { await act(async () => { resolveAvatar(avatar()); resolveRoom(room()); }); }
 
-it('waits for BOTH original assets and a rendered frame, then offers focus/help/stop', async () => {
+it('waits for BOTH original assets and a rendered frame, then renders a clean interactive viewport without toolbar clutter', async () => {
   render(<ReceptionPreview />);
   expect(screen.getByText(/Loading.*avatar.*reception/i)).toBeDefined();
   await act(async () => resolveAvatar(avatar())); expect(screen.queryByTestId('canvas')).toBeNull();
   await act(async () => resolveRoom(room()));
   expect(screen.queryByText(/Reception ready/i)).toBeNull();
   fireEvent.click(screen.getByText('Rendered'));
-  expect(screen.getByText(/Reception ready/i)).toBeDefined();
   expect(screen.getByLabelText('Local reception navigation').tabIndex).toBe(0);
-  expect(screen.getByText(/WASD/)).toBeDefined(); expect(screen.getByRole('button', { name: /Stop navigation/ })).toBeDefined();
+  expect(screen.queryByRole('button', { name: /Stop navigation/i })).toBeNull();
+  expect(screen.queryByRole('button', { name: /Ring reception bell/i })).toBeNull();
 });
 it.each(['avatar', 'room'])('reports %s failure, releases the other asset including late results, without diagnostics', async asset => {
   render(<ReceptionPreview />);
@@ -113,32 +113,33 @@ it.each(['drag', 'cancel', 'blur'])('does not accept an interrupted or dragged t
   fireEvent.pointerUp(floor, { pointerId: 1, button: 0, clientX: interruption === 'drag' ? 50 : 20, clientY: 20 });
   expect(screen.queryByText(/Moving to selected floor/)).toBeNull();
 });
-it('accepts a fresh touch tap without hover and does not leak UI pointer events into navigation', async () => {
+it('accepts a fresh touch tap without hover and cancels movement with Escape', async () => {
   render(<ReceptionPreview />); await loaded(); fireEvent.click(screen.getByText('Rendered'));
   const floor = screen.getByTestId('floor');
   fireEvent.pointerDown(floor, { pointerId: 1, button: 0, clientX: 20, clientY: 20, pointerType: 'touch' });
   fireEvent.pointerUp(floor, { pointerId: 1, button: 0, clientX: 20, clientY: 20, pointerType: 'touch' });
   expect(screen.getByText(/Moving to selected floor/)).toBeDefined();
-  fireEvent.click(screen.getByRole('button', { name: /Stop navigation/ }));
+  fireEvent.keyDown(screen.getByLabelText('Local reception navigation'), { key: 'Escape' });
   expect(screen.queryByText(/Moving to selected floor/)).toBeNull();
 });
 
-it('supports 3D object taps and keyboard-accessible interaction buttons, opens the Noticeboard dialog, pauses navigation and restores focus on close', async () => {
+it('interacts directly with 3D reception objects, opens the Noticeboard dialog on 3D tap, pauses navigation and restores focus on close', async () => {
   render(<ReceptionPreview />); await loaded(); fireEvent.click(screen.getByText('Rendered'));
+  const region = screen.getByLabelText('Local reception navigation');
   const bell3d = screen.getByTestId('prop-bell');
   fireEvent.pointerDown(bell3d, { pointerId: 1, button: 0, clientX: 15, clientY: 15 });
   fireEvent.pointerUp(bell3d, { pointerId: 1, button: 0, clientX: 15, clientY: 15 });
   expect(screen.getByText(/Reception bell rung/i)).toBeDefined();
 
-  // Start floor movement, then open the Noticeboard via keyboard-accessible button
+  // Start floor movement, then tap the 3D Noticeboard directly
   const floor = screen.getByTestId('floor');
   fireEvent.pointerDown(floor, { pointerId: 2, button: 0, clientX: 20, clientY: 20 });
   fireEvent.pointerUp(floor, { pointerId: 2, button: 0, clientX: 20, clientY: 20 });
   expect(screen.getByText(/Moving to selected floor/)).toBeDefined();
 
-  const noticeboardButton = screen.getByRole('button', { name: /Inspect noticeboard/i });
-  noticeboardButton.focus();
-  fireEvent.click(noticeboardButton);
+  const noticeboard3d = screen.getByTestId('prop-noticeboard');
+  fireEvent.pointerDown(noticeboard3d, { pointerId: 3, button: 0, clientX: 25, clientY: 25 });
+  fireEvent.pointerUp(noticeboard3d, { pointerId: 3, button: 0, clientX: 25, clientY: 25 });
   const dialog = screen.getByRole('dialog', { name: /Reception noticeboard/i });
   expect(dialog.getAttribute('aria-modal')).toBe('true');
   expect(dialog.textContent).toMatch(/local preview|backend authorization/i);
@@ -146,9 +147,5 @@ it('supports 3D object taps and keyboard-accessible interaction buttons, opens t
   const closeButton = screen.getByRole('button', { name: /Close noticeboard/i });
   fireEvent.click(closeButton);
   expect(screen.queryByRole('dialog')).toBeNull();
-  expect(document.activeElement).toBe(noticeboardButton);
-
-  // Portal doorway interaction reports unavailable transition without false arrival
-  fireEvent.click(screen.getByRole('button', { name: /Check portal doorway/i }));
-  expect(screen.getByText(/Room transition unavailable/i)).toBeDefined();
+  expect(document.activeElement).toBe(region);
 });

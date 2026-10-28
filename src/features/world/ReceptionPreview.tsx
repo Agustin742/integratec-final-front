@@ -4,7 +4,6 @@ import { loadAvatar, type AvatarResource } from '../avatar/load-avatar';
 import { loadReception, type ReceptionResource } from './load-reception';
 import { ReceptionScene } from './ReceptionScene';
 import {
-  RECEPTION_INTERACTIONS,
   getReceptionInteraction,
   type ReceptionInteractionId,
 } from './reception-interactions';
@@ -29,14 +28,12 @@ function ReceptionContent() {
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const release = useRef<() => void>(() => {});
   const controls = useNavigationControls(status === 'ready', receptionAvatarRadius);
-  const help = useId();
   const dialogTitleId = useId();
   const ready = useCallback(() => setStatus(current => current === 'loading' ? 'ready' : current), []);
   const failed = useCallback(() => { release.current(); setStatus('webgl-error'); }, []);
 
-  const triggerInteraction = useCallback((id: ReceptionInteractionId, fromSceneTap = false) => {
-    if (status !== 'ready') return;
-    if (fromSceneTap && !controls.consumeTap()) return;
+  const triggerInteraction = useCallback((id: ReceptionInteractionId) => {
+    if (status !== 'ready' || !controls.consumeTap()) return;
     const item = getReceptionInteraction(id);
     setInteractionNote(item.feedback);
     if (id === 'noticeboard') {
@@ -96,52 +93,53 @@ function ReceptionContent() {
   if (status === 'avatar-error' || status === 'room-error') return <p role="alert">
     The original {status === 'avatar-error' ? 'avatar' : 'reception'} could not be loaded. Check the local model file and reload.
   </p>;
-  return <>
-    <p role="status">{status === 'ready' ? 'Reception ready — local navigation and object interactions active.' : 'Loading original avatar and reception; preparing WebGL…'}</p>
-    <p id={help}>Focus the reception, then use WASD (W −Z, S +Z, A −X, D +X). Click or tap clear floor to move, or select a reception object (or its button below) for local feedback.
-      Escape or Stop navigation cancels movement.</p>
-    <div className="preview reception" ref={controls.container} tabIndex={0} role="region"
-      aria-label="Local reception navigation" aria-describedby={help} aria-busy={status !== 'ready'} {...controls.events}>
-      {avatar && room && <Canvas orthographic camera={{ position: [14, 14, 14], near: 0.1, far: 100 }} dpr={[1, 1.5]}
-        onPointerMissed={() => controls.tapTarget(null)}>
-        <ReceptionScene
-          avatar={avatar}
-          room={room}
-          tick={controls.tick}
-          onSelect={point => { setInteractionNote(null); controls.tapTarget(point); }}
-          onInteract={id => triggerInteraction(id, true)}
-          onReady={ready}
-          onFailure={failed}
-        />
-      </Canvas>}
-    </div>
-    <div className="reception-actions" role="group" aria-label="Reception local interactions">
-      <button type="button" onClick={controls.stop} disabled={status !== 'ready'}>Stop navigation</button>
-      {RECEPTION_INTERACTIONS.map(item => (
-        <button
-          key={item.id}
-          type="button"
-          onClick={() => triggerInteraction(item.id, false)}
-          disabled={status !== 'ready'}
-        >
-          {item.buttonLabel}
-        </button>
-      ))}
-    </div>
-    {noticeboardOpen && (
-      <div role="dialog" aria-modal="true" aria-labelledby={dialogTitleId} className="reception-dialog">
-        <h2 id={dialogTitleId}>Reception noticeboard</h2>
-        <p>{getReceptionInteraction('noticeboard').detail}</p>
-        <ul>
-          <li>Welcome to the cream, wood and turquoise reception study.</li>
-          <li>Use WASD or click/tap clear floor tiles to test collision boundaries.</li>
-          <li>Persistent tasks, announcements and room transitions remain disabled until backend integration.</li>
-        </ul>
-        <button ref={closeButtonRef} type="button" onClick={closeNoticeboard}>Close noticeboard</button>
+  return (
+    <div className="reception-stage">
+      {status !== 'ready' && (
+        <p role="status" className="reception-loading">
+          Loading original avatar and reception; preparing WebGL…
+        </p>
+      )}
+      <div
+        className="preview reception"
+        ref={controls.container}
+        tabIndex={0}
+        role="region"
+        aria-label="Local reception navigation"
+        aria-busy={status !== 'ready'}
+        {...controls.events}
+      >
+        {avatar && room && (
+          <Canvas
+            orthographic
+            camera={{ position: [14, 14, 14], near: 0.1, far: 100 }}
+            dpr={[1, 1.5]}
+            onPointerMissed={() => controls.tapTarget(null)}
+          >
+            <ReceptionScene
+              avatar={avatar}
+              room={room}
+              tick={controls.tick}
+              onSelect={point => { setInteractionNote(null); controls.tapTarget(point); }}
+              onInteract={triggerInteraction}
+              onReady={ready}
+              onFailure={failed}
+            />
+          </Canvas>
+        )}
       </div>
-    )}
-    <p role="status" aria-live="polite">{interactionNote ?? controls.feedback}</p>
-  </>;
+      {noticeboardOpen && (
+        <div role="dialog" aria-modal="true" aria-labelledby={dialogTitleId} className="reception-dialog">
+          <h2 id={dialogTitleId}>Reception noticeboard</h2>
+          <p>{getReceptionInteraction('noticeboard').detail}</p>
+          <button ref={closeButtonRef} type="button" onClick={closeNoticeboard}>Close noticeboard</button>
+        </div>
+      )}
+      <p role="status" aria-live="polite" className="reception-hud">
+        {interactionNote ?? controls.feedback}
+      </p>
+    </div>
+  );
 }
 export function ReceptionPreview() {
   return <ReceptionBoundary><ReceptionContent /></ReceptionBoundary>;
