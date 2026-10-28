@@ -1,5 +1,13 @@
 # Tracker — Agustin
 
+## 2026-10-28 — Record Terraform decision in master document
+
+- **Status:** completed
+- **Area / files:** `master-document.md`
+- **Change:** Added Terraform to the stack table and deployment section and listed the backend-owned infrastructure-as-code rule in section 13. Done with AI assistance (Claude Code), reviewed by Agustin.
+- **Reason:** Keep the master document synchronized with the backend after adopting Terraform.
+- **Next step:** None.
+
 ## 2026-10-27 — Confirm rendering technology and complete frontend rules
 
 - **Status:** completed
