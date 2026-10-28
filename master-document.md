@@ -462,14 +462,15 @@ rules/
   movement-and-interactions.md
   art-direction.md
   avatars-and-customization.md
-  colyseus-and-multiplayer.md
+  realtime-and-presence.md
   rooms-and-permissions.md
   tasks-and-productivity.md
   communication-and-meetings.md
   ai-bot-and-daily-briefing.md
-  data.md
-  security-and-authentication.md
-  aws-infrastructure.md
+  authentication-and-session.md
+  security.md
+  data.md                # vive en el repositorio backend
+  aws-infrastructure.md  # vive en el repositorio backend
   quality-and-testing.md
 docs/
   technical-justification.md
