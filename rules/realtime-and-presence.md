@@ -8,7 +8,7 @@ Authorized users MUST see live presence and movement in their shared space witho
 - [Master §6](../master-document.md#6-arquitectura-general-actualizada) assigns Colyseus live state, NestJS/PostgreSQL persistent business authority, and confirmed-change notification ordering.
 - [Master §7.4](../master-document.md#74-despliegue-red-y-operación) establishes separate services and an initial single Colyseus service instance; this rule does not choose a distributed presence design.
 - [Security](./security.md) applies to admission and every protected action. [Quality and testing](./quality-and-testing.md) defines verification reporting.
-- [Art direction](./art-direction.md) remains the agreed visual target. The master header leaves the rendering engine unselected; this rule selects no renderer, physics library, camera implementation, or asset format.
+- [Art direction](./art-direction.md) remains the agreed visual target. The rendering technology is Three.js with React Three Fiber ([3D world and camera](./3d-world-and-camera.md)); this rule selects no physics library or wire format.
 - This document defines reusable synchronization invariants, not wire event names, schemas, tick rates, reconnect durations, or evidence that a server already implements them.
 
 ## Separate persistent and live identity
@@ -121,7 +121,7 @@ Master §6.2's event names are illustrative, not approved protocol identifiers. 
 
 - Exact admission credentials, session mapping contracts, reconnect behavior, removal timing, and handling of permission changes require backend/frontend agreement; no timeout or token format is chosen here.
 - Multi-tab or multi-device identity, simultaneous participation across rooms, and how duplicate connections map to avatars remain unresolved; examples MUST NOT settle one-avatar-per-user or one-avatar-per-connection.
-- Movement bounds, validation algorithms, tick/update frequency, interpolation technique, and correction presentation remain to be specified without choosing a rendering engine.
+- Movement bounds, validation algorithms, tick/update frequency, interpolation technique, and correction presentation remain to be specified.
 - Ordering, deduplication, snapshot reconciliation, missed-notification recovery, and mutation correlation mechanisms need explicit contracts; this rule defines outcomes only.
 - Additional activity states and any justified dedicated messaging channel require separate decisions, not assumed enums or Socket.IO installation.
 - Horizontal scaling requires the strategy identified in master §7.4; no broker, distributed presence layer, or multi-instance architecture is selected here.

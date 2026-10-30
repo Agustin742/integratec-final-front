@@ -5,7 +5,7 @@ Users MUST be able to navigate the shared 3D space and reach authorized tools wi
 ## Authority and scope
 
 - [Master document](../master-document.md), sections 2.2–2.3, 3.2, and 9.1, establishes movement, spatial interactions, alternative access, and the usable product journey.
-- Its header leaves the rendering engine unselected; technology examples elsewhere MUST NOT be treated as approval of an engine or integration pipeline.
+- The rendering technology is Three.js with React Three Fiber; scene and camera conventions are in [3D world and camera](./3d-world-and-camera.md).
 - [Art direction](./art-direction.md), especially Camera and spatial readability, governs the agreed isometric/elevated visual target. Its numeric starting points and open choices remain qualified there.
 - Master sections 5–6 establish NestJS/PostgreSQL business authority and Colyseus live-state authority.
 - [Security](./security.md) governs authorization and untrusted input; [Quality and testing](./quality-and-testing.md) governs verification evidence.
@@ -118,7 +118,7 @@ These are future implementation checks, not claims of runtime compliance.
 
 - Input precedence, gesture mapping, interruption controls, movement speed, and interaction distance remain undecided.
 - Traversal representation, collision/physics implementation, pathfinding, destination resolution, and correction tuning remain undecided.
-- Camera implementation, projection choice, occlusion treatment, and performance budgets require decisions consistent with art direction.
+- Occlusion treatment and performance budgets require decisions consistent with art direction.
 - Object-specific trigger conditions and failure feedback need definition as interactions are approved; example objects do not establish a mandatory catalog.
 - Reconnection timing and precise recovery behavior require a shared realtime contract; this document selects no timeout or automatic replay policy.
 - Cross-repository contract ownership and distribution remain unresolved in master section 5; no shared package or transport schema is selected here.

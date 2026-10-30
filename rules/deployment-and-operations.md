@@ -5,7 +5,7 @@ A successful merge or build is not evidence that the product is working in a dep
 ## Ownership and readiness
 
 - Frontend and backend **MUST** identify their deployment owners and compatible integration versions independently.
-- Deployment configuration **MUST** reflect agreed infrastructure choices; this rule does not provision services or approve a rendering engine.
+- Deployment configuration **MUST** reflect agreed infrastructure choices; this rule does not provision services.
 - Release candidates **MUST** satisfy [Git workflow](./git-workflow.md) and applicable [quality checks](./quality-and-testing.md).
 - Deployment automation **MUST NOT** be claimed unless its actual trigger, permissions, and results have been verified.
 - Data-changing migrations **MUST** have a backend-owned execution and recovery plan before deployment.

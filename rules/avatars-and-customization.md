@@ -6,7 +6,7 @@ Each user MUST have a recognizable human avatar whose confirmed customization pe
 
 - [Master document](../master-document.md), sections 1, 2.3, and 3.1, establishes customizable avatars, persistent configuration, shared presence, and the 3D visual direction.
 - Master sections 5–6 assign persistent business records to NestJS/PostgreSQL and live room state to Colyseus; section 6.4 identifies `AvatarConfiguration` without defining its storage shape.
-- The master's header explicitly leaves the rendering engine unselected. Rendering mentions elsewhere are not authority to select an engine, asset format, or pipeline.
+- The rendering technology is Three.js with React Three Fiber; asset loading conventions are in [3D world and camera](./3d-world-and-camera.md).
 - [Art direction](./art-direction.md), especially Avatars, Camera and spatial readability, and Intellectual property, is the agreed visual target and sole source for palette and proportions.
 - Its numerical starting points, optional techniques, and open questions MUST retain their qualifications. This document neither duplicates them nor makes them final.
 - [Security](./security.md) supplies ownership, validation, and privacy boundaries; [Quality and testing](./quality-and-testing.md) supplies evidence expectations.
@@ -133,7 +133,7 @@ These are future implementation checks, not evidence that runtime behavior alrea
 - Catalog contents, selectable categories, slots, option counts, combinations, and customization limits remain undecided.
 - Save triggers, preview layout, draft recovery, simultaneous-edit conflict policy, and exact validation contracts require product/backend agreement.
 - Initial configuration and fallback appearance remain undecided; examples above do not choose defaults or require a reset feature.
-- Asset formats, delivery pipeline, rigs, morph systems, rendering engine, and animation implementation remain undecided.
+- Rigs, morph systems, avatar asset pipeline details, and animation implementation remain undecided.
 - Uploads, inventory, unlocks, commerce, public profiles, and expanded decoration are not required by this document; they need separate approval if proposed.
 - Live update delivery details, reconnect windows, and the cross-repository distribution of contracts remain unresolved; no event schema, timeout, or shared package is selected.
 - Art direction retains its own open choices, including final measurements and animation complexity; these rules do not close them.

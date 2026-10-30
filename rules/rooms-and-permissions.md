@@ -9,7 +9,7 @@ Users must be able to enter authorized spaces without confusing a visible room, 
 - [Master §6](../master-document.md#6-arquitectura-general-actualizada) establishes persistence, realtime responsibilities, and authentication boundaries.
 - [Security](./security.md) governs protected operations; [Quality and testing](./quality-and-testing.md) governs evidence.
 - These rules refine established behavior and derived integrity constraints, not an approved permission matrix or database schema.
-- The master header leaves the rendering engine unselected. [Art direction](./art-direction.md) remains the agreed visual target, with its own qualified starting points and open choices.
+- The rendering technology is Three.js with React Three Fiber ([3D world and camera](./3d-world-and-camera.md)). [Art direction](./art-direction.md) remains the agreed visual target, with its own qualified starting points and open choices.
 
 ## Room types and durable identity
 
