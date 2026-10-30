@@ -11,12 +11,13 @@ Essential product functions must remain understandable and usable beyond a visua
 
 ## Input and focus
 
-- Essential functions **MUST** have a keyboard-accessible interface rather than depend exclusively on selecting a spatial object.
+- Essential functions **MUST** have a keyboard-accessible interface rather than depend exclusively on selecting a spatial object. The classic 2D mode of master §2.9 is the agreed accessible alternative: it **MUST** expose activities, material, chat, grades, shop, and bot with the same data and server checks as the 3D classroom ([Classrooms and roles](./classrooms-and-roles.md)).
 - Pointer interactions **MUST** offer touch equivalents without relying on hover.
 - Controls **MUST** have accessible names and visible focus. Prefer semantic HTML over simulated controls.
 - Dialogs **MUST** manage focus, prevent accidental interaction behind them, and return focus to a meaningful location when closed.
 - Typing in inputs or using UI controls **MUST NOT** trigger world movement or unrelated global shortcuts.
 - Drag-and-drop actions **MUST** have a non-drag alternative for essential operations.
+- The parent interface **MUST** stay minimal and fully usable without the 3D classroom.
 
 ## Responsive and motion behavior
 
@@ -27,4 +28,4 @@ Essential product functions must remain understandable and usable beyond a visua
 
 ## Verification
 
-Review affected controls using keyboard and touch-equivalent input, verify focus after dialogs, and confirm the main action remains usable without precise pointing in the world.
+Review affected controls using keyboard and touch-equivalent input, verify focus after dialogs, and confirm the main action remains usable without precise pointing in the world, including through the classic 2D mode.

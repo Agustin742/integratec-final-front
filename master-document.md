@@ -562,7 +562,7 @@ La implementación seguirá entregas incrementales, con despliegue desde etapas 
 
 ## 13. Organización documental
 
-Este documento es el **índice conceptual y fuente de decisiones generales**. El detalle técnico y funcional podrá desarrollarse en los archivos propuestos de `rules/`, por ejemplo. Los nombres listados a continuación son **planificados, no una afirmación de que esos archivos ya existan**:
+Este documento es el **índice conceptual y fuente de decisiones generales**. El detalle técnico y funcional se desarrolla en los archivos de `rules/` y `docs/` de este repositorio (frontend). Los archivos marcados como *(backend)* son responsabilidad del repositorio backend y **no existen en este repositorio**; los demás reflejan los nombres reales:
 
 ```text
 master-document.md
@@ -573,27 +573,25 @@ rules/
   art-direction.md
   avatars-and-customization.md
   realtime-and-presence.md
-  classrooms-and-roles.md       # nuevo; reemplaza rooms-and-permissions.md
-  activities-and-grading.md     # nuevo; reemplaza tasks-and-productivity.md
-  points-and-shop.md            # nuevo
-  live-classroom-tools.md       # nuevo; UI (front) y credenciales/sincronización (back)
-  notifications.md              # nuevo; UI (front) y email/entrega (back)
-  communication-and-meetings.md # a realinear: chat, anuncios y @menciones
-  ai-bot-and-daily-briefing.md  # a realinear: RAG, bloqueo en exámenes, anticopia
-  rooms-and-permissions.md      # a realinear o reemplazar por classrooms-and-roles.md
-  tasks-and-productivity.md     # a realinear o reemplazar por activities-and-grading.md
+  classrooms-and-roles.md              # interfaz por rol, modo 2D/3D, vista de padres
+  activities-and-grading.md            # entrega, revisión y calificación
+  points-and-shop.md                   # puntos, tienda, racha, mascota, medallas
+  live-classroom-tools.md              # congelar, silenciar, llamadas, pizarra/gráficos/LaTeX
+  communication-and-notifications.md   # chat, anuncios, @menciones, mensajes de padres y notificaciones en la aplicación
+  ai-bot-and-daily-briefing.md
+  state-management.md
   authentication-and-session.md
   security.md
-  data.md                # vive en el repositorio backend
-  aws-infrastructure.md  # vive en el repositorio backend
-  infrastructure-as-code.md  # vive en el repositorio backend
   quality-and-testing.md
+  data.md                    (backend)
+  aws-infrastructure.md      (backend)
+  infrastructure-as-code.md  (backend)
 docs/
   technical-justification.md
   ai-usage.md
   architecture.md
 ```
 
-**Seguimiento pendiente:** los archivos `rules/` existentes (`rooms-and-permissions`, `tasks-and-productivity`, `communication-and-meetings`, `ai-bot-and-daily-briefing`, `data` y los relacionados) describen todavía el modelo anterior de oficinas y deben **realinearse** con este documento. Hasta entonces, ante contradicción, prevalece este documento maestro.
+**Seguimiento pendiente:** los archivos `rules/` de este repositorio ya están realineados con el modelo escolar. Los archivos de `docs/` (requisitos funcionales, historias de usuario, decisiones de requisitos, justificación técnica y arquitectura) todavía describen el modelo anterior de oficinas y habitaciones y deben realinearse; hasta entonces, ante contradicción, prevalece este documento maestro.
 
 Los archivos `rules/` desarrollan los detalles de implementación y experiencia sin contradecir este contrato general.

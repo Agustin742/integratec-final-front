@@ -1,10 +1,10 @@
-# Art Direction — Cozy Virtual Office
+# Art Direction — Cozy Virtual Classroom
 
 > This rule governs the product's visual language for environments, avatars, props, color, lighting, and camera. Numeric values are starting points to validate at actual gameplay scale, not immutable measurements.
 
 ## Purpose
 
-Establish a coherent, readable, welcoming visual identity for the virtual office while preserving original designs and separating settled project decisions from proposals that still require validation.
+Establish a coherent, readable, welcoming visual identity for the virtual classroom while preserving original designs and separating settled project decisions from proposals that still require validation.
 
 ## Scope
 
@@ -13,7 +13,7 @@ This document covers visual design: shapes, avatars, environments, props, palett
 ## Principles
 
 - **Decision priority:** settled project decisions in this document take precedence over reference images, other rules here, approved assets, and individual interpretation, in that order.
-- **Proposal versus decision:** values and room accents labeled as proposals or starting points MUST be tested before they are treated as final. Open questions remain open until validated and decided.
+- **Proposal versus decision:** values and zone accents labeled as proposals or starting points MUST be tested before they are treated as final. Open questions remain open until validated and decided.
 - **Reference honesty:** an agent MUST disclose when it cannot see reference images and MUST NOT claim visual fidelity based only on this text. No image access is implied by this rule.
 - **Style, not content:** the project MAY use broad visual principles associated with cozy games, but MUST NOT substitute a generic cozy-game style for the stated visual language or reproduce another work's content (see Intellectual property).
 - **Finished simplicity:** simplified geometry MUST look intentional and complete, not provisional.
@@ -32,7 +32,7 @@ This document covers visual design: shapes, avatars, environments, props, palett
 | World shapes | Beveled rectangular modules combined with rounded organic forms. | Neither perfect cubes, obvious voxels, nor an everything-inflated look. |
 | Outlines and shading | No black outlines; soft shading and matte materials. | No hard cel shading. |
 | Palette | Use the single authoritative HEX palette in Palette and color. | First-version extras are optional only. |
-| Interiors | Each room is a diorama box with its own accent. | Accent choices below are proposals, not settled choices. |
+| Interiors | The classroom is a diorama box whose zones carry their own accent. | Accent choices below are proposals, not settled choices. |
 | Intellectual property | Style may inspire; assets must be original. | See Intellectual property. |
 
 ### Shape language
@@ -115,11 +115,11 @@ This document covers visual design: shapes, avatars, environments, props, palett
 - Use light greens on exposed areas and deep greens within crowns.
 - Balance dense areas with visual-rest surfaces, clear paths, and focal points. Abundance MUST NOT hide walkable routes.
 
-### Interiors and office props
+### Interiors and classroom props
 
-#### Rooms as dioramas
+#### The classroom as a diorama
 
-- Each room SHOULD read as a box with a floor, two visible walls, and props arranged in layers.
+- The classroom SHOULD read as a box with a floor, two visible walls, and props arranged in layers; any additional space of the school scene follows the same treatment.
 - Walls SHOULD use horizontal two-tone bands (cream above, warm lower trim) and may include a decorative dotted-and-dashed line.
 - Floors SHOULD use large, smooth, low-contrast tiles with visible joints.
 - Windows and screens SHOULD have thick rounded frames and turquoise or sky-blue glass with soft waves.
@@ -127,18 +127,20 @@ This document covers visual design: shapes, avatars, environments, props, palett
 - Lighting SHOULD be distributed and warm, with localized hanging bulbs and soft yellow glow.
 - A cozy density MAY include small counter and shelf props, hanging plants, and rugs with circular motifs.
 
-#### Room accents — proposal
+#### Zone accents — proposal
 
-The proposed rule is a shared warm base plus vegetation green and one accent per room. These room assignments remain proposals and MUST be validated before adoption.
+The proposed rule is a shared warm base plus vegetation green and one accent per classroom zone. These zone assignments are visual proposals only, tied to the illustrative interactable objects of master section 2.10, and MUST be validated before adoption.
 
-| Room | Proposed accent | Key props |
+| Zone | Proposed accent | Key props |
 |---|---|---|
-| Reception | Coral `#E66861` | Curved or L-shaped counter with colored top, bell, plants. |
-| Meeting room | Turquoise `#62CFC7` | Thick table, rounded chairs, rounded-frame screen, board. |
-| Open workspace | Butter `#F7D86B` | Thick wooden desks, monitors, shelves with muted books. |
-| Lounge | Green `#65B96A` | Tufted sofas, benches, hanging plants, circular rug. |
-| Kitchen / café | Peach pink `#F5B5AB` | Counter, barrel or stools, display dishes and jars. |
-| Quiet room | Lavender `#B5A7D6` | Armchair, spherical lamp, curtains. |
+| Entrance and bulletin board | Coral `#E66861` | Door with a clear frame, bulletin board, plants, curved counter with colored top. |
+| Teaching zone | Turquoise `#62CFC7` | Board with a rounded frame, projector or screen, teacher desk with thick top. |
+| Student desks | Butter `#F7D86B` | Thick wooden desks and chairs, shelf or folder with muted books. |
+| Reading and pet corner | Green `#65B96A` | Benches, hanging plants, circular rug, the classroom pet and its accessories. |
+| Shop and games corner | Peach pink `#F5B5AB` | Shop counter, display jars, game console. |
+| Tutor corner | Lavender `#B5A7D6` | Tutor bot character, armchair, spherical lamp, curtains. |
+
+The classroom pet and the tutor bot MUST be visually distinct in silhouette, placement, and color, so that neither is mistaken for the other.
 
 #### Props
 
@@ -245,7 +247,7 @@ Validate at actual gameplay size in each of these views:
 
 1. One avatar on a path.
 2. An avatar beside a wall, door, and piece of furniture.
-3. Several avatars among props in a room.
+3. Several avatars among props in the classroom.
 4. A garden with small decorations.
 5. A reduced or mobile screen.
 
@@ -291,7 +293,7 @@ These are conditional implementation paths, not a decision to replace the establ
 - [ ] The scene feels cozy, cheerful, and welcoming.
 - [ ] Geometry is simple, with bevels and rounding where appropriate; flowers, trees, and lamps are not cubic by obligation.
 - [ ] The scene reads at normal camera distance and at reduced size.
-- [ ] The palette is coherent: warm base, greens, and one or two accents per room.
+- [ ] The palette is coherent: warm base, greens, and one or two accents per zone.
 - [ ] There are no hyperreal textures or excessive noise.
 - [ ] Lighting is soft with enough shadow to anchor objects and no excessive bloom.
 - [ ] Walkable areas are clearly separated from decorative clusters.
@@ -309,14 +311,14 @@ These are conditional implementation paths, not a decision to replace the establ
 3. Materials: wall, tile, stone, pot, tree, garment.
 4. Lighting: small daytime scene with sun, fill, and shadows.
 5. Color: apply the palette and correct under real lighting.
-6. One complete room: floor, two walls, door, 4–6 props, plant, and three avatars.
-7. Camera: view that same room at gameplay size and on mobile.
-8. Several adjacent rooms: consistent warm base and distinct accents.
+6. One complete classroom: floor, two walls, door, 4–6 props, plant, and three avatars.
+7. Camera: view that same classroom at gameplay size and on mobile.
+8. The classroom zones together: consistent warm base and distinct accents.
 9. Performance: evaluate geometry, shadows, and animation cost before scaling up.
 
 ### Open questions
 
-The following remain unresolved and MUST be decided through tests: module M and exact dimensions; orthographic versus perspective projection; final avatar proportions; final color range; room accents; day/night cycle; and animation complexity. Numeric values in this guide are initial measurements, not claims that these decisions have been finalized.
+The following remain unresolved and MUST be decided through tests: module M and exact dimensions; orthographic versus perspective projection; final avatar proportions; final color range; zone accents; day/night cycle; and animation complexity. Numeric values in this guide are initial measurements, not claims that these decisions have been finalized.
 
 ## References
 
@@ -327,7 +329,7 @@ The following remain unresolved and MUST be decided through tests: module M and 
 
 The following prompt is a concise style summary, not a replacement for the rules above and not permission to reproduce another work:
 
-> Cozy 3D diorama style, isometric view around 40° (azimuth 45°). Beveled rectangular modules combined with grouped rounded nature. No black outlines; matte or softly satin painted-toy materials; subtle ambient occlusion. Warm base (cream `#FFF0D8`, sand `#E9C99B`, wood `#AF7B52`), greens (`#A6D96A`, `#65B96A`, `#3E8654`), and one room accent (coral `#E66861`, turquoise `#62CFC7`, or butter `#F7D86B`). Lavender-tinted shadows `#B5A7D6`, never black. Human avatars: rounded-cube head (~35% of height), `:)` face with dot eyes, long torso, short legs, long flexible arms, hair and clothes in color masses, soft circular contact shadow. Fine detail only in foreground; silhouettes readable at gameplay scale. Original design: do not reproduce characters, creatures, or assets from any game.
+> Cozy 3D diorama style, isometric view around 40° (azimuth 45°). Beveled rectangular modules combined with grouped rounded nature. No black outlines; matte or softly satin painted-toy materials; subtle ambient occlusion. Warm base (cream `#FFF0D8`, sand `#E9C99B`, wood `#AF7B52`), greens (`#A6D96A`, `#65B96A`, `#3E8654`), and one zone accent (coral `#E66861`, turquoise `#62CFC7`, or butter `#F7D86B`). Lavender-tinted shadows `#B5A7D6`, never black. Human avatars: rounded-cube head (~35% of height), `:)` face with dot eyes, long torso, short legs, long flexible arms, hair and clothes in color masses, soft circular contact shadow. Fine detail only in foreground; silhouettes readable at gameplay scale. Original design: do not reproduce characters, creatures, or assets from any game.
 
 Suggested token summary, subject to the same validation and open decisions:
 
