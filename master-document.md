@@ -102,7 +102,7 @@ Interfaz lo más simple posible:
 - **Moneda única de puntos**, obtenida por calificaciones de actividades.
 - Los puntos compran **ítems del aula** (juegos, mejoras) y **accesorios de la mascota**. Los ítems deben aportar funcionalidad real.
 - **Racha de conexión:** cuenta solo cuando ocurre una actividad real, no por el mero inicio de sesión.
-- **Mascota:** una por aula, con accesorios; puede iniciar la conversación con el bot.
+- **Mascota:** una por aula, con accesorios comprados con puntos; es un elemento de motivación y no está vinculada al bot IA.
 - **Minijuegos del aula** (por ejemplo Tetris, Pong): no pueden jugarse durante la clase; el profesor los deshabilita cuando quiera.
 - **Medallas** por logros.
 
@@ -137,7 +137,8 @@ Los siguientes son **ejemplos, no una lista cerrada**. Se podrán incorporar nue
 | Cartelera | Tablón de anuncios del aula. |
 | Boletín o libro de notas | Calificaciones, puntos y medallas. |
 | Tienda | Comprar ítems del aula y accesorios de la mascota. |
-| Mascota | Conversar con el bot IA; ver accesorios. |
+| Mascota | Ver la mascota del aula y sus accesorios. |
+| Bot tutor | Conversar con el bot IA (guía de estudio). |
 | Consola o máquina de juegos | Minijuegos (deshabilitables por el profesor). |
 | Puertas y accesos | Entrar o salir del aula con control de permisos. |
 | Pantalla o proyector | Videollamada y presentación en vivo. |
@@ -186,7 +187,7 @@ Las acciones con efectos de negocio se validan en el backend; interactuar con un
 
 ## 4. Bot con inteligencia artificial
 
-El bot forma parte del mundo como personaje (la mascota del aula) y también está disponible desde el modo 2D. Funciona como **guía de estudio**: responde consultas sobre el material del aula y orienta al alumno sin resolverle las tareas.
+El bot forma parte del mundo como un personaje propio (el tutor del aula), independiente de la mascota, y también está disponible desde el modo 2D. Funciona como **guía de estudio**: responde consultas sobre el material del aula y orienta al alumno sin resolverle las tareas.
 
 **Capacidades y reglas del bot:**
 
