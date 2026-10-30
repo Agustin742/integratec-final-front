@@ -30,10 +30,12 @@ Rules describe **how the project must be designed and built**. They are not impl
 
 ### Product behavior
 
-- [Rooms and permissions](./rooms-and-permissions.md) — room types, durable membership, privacy, invitations, and server-authorized access.
-- [Tasks and productivity](./tasks-and-productivity.md) — persisted CRUD, list/Kanban consistency, validation, and uncertain writes.
-- [Communication and meetings](./communication-and-meetings.md) — authorized history, contextual messaging, announcements, meetings, and attendance.
-- [AI bot and daily briefing](./ai-bot-and-daily-briefing.md) — authorized tools, Argentina-local daily identity, duplicate prevention, and provider failure.
+- [Classrooms, roles, and permissions](./classrooms-and-roles.md) — organization paths, role-specific interface, invitations, parent area, 2D/3D mode, and server-authorized access.
+- [Activities and grading](./activities-and-grading.md) — activity CRUD, student submission, teacher review and grading, exams, and uncertain writes.
+- [Communication and notifications](./communication-and-notifications.md) — classroom chat with moderation and mute, @mentions, announcement board, parent messages, and in-app notifications.
+- [Points, streak, shop, pet, and medals](./points-and-shop.md) — server-owned points display, shop purchases, streak, mini-games disabled state, classroom pet, and medals.
+- [Live classroom tools](./live-classroom-tools.md) — freeze and seat lock, mute controls, calls and live presentations, and collaborative whiteboard, charts, and LaTeX with lock state.
+- [AI bot and daily briefing](./ai-bot-and-daily-briefing.md) — study-guide tutor bot with RAG over approved material, exam block, Argentina-local daily review, duplicate prevention, and provider failure.
 - [Movement and interactions](./movement-and-interactions.md) — WASD/click/touch navigation, input arbitration, collisions, and accessible interaction.
 - [Avatars and customization](./avatars-and-customization.md) — confirmed appearance, persistence, authorized visibility, and fallback integrity.
 - [Realtime and presence](./realtime-and-presence.md) — authoritative sessions, reconnection, stale-state cleanup, and persistence-before-broadcast.

@@ -1,11 +1,11 @@
 # Avatars and Customization
 
-Each user MUST have a recognizable human avatar whose confirmed customization persists and whose live representation is visible only within authorized shared-room participation.
+Each user MUST have a recognizable human avatar whose confirmed customization persists and whose live representation is visible only within authorized shared-classroom participation.
 
 ## Authority and scope
 
-- [Master document](../master-document.md), sections 1, 2.3, and 3.1, establishes customizable avatars, persistent configuration, shared presence, and the 3D visual direction.
-- Master sections 5–6 assign persistent business records to NestJS/PostgreSQL and live room state to Colyseus; section 6.4 identifies `AvatarConfiguration` without defining its storage shape.
+- [Master document](../master-document.md), sections 1, 2.11, and 3.1, establishes customizable avatars, persistent configuration, shared presence, and the 3D visual direction.
+- Master sections 5–6 assign persistent business records to NestJS/PostgreSQL and live classroom state to Colyseus; section 6.4 identifies `AvatarConfiguration` without defining its storage shape.
 - The rendering technology is Three.js with React Three Fiber; asset loading conventions are in [3D world and camera](./3d-world-and-camera.md).
 - [Art direction](./art-direction.md), especially Avatars, Camera and spatial readability, and Intellectual property, is the agreed visual target and sole source for palette and proportions.
 - Its numerical starting points, optional techniques, and open questions MUST retain their qualifications. This document neither duplicates them nor makes them final.
@@ -46,7 +46,7 @@ The frontend MUST coordinate backend-dependent validation and synchronization wi
 - Motion SHOULD preserve the agreed soft, readable character language without requiring any particular rig, bone count, or deformation technique.
 - Designs MUST be original; reference-inspired style is not permission to copy external characters, models, logos, or distinctive assets.
 
-**Rationale:** customization supports social recognition in a shared office. Appearance that works only at close range defeats the master's presence goal even when its preview looks complete.
+**Rationale:** customization supports social recognition in a shared classroom. Appearance that works only at close range defeats the master's presence goal even when its preview looks complete.
 No screenshot or reference-image fidelity is asserted by this document; visual acceptance requires later evaluation of actual rendered results.
 
 ## Persistent configuration and validation
@@ -80,7 +80,7 @@ The last rule is an integrity requirement, not a chosen conflict-resolution stra
 - A failed update MUST NOT destroy or replace the last confirmed configuration with an invalid preview.
 - Expected cancellation MUST NOT be reported as a persistence failure. Canceling a draft MUST NOT falsely imply that an already confirmed operation was undone.
 - Logout or account changes MUST clear or invalidate private draft/configuration state and associated subscriptions.
-- Late responses for another account or obsolete room context MUST NOT restore its private data into the current context.
+- Late responses for another account or obsolete classroom context MUST NOT restore its private data into the current context.
 - Recovery MUST NOT assume that a timeout proves no write occurred. An explicit contract is required before automatically retrying writes.
 
 Draft and cache lifecycle conventions are developed in `rules/state-management.md`; pending/uncertain outcomes are developed in `rules/error-handling-and-feedback.md`.
@@ -88,18 +88,18 @@ These references describe integration seams, not new storage or save workflows.
 
 ## Live visibility and fallback boundaries
 
-- Other users' avatars MUST be shown in the context of authorized co-room participation, consistent with master section 2.3.
-- Room admission and applicable configuration access MUST be server-authorized. Seeing an avatar or accessory grants no membership, role, or business permission.
-- A persistent room and a Colyseus `Room` session MUST remain distinct; a new connection does not create another persistent avatar identity.
+- Other users' avatars MUST be shown in the context of authorized co-classroom participation, consistent with master section 2.11.
+- Classroom admission and applicable configuration access MUST be server-authorized. Seeing an avatar or accessory grants no membership, role, or business permission.
+- A persistent classroom and a Colyseus `Room` session MUST remain distinct; a new connection does not create another persistent avatar identity.
 - Join and reconnect flows MUST reconcile appearance with the authoritative confirmed configuration rather than reuse an unrelated cached user's appearance.
 - Leaving, disconnecting, or losing access MUST NOT leave a representation falsely implying active authorized presence; exact reconnection timing belongs to the realtime contract.
-- Appearance updates MUST NOT broadcast private configuration data to unrelated rooms or unauthorized recipients. Only data appropriate for authorized rendering should cross that boundary.
-- Public profile visibility beyond shared-room participation is not established by these rules.
+- Appearance updates MUST NOT broadcast private configuration data to unrelated classrooms or unauthorized recipients. Only data appropriate for authorized rendering should cross that boundary.
+- Public profile visibility beyond shared-classroom participation is not established by these rules.
 - If a resource cannot render, fallback MUST preserve the association with the correct user and the distinction between confirmed data and a rendering problem.
 - A visual fallback MUST NOT silently overwrite persistent configuration or create a saved default merely because a resource is unavailable.
 - Fallback SHOULD preserve readable presence and access to essential authorized UI where feasible; it MUST NOT invent another user's appearance or claim an unrendered accessory is visible.
 
-**Rationale:** persistence failure, resource-loading failure, and lost room access are different conditions. Treating all three as a reset would lose customization or misrepresent who is present.
+**Rationale:** persistence failure, resource-loading failure, and lost classroom access are different conditions. Treating all three as a reset would lose customization or misrepresent who is present.
 This rule deliberately selects no fallback model, color, accessory, storage migration, or default configuration.
 
 ## Scenarios and examples
@@ -107,7 +107,7 @@ This rule deliberately selects no fallback model, color, accessory, storage migr
 | Scenario | Correct behavior | Incorrect behavior |
 |---|---|---|
 | Confirmed change and reload | Reload retrieves the accepted persistent configuration. | Reload restores only the preview stored in a browser tab. |
-| Two authorized occupants | Both render the user's confirmed appearance in the shared room. | Publish appearance into every room because a user is online. |
+| Two authorized occupants | Both render the user's confirmed appearance in the shared classroom. | Publish appearance into every classroom because a user is online. |
 | Rejected customization | Keep the last confirmed record and identify the draft failure. | Broadcast the preview as saved before validation. |
 | Forged owner identifier | Reject modification of another user's configuration server-side. | Trust the owner selected in a client store. |
 | Resource load failure | Keep confirmed data intact and use an honest visual fallback. | Persist a replacement default over valid customization. |
@@ -119,12 +119,12 @@ This rule deliberately selects no fallback model, color, accessory, storage migr
 These are future implementation checks, not evidence that runtime behavior already exists.
 
 - [ ] Human design, original assets, and normal-view readability satisfy art direction without a second palette/proportion specification.
-- [ ] Offered customization remains readable in an occupied room and at reduced/mobile view, including orientation and accessories where present.
+- [ ] Offered customization remains readable in an occupied classroom and at reduced/mobile view, including orientation and accessories where present.
 - [ ] Confirmed appearance survives reload and service restart; destroying a live session does not erase configuration.
 - [ ] Draft, pending, confirmed, rejected, and uncertain outcomes are distinguishable and do not mislead other occupants.
 - [ ] Direct requests using another user's identity or unsupported values cannot alter their configuration or bypass validation.
-- [ ] Authorized occupants see applicable confirmed appearance; unrelated rooms and unauthorized users do not receive private configuration.
-- [ ] Disconnect, room changes, logout, and account changes reconcile presence and clear or isolate stale state.
+- [ ] Authorized occupants see applicable confirmed appearance; unrelated classrooms and unauthorized users do not receive private configuration.
+- [ ] Disconnect, classroom changes, logout, and account changes reconcile presence and clear or isolate stale state.
 - [ ] Missing resources do not overwrite confirmed configuration or falsely associate an avatar with another user.
 - [ ] Concurrent or delayed updates do not label a rejected or superseded preview as current saved appearance.
 
@@ -134,6 +134,6 @@ These are future implementation checks, not evidence that runtime behavior alrea
 - Save triggers, preview layout, draft recovery, simultaneous-edit conflict policy, and exact validation contracts require product/backend agreement.
 - Initial configuration and fallback appearance remain undecided; examples above do not choose defaults or require a reset feature.
 - Rigs, morph systems, avatar asset pipeline details, and animation implementation remain undecided.
-- Uploads, inventory, unlocks, commerce, public profiles, and expanded decoration are not required by this document; they need separate approval if proposed.
+- Uploads, inventory, unlocks, public profiles, and expanded decoration are not required by this document; they need separate approval if proposed. Avatar accessories are not the classroom pet's accessories, which are bought with points through the shop ([Points and shop](./points-and-shop.md)); whether avatar customization is ever unlocked through the shop is open.
 - Live update delivery details, reconnect windows, and the cross-repository distribution of contracts remain unresolved; no event schema, timeout, or shared package is selected.
 - Art direction retains its own open choices, including final measurements and animation complexity; these rules do not close them.

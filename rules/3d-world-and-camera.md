@@ -9,11 +9,17 @@ Define how the Three.js scene is built, framed, loaded, and released inside the 
 - Movement behavior belongs to [Movement and interactions](./movement-and-interactions.md); live state to [Realtime and presence](./realtime-and-presence.md); responsibility boundaries to [Architecture](./architecture.md).
 - This rule does not select a physics library, pathfinding approach, or asset catalog.
 
+## Classroom scene
+
+- **MUST:** The scene represents the persistent classroom of master section 2.1: seats for the freeze lock, interactable objects (board, teacher desk, student desks, shelf or folder, bulletin board, report card, shop, pet, tutor bot, game console, doors, projector) and avatars, as illustrative examples of master section 2.10, not a closed catalog.
+- **MUST:** The classroom pet and the AI tutor bot are separate scene elements with distinct objects and entry points; the scene **MUST NOT** present them as the same character ([AI bot and daily briefing](./ai-bot-and-daily-briefing.md)).
+- **MUST:** The scene is optional for essential functions: the same functions are available in the classic 2D mode ([Classrooms and roles](./classrooms-and-roles.md)). Parents have no 3D classroom.
+
 ## Scene and React separation
 
-- **MUST:** R3F owns the scene graph. Scene components **MUST** live inside the canvas; application panels, dialogs, forms, chat, and Kanban **MUST** be regular React/DOM UI outside it ([master section 2.2](../master-document.md#22-objetos-y-elementos-interactuables)).
+- **MUST:** R3F owns the scene graph. Scene components **MUST** live inside the canvas; application panels, dialogs, forms, chat, grade tables, and the shop **MUST** be regular React/DOM UI outside it ([master section 2.10](../master-document.md#210-objetos-y-elementos-interactuables)).
 - **MUST NOT:** Scene objects own business rules, permission decisions, or network calls. They surface intent (for example "object selected") to the application, which decides what happens.
-- **MUST:** Scene components read state through the owners defined in [State management](./state-management.md); they **MUST NOT** create parallel authoritative copies of server or room state.
+- **MUST:** Scene components read state through the owners defined in [State management](./state-management.md); they **MUST NOT** create parallel authoritative copies of server or classroom state.
 - **SHOULD:** Per-frame updates mutate scene objects directly (refs, frame loop) instead of triggering React state updates on every frame.
 
 ## Camera
@@ -55,12 +61,12 @@ Define how the Three.js scene is built, framed, loaded, and released inside the 
 ## Lifecycle and cleanup
 
 - **MUST:** Canvas mount and unmount **MUST** release listeners, animation loops, loaders, and GPU resources; remounting **MUST NOT** duplicate them ([Frontend conventions](./frontend-conventions.md)).
-- **MUST:** Room changes, logout, and lost access dispose scene content tied to the previous context ([State management](./state-management.md)).
+- **MUST:** Classroom changes, logout, and lost access dispose scene content tied to the previous context ([State management](./state-management.md)).
 - **SHOULD:** Handle WebGL context loss with a visible recovery or fallback state.
 
 ## Accessibility alternative
 
-- **MUST:** Essential functions remain usable without pointing at 3D objects, through keyboard-accessible or alternative UI ([UI and accessibility](./ui-and-accessibility.md), master section 3.2).
+- **MUST:** Essential functions remain usable without pointing at 3D objects, through the classic 2D mode and keyboard-accessible UI ([UI and accessibility](./ui-and-accessibility.md), master sections 2.9 and 3.2).
 - **SHOULD:** Respect reduced-motion preferences for non-essential scene animation.
 
 ## Verification

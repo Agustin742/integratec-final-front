@@ -1,15 +1,15 @@
 # Movement and Interactions
 
-Users MUST be able to navigate the shared 3D space and reach authorized tools without confusing movement, interface input, or visual feedback with a business operation.
+Users MUST be able to navigate the shared 3D classroom and reach authorized tools without confusing movement, interface input, or visual feedback with a business operation.
 
 ## Authority and scope
 
-- [Master document](../master-document.md), sections 2.2–2.3, 3.2, and 9.1, establishes movement, spatial interactions, alternative access, and the usable product journey.
+- [Master document](../master-document.md), sections 2.8–2.11, 3.2, and 9.1, establishes movement, interactable objects, the classic 2D mode as alternative access, the freeze lock, and the usable product journey.
 - The rendering technology is Three.js with React Three Fiber; scene and camera conventions are in [3D world and camera](./3d-world-and-camera.md).
 - [Art direction](./art-direction.md), especially Camera and spatial readability, governs the agreed isometric/elevated visual target. Its numeric starting points and open choices remain qualified there.
 - Master sections 5–6 establish NestJS/PostgreSQL business authority and Colyseus live-state authority.
 - [Security](./security.md) governs authorization and untrusted input; [Quality and testing](./quality-and-testing.md) governs verification evidence.
-- These rules define observable behavior, not physics, pathfinding, camera algorithms, event schemas, or a fixed interactive-object catalog.
+- These rules define observable behavior, not physics, pathfinding, camera algorithms, event schemas, or a fixed interactive-object catalog. Parents do not use the 3D classroom.
 
 MUST and MUST NOT are requirements; SHOULD is an expectation whose exception needs a reason; MAY denotes an option, not an approved new feature.
 Derived integrity rules below preserve the master's separation of visual intent, live state, and persistent business effects.
@@ -24,13 +24,13 @@ Derived integrity rules below preserve the master's separation of visual intent,
 | Persistent operations and access | NestJS validates business actions against authoritative records in PostgreSQL. |
 | Visual readability | Scene contributors apply art direction without introducing another palette or camera specification. |
 
-1. The user enters a room through authenticated, authorized admission.
+1. The user enters a classroom through authenticated, authorized admission.
 2. Available input moves the avatar on traversable surfaces or selects an interaction.
 3. The application separates movement intent, local decoration, and protected actions.
 4. The relevant server authority validates protected effects; the client displays the actual outcome.
 5. Other authorized occupants receive applicable live state, without database writes for every step.
 
-A persistent product room MUST NOT be confused with a Colyseus `Room` session. Recreating a live session does not create a new persistent room or grant membership.
+A persistent classroom MUST NOT be confused with a Colyseus `Room` session. Recreating a live session does not create a new persistent classroom or grant membership.
 
 ## Navigation contract
 
@@ -40,9 +40,10 @@ A persistent product room MUST NOT be confused with a Colyseus `Room` session. R
 - A visible floor area MUST NOT automatically be treated as reachable; its surface, connections, and obstructions matter.
 - A destination on another elevation MUST NOT cause passage through an intervening wall or unsupported space merely because its screen position is selectable.
 - The implementation MUST distinguish navigable space from decorative geometry and interactive targets sufficiently to avoid unintended actions.
-- Movement SHOULD feel fluid locally while remaining consistent with the validated live state. A local visual prediction MUST NOT become authority for room access or persistent effects.
-- Server validation MUST reject movement or action claims that violate the applicable room boundary and traversal constraints. The exact validation model remains open.
+- Movement SHOULD feel fluid locally while remaining consistent with the validated live state. A local visual prediction MUST NOT become authority for classroom access or persistent effects.
+- Server validation MUST reject movement or action claims that violate the applicable classroom boundary and traversal constraints. The exact validation model remains open.
 - Movement MUST NOT create a PostgreSQL record for every step or rendered frame.
+- While the classroom is **frozen**, the avatar is seated and locked: the client MUST stop issuing WASD, click-destination, and touch movement input, discard any pending destination, and MUST NOT present a movement attempt as accepted. The server rejects movement regardless ([Live classroom tools](./live-classroom-tools.md)). Releasing the lock returns control only after server confirmation and does not replay old input.
 
 **Rationale:** the master commits to surfaces, obstacles, collisions, and synchronized movement, not a flat image with unrestricted coordinate changes. These constraints preserve that commitment without choosing a simulation technique.
 
@@ -52,10 +53,10 @@ A persistent product room MUST NOT be confused with a Colyseus `Room` session. R
 - Activating a UI control MUST NOT also activate a world object behind it or issue a click destination.
 - Dialogs MUST prevent accidental background interaction, manage focus, and return focus to a meaningful location when closed.
 - Closing a panel MUST NOT replay an earlier pointer action or a movement key that is no longer held.
-- Loss of input focus, logout, or loss of room access MUST NOT leave stale movement input driving the avatar.
-- Room transitions MUST NOT carry a previous room's destination or delayed action into the newly active room.
+- Loss of input focus, logout, or loss of classroom access MUST NOT leave stale movement input driving the avatar.
+- Classroom transitions MUST NOT carry a previous classroom's destination or delayed action into the newly active classroom.
 - Disconnection or interrupted navigation MUST NOT be presented as confirmed arrival. The UI MUST distinguish unavailable control from ordinary idle presence.
-- Recovery MUST reconcile with the current authorized room and live state rather than assume an old local destination remains valid.
+- Recovery MUST reconcile with the current authorized classroom and live state rather than assume an old local destination remains valid.
 - Users MUST have an understandable way to interrupt or replace ongoing navigation intent. The control mapping and input precedence remain open.
 
 These constraints prevent a single user action from producing unrelated effects; they do not prescribe whether a particular nonmodal panel pauses movement.
@@ -66,8 +67,8 @@ Input and focus conventions are developed in `rules/ui-and-accessibility.md`; re
 | Interaction class | Required distinction | Illustrative example, not a catalog |
 |---|---|---|
 | Local decorative response | Animation MUST NOT imply a persistent business effect. | A decorative prop reacts visually. |
-| Functional interface | React presents the interface when needed; opening it does not authorize its operations. | A board opens a task view. |
-| Direct protected action | The server validates the action even if no panel opens. | A door requests a room transition. |
+| Functional interface | React presents the interface when needed; opening it does not authorize its operations. | A student desk opens the pending activities. |
+| Direct protected action | The server validates the action even if no panel opens. | A door requests a classroom transition. |
 
 - Interactions MUST NOT be required to open a React panel universally. Decoration and direct transitions are valid interaction classes in master section 2.2.
 - Selection, proximity, object visibility, and successful animation MUST NOT confer permission to read or change a resource.
@@ -75,8 +76,8 @@ Input and focus conventions are developed in `rules/ui-and-accessibility.md`; re
 - A frontend store, scene object, or AI response MUST NOT decide permissions or manufacture confirmed business success.
 - The interface MUST distinguish pending, confirmed, denied, and uncertain outcomes when relevant; a local animation MUST NOT replace that feedback.
 - An inaccessible destination MUST NOT produce forbidden traversal or false arrival. A denied business action MUST leave its protected records unchanged; feedback MUST explain the limitation without exposing private destination content.
-- A transition MUST NOT expose destination-room resources before authorized admission. A visible door is an affordance, not an access credential.
-- Essential functions MUST have keyboard-accessible or alternative UI access without requiring precise selection of a 3D object.
+- A transition MUST NOT expose destination-classroom resources before authorized admission. A visible door is an affordance, not an access credential.
+- Essential functions MUST have keyboard-accessible access, including the classic 2D mode of master section 2.9, without requiring precise selection of a 3D object.
 - Alternative access MUST use the same resource scope and server checks as scene interaction, not a privileged bypass.
 
 ## Spatial readability and camera
@@ -98,7 +99,8 @@ Input and focus conventions are developed in `rules/ui-and-accessibility.md`; re
 | Permission changes before action | Revalidate the protected effect and reject lost access. | Trust permissions captured when a door first appeared. |
 | Network interruption | Indicate interrupted control and reconcile authorized live state on recovery. | Keep showing successful remote travel from local prediction. |
 | Essential tool is occluded | Offer equivalent accessible UI for the authorized tool. | Require pixel-precise selection behind a wall. |
-| Decorative selection | Show only the intended local response. | Treat a prop's animation as a confirmed task update. |
+| Classroom is frozen | Movement input stops and the seated avatar is shown; the server rejects any movement. | Keep moving locally and rely on a later correction. |
+| Decorative selection | Show only the intended local response. | Treat a prop's animation as a confirmed grade or purchase. |
 
 ## Observable acceptance checks
 
@@ -107,7 +109,8 @@ These are future implementation checks, not claims of runtime compliance.
 - [ ] WASD, mouse click destination, and touch equivalents reach valid destinations without bypassing obstacles.
 - [ ] An unreachable surface, blocked destination, and different elevation do not produce false arrival or unauthorized traversal.
 - [ ] Typing, modal focus, pointer activation over UI, focus loss, and resumed input do not leak stale movement.
-- [ ] Room switching, disconnect, and revoked access discard or reconcile old intent without exposing another room.
+- [ ] Classroom switching, disconnect, and revoked access discard or reconcile old intent without exposing another classroom.
+- [ ] Freeze stops local movement input, seats the avatar, and releases only after server confirmation.
 - [ ] A decorative response, panel-opening object, and direct transition demonstrate distinct outcomes.
 - [ ] Direct unauthorized requests fail even when a local object or panel remains visible.
 - [ ] Essential functions remain usable with keyboard/alternative UI and touch without hover or precise world pointing.

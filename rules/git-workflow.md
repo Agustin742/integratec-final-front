@@ -10,7 +10,7 @@ Use short-lived work branches, reviewed pull requests, and traceable commits. Th
 | `test` | Validate an integrated candidate | `develop` only |
 | `main` | Stable, validated version | `test` only |
 
-- Contributors **MUST** branch from an up-to-date `develop` and use English names such as `feat/task-board`, `fix/login-error`, or `docs/setup`.
+- Contributors **MUST** branch from an up-to-date `develop` and use English names such as `feat/activity-review`, `fix/login-error`, or `docs/setup`.
 - Changes **MUST** enter shared branches through pull requests, not direct pushes.
 - Contributors **MUST NOT** force-push shared branches or rewrite another contributor's history.
 - Fixes **MUST** follow the same promotion flow; do not bypass it with a direct fix to `test` or `main`.
@@ -27,7 +27,7 @@ Every commit message **MUST** follow Conventional Commits and be written in Engl
 Use a type that describes the change: `feat`, `fix`, `docs`, `test`, `refactor`, `style`, `perf`, `build`, `ci`, or `chore`. A breaking change **MUST** be identified with `!` or a `BREAKING CHANGE:` footer explaining its impact.
 
 ```text
-feat(tasks): add task creation form
+feat(activities): add activity creation form
 fix(auth): redirect expired sessions to login
 docs(rules): document pull request reviews
 ```
