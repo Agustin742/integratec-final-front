@@ -1,5 +1,13 @@
 # Tracker — Agustin
 
+## 2026-11-02 — Record contract sync, 3D performance budget and verified hosting region
+
+- **Status:** completed
+- **Area / files:** `docs/technical-justification.md`, `docs/architecture.md`, `README.md`, `rules/` (api-contracts, realtime-and-presence, 3d-world-and-camera, art-direction, and the rules that listed realtime contract distribution as open)
+- **Change:** Recorded FD7 (backend commits `openapi.json` and realtime type artifacts; `pnpm api:sync` pulls them and generated types are committed in `src/api/` and `src/realtime/`), FD8 (conservative 3D performance budget with an automatic offer of the 2D Classic Mode), and marked the Amplify availability in `sa-east-1` as verified (FD5). Closed the FD2 open sub-choice and the realtime type distribution items. Done with AI assistance (Claude Code), reviewed by Agustin.
+- **Reason:** Contract changes must be visible in pull requests without a running backend, and school hardware needs measurable 3D limits.
+- **Next step:** Implement `pnpm api:sync` and the runtime performance check when the application is scaffolded.
+
 ## 2026-11-02 — Record frontend decisions and sync with backend
 
 - **Status:** completed

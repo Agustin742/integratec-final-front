@@ -121,7 +121,7 @@ These are future implementation checks, not claims of runtime compliance.
 
 - Input precedence, gesture mapping, interruption controls, movement speed, and interaction distance remain undecided.
 - Traversal representation, collision/physics implementation, pathfinding, destination resolution, and correction tuning remain undecided.
-- Occlusion treatment and performance budgets require decisions consistent with art direction.
+- Occlusion treatment requires a decision consistent with art direction; performance budgets are set in [3D world and camera](./3d-world-and-camera.md#performance-and-mobile).
 - Object-specific trigger conditions and failure feedback need definition as interactions are approved; example objects do not establish a mandatory catalog.
 - Reconnection timing and precise recovery behavior require a shared realtime contract; this document selects no timeout or automatic replay policy.
-- Distribution of realtime contracts remains unresolved (REST contracts are decided ([API contracts](./api-contracts.md))); no shared package or transport schema is selected here.
+- Realtime contract artifacts are distributed as decided in [API contracts](./api-contracts.md); this document selects no transport schema.

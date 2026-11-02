@@ -49,8 +49,23 @@ Define how the Three.js scene is built, framed, loaded, and released inside the 
 - **SHOULD:** Cap device pixel ratio (for example at 2) and reduce it on constrained devices.
 - **SHOULD:** Render on demand (frame-on-demand) when the scene is static, and pause rendering when the tab is hidden or the canvas is not visible.
 - **SHOULD:** Use instancing for repeated meshes and share geometries and materials across similar objects.
-- **SHOULD:** Limit shadow-casting lights, shadow map size, and post-processing; keep a documented draw-call and texture-size budget once measured.
-- Concrete budgets are not set here; they require measurement and a team decision.
+- **SHOULD:** Limit shadow-casting lights, shadow map size, and post-processing.
+
+### Performance budget
+
+The budget is conservative for school hardware (decision FD8, approved by Agustin on 2026-11-02; see the [technical justification](../docs/technical-justification.md#fd8-3d-performance-budget)). The numbers are limits to verify, not measured results.
+
+| Measure | Limit |
+|---|---|
+| Frame rate | Target 30 fps on integrated GPUs and 60 fps on mid-range machines |
+| Draw calls on screen | At most 100 |
+| Triangles on screen | At most 200k |
+| Avatar GLB | At most 1 MB |
+| Full classroom scene | At most 8 MB compressed: Draco or meshopt geometry, KTX2 textures |
+| GPU memory | At most 256 MB |
+
+- **MUST:** Scene and asset changes stay within the table; a change that needs to exceed it **MUST** record an exception per [Documentation and decisions](./documentation-and-decisions.md).
+- **MUST:** When the device cannot sustain the frame-rate target, measured at runtime, the client automatically **offers** the 2D Classic Mode ([Classrooms, roles, and permissions](./classrooms-and-roles.md)); the user **MAY** decline and keep the 3D scene. The offer **MUST NOT** switch modes without the user's choice.
 
 ## Raycast and selection
 

@@ -135,5 +135,5 @@ These are future implementation checks, not evidence that runtime behavior alrea
 - Initial configuration and fallback appearance remain undecided; examples above do not choose defaults or require a reset feature.
 - Rigs, morph systems, avatar asset pipeline details, and animation implementation remain undecided.
 - Uploads, inventory, unlocks, public profiles, and expanded decoration are not required by this document; they need separate approval if proposed. Avatar accessories are not the classroom pet's accessories, which are bought with points through the shop ([Points and shop](./points-and-shop.md)); whether avatar customization is ever unlocked through the shop is open.
-- Live update delivery details, reconnect windows, and the distribution of realtime contracts remain unresolved; no event schema, timeout, or shared package is selected.
+- Live update delivery details and reconnect windows remain unresolved; no event schema or timeout is selected here (contract distribution is in [API contracts](./api-contracts.md)).
 - Art direction retains its own open choices, including final measurements and animation complexity; these rules do not close them.

@@ -27,7 +27,7 @@ Users must be able to exchange authorized classroom messages, consult persisted 
 - A received realtime event **MUST NOT** independently establish permanent storage or grant access to another resource.
 - Socket.IO **MAY** serve a justified independent channel under the master; it **MUST NOT** be installed by default or duplicate Colyseus synchronization.
 - Client caches and local conversation arrays **MUST NOT** become authoritative message or notification stores.
-- Frontend and backend owners **MUST** agree on observable contracts; REST contracts come from the backend OpenAPI document ([API contracts](./api-contracts.md)), and no shared package is assumed for realtime contracts.
+- Frontend and backend owners **MUST** agree on observable contracts; REST and realtime contract artifacts come from the backend and are synced as described in [API contracts](./api-contracts.md); no published shared package is assumed.
 
 ## Classroom chat and history
 
@@ -164,6 +164,6 @@ Use [Quality and testing](./quality-and-testing.md); these are verification expe
 - Parent visibility of announcements.
 - Mentions bound per message.
 - Email service confirmation (candidate: Amazon SES), digest policy, opt-out, and bounce handling.
-- Transport deduplication, reconnect recovery details, and distribution of realtime contracts.
+- Transport deduplication and reconnect recovery details.
 
 These choices **MUST** be resolved explicitly by the responsible product and backend/frontend owners before examples or UI placeholders are treated as commitments.

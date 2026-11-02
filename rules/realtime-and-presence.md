@@ -143,7 +143,7 @@ Master §6.2's event names (for example `classroom:frozen`, `chat:muted`, `white
 - Additional activity states and any justified dedicated messaging channel require separate decisions, not assumed enums or Socket.IO installation.
 - Horizontal scaling requires the strategy identified in master §7.4; no broker, distributed presence layer, or multi-instance architecture is selected here.
 - What seated students may do while frozen, how freeze applies to users in the 2D mode, and the collaborative synchronization mechanism remain open ([Live classroom tools](./live-classroom-tools.md)).
-- Distribution of realtime message and state types remains open (REST contracts are decided in [API contracts](./api-contracts.md)). Frontend types or illustrative events MUST NOT silently become a shared contract package.
+- Realtime message and state types come from backend-generated artifacts synced into `src/realtime/` ([API contracts](./api-contracts.md), FD7); hand-written frontend types or illustrative events MUST NOT silently become the contract.
 
 ## Observable acceptance checks
 

@@ -265,6 +265,7 @@ Validate at actual gameplay size in each of these views:
 #### If the scene is 3D (Three.js / React Three Fiber)
 
 - A shared material library MAY include `stoneWarm`, `grassLight`, `grassDark`, `woodWarm`, `roofCoral`, `glassTeal`, `skinBase`, and `fabricMatte`.
+- Assets stay within the measurable limits in [3D world and camera](./3d-world-and-camera.md#performance-and-mobile) (for example avatar GLB at most 1 MB).
 - Use GLB/glTF for complex avatars and objects, procedural meshes for simple modules, and instancing for repeated elements where appropriate.
 - Define sRGB, tone mapping, and exposure before tuning the palette.
 - Maintain a fixed reference scene to detect lighting or material changes.

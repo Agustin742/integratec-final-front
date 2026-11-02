@@ -118,4 +118,4 @@ These checks guide implementation evidence under [Quality and testing](./quality
 - Default state and rewards of mini-games.
 - Visibility of other students' balances.
 - Who may buy and equip pet accessories.
-- Realtime contract distribution remains unresolved (REST contracts are decided ([API contracts](./api-contracts.md))); examples are not published API contracts.
+- Contract artifacts are distributed as decided in [API contracts](./api-contracts.md); examples are not published API contracts.
