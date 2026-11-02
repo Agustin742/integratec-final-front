@@ -587,11 +587,14 @@ rules/
   aws-infrastructure.md      (backend)
   infrastructure-as-code.md  (backend)
 docs/
+  functional-requirements.md
+  user-stories.md
+  requirements-decision.md
   technical-justification.md
   ai-usage.md
   architecture.md
 ```
 
-**Seguimiento pendiente:** los archivos `rules/` de este repositorio ya están realineados con el modelo escolar. Los archivos de `docs/` (requisitos funcionales, historias de usuario, decisiones de requisitos, justificación técnica y arquitectura) todavía describen el modelo anterior de oficinas y habitaciones y deben realinearse; hasta entonces, ante contradicción, prevalece este documento maestro.
+**Estado de la documentación y seguimiento:** los archivos de `rules/` y la documentación de requisitos en `docs/` (`docs/functional-requirements.md`, `docs/user-stories.md` y `docs/requirements-decision.md`) ya están actualizados y alineados con el modelo escolar v0.3 (**Aula Virtual 3D para Escuelas**). Los documentos restantes de `docs/` (justificación técnica y arquitectura) que aún conserven referencias al modelo anterior deberán terminar de realinearse; hasta entonces, ante cualquier contradicción, prevalece este documento maestro junto con `rules/` y la ERS v0.2.
 
 Los archivos `rules/` desarrollan los detalles de implementación y experiencia sin contradecir este contrato general.
