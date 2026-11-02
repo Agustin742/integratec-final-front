@@ -12,7 +12,7 @@ Frontend-side justification for course requirement R6. Decisions come from the [
 | Client state | Zustand | UI state, interactions, local preferences |
 | Server data | TanStack Query | Queries, cache, invalidation of persistent data |
 | Forms | React Hook Form + Zod | Form handling and input validation |
-| Drag and drop | dnd-kit | Kanban interactions |
+| Drag and drop (optional) | dnd-kit | Only if a future feature needs drag and drop; no current requirement does |
 | Testing | Vitest + Playwright | Unit/integration and end-to-end tests |
 | Hosting | AWS Amplify Hosting | Static build served over HTTPS |
 
@@ -56,7 +56,7 @@ Frontend-side justification for course requirement R6. Decisions come from the [
 
 ### dnd-kit
 
-- **Why:** Accessible, framework-aligned drag and drop for the Kanban board.
+- **Why:** No current requirement or user story needs drag and drop, so this dependency is optional and MUST NOT be installed until a feature requires it. If one does, dnd-kit offers accessible, framework-aligned drag and drop.
 - **Alternatives:** react-beautiful-dnd; native HTML drag and drop.
 - **Trade-offs:** More setup than native drag; essential operations still need a non-drag alternative ([UI and accessibility](../rules/ui-and-accessibility.md)).
 

@@ -6,7 +6,7 @@ This repository currently contains frontend documentation and CI tooling only; i
 
 Read the [project rules](rules/README.md) before contributing. They cover GitHub Projects coordination, Git collaboration, English Conventional Commits and code, architecture, state and API contracts, session handling, accessible UI and forms, data/time conventions, configuration, operations, quality, security, AI usage, and art direction. The visual target and the rendering technology (Three.js with React Three Fiber) are agreed. The [course requirements](rules/project-requirements.md) preserve the academic requirements and evaluation criteria extracted from the temporary course brief; section 10 of [the project document](master-document.md#10-cumplimiento-del-enunciado-integrartec-2026) maps them to the proposed product.
 
-The product rules develop the expected behavior for rooms/permissions, tasks, communication/meetings, the AI briefing, movement, avatars, and realtime presence. Their acceptance checklists describe future implementation evidence, not working features; open domain decisions are explicitly separated from established requirements.
+The product rules develop the expected behavior for classrooms/roles, activities and grading, communication, the AI briefing, movement, avatars, and realtime presence. Their acceptance checklists describe future implementation evidence, not working features; open domain decisions are explicitly separated from established requirements.
 
 ## Promotion flow
 
