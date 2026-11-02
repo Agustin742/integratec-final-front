@@ -1,6 +1,6 @@
 # Security
 
-Treat browser input as untrusted and keep secrets outside the repository and client bundle. This rule governs frontend work and the security expectations of its integration with the backend; it does not select an authentication provider.
+Treat browser input as untrusted and keep secrets outside the repository and client bundle. This rule governs frontend work and the security expectations of its integration with the backend; the session mechanism is defined in [Authentication and session](./authentication-and-session.md).
 
 ## Secrets and configuration
 
@@ -14,8 +14,8 @@ Treat browser input as untrusted and keep secrets outside the repository and cli
 
 - Protected frontend routes **MUST** handle missing or expired sessions and redirect unauthenticated users to login.
 - The backend **MUST** validate identity, role, and resource ownership or membership for every protected operation. Hidden controls and client-side checks are not authorization.
-- Protected APIs **MUST** return `401` for missing or invalid authentication and `403` for insufficient role permissions.
-- Users **MUST NOT** gain access to another user's private resources by changing an identifier. Realtime room access and actions **MUST** enforce the same permission boundaries when implemented.
+- Protected APIs **MUST** return `401` for missing or invalid authentication and `403` for insufficient role permissions, and `404` for a resource outside the caller's access so its existence is not revealed.
+- Users **MUST NOT** gain access to another user's private resources by changing an identifier. Realtime classroom access and actions **MUST** enforce the same permission boundaries when implemented.
 - Passwords **MUST** use an appropriate password hash, never plaintext or reversible encryption. Sessions or tokens **MUST** expire, and logout **MUST** remove access to protected frontend content.
 - API responses **MUST NOT** include password hashes, secrets, stack traces, database queries, or internal diagnostics.
 
@@ -24,7 +24,7 @@ Treat browser input as untrusted and keep secrets outside the repository and cli
 - Input **MUST** be validated in the frontend for usability and in the backend for integrity and security.
 - Database access **MUST** use parameterized queries or a safe ORM/ODM; user input **MUST NOT** be concatenated into executable queries.
 - Production traffic **MUST** use HTTPS and, where applicable, WSS. CORS **MUST** allow the authorized frontend origins; wildcard origins **MUST NOT** be used with credentials.
-- User-provided content **MUST NOT** be executed or rendered as trusted HTML without an appropriate sanitization strategy.
+- User-provided content **MUST NOT** be executed or rendered as trusted HTML without an appropriate sanitization strategy. Because tokens live in `sessionStorage`, the application also **MUST** ship a strict Content-Security-Policy and avoid `dangerouslySetInnerHTML` with user content; see [Authentication and session](./authentication-and-session.md#token-storage-and-transport).
 - Failures **MUST** produce understandable user feedback without disclosing sensitive information.
 
 ## Verification and ownership

@@ -3,5 +3,6 @@
 /odd/
 /node_modules/
 /dist/
+/.vite/
 /coverage/
 /src/test/*.log

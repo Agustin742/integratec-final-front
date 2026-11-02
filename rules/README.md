@@ -28,12 +28,16 @@ Rules describe **how the project must be designed and built**. They are not impl
 
 ## Rule index
 
+The [rule routing index](./index.md) maps tasks and touched areas to the rules below.
+
 ### Product behavior
 
-- [Rooms and permissions](./rooms-and-permissions.md) — room types, durable membership, privacy, invitations, and server-authorized access.
-- [Tasks and productivity](./tasks-and-productivity.md) — persisted CRUD, list/Kanban consistency, validation, and uncertain writes.
-- [Communication and meetings](./communication-and-meetings.md) — authorized history, contextual messaging, announcements, meetings, and attendance.
-- [AI bot and daily briefing](./ai-bot-and-daily-briefing.md) — authorized tools, Argentina-local daily identity, duplicate prevention, and provider failure.
+- [Classrooms, roles, and permissions](./classrooms-and-roles.md) — organization paths, role-specific interface, invitations and classroom join code, parent area, 2D/3D mode, and server-authorized access.
+- [Activities and grading](./activities-and-grading.md) — activity CRUD, student submission, teacher review and grading, exams, and uncertain writes.
+- [Communication and notifications](./communication-and-notifications.md) — classroom chat with moderation and mute, @mentions, announcement board, parent messages, and in-app notifications.
+- [Points, streak, shop, pet, and medals](./points-and-shop.md) — server-owned points display, shop purchases, streak, mini-games disabled state, classroom pet, and medals.
+- [Live classroom tools](./live-classroom-tools.md) — freeze and seat lock, mute controls, calls and live presentations, and collaborative whiteboard, charts, and LaTeX with lock state.
+- [AI bot and daily briefing](./ai-bot-and-daily-briefing.md) — study-guide tutor bot with RAG over approved material, exam block, Argentina-local daily review, duplicate prevention, and provider failure.
 - [Movement and interactions](./movement-and-interactions.md) — WASD/click/touch navigation, input arbitration, collisions, and accessible interaction.
 - [Avatars and customization](./avatars-and-customization.md) — confirmed appearance, persistence, authorized visibility, and fallback integrity.
 - [Realtime and presence](./realtime-and-presence.md) — authoritative sessions, reconnection, stale-state cleanup, and persistence-before-broadcast.
@@ -45,11 +49,12 @@ Rules describe **how the project must be designed and built**. They are not impl
 
 ### Architecture and integration
 
-- [Architecture](./architecture.md) — responsibility boundaries for the confirmed React/Three.js/React Three Fiber stack.
+- [Architecture](./architecture.md) — responsibility boundaries and the agreed Three.js and React Three Fiber rendering technology.
+- [3D world and camera](./3d-world-and-camera.md) — React Three Fiber scene boundaries, fixed isometric camera, asset loading, performance, and non-3D alternatives.
 - [Frontend conventions](./frontend-conventions.md) — modules, TypeScript boundaries, React composition, and lifecycle cleanup.
 - [State management](./state-management.md) — local, server, shared client, and realtime state ownership.
-- [API contracts](./api-contracts.md) — cross-repository ownership, payloads, compatibility, and integration evidence.
-- [Authentication and session](./authentication-and-session.md) — session states, expiration, logout, and account isolation without selecting a session mechanism.
+- [API contracts](./api-contracts.md) — cross-repository ownership, OpenAPI-generated types, payloads, compatibility, and integration evidence.
+- [Authentication and session](./authentication-and-session.md) — session states, `sessionStorage` token handling and its mandatory mitigations, expiration, logout, and account isolation.
 - [Data and time](./data-and-time.md) — opaque identity, optional values, dates, time zones, and persistence boundaries.
 
 ### Experience and operation
@@ -72,11 +77,11 @@ Rules describe **how the project must be designed and built**. They are not impl
 
 ## How to use the rules
 
-Read the relevant rules before designing, implementing, modifying, or reviewing a part of the project. Apply them consistently regardless of whether the work is performed manually or with an AI coding assistant.
+Use the [rule routing index](./index.md) to find which rules apply to a task and which to skip. Read the relevant rules before designing, implementing, modifying, or reviewing a part of the project. Apply them consistently regardless of whether the work is performed manually or with an AI coding assistant.
 
 When a rule needs to change, update its source document explicitly rather than silently deviating in code.
 
-The expected art direction is agreed; React, Three.js, and React Three Fiber are confirmed by the [project document](../master-document.md), sections 3.1 and 5. The [rendering and authoring decision](../docs/decisions/rendering-and-authoring.md) records the user's confirmation and Blender authoring choice. Detailed scene, rig, and collision choices remain open. The product rules separate these unresolved choices from requirements. No rule here claims that application code, board automation, or deployed infrastructure already exists.
+The expected art direction and the rendering technology (Three.js integrated in React through React Three Fiber) are agreed; scene rules are in [3D world and camera](./3d-world-and-camera.md). The product rules develop existing commitments and clearly separate unresolved domain choices from requirements. No rule here claims that application code, board automation, or deployed infrastructure already exists.
 
 ## Document template
 
