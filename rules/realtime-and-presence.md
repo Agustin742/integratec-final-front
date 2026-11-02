@@ -45,6 +45,12 @@ Backend owners MUST define coherent authorization across NestJS and Colyseus. Fr
 
 How permission changes reach live sessions is an integration decision. The invariant is that stale client state cannot extend access; this rule does not choose a polling interval or invalidation channel.
 
+## Join credential
+
+- The client MUST send its current access token in the `join` options (FD3). Colyseus `onAuth` forwards it to NestJS for verification (backend decision D2); the client MUST NOT treat sending it as admission, which the server decides.
+- The client MUST NOT request or rely on a separate join ticket.
+- When the access token has expired, the client MUST refresh it ([Authentication and session](./authentication-and-session.md)) and then rejoin; a rejected join MUST NOT be shown as an empty classroom.
+
 ## Movement and presence authority
 
 - Colyseus MUST own authoritative live presence and synchronized movement; the browser sends intent under a validated contract rather than assigning trusted world state.
@@ -130,14 +136,14 @@ Master §6.2's event names (for example `classroom:frozen`, `chat:muted`, `white
 
 ## Open decisions — not implicit approvals
 
-- Exact admission credentials, session mapping contracts, reconnect behavior, removal timing, and handling of permission changes require backend/frontend agreement; no timeout or token format is chosen here.
+- Session mapping contracts, reconnect behavior, removal timing, and handling of permission changes require backend/frontend agreement; no timeout is chosen here. The admission credential is decided (see "Join credential").
 - Multi-tab or multi-device identity, simultaneous participation across classrooms, and how duplicate connections map to avatars remain unresolved; examples MUST NOT settle one-avatar-per-user or one-avatar-per-connection.
 - Movement bounds, validation algorithms, tick/update frequency, interpolation technique, and correction presentation remain to be specified.
 - Ordering, deduplication, snapshot reconciliation, missed-notification recovery, and mutation correlation mechanisms need explicit contracts; this rule defines outcomes only.
 - Additional activity states and any justified dedicated messaging channel require separate decisions, not assumed enums or Socket.IO installation.
 - Horizontal scaling requires the strategy identified in master §7.4; no broker, distributed presence layer, or multi-instance architecture is selected here.
 - What seated students may do while frozen, how freeze applies to users in the 2D mode, and the collaborative synchronization mechanism remain open ([Live classroom tools](./live-classroom-tools.md)).
-- Cross-repository contract distribution and ownership remain unresolved. Frontend types or illustrative events MUST NOT silently become a shared contract package.
+- Distribution of realtime message and state types remains open (REST contracts are decided in [API contracts](./api-contracts.md)). Frontend types or illustrative events MUST NOT silently become a shared contract package.
 
 ## Observable acceptance checks
 

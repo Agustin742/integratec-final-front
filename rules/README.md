@@ -30,7 +30,7 @@ Rules describe **how the project must be designed and built**. They are not impl
 
 ### Product behavior
 
-- [Classrooms, roles, and permissions](./classrooms-and-roles.md) — organization paths, role-specific interface, invitations, parent area, 2D/3D mode, and server-authorized access.
+- [Classrooms, roles, and permissions](./classrooms-and-roles.md) — organization paths, role-specific interface, invitations and classroom join code, parent area, 2D/3D mode, and server-authorized access.
 - [Activities and grading](./activities-and-grading.md) — activity CRUD, student submission, teacher review and grading, exams, and uncertain writes.
 - [Communication and notifications](./communication-and-notifications.md) — classroom chat with moderation and mute, @mentions, announcement board, parent messages, and in-app notifications.
 - [Points, streak, shop, pet, and medals](./points-and-shop.md) — server-owned points display, shop purchases, streak, mini-games disabled state, classroom pet, and medals.
@@ -51,8 +51,8 @@ Rules describe **how the project must be designed and built**. They are not impl
 - [3D world and camera](./3d-world-and-camera.md) — React Three Fiber scene boundaries, fixed isometric camera, asset loading, performance, and non-3D alternatives.
 - [Frontend conventions](./frontend-conventions.md) — modules, TypeScript boundaries, React composition, and lifecycle cleanup.
 - [State management](./state-management.md) — local, server, shared client, and realtime state ownership.
-- [API contracts](./api-contracts.md) — cross-repository ownership, payloads, compatibility, and integration evidence.
-- [Authentication and session](./authentication-and-session.md) — session states, expiration, logout, and account isolation without selecting a session mechanism.
+- [API contracts](./api-contracts.md) — cross-repository ownership, OpenAPI-generated types, payloads, compatibility, and integration evidence.
+- [Authentication and session](./authentication-and-session.md) — session states, `sessionStorage` token handling and its mandatory mitigations, expiration, logout, and account isolation.
 - [Data and time](./data-and-time.md) — opaque identity, optional values, dates, time zones, and persistence boundaries.
 
 ### Experience and operation

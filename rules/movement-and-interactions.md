@@ -124,4 +124,4 @@ These are future implementation checks, not claims of runtime compliance.
 - Occlusion treatment and performance budgets require decisions consistent with art direction.
 - Object-specific trigger conditions and failure feedback need definition as interactions are approved; example objects do not establish a mandatory catalog.
 - Reconnection timing and precise recovery behavior require a shared realtime contract; this document selects no timeout or automatic replay policy.
-- Cross-repository contract ownership and distribution remain unresolved in master section 5; no shared package or transport schema is selected here.
+- Distribution of realtime contracts remains unresolved (REST contracts are decided ([API contracts](./api-contracts.md))); no shared package or transport schema is selected here.

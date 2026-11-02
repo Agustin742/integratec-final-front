@@ -74,7 +74,7 @@ Teachers and students can alternate between the 3D world and the classic 2D inte
 | NestJS / PostgreSQL | Persistent schools, classrooms, memberships, roles, invitations, adult mode, and authorized business changes |
 | Colyseus | Live session admission, presence, movement, and permission checks for received actions |
 | Frontend | Show context and role-specific surfaces, request actions, represent pending/rejected results, and clear inaccessible state |
-| Backend and frontend maintainers | Agree on consumed contracts without assuming a cross-repository distribution mechanism |
+| Backend and frontend maintainers | Agree on consumed contracts; REST types are generated from the backend OpenAPI document, with no assumed distribution mechanism for realtime contracts |
 
 - Every protected read or mutation **MUST** be authorized server-side; a visible door, an open panel, a cached classroom, or a client store **MUST NOT** grant authority.
 - Visibility, discovery, admission, and resource modification **MUST NOT** be treated as interchangeable permissions.
@@ -86,7 +86,7 @@ Teachers and students can alternate between the 3D world and the classic 2D inte
 
 ## Invitations
 
-- Onboarding is by email invitation: teachers and administrators invite teachers; teachers and administrators invite students and parents to a classroom. Master §2.1 and §2.2 define it; the server owns the secret, expiry, and single use.
+- Onboarding has two mechanisms (backend decision D7). Email invitations: teachers and administrators invite teachers, and teachers and administrators invite students and parents to a classroom; the server owns the secret, expiry, and single use. Parents and invited teachers **MUST** always join by email invitation. The classroom join code (below) is for students only. Master §2.1 and §2.2 define the model.
 - The interface **MUST** let authorized staff send invitations for a school or classroom with a role, and show the pending, accepted, expired, or revoked state returned by the server. Resending or revoking is offered only if the backend contract supports it.
 - Invitation acceptance **MUST** require authentication. The interface **MUST NOT** treat possession of an invitation link as access to unrelated resources.
 - An invalid, expired, revoked, or reused invitation **MUST** be explained without exposing protected school, classroom, or user information, and **MUST NOT** create a visible membership.
@@ -135,10 +135,22 @@ Apply [Quality and testing](./quality-and-testing.md); these checks describe req
 - [ ] Direct API and realtime attempts with missing identity, insufficient permissions, and foreign IDs cannot bypass authorization, whatever the interface shows.
 - [ ] 3D and 2D modes expose the same essential functions with the same server checks; switching preserves membership and context.
 - [ ] Invitation states and failures are explained without leaking information, and acceptance requires authentication.
+- [ ] A student can join with a classroom code and receives only the student role; the teacher sees a created or regenerated code once and can revoke it.
 - [ ] Adult education mode hides parent invitations and disables the actions of existing parent links; a third guardian cannot be invited.
 - [ ] Disconnect/reconnect preserves classroom and membership records while presence changes.
 - [ ] Lost access, logout, and late responses clear or isolate affected private state under [Security](./security.md).
 - [ ] Classroom layouts preserve readable doors, routes, and human avatars under [Art direction](./art-direction.md), without selecting an engine.
+
+## Classroom join code
+
+The server is the authority for every rule in this section; the interface only presents and requests.
+
+- An authenticated student **MUST** be able to enter a classroom code. Joining **MUST** require authentication; the interface **MUST NOT** treat knowing a code as access to the classroom's resources.
+- A code grants only the student role. The interface **MUST NOT** offer a role choice when joining with a code.
+- The teacher (and the school Owner or Admin) **MUST** be able to create, regenerate, and revoke the classroom code, and see the state the server returns (active, expired, revoked, uses).
+- The code **MUST** be shown only once, when it is created or regenerated; the interface **MUST NOT** persist it in client storage or show it again later. Regenerating invalidates the previous code, and the interface **MUST** say so.
+- An invalid, expired, revoked, or exhausted code **MUST** be explained without exposing protected classroom or user information, and **MUST NOT** create a visible membership. A rate-limit rejection **MUST** be shown as such.
+- An already-enrolled student joining again **MUST NOT** see a duplicate membership; the interface shows the server's result.
 
 ## Open decisions — not implementation defaults
 
@@ -146,6 +158,6 @@ Apply [Quality and testing](./quality-and-testing.md); these checks describe req
 - Whether a user may belong to several schools (a single account holding both organization paths is decided).
 - Where the 2D/3D preference is persisted, and whether a user in 2D mode keeps a visible avatar in the shared classroom.
 - Permission-change propagation and active-session handling; no timeout or eviction protocol is selected here.
-- Authoritative contract publication and distribution between the independent repositories.
+- Distribution of realtime contracts between the independent repositories (REST contracts are decided in [API contracts](./api-contracts.md)).
 
 Decisions **MUST** be recorded with the responsible backend and frontend owners before consumers rely on them. Examples above demonstrate invariants only, not additional approved roles or workflows.
