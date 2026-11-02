@@ -96,16 +96,6 @@ function OwnedPreview(props: CustomizedAvatarPreviewProps & { angle: number }) {
           <AvatarScene avatar={avatar} onReady={ready} onFailure={failed} />
         </Canvas>}
       </div>
-      {avatar && <div role="group" aria-label="Inspeccionar movimiento" className="avatar-motion-controls"
-        onPointerDown={event => event.stopPropagation()}>
-        {['Idle', 'Walk', 'Sit'].map(name => {
-          const available = avatar.availableMotions?.includes(name) && Boolean(avatar.setMotion);
-          return <button key={name} type="button" disabled={status !== 'ready' || !available}
-            onClick={() => avatar.setMotion?.(name)}>{name}{!available && ' · No disponible'}</button>;
-        })}
-        <button type="button" disabled={status !== 'ready' || !avatar.setMotion}
-          onClick={() => avatar.setMotion?.(null)}>Pausar movimiento</button>
-      </div>}
     </div>
   </PreviewBoundary>;
 }

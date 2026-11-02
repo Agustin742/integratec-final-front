@@ -1,5 +1,8 @@
 import { Component, useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Canvas } from '@react-three/fiber';
+import type { AvatarConfiguration } from '../avatar/AvatarCustomizer';
+import type { AppearanceCatalogue } from '../avatar/avatar-appearance';
+import { loadCustomizedAvatar } from '../avatar/load-customized-avatar';
 import { loadAvatar, type AvatarResource } from '../avatar/load-avatar';
 import { loadReception, type ReceptionResource } from './load-reception';
 import { ReceptionScene } from './ReceptionScene';
@@ -18,7 +21,11 @@ class ReceptionBoundary extends Component<{ children: ReactNode }, { failed: boo
   static getDerivedStateFromError() { return { failed: true }; }
   render() { return this.state.failed ? <WebGLFailure /> : this.props.children; }
 }
-function ReceptionContent() {
+interface ReceptionPreviewProps {
+  configuration?: AvatarConfiguration;
+  catalogue?: AppearanceCatalogue;
+}
+function ReceptionContent({ configuration, catalogue }: ReceptionPreviewProps) {
   const [avatar, setAvatar] = useState<AvatarResource>();
   const [room, setRoom] = useState<ReceptionResource>();
   const [status, setStatus] = useState<'loading' | 'ready' | 'avatar-error' | 'room-error' | 'webgl-error'>('loading');
@@ -82,12 +89,13 @@ function ReceptionContent() {
     const reject = (error: 'avatar-error' | 'room-error') => {
       if (active) { cleanup(); setStatus(error); }
     };
-    loadAvatar(window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    (configuration && catalogue ? loadCustomizedAvatar(configuration, catalogue, reducedMotion) : loadAvatar(reducedMotion))
       .then(resource => accept(resource, setAvatar)).catch(() => reject('avatar-error'));
     loadReception().then(resource => accept(resource, setRoom)).catch(() => reject('room-error'));
     // GLTF downloads cannot be aborted: every obsolete result is disposed, never mounted.
     return cleanup;
-  }, [failed]);
+  }, [failed, configuration, catalogue]);
 
   if (status === 'webgl-error') return <WebGLFailure />;
   if (status === 'avatar-error' || status === 'room-error') return <p role="alert">
@@ -141,6 +149,7 @@ function ReceptionContent() {
     </div>
   );
 }
-export function ReceptionPreview() {
-  return <ReceptionBoundary><ReceptionContent /></ReceptionBoundary>;
+export function ReceptionPreview(props: ReceptionPreviewProps) {
+  const key = props.configuration ? JSON.stringify([props.configuration, props.catalogue]) : 'original';
+  return <ReceptionBoundary key={key}><ReceptionContent {...props} /></ReceptionBoundary>;
 }

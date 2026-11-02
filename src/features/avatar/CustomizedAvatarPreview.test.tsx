@@ -118,16 +118,13 @@ it('orbits the real preview camera to the rear without changing its resource or 
   fireEvent.click(screen.getByText('Render frame'));
   expect(input.onStatusChange).toHaveBeenLastCalledWith('ready');
 });
-it('offers actual motion controls, marks unavailable clips and pauses without reloading', async () => {
+it('shows only the status and 3D preview, without motion inspection buttons', async () => {
   render(<CustomizedAvatarPreview {...props()} />);
-  const avatar = { ...resource(), availableMotions: ['Idle', 'Walk'], setMotion: vi.fn(() => true) };
-  await act(async () => pending[0].resolve(avatar));
+  await act(async () => pending[0].resolve({ ...resource(), availableMotions: ['Idle', 'Walk', 'Sit'], setMotion: vi.fn(() => true) }));
   fireEvent.click(screen.getByText('Render frame'));
-  expect((screen.getByRole('button', { name: 'Sit · No disponible' }) as HTMLButtonElement).disabled).toBe(true);
-  fireEvent.click(screen.getByRole('button', { name: 'Walk' }));
-  expect(avatar.setMotion).toHaveBeenLastCalledWith('Walk');
-  fireEvent.click(screen.getByRole('button', { name: 'Pausar movimiento' }));
-  expect(avatar.setMotion).toHaveBeenLastCalledWith(null);
+  expect(screen.getByRole('img', { name: 'Vista previa 3D de tu avatar' })).toBeDefined();
+  expect(screen.queryByRole('group', { name: 'Inspeccionar movimiento' })).toBeNull();
+  for (const name of ['Idle', 'Walk', 'Sit', 'Pausar movimiento']) expect(screen.queryByRole('button', { name })).toBeNull();
   expect(loadCustomizedAvatar).toHaveBeenCalledTimes(1);
 });
 

@@ -246,31 +246,45 @@ describe('customized avatar public resource', () => {
   });
 
   describe('school uniform tops', () => {
-    const uniformId = 'uniform-primary-trousers';
-    const uniformOf = (body: AppearanceBody) => body.tops.find(top => top.id === uniformId)!;
+    const uniformIds = ['uniform-primary', 'uniform-secondary'] as const;
+    const baseNames = ['Pants', 'boots'];
     // GLTFLoader turns a multi-primitive mesh node (such as boots) into a named Group, so test effective visibility.
-    const hideable = (scene: GLTF['scene']) => {
+    const baseNodes = (scene: GLTF['scene']) => {
       const nodes: Object3D[] = [];
-      scene.traverse(node => { if (['Pants', 'boots'].includes(node.name)) nodes.push(node); });
+      scene.traverse(node => { if (baseNames.includes(node.name)) nodes.push(node); });
       return nodes;
     };
     const shown = (node: Object3D): boolean => node.visible && (!node.parent || shown(node.parent));
-    const underHidden = (node: Object3D): boolean => ['Pants', 'boots'].includes(node.name) || (!!node.parent && underHidden(node.parent));
 
-    for (const body of catalogue.bodies) it(`${body.id}: hides only the body Pants and boots meshes and shows every uniform garment`, async () => {
-      const { loaded } = mockLoads();
-      const avatar = await loadCustomizedAvatar(configuration(body, { topId: uniformId }), catalogue, false);
-      expect(hideable(loaded[0].scene).map(mesh => mesh.name).sort()).toEqual(['Pants', 'boots']);
-      expect(hideable(loaded[0].scene).every(node => !node.visible)).toBe(true);
-      const bodyMeshes = meshes(loaded[0].scene);
-      expect(bodyMeshes.some(mesh => !underHidden(mesh))).toBe(true);
-      for (const mesh of bodyMeshes) expect(shown(mesh)).toBe(!underHidden(mesh));
-      const moduleGeometry = new Set(loaded.slice(1).flatMap(gltf => meshes(gltf.scene).map(mesh => mesh.geometry)));
-      const garments = meshes(avatar.scene).filter(mesh => moduleGeometry.has(mesh.geometry));
-      expect(garments.length).toBeGreaterThan(0);
-      expect(garments.every(shown)).toBe(true);
-      avatar.dispose();
-    });
+    for (const body of catalogue.bodies) for (const uniformId of uniformIds) {
+      it(`${body.id}: ${uniformId} loads only body, hair and top and keeps the base Pants and boots visible`, async () => {
+        const uniform = body.tops.find(top => top.id === uniformId)!;
+        const requested: string[] = [];
+        const loaded: GLTF[] = [];
+        let active = 0;
+        let overlap = false;
+        vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(async url => {
+          requested.push(url);
+          overlap ||= active > 0;
+          active += 1;
+          try { const gltf = await parse(url); loaded.push(gltf); return gltf; } finally { active -= 1; }
+        });
+        const avatar = await loadCustomizedAvatar(configuration(body, { topId: uniformId }), catalogue, false);
+        expect(requested).toEqual([body.path, body.hair[0].path, uniform.path]);
+        expect(loaded).toHaveLength(3);
+        expect(overlap).toBe(false);
+        const base = baseNodes(loaded[0].scene);
+        expect(base.map(node => node.name).sort()).toEqual(['Pants', 'boots']);
+        for (const node of base) expect(node.visible).toBe(true);
+        expect(base.every(shown)).toBe(true);
+        expect(meshes(loaded[0].scene).every(shown)).toBe(true);
+        const moduleGeometry = new Set(loaded.slice(1).flatMap(gltf => meshes(gltf.scene).map(mesh => mesh.geometry)));
+        const garments = meshes(avatar.scene).filter(mesh => moduleGeometry.has(mesh.geometry));
+        expect(garments.length).toBeGreaterThan(0);
+        expect(garments.every(shown)).toBe(true);
+        avatar.dispose();
+      });
+    }
 
     for (const body of catalogue.bodies) it(`${body.id}: keeps the whole body visible for regular tops`, async () => {
       const { loaded } = mockLoads();
@@ -279,34 +293,16 @@ describe('customized avatar public resource', () => {
       avatar.dispose();
     });
 
-    for (const body of catalogue.bodies) it(`${body.id}: loads body, hair, uniform path and companions one at a time in declared order`, async () => {
-      const uniform = uniformOf(body);
-      expect(uniform.extraPaths).toHaveLength(2);
-      let active = 0;
-      let overlap = false;
-      const requested: string[] = [];
-      vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(async url => {
-        requested.push(url);
-        overlap ||= active > 0;
-        active += 1;
-        try { return await parse(url); } finally { active -= 1; }
-      });
-      const avatar = await loadCustomizedAvatar(configuration(body, { topId: uniformId }), catalogue, false);
-      expect(requested).toEqual([body.path, body.hair[0].path, uniform.path, ...uniform.extraPaths!]);
-      expect(overlap).toBe(false);
-      avatar.dispose();
-    });
-
-    it('remaps companion skins to the canonical body skeleton under the same tint rules', async () => {
+    it('remaps the uniform skin to the canonical body skeleton under the same tint rules', async () => {
       const { loaded } = mockLoads();
       const body = catalogue.bodies[1];
-      const avatar = await loadCustomizedAvatar(configuration(body, { topId: 'uniform-secondary-skirt' }), catalogue, false);
+      const avatar = await loadCustomizedAvatar(configuration(body, { topId: 'uniform-secondary' }), catalogue, false);
       const canonical = new Map((meshes(loaded[0].scene).find(node => node instanceof SkinnedMesh) as SkinnedMesh).skeleton.bones.map(bone => [bone.name, bone]));
-      const companionGeometry = new Set(loaded.slice(3).flatMap(gltf => meshes(gltf.scene).map(mesh => mesh.geometry)));
-      const companions = meshes(avatar.scene).filter((mesh): mesh is SkinnedMesh => mesh instanceof SkinnedMesh && companionGeometry.has(mesh.geometry));
-      expect(loaded).toHaveLength(5);
-      expect(companions.length).toBeGreaterThanOrEqual(2);
-      for (const mesh of companions) {
+      const uniformGeometry = new Set(meshes(loaded[2].scene).map(mesh => mesh.geometry));
+      const garments = meshes(avatar.scene).filter((mesh): mesh is SkinnedMesh => mesh instanceof SkinnedMesh && uniformGeometry.has(mesh.geometry));
+      expect(loaded).toHaveLength(3);
+      expect(garments.length).toBeGreaterThanOrEqual(2);
+      for (const mesh of garments) {
         mesh.skeleton.bones.forEach(bone => expect(bone).toBe(canonical.get(bone.name)));
         const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         expect(materials.every(material => !(material as MeshStandardMaterial).color.equals(new Color('#5b4f96')))).toBe(true);
@@ -314,26 +310,9 @@ describe('customized avatar public resource', () => {
       avatar.dispose();
     });
 
-    it('releases already loaded assets when a companion download fails and starts no later load', async () => {
-      const body = catalogue.bodies[0];
-      const loaded: GLTF[] = [];
-      const spy = vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(async url => {
-        if (url.endsWith('/trousers.glb')) throw new Error('offline');
-        const gltf = await parse(url);
-        loaded.push(gltf);
-        return gltf;
-      });
-      const disposals = new Map<string, ReturnType<typeof vi.spyOn>>();
-      spy.mockImplementationOnce(async url => { const gltf = await parse(url); loaded.push(gltf); disposals.set(url, vi.spyOn(meshes(gltf.scene)[0].geometry, 'dispose')); return gltf; });
-      await expect(loadCustomizedAvatar(configuration(body, { topId: uniformId }), catalogue, false)).rejects.toThrow('offline');
-      expect(spy).toHaveBeenCalledTimes(4); // body, hair, uniform main, failed trousers; shoes never starts.
-      expect(loaded).toHaveLength(3);
-      expect(disposals.get(body.path)).toHaveBeenCalledTimes(1);
-    });
-
-    it('releases companion geometry, materials and skeletons exactly once on dispose', async () => {
+    it('releases uniform geometry, materials and skeletons exactly once on dispose', async () => {
       mockLoads();
-      const avatar = await loadCustomizedAvatar(configuration(catalogue.bodies[0], { topId: uniformId }), catalogue, false);
+      const avatar = await loadCustomizedAvatar(configuration(catalogue.bodies[0], { topId: 'uniform-primary' }), catalogue, false);
       const found = meshes(avatar.scene);
       const resources = [...new Set(found.map(mesh => mesh.geometry)),
         ...new Set(found.flatMap(mesh => Array.isArray(mesh.material) ? mesh.material : [mesh.material])),

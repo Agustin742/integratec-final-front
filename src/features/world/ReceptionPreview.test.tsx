@@ -2,10 +2,15 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { Group } from 'three';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { loadAvatar, type AvatarResource } from '../avatar/load-avatar';
+import manifest from '../../../public/models/avatars/integration-catalogue.json';
+import { parseAppearanceCatalogue } from '../avatar/avatar-catalogue';
+import { defaultAvatarConfiguration } from '../avatar/avatar-preferences';
+import { loadCustomizedAvatar } from '../avatar/load-customized-avatar';
 import { loadReception, type ReceptionResource } from './load-reception';
 import { ReceptionPreview } from './ReceptionPreview';
 
 vi.mock('../avatar/load-avatar', () => ({ loadAvatar: vi.fn() }));
+vi.mock('../avatar/load-customized-avatar', () => ({ loadCustomizedAvatar: vi.fn() }));
 vi.mock('./load-reception', () => ({ loadReception: vi.fn() }));
 const renderer = vi.hoisted(() => ({ crashes: false }));
 vi.mock('@react-three/fiber', () => ({ Canvas: ({ children, onPointerMissed }: { children: React.ReactNode; onPointerMissed: () => void }) => {
@@ -40,6 +45,8 @@ beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ getExtension: () => null } as unknown as ReturnType<HTMLCanvasElement['getContext']>);
   vi.stubGlobal('matchMedia', () => ({ matches: false }));
   vi.mocked(loadAvatar).mockReturnValue(new Promise((yes, no) => { resolveAvatar = yes; rejectAvatar = no; }));
+  vi.mocked(loadCustomizedAvatar).mockReset();
+  vi.mocked(loadCustomizedAvatar).mockImplementation(() => new Promise((yes, no) => { resolveAvatar = yes; rejectAvatar = no; }));
   vi.mocked(loadReception).mockReturnValue(new Promise((yes, no) => { resolveRoom = yes; rejectRoom = no; }));
 });
 async function loaded() { await act(async () => { resolveAvatar(avatar()); resolveRoom(room()); }); }
@@ -148,4 +155,27 @@ it('interacts directly with 3D reception objects, opens the Noticeboard dialog o
   fireEvent.click(closeButton);
   expect(screen.queryByRole('dialog')).toBeNull();
   expect(document.activeElement).toBe(region);
+});
+
+it('loads the customized avatar when a configuration and catalogue are provided, and the original otherwise', async () => {
+  const catalogue = parseAppearanceCatalogue(manifest);
+  const configuration = defaultAvatarConfiguration(catalogue);
+  const { unmount } = render(<ReceptionPreview configuration={configuration} catalogue={catalogue} />);
+  expect(loadCustomizedAvatar).toHaveBeenCalledWith(configuration, catalogue, false);
+  expect(loadAvatar).not.toHaveBeenCalled();
+  await loaded();
+  fireEvent.click(screen.getByText('Rendered'));
+  expect(screen.getByLabelText('Local reception navigation')).toBeDefined();
+  unmount();
+  render(<ReceptionPreview />);
+  expect(loadAvatar).toHaveBeenCalledWith(false);
+  expect(loadCustomizedAvatar).toHaveBeenCalledOnce();
+});
+it('reloads the customized avatar when the confirmed appearance changes', () => {
+  const catalogue = parseAppearanceCatalogue(manifest);
+  const configuration = defaultAvatarConfiguration(catalogue);
+  const { rerender } = render(<ReceptionPreview configuration={configuration} catalogue={catalogue} />);
+  rerender(<ReceptionPreview configuration={{ ...configuration, hairId: 'dreads' }} catalogue={catalogue} />);
+  expect(loadCustomizedAvatar).toHaveBeenCalledTimes(2);
+  expect(loadCustomizedAvatar).toHaveBeenLastCalledWith({ ...configuration, hairId: 'dreads' }, catalogue, false);
 });

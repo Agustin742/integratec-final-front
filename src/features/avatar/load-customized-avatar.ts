@@ -122,11 +122,8 @@ export async function loadCustomizedAvatar(
     resources.collect(scene);
     scene.updateMatrixWorld(true);
     const joints = canonicalJoints(scene);
-    // Hide before attaching modules so only original body nodes can match.
-    const hidden = new Set(selected.flatMap(asset => asset.hideBodyMeshes ?? []));
-    scene.traverse(node => { if (hidden.has(node.name)) node.visible = false; });
-    for (const asset of selected) for (const path of [asset.path, ...(asset.extraPaths ?? [])]) {
-      const module = await loader.loadAsync(url(path));
+    for (const asset of selected) {
+      const module = await loader.loadAsync(url(asset.path));
       resources.collect(module.scene);
       module.scene.updateMatrixWorld(true);
       const sources: Mesh[] = [];

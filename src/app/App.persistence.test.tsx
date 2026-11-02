@@ -21,7 +21,6 @@ afterEach(() => {
 });
 
 it('retains local-save failure feedback after the real wardrobe confirms and unmounts', () => {
-  window.history.replaceState(null, '', '/wardrobe');
   window.localStorage.setItem('unrelated', 'keep');
   const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
     throw new DOMException('Synthetic storage failure', 'QuotaExceededError');
@@ -32,8 +31,8 @@ it('retains local-save failure feedback after the real wardrobe confirms and unm
   });
   fireEvent.click(screen.getByRole('button', { name: 'Entrar a la oficina →' }));
 
-  expect(window.location.pathname).toBe('/');
   expect(screen.getByText('Reception canvas')).toBeDefined();
+  expect(screen.getByRole('button', { name: 'Vestidor' })).toBeDefined();
   expect(screen.queryByRole('form', { name: 'Armá tu combinación' })).toBeNull();
   expect(screen.getByRole('alert').textContent).toBe(
     'No pudimos guardar o recuperar tu selección en este navegador. Podés continuar sin guardarla; no se guarda en una cuenta.',

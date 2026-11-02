@@ -9,6 +9,7 @@ body {
   overflow: hidden;
 }
 .app-shell {
+  position: relative;
   width: 100vw;
   height: 100vh;
   margin: 0;
@@ -86,4 +87,38 @@ button {
   border-left: 0.25rem solid #382f3f;
   padding: 1rem;
   background: #fff0d8;
+}
+.reception-wardrobe-button {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 2;
+  padding: 0.55rem 1.2rem;
+  border: 2px solid #af7b52;
+  border-radius: 999px;
+  color: #382f3f;
+  background: #fff9eb;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(56, 47, 63, 0.18);
+  pointer-events: auto;
+}
+.reception-wardrobe-button:hover {
+  background: #62cfc7;
+  border-color: #382f3f;
+}
+.reception-wardrobe-button:focus-visible {
+  outline: 3px solid #62cfc7;
+  outline-offset: 2px;
+}
+.reception-warning {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 2;
+  max-width: min(32rem, calc(100% - 9rem));
+  margin: 0;
+  border-radius: 0.85rem;
+  box-shadow: 0 4px 14px rgba(56, 47, 63, 0.18);
+  font-size: 0.9rem;
+  pointer-events: auto;
 }
