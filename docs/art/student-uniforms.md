@@ -1,8 +1,12 @@
 # Student uniform visual designs
 
-**Both female skirt alternatives now end at the canonical anatomical knees. Animated fit remains partial, not approved.** Primary retains the ivory guardapolvo and navy tie; secondary retains the indigo sweater and cream polo, without a tie. Trousers, shoes, bodies and materials keep their existing designs.
+**Both female skirt alternatives now end at the canonical anatomical knees, and all six uniforms are selectable in `/wardrobe`. Animated fit remains partial, not approved.** Primary retains the ivory guardapolvo and navy tie; secondary retains the indigo sweater and cream polo, without a tie. Trousers, shoes, bodies and materials keep their existing designs.
 
-The renewed S10–S11 Blender pass sampled the existing Idle/Walk/Sit actions on all six assemblies and regenerated the same modular paths. Seated primary coats still have side-front penetration after two bounded weighting corrections. Skirt hems also crease sharply when seated, with rear waist/coat overlap visible from the side. Secondary sleeves expose elbow skin in the seated view. These are **study exports, not integration-ready animated clothing**; do not interpret structural checks as visual fit approval. Earlier parent Chrome inspection applies to the previous static stage, not these regenerated exports.
+The renewed S10–S11 Blender pass sampled the existing Idle/Walk/Sit actions on all six assemblies and regenerated the same modular paths. Seated primary coats still have side-front penetration after two bounded weighting corrections. Skirt hems also crease sharply when seated, with rear waist/coat overlap visible from the side. Secondary sleeves expose elbow skin in the seated view. These exports are connected to the wardrobe with this accepted seated-fit limitation; they are **not approved animated clothing**, and structural checks are not visual fit approval. Earlier parent Chrome inspection applies to the previous static stage, not these regenerated exports.
+
+## Wardrobe selection
+
+All six variants appear under **Prenda** at `/wardrobe` (male: primary and secondary; female: primary and secondary, each with trousers or a knee-length skirt). Selecting one loads the garment, trousers or skirt, and shoes, and hides the body's original pants and boots. Idle, Walk and Sit can be inspected there. Sit still deforms the uniforms as described above; the user accepted this limitation when connecting them. Catalogue and loader details are in [avatar-wardrobe.md](./avatar-wardrobe.md#school-uniforms-in-the-wardrobe).
 
 ## Quick inspection
 
@@ -42,7 +46,7 @@ The self-contained helper is `scripts/blender/student_uniforms.py`. In Blender's
 
 Construction uses new stitched torso/armhole/sleeve loops, tailored trouser volumes, gently pleated A-line skirts and shaped shoe lasts. No old outfit geometry is copied. Neck folds are tessellated before seating against the sole continuous sweater surface; corner-only fitting failed because the intervening broad faces cut into its curvature. Primary pockets and placket are coherent patches. Colors are original implementation choices, not a finalized institutional identity; there are no logos or insignia.
 
-Anatomical meshes, materials, proportions and canonical rigs are unchanged. Original pants/boots remain unchanged but hidden in editable design scenes and omitted from dressed references so the new clothing can be inspected. This asset unit does not migrate a runtime body, hair/accessory catalog, app or wardrobe. Scene copies use `bpy.data.libraries.write`; the helper never opens/resets a main file or deletes pre-existing scenes/data. The original Cube/Camera/Light scene remains active. Open editable outputs in a separate Blender session rather than discarding unsaved work.
+Anatomical meshes, materials, proportions and canonical rigs are unchanged. Original pants/boots remain unchanged but hidden in editable design scenes and omitted from dressed references so the new clothing can be inspected. This asset unit did not migrate a runtime body, hair/accessory catalog, app or wardrobe; the later wardrobe integration only references the exported modules. Scene copies use `bpy.data.libraries.write`; the helper never opens/resets a main file or deletes pre-existing scenes/data. The original Cube/Camera/Light scene remains active. Open editable outputs in a separate Blender session rather than discarding unsaved work.
 
 ## Historical static-stage checks
 
@@ -74,7 +78,7 @@ Every assembly has `motion-checks.json`, `motion-after/` renders and a contact s
 
 Structural evidence: 171 integer frames per assembly (Idle1–49, Walk1–25, Sit1–97), including clip boundaries and all integer keyframes, remain finite: 1,026 sampled poses total. Midpoints have front/side/three-quarter renders; boundaries have three-quarter renders. All 24 GLBs reimported in separate Blender scenes; canonical joints remain 34 male/41 female, maximum inverse-bind error `1.1920928955078125e-6`, normalized exported weights within `1e-5`. Exact source-base coordinates, topology, weights, material colors/roughness/metalness and transforms match fresh source imports in REST at frame0. An initial cross-source fingerprint check compared animated frame1 facial transforms against REST and failed; aligning both to REST/frame0 corrected the check, not the bodies. See `motion-base-preservation.json`, `motion-regressions.json` and `motion-reimports.json` in the asset root. Per-variant source hashes/rest-bind snapshots remained unchanged.
 
-Visual checks inspected all six sheets plus full-size knee/seated examples. These are finite sampled views, not continuous-motion, collision or physics approval. App tests/typecheck/browser integration were not run for this asset-only unit; parent T6 owns wardrobe assembly. No source files or original scenes were edited, opened or reset. Added inspection scenes remain in Blender, with `Scene` restored active.
+Visual checks inspected all six sheets plus full-size knee/seated examples. These are finite sampled views, not continuous-motion, collision or physics approval. App tests/typecheck/browser integration were not run for this asset-only unit; the wardrobe integration is documented above. No source files or original scenes were edited, opened or reset. Added inspection scenes remain in Blender, with `Scene` restored active.
 
 ## Historical design-stage limitations
 

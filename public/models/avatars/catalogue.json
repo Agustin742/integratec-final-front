@@ -220,6 +220,38 @@
             "shared_joints": 34,
             "tolerance": 1e-05
           }
+        },
+        {
+          "id": "uniform-primary-trousers",
+          "label": "Uniforme primaria",
+          "path": "/models/avatars/male/uniforms/primary-trousers/coat-tie.glb",
+          "slot": "top",
+          "tintMaterials": [],
+          "detailMaterials": [],
+          "extraPaths": [
+            "/models/avatars/male/uniforms/primary-trousers/trousers.glb",
+            "/models/avatars/male/uniforms/primary-trousers/shoes.glb"
+          ],
+          "hideBodyMeshes": [
+            "Pants",
+            "boots"
+          ]
+        },
+        {
+          "id": "uniform-secondary-trousers",
+          "label": "Uniforme secundaria",
+          "path": "/models/avatars/male/uniforms/secondary-trousers/polo-sweater.glb",
+          "slot": "top",
+          "tintMaterials": [],
+          "detailMaterials": [],
+          "extraPaths": [
+            "/models/avatars/male/uniforms/secondary-trousers/trousers.glb",
+            "/models/avatars/male/uniforms/secondary-trousers/shoes.glb"
+          ],
+          "hideBodyMeshes": [
+            "Pants",
+            "boots"
+          ]
         }
       ],
       "accessories": [
@@ -802,6 +834,70 @@
             "shared_joints": 41,
             "tolerance": 1e-05
           }
+        },
+        {
+          "id": "uniform-primary-trousers",
+          "label": "Uniforme primaria (pantalón)",
+          "path": "/models/avatars/female/uniforms/primary-trousers/coat-tie.glb",
+          "slot": "top",
+          "tintMaterials": [],
+          "detailMaterials": [],
+          "extraPaths": [
+            "/models/avatars/female/uniforms/primary-trousers/trousers.glb",
+            "/models/avatars/female/uniforms/primary-trousers/shoes.glb"
+          ],
+          "hideBodyMeshes": [
+            "Pants",
+            "boots"
+          ]
+        },
+        {
+          "id": "uniform-primary-skirt",
+          "label": "Uniforme primaria (pollera)",
+          "path": "/models/avatars/female/uniforms/primary-skirt/coat-tie.glb",
+          "slot": "top",
+          "tintMaterials": [],
+          "detailMaterials": [],
+          "extraPaths": [
+            "/models/avatars/female/uniforms/primary-skirt/skirt.glb",
+            "/models/avatars/female/uniforms/primary-skirt/shoes.glb"
+          ],
+          "hideBodyMeshes": [
+            "Pants",
+            "boots"
+          ]
+        },
+        {
+          "id": "uniform-secondary-trousers",
+          "label": "Uniforme secundaria (pantalón)",
+          "path": "/models/avatars/female/uniforms/secondary-trousers/polo-sweater.glb",
+          "slot": "top",
+          "tintMaterials": [],
+          "detailMaterials": [],
+          "extraPaths": [
+            "/models/avatars/female/uniforms/secondary-trousers/trousers.glb",
+            "/models/avatars/female/uniforms/secondary-trousers/shoes.glb"
+          ],
+          "hideBodyMeshes": [
+            "Pants",
+            "boots"
+          ]
+        },
+        {
+          "id": "uniform-secondary-skirt",
+          "label": "Uniforme secundaria (pollera)",
+          "path": "/models/avatars/female/uniforms/secondary-skirt/polo-sweater.glb",
+          "slot": "top",
+          "tintMaterials": [],
+          "detailMaterials": [],
+          "extraPaths": [
+            "/models/avatars/female/uniforms/secondary-skirt/skirt.glb",
+            "/models/avatars/female/uniforms/secondary-skirt/shoes.glb"
+          ],
+          "hideBodyMeshes": [
+            "Pants",
+            "boots"
+          ]
         }
       ],
       "accessories": [

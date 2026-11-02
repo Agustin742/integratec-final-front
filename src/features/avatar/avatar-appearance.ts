@@ -5,6 +5,10 @@ export interface AppearanceAsset {
   id: string;
   label: string;
   path: string;
+  /** Companion GLBs (for example trousers and shoes) loaded with `path`; uniform tops only. */
+  extraPaths?: readonly string[];
+  /** Body mesh names hidden while this option is selected; uniform tops only. */
+  hideBodyMeshes?: readonly string[];
   slot: 'hair' | 'top' | 'accessory';
   tintMaterials: readonly string[];
   detailMaterials: readonly string[];

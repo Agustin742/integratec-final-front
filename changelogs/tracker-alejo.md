@@ -1,5 +1,14 @@
 # Tracker — Alejo
 
+## 2026-11-02 — Recover the original wardrobe and revise school uniforms
+
+- **Status:** completed
+- **Area / files:** `src/features/avatar/`, `src/app/`, `public/models/avatars/`, `scripts/blender/student_uniforms*.py`, `assets/blender/avatars/student-uniforms/`, `docs/art/avatar-wardrobe.md`, `docs/art/student-uniforms.md`.
+- **Change:** Restore the original browser-only wardrobe at `/wardrobe` with its selectors, modular assets, storage-warning handoff across navigation, and Idle/Walk/Sit inspection controls (`5595a58` on `feat/avatar-wardrobe`). Shorten both female uniform skirts to canonical knee height (`0.2651351392`) and record the 6-variant motion study (`b7f2f77` on `feat/student-uniforms-motion`). Connect all 6 school uniform options (primary and secondary for male/female, including trouser and knee-length skirt alternatives) into `/wardrobe` with companion GLB loading and automatic hiding of base `Pants`/`boots`, documenting the known `Sit` deformation limitation per user decision.
+- **Reason:** Address the user's request to reuse the original wardrobe page rather than the temporary inspector, shorten female skirts to the knee, inspect clothing/accessory motion, and integrate the uniform options into `/wardrobe`.
+- **Verification:** Full test suite (`218/218` across 19 files), both TypeScript checks, Vite production build (`1,145.86 kB` chunk warning), `5/5` CI regression tests, 45-file doc link/anchor checks, both Blender-helper syntax checks and scoped whitespace checks passed. Viewed `/wardrobe` in Chrome at desktop and 390px mobile width, verified the new uniform options (`Uniforme primaria`, `Uniforme secundaria`, `Uniforme primaria (pantalón)`, `Uniforme primaria (pollera)`, `Uniforme secundaria (pantalón)`, `Uniforme secundaria (pollera)`), `Idle`/`Walk`/`Sit` motion switching, knee-length skirts, and return to reception with no horizontal overflow or model errors (only `/favicon.ico` 404).
+- **Next step:** None for this local feature chain (`feat/student-uniform-assets` -> `feat/student-uniforms-male` -> `feat/student-uniforms-female` -> `feat/avatar-wardrobe` -> `feat/student-uniforms-motion` -> `feat/student-uniforms-wardrobe`). Future seated shape-key/geometry refinement and remote push/PR/merge remain separate team decisions.
+
 ## 2026-10-27 — Repair project-local dependency resolution
 
 - **Status:** completed

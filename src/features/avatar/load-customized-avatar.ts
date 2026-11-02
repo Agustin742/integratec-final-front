@@ -74,7 +74,10 @@ function remapSkin(source: SkinnedMesh, joints: Map<string, CanonicalJoint>) {
     const joint = joints.get(bone.name);
     if (!joint || seen.has(bone.name)) throw new Error(`Missing or duplicate module bone: ${bone.name}`);
     seen.add(bone.name);
-    if (bone.parent?.name !== joint.bone.parent?.name) throw new Error(`Incompatible bone parent: ${bone.name}`);
+    // Bone parents must match by name; a non-bone armature container's name (for example a Blender
+    // duplicate suffix) is not skeleton data, and its transform is covered by the rest-matrix checks.
+    const boneParent = bone.parent instanceof Bone || joint.bone.parent instanceof Bone;
+    if (boneParent && bone.parent?.name !== joint.bone.parent?.name) throw new Error(`Incompatible bone parent: ${bone.name}`);
     assertMatrix(bone.matrix, joint.bone.matrix, `bone local rest: ${bone.name}`);
     assertMatrix(bone.matrixWorld, joint.bone.matrixWorld, `bone world rest: ${bone.name}`);
     assertMatrix(source.skeleton.boneInverses[index], joint.inverse, `inverse bind: ${bone.name}`);
@@ -119,8 +122,11 @@ export async function loadCustomizedAvatar(
     resources.collect(scene);
     scene.updateMatrixWorld(true);
     const joints = canonicalJoints(scene);
-    for (const asset of selected) {
-      const module = await loader.loadAsync(url(asset.path));
+    // Hide before attaching modules so only original body nodes can match.
+    const hidden = new Set(selected.flatMap(asset => asset.hideBodyMeshes ?? []));
+    scene.traverse(node => { if (hidden.has(node.name)) node.visible = false; });
+    for (const asset of selected) for (const path of [asset.path, ...(asset.extraPaths ?? [])]) {
+      const module = await loader.loadAsync(url(path));
       resources.collect(module.scene);
       module.scene.updateMatrixWorld(true);
       const sources: Mesh[] = [];
