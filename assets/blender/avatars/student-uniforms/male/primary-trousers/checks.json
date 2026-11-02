@@ -1,0 +1,19 @@
+{
+  "scene": "Continuous uniform male primary-trousers.004",
+  "variant": "male/primary-trousers",
+  "source_sha256": {
+    "D:\\ALEJO\\AleMart\\Documents\\GITHUB\\IntegrarTec\\ProyectoFinal\\prueba-3d\\odd\\worktrees\\avatar-customization\\public\\models\\avatars\\male\\body.glb": "ad70c9aac18f75dbf0f38c4b7d1c08efa9323342e583c5596e45fdf4aea63b26",
+    "D:\\ALEJO\\AleMart\\Documents\\GITHUB\\IntegrarTec\\ProyectoFinal\\prueba-3d\\odd\\worktrees\\avatar-customization\\assets\\blender\\avatars\\male-editable.blend": "38b8b823870c28cf3b75617f2caa566da77f003d805b4b008e2ad0707d56b637"
+  },
+  "base_geometry_weights_and_binds_unchanged": true,
+  "source_hashes_unchanged": true,
+  "garment_meshes": 16,
+  "motion_acceptance": "Deferred by S8; not checked in this stage.",
+  "static_views": [
+    "rest.png",
+    "front.png"
+  ],
+  "visual_acceptance": "Worker static inspection PASS: front and three-quarter rest renders; no visible gaps or body penetration. Parent Chrome/design review pending.",
+  "continuous_top_connected_components": 1,
+  "known_motion_limits": "Animated fit deferred by S8. Prior male primary Sit had thigh/coat clipping; new variants motion unverified. No new motion tests run."
+}
