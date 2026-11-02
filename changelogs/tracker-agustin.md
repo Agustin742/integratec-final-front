@@ -1,5 +1,13 @@
 # Tracker — Agustin
 
+## 2026-11-02 — Record multiple-choice quizzes and mention autocomplete source (FD12)
+
+- **Status:** completed
+- **Area / files:** `docs/technical-justification.md`, `docs/functional-requirements.md`, `rules/` (activities-and-grading, communication-and-notifications)
+- **Change:** Recorded FD12: auto-graded multiple choice is MVP Core and rendered as a quiz or exam UI with server-provided results (never graded client-side); mention autocomplete consumes backend `GET /classrooms/:id/members`. Mirrored backend D11 and D12 and fixed the requirements wording on self-assessed quizzes. Done with AI assistance (Claude Code), reviewed by Agustin.
+- **Reason:** The requirements contradicted themselves on multiple-choice scope, and the chat composer needs a defined, minimal source for mention suggestions (frontend issue #51, backend issue #52).
+- **Next step:** Build the quiz/exam interface and the mention autocomplete against the published contract and MSW handlers (FD9).
+
 ## 2026-11-02 — Record contract mocks, UI language and deadline time zone (FD9–FD11)
 
 - **Status:** completed

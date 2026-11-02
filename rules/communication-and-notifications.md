@@ -62,6 +62,7 @@ Users must be able to exchange authorized classroom messages, consult persisted 
 ### @mentions
 
 - The composer **MAY** offer mention suggestions limited to the classroom roster the server returns; it **MUST NOT** expose users outside the classroom or members the actor may not see.
+- The suggestion source is backend `GET /classrooms/:id/members` (backend decision D12, FD12): paginated, with the optional `q` case-insensitive display-name prefix filter. The interface shows only the fields it returns (id, display name, classroom role, avatar summary) and **MUST NOT** assume emails or other personal data are available.
 - The server resolves mentions; the interface **MUST** render unresolved text as plain text and **MUST NOT** treat a typed `@name` as a confirmed mention until the server accepts it.
 - A mentioned user receives an in-app notification (see below) only if they still have access to the classroom.
 - A bound on mentions per message is an open decision; the interface **MUST** show the server's rejection if exceeded.

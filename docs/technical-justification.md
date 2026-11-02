@@ -78,9 +78,9 @@ Frontend-side justification for course requirement R6. Decisions come from the [
 
 Decided and approved by Agustin (decision owner) on 2026-11-02. This is not a claim of team-wide approval; per [Documentation and decisions](../rules/documentation-and-decisions.md), a conflict with the team **MUST** be resolved before dependent implementation proceeds.
 
-### Backend decisions D1-D10 and their frontend impact
+### Backend decisions D1-D12 and their frontend impact
 
-The backend repository records decisions D1-D10 in its `docs/technical-justification.md` section 7 (a relative link to that repository is not possible, so it is cited here). They affect the frontend as follows.
+The backend repository records decisions D1-D12 in its `docs/technical-justification.md` section 7 (a relative link to that repository is not possible, so it is cited here). They affect the frontend as follows.
 
 | ID | Backend decision | Frontend impact |
 |---|---|---|
@@ -94,6 +94,8 @@ The backend repository records decisions D1-D10 in its `docs/technical-justifica
 | D8 | The backend commits `openapi.json` (CI fails if stale), generates Colyseus room state types with `schema-codegen`, exports realtime message payload types from `packages/contracts`, and commits them | The frontend pulls these artifacts with `pnpm api:sync` and commits the generated types (FD7) |
 | D9 | Contract-first: the backend publishes each endpoint's DTOs and OpenAPI entry (a `501` stub is allowed) before or with its implementation; the committed `openapi.json` carries it | The frontend builds MSW handlers from the contract and proceeds before the backend implementation lands (FD9) |
 | D10 | Timestamps stored in UTC and returned as ISO 8601 UTC; each School has a persisted IANA time zone (default `America/Argentina/Buenos_Aires`); the server decides lateness in UTC | The frontend displays deadlines in the school's time zone and indicates the zone (FD11) |
+| D11 | Auto-graded multiple choice in activities and exams is MVP Core; ungraded self-assessed practice quizzes stay MVP Extendido | The interface renders multiple choice as a quiz or exam and shows the server's result (FD12) |
+| D12 | `GET /classrooms/:id/members` returns id, display name, classroom role, and avatar summary to every classroom member; paginated, optional `q` prefix filter, `404` for non-members | Mention autocomplete consumes it (FD12) |
 
 ### FD1. Token storage
 
@@ -202,6 +204,16 @@ The backend repository records decisions D1-D10 in its `docs/technical-justifica
 - **Alternatives:** Display in each viewer's browser time zone (rejected: students and teachers could see different deadline times).
 - **Trade-offs:** The client must receive the school's time zone and format with it explicitly.
 - **Affected contracts:** [Data and time](../rules/data-and-time.md), [Activities and grading](../rules/activities-and-grading.md), and backend decision D10.
+- **Approval:** Approved by Agustin (decision owner) on 2026-11-02.
+
+### FD12. Multiple-choice quizzes and mention autocomplete
+
+- **Question:** How does the frontend present auto-graded multiple choice, and where do @mention suggestions come from (backend D11 and D12)?
+- **Decision:** Auto-graded multiple choice is MVP Core (backend D11). The frontend renders it as a quiz or exam interface, and results come from the server: the browser **MUST NOT** grade answers or submit a computed score. Optional self-assessed practice quizzes remain MVP Extendido. Mention autocomplete in the chat composer consumes backend `GET /classrooms/:id/members` (backend D12, backend issue #52; frontend issue #51), which is paginated and accepts an optional `q` case-insensitive display-name prefix filter. The interface shows only the fields the endpoint returns (id, display name, classroom role, avatar summary) and treats a typed `@name` as a confirmed mention only after the server accepts the message.
+- **Rationale:** Server-side grading keeps answer keys and scores authoritative, and a single member directory gives suggestions without exposing personal data or building a client-side roster.
+- **Alternatives:** Grading in the browser (rejected: exposes answer keys and allows forged scores); building the suggestion list from chat history or other endpoints (rejected: incomplete and may expose data the directory deliberately omits).
+- **Trade-offs:** Suggestions need a network request (debounced, with cached pages), and the quiz result is available only after the server responds; the number of attempts and partial credit stay open.
+- **Affected contracts:** [Activities and grading](../rules/activities-and-grading.md), [Communication and notifications](../rules/communication-and-notifications.md#mentions), and backend decisions D11 and D12.
 - **Approval:** Approved by Agustin (decision owner) on 2026-11-02.
 
 ## Open items
