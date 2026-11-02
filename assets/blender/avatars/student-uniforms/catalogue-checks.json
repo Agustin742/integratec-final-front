@@ -8,7 +8,10 @@
     "static_views": [
       "front.png",
       "rest.png"
-    ]
+    ],
+    "motion_integer_samples": 171,
+    "motion_accepted": false,
+    "visual_fit": "Sit49 side-front coat penetration persists"
   },
   "male/secondary-trousers": {
     "garment_meshes": 8,
@@ -19,7 +22,10 @@
     "static_views": [
       "front.png",
       "rest.png"
-    ]
+    ],
+    "motion_integer_samples": 171,
+    "motion_accepted": false,
+    "visual_fit": "Seated elbow exposure; not approved"
   },
   "female/primary-trousers": {
     "garment_meshes": 16,
@@ -30,7 +36,10 @@
     "static_views": [
       "front.png",
       "rest.png"
-    ]
+    ],
+    "motion_integer_samples": 171,
+    "motion_accepted": false,
+    "visual_fit": "Sit49 side-front coat penetration persists"
   },
   "female/primary-skirt": {
     "garment_meshes": 16,
@@ -41,7 +50,10 @@
     "static_views": [
       "front.png",
       "rest.png"
-    ]
+    ],
+    "motion_integer_samples": 171,
+    "motion_accepted": false,
+    "visual_fit": "Seated skirt creasing and rear waist/coat overlap; not approved"
   },
   "female/secondary-trousers": {
     "garment_meshes": 8,
@@ -52,7 +64,10 @@
     "static_views": [
       "front.png",
       "rest.png"
-    ]
+    ],
+    "motion_integer_samples": 171,
+    "motion_accepted": false,
+    "visual_fit": "Seated elbow exposure; not approved"
   },
   "female/secondary-skirt": {
     "garment_meshes": 8,
@@ -63,6 +78,9 @@
     "static_views": [
       "front.png",
       "rest.png"
-    ]
+    ],
+    "motion_integer_samples": 171,
+    "motion_accepted": false,
+    "visual_fit": "Seated skirt creasing and rear waist/coat overlap; not approved"
   }
 }

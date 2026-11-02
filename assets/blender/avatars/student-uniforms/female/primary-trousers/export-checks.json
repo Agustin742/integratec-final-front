@@ -1,34 +1,30 @@
-{
-  "coat-tie.glb": {
-    "finite_vertices": 3658,
+[
+  {
+    "path": "public\\models\\avatars\\female\\uniforms\\primary-trousers\\coat-tie.glb",
+    "bytes": 223132,
+    "canonical_joints": 41,
     "inverse_bind_max_error": 1.1920928955078125e-06,
-    "weight_sum_max_error": 1.30385160446167e-07,
-    "canonical_joint_count": 41,
-    "reimport_meshes": 13,
-    "unchanged_rigid_base_primitives": 0
+    "weight_sum_max_error": 1.30385160446167e-07
   },
-  "shoes.glb": {
-    "finite_vertices": 672,
+  {
+    "path": "public\\models\\avatars\\female\\uniforms\\primary-trousers\\shoes.glb",
+    "bytes": 50196,
+    "canonical_joints": 41,
     "inverse_bind_max_error": 1.1920928955078125e-06,
-    "weight_sum_max_error": 1.2293457984924316e-07,
-    "canonical_joint_count": 41,
-    "reimport_meshes": 2,
-    "unchanged_rigid_base_primitives": 0
+    "weight_sum_max_error": 1.2293457984924316e-07
   },
-  "trousers.glb": {
-    "finite_vertices": 14556,
+  {
+    "path": "public\\models\\avatars\\female\\uniforms\\primary-trousers\\trousers.glb",
+    "bytes": 829676,
+    "canonical_joints": 41,
     "inverse_bind_max_error": 1.1920928955078125e-06,
-    "weight_sum_max_error": 1.3431417755782604e-07,
-    "canonical_joint_count": 41,
-    "reimport_meshes": 1,
-    "unchanged_rigid_base_primitives": 0
+    "weight_sum_max_error": 1.3431417755782604e-07
   },
-  "dressed.glb": {
-    "finite_vertices": 34047,
+  {
+    "path": "odd\\previews\\student-uniforms\\female\\primary-trousers\\dressed.glb",
+    "bytes": 2241764,
+    "canonical_joints": 41,
     "inverse_bind_max_error": 1.1920928955078125e-06,
-    "weight_sum_max_error": 1.3431417755782604e-07,
-    "canonical_joint_count": 41,
-    "reimport_meshes": 22,
-    "unchanged_rigid_base_primitives": 4
+    "weight_sum_max_error": 1.3431417755782604e-07
   }
-}
+]

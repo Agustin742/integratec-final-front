@@ -1,0 +1,1149 @@
+{
+  "status": "partial",
+  "baseline": "0295a99c0cebc8ff342db409c16ae7c6f175ba9a",
+  "covered_specs": [
+    "S6",
+    "S7",
+    "S10",
+    "S11 (partial)"
+  ],
+  "authored_diff": {
+    "additions": 355,
+    "deletions": 18,
+    "total": 373
+  },
+  "sizes_bytes": {
+    "authored": 51299,
+    "generated-json": 49330,
+    "binary": 174057445
+  },
+  "generated_json_lines": 1954,
+  "files": [
+    {
+      "path": "assets/blender/avatars/student-uniforms/catalogue-checks.json",
+      "bytes": 2544,
+      "category": "generated-json"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/checks.json",
+      "bytes": 1225,
+      "category": "generated-json"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/export-checks.json",
+      "bytes": 1015,
+      "category": "generated-json"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/front.png",
+      "bytes": 216170,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-after/contact-sheet.png",
+      "bytes": 538964,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-after/idle-1-three-quarter.png",
+      "bytes": 218609,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-after/idle-25-front.png",
+      "bytes": 216558,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-after/idle-25-side.png",
+      "bytes": 211404,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-after/idle-25-three-quarter.png",
+      "bytes": 218999,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-after/idle-49-three-quarter.png",
+      "bytes": 218609,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-after/rest-front.png",
+      "bytes": 216170,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-after/rest-side.png",
+      "bytes": 211025,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-after/rest-three-quarter.png",
+      "bytes": 220947,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-after/sit-1-three-quarter.png",
+      "bytes": 216548,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-after/sit-49-front.png",
+      "bytes": 216449,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-after/sit-49-side.png",
+      "bytes": 211640,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-after/sit-49-three-quarter.png",
+      "bytes": 216548,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-after/sit-97-three-quarter.png",
+      "bytes": 216548,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-after/walk-1-three-quarter.png",
+      "bytes": 220157,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-after/walk-13-front.png",
+      "bytes": 218775,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-after/walk-13-side.png",
+      "bytes": 213019,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-after/walk-13-three-quarter.png",
+      "bytes": 219229,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-after/walk-25-three-quarter.png",
+      "bytes": 220157,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-before/idle-25.png",
+      "bytes": 219405,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-before/rest.png",
+      "bytes": 220844,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-before/sit-49.png",
+      "bytes": 216903,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-before/walk-13.png",
+      "bytes": 219502,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/motion-checks.json",
+      "bytes": 3579,
+      "category": "generated-json"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/rest.png",
+      "bytes": 220947,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-skirt/uniform.blend",
+      "bytes": 20184301,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/checks.json",
+      "bytes": 1210,
+      "category": "generated-json"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/export-checks.json",
+      "bytes": 1033,
+      "category": "generated-json"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/front.png",
+      "bytes": 214854,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/motion-after/contact-sheet.png",
+      "bytes": 535469,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/motion-after/idle-1-three-quarter.png",
+      "bytes": 217261,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/motion-after/idle-25-front.png",
+      "bytes": 214796,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/motion-after/idle-25-side.png",
+      "bytes": 209067,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/motion-after/idle-25-three-quarter.png",
+      "bytes": 217723,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/motion-after/idle-49-three-quarter.png",
+      "bytes": 217261,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/motion-after/rest-front.png",
+      "bytes": 214854,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/motion-after/rest-side.png",
+      "bytes": 208461,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/motion-after/rest-three-quarter.png",
+      "bytes": 219021,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/motion-after/sit-1-three-quarter.png",
+      "bytes": 215742,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/motion-after/sit-49-front.png",
+      "bytes": 213755,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/motion-after/sit-49-side.png",
+      "bytes": 210606,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/motion-after/sit-49-three-quarter.png",
+      "bytes": 215742,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/motion-after/sit-97-three-quarter.png",
+      "bytes": 215742,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/motion-after/walk-1-three-quarter.png",
+      "bytes": 218560,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/motion-after/walk-13-front.png",
+      "bytes": 217583,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/motion-after/walk-13-side.png",
+      "bytes": 210671,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/motion-after/walk-13-three-quarter.png",
+      "bytes": 217859,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/motion-after/walk-25-three-quarter.png",
+      "bytes": 218560,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/motion-checks.json",
+      "bytes": 3547,
+      "category": "generated-json"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/rest.png",
+      "bytes": 219021,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/primary-trousers/uniform.blend",
+      "bytes": 22201357,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/checks.json",
+      "bytes": 1228,
+      "category": "generated-json"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/export-checks.json",
+      "bytes": 1027,
+      "category": "generated-json"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/front.png",
+      "bytes": 215577,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/motion-after/contact-sheet.png",
+      "bytes": 540167,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/motion-after/idle-1-three-quarter.png",
+      "bytes": 218871,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/motion-after/idle-25-front.png",
+      "bytes": 217029,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/motion-after/idle-25-side.png",
+      "bytes": 211178,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/motion-after/idle-25-three-quarter.png",
+      "bytes": 218763,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/motion-after/idle-49-three-quarter.png",
+      "bytes": 218871,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/motion-after/rest-front.png",
+      "bytes": 215577,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/motion-after/rest-side.png",
+      "bytes": 210419,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/motion-after/rest-three-quarter.png",
+      "bytes": 220322,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/motion-after/sit-1-three-quarter.png",
+      "bytes": 216255,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/motion-after/sit-49-front.png",
+      "bytes": 215182,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/motion-after/sit-49-side.png",
+      "bytes": 211189,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/motion-after/sit-49-three-quarter.png",
+      "bytes": 216255,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/motion-after/sit-97-three-quarter.png",
+      "bytes": 216255,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/motion-after/walk-1-three-quarter.png",
+      "bytes": 219872,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/motion-after/walk-13-front.png",
+      "bytes": 218497,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/motion-after/walk-13-side.png",
+      "bytes": 213000,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/motion-after/walk-13-three-quarter.png",
+      "bytes": 219289,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/motion-after/walk-25-three-quarter.png",
+      "bytes": 219872,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/motion-checks.json",
+      "bytes": 3583,
+      "category": "generated-json"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/rest.png",
+      "bytes": 220322,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-skirt/uniform.blend",
+      "bytes": 20055903,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/checks.json",
+      "bytes": 1206,
+      "category": "generated-json"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/export-checks.json",
+      "bytes": 1045,
+      "category": "generated-json"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/front.png",
+      "bytes": 215401,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/motion-after/contact-sheet.png",
+      "bytes": 534981,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/motion-after/idle-1-three-quarter.png",
+      "bytes": 218717,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/motion-after/idle-25-front.png",
+      "bytes": 216626,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/motion-after/idle-25-side.png",
+      "bytes": 209580,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/motion-after/idle-25-three-quarter.png",
+      "bytes": 218610,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/motion-after/idle-49-three-quarter.png",
+      "bytes": 218717,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/motion-after/rest-front.png",
+      "bytes": 215401,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/motion-after/rest-side.png",
+      "bytes": 209005,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/motion-after/rest-three-quarter.png",
+      "bytes": 219794,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/motion-after/sit-1-three-quarter.png",
+      "bytes": 215363,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/motion-after/sit-49-front.png",
+      "bytes": 212302,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/motion-after/sit-49-side.png",
+      "bytes": 210065,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/motion-after/sit-49-three-quarter.png",
+      "bytes": 215363,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/motion-after/sit-97-three-quarter.png",
+      "bytes": 215363,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/motion-after/walk-1-three-quarter.png",
+      "bytes": 219552,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/motion-after/walk-13-front.png",
+      "bytes": 218387,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/motion-after/walk-13-side.png",
+      "bytes": 211718,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/motion-after/walk-13-three-quarter.png",
+      "bytes": 219388,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/motion-after/walk-25-three-quarter.png",
+      "bytes": 219552,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/motion-checks.json",
+      "bytes": 3544,
+      "category": "generated-json"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/rest.png",
+      "bytes": 219794,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/female/secondary-trousers/uniform.blend",
+      "bytes": 22072959,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/checks.json",
+      "bytes": 1202,
+      "category": "generated-json"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/export-checks.json",
+      "bytes": 1026,
+      "category": "generated-json"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/front.png",
+      "bytes": 214489,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-after/contact-sheet.png",
+      "bytes": 531558,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-after/idle-1-three-quarter.png",
+      "bytes": 216736,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-after/idle-25-front.png",
+      "bytes": 214883,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-after/idle-25-side.png",
+      "bytes": 208482,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-after/idle-25-three-quarter.png",
+      "bytes": 217670,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-after/idle-49-three-quarter.png",
+      "bytes": 216736,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-after/rest-front.png",
+      "bytes": 214489,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-after/rest-side.png",
+      "bytes": 207966,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-after/rest-three-quarter.png",
+      "bytes": 218419,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-after/sit-1-three-quarter.png",
+      "bytes": 215804,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-after/sit-49-front.png",
+      "bytes": 213958,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-after/sit-49-side.png",
+      "bytes": 210007,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-after/sit-49-three-quarter.png",
+      "bytes": 215804,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-after/sit-97-three-quarter.png",
+      "bytes": 215804,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-after/walk-1-three-quarter.png",
+      "bytes": 217867,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-after/walk-13-front.png",
+      "bytes": 217448,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-after/walk-13-side.png",
+      "bytes": 210558,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-after/walk-13-three-quarter.png",
+      "bytes": 217308,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-after/walk-25-three-quarter.png",
+      "bytes": 217867,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-attempt-1/idle-1-three-quarter.png",
+      "bytes": 216743,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-attempt-1/idle-25-front.png",
+      "bytes": 215175,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-attempt-1/idle-25-side.png",
+      "bytes": 208737,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-attempt-1/idle-25-three-quarter.png",
+      "bytes": 217468,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-attempt-1/idle-49-three-quarter.png",
+      "bytes": 216743,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-attempt-1/rest-front.png",
+      "bytes": 214463,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-attempt-1/rest-side.png",
+      "bytes": 207905,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-attempt-1/rest-three-quarter.png",
+      "bytes": 218419,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-attempt-1/sit-1-three-quarter.png",
+      "bytes": 216242,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-attempt-1/sit-49-front.png",
+      "bytes": 213865,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-attempt-1/sit-49-side.png",
+      "bytes": 209215,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-attempt-1/sit-49-three-quarter.png",
+      "bytes": 216242,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-attempt-1/sit-97-three-quarter.png",
+      "bytes": 216242,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-attempt-1/walk-1-three-quarter.png",
+      "bytes": 218465,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-attempt-1/walk-13-front.png",
+      "bytes": 217954,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-attempt-1/walk-13-side.png",
+      "bytes": 211458,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-attempt-1/walk-13-three-quarter.png",
+      "bytes": 217433,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-attempt-1/walk-25-three-quarter.png",
+      "bytes": 218465,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-before/idle-25.png",
+      "bytes": 217486,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-before/sit-49.png",
+      "bytes": 216187,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-before/walk-13.png",
+      "bytes": 217441,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/motion-checks.json",
+      "bytes": 3539,
+      "category": "generated-json"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/rest.png",
+      "bytes": 218419,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/primary-trousers/uniform.blend",
+      "bytes": 17948726,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/checks.json",
+      "bytes": 1198,
+      "category": "generated-json"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/export-checks.json",
+      "bytes": 1038,
+      "category": "generated-json"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/front.png",
+      "bytes": 214901,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/motion-after/contact-sheet.png",
+      "bytes": 532786,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/motion-after/idle-1-three-quarter.png",
+      "bytes": 218072,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/motion-after/idle-25-front.png",
+      "bytes": 215751,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/motion-after/idle-25-side.png",
+      "bytes": 208587,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/motion-after/idle-25-three-quarter.png",
+      "bytes": 217602,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/motion-after/idle-49-three-quarter.png",
+      "bytes": 218072,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/motion-after/rest-front.png",
+      "bytes": 214901,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/motion-after/rest-side.png",
+      "bytes": 208132,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/motion-after/rest-three-quarter.png",
+      "bytes": 218605,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/motion-after/sit-1-three-quarter.png",
+      "bytes": 215087,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/motion-after/sit-49-front.png",
+      "bytes": 212423,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/motion-after/sit-49-side.png",
+      "bytes": 208925,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/motion-after/sit-49-three-quarter.png",
+      "bytes": 215087,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/motion-after/sit-97-three-quarter.png",
+      "bytes": 215087,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/motion-after/walk-1-three-quarter.png",
+      "bytes": 218530,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/motion-after/walk-13-front.png",
+      "bytes": 217745,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/motion-after/walk-13-side.png",
+      "bytes": 210781,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/motion-after/walk-13-three-quarter.png",
+      "bytes": 218227,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/motion-after/walk-25-three-quarter.png",
+      "bytes": 218530,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/motion-checks.json",
+      "bytes": 3536,
+      "category": "generated-json"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/rest.png",
+      "bytes": 218605,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/male/secondary-trousers/uniform.blend",
+      "bytes": 17830304,
+      "category": "binary"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/motion-base-preservation.json",
+      "bytes": 739,
+      "category": "generated-json"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/motion-regressions.json",
+      "bytes": 390,
+      "category": "generated-json"
+    },
+    {
+      "path": "assets/blender/avatars/student-uniforms/motion-reimports.json",
+      "bytes": 3607,
+      "category": "generated-json"
+    },
+    {
+      "path": "docs/art/student-uniforms.md",
+      "bytes": 13790,
+      "category": "authored"
+    },
+    {
+      "path": "odd/previews/student-uniforms/female/primary-skirt/checks.json",
+      "bytes": 1225,
+      "category": "generated-json"
+    },
+    {
+      "path": "odd/previews/student-uniforms/female/primary-skirt/dressed.glb",
+      "bytes": 1436824,
+      "category": "binary"
+    },
+    {
+      "path": "odd/previews/student-uniforms/female/primary-skirt/front.png",
+      "bytes": 216170,
+      "category": "binary"
+    },
+    {
+      "path": "odd/previews/student-uniforms/female/primary-skirt/rest.png",
+      "bytes": 220947,
+      "category": "binary"
+    },
+    {
+      "path": "odd/previews/student-uniforms/female/primary-trousers/checks.json",
+      "bytes": 1210,
+      "category": "generated-json"
+    },
+    {
+      "path": "odd/previews/student-uniforms/female/primary-trousers/dressed.glb",
+      "bytes": 2241764,
+      "category": "binary"
+    },
+    {
+      "path": "odd/previews/student-uniforms/female/primary-trousers/front.png",
+      "bytes": 214854,
+      "category": "binary"
+    },
+    {
+      "path": "odd/previews/student-uniforms/female/primary-trousers/rest.png",
+      "bytes": 219021,
+      "category": "binary"
+    },
+    {
+      "path": "odd/previews/student-uniforms/female/secondary-skirt/checks.json",
+      "bytes": 1228,
+      "category": "generated-json"
+    },
+    {
+      "path": "odd/previews/student-uniforms/female/secondary-skirt/dressed.glb",
+      "bytes": 1406552,
+      "category": "binary"
+    },
+    {
+      "path": "odd/previews/student-uniforms/female/secondary-skirt/front.png",
+      "bytes": 215577,
+      "category": "binary"
+    },
+    {
+      "path": "odd/previews/student-uniforms/female/secondary-skirt/rest.png",
+      "bytes": 220322,
+      "category": "binary"
+    },
+    {
+      "path": "odd/previews/student-uniforms/female/secondary-trousers/checks.json",
+      "bytes": 1206,
+      "category": "generated-json"
+    },
+    {
+      "path": "odd/previews/student-uniforms/female/secondary-trousers/dressed.glb",
+      "bytes": 2211492,
+      "category": "binary"
+    },
+    {
+      "path": "odd/previews/student-uniforms/female/secondary-trousers/front.png",
+      "bytes": 215401,
+      "category": "binary"
+    },
+    {
+      "path": "odd/previews/student-uniforms/female/secondary-trousers/rest.png",
+      "bytes": 219794,
+      "category": "binary"
+    },
+    {
+      "path": "odd/previews/student-uniforms/male/primary-trousers/checks.json",
+      "bytes": 1202,
+      "category": "generated-json"
+    },
+    {
+      "path": "odd/previews/student-uniforms/male/primary-trousers/dressed.glb",
+      "bytes": 2235472,
+      "category": "binary"
+    },
+    {
+      "path": "odd/previews/student-uniforms/male/primary-trousers/front.png",
+      "bytes": 214489,
+      "category": "binary"
+    },
+    {
+      "path": "odd/previews/student-uniforms/male/primary-trousers/rest.png",
+      "bytes": 218419,
+      "category": "binary"
+    },
+    {
+      "path": "odd/previews/student-uniforms/male/secondary-trousers/checks.json",
+      "bytes": 1198,
+      "category": "generated-json"
+    },
+    {
+      "path": "odd/previews/student-uniforms/male/secondary-trousers/dressed.glb",
+      "bytes": 2205196,
+      "category": "binary"
+    },
+    {
+      "path": "odd/previews/student-uniforms/male/secondary-trousers/front.png",
+      "bytes": 214901,
+      "category": "binary"
+    },
+    {
+      "path": "odd/previews/student-uniforms/male/secondary-trousers/rest.png",
+      "bytes": 218605,
+      "category": "binary"
+    },
+    {
+      "path": "public/models/avatars/female/uniforms/primary-skirt/coat-tie.glb",
+      "bytes": 223128,
+      "category": "binary"
+    },
+    {
+      "path": "public/models/avatars/female/uniforms/primary-skirt/shoes.glb",
+      "bytes": 50196,
+      "category": "binary"
+    },
+    {
+      "path": "public/models/avatars/female/uniforms/primary-skirt/skirt.glb",
+      "bytes": 24728,
+      "category": "binary"
+    },
+    {
+      "path": "public/models/avatars/female/uniforms/primary-trousers/coat-tie.glb",
+      "bytes": 223132,
+      "category": "binary"
+    },
+    {
+      "path": "public/models/avatars/female/uniforms/primary-trousers/shoes.glb",
+      "bytes": 50196,
+      "category": "binary"
+    },
+    {
+      "path": "public/models/avatars/female/uniforms/primary-trousers/trousers.glb",
+      "bytes": 829676,
+      "category": "binary"
+    },
+    {
+      "path": "public/models/avatars/female/uniforms/secondary-skirt/polo-sweater.glb",
+      "bytes": 192952,
+      "category": "binary"
+    },
+    {
+      "path": "public/models/avatars/female/uniforms/secondary-skirt/shoes.glb",
+      "bytes": 50196,
+      "category": "binary"
+    },
+    {
+      "path": "public/models/avatars/female/uniforms/secondary-skirt/skirt.glb",
+      "bytes": 24728,
+      "category": "binary"
+    },
+    {
+      "path": "public/models/avatars/female/uniforms/secondary-trousers/polo-sweater.glb",
+      "bytes": 192952,
+      "category": "binary"
+    },
+    {
+      "path": "public/models/avatars/female/uniforms/secondary-trousers/shoes.glb",
+      "bytes": 50200,
+      "category": "binary"
+    },
+    {
+      "path": "public/models/avatars/female/uniforms/secondary-trousers/trousers.glb",
+      "bytes": 829680,
+      "category": "binary"
+    },
+    {
+      "path": "public/models/avatars/male/uniforms/primary-trousers/coat-tie.glb",
+      "bytes": 220844,
+      "category": "binary"
+    },
+    {
+      "path": "public/models/avatars/male/uniforms/primary-trousers/shoes.glb",
+      "bytes": 47908,
+      "category": "binary"
+    },
+    {
+      "path": "public/models/avatars/male/uniforms/primary-trousers/trousers.glb",
+      "bytes": 827388,
+      "category": "binary"
+    },
+    {
+      "path": "public/models/avatars/male/uniforms/secondary-trousers/polo-sweater.glb",
+      "bytes": 190664,
+      "category": "binary"
+    },
+    {
+      "path": "public/models/avatars/male/uniforms/secondary-trousers/shoes.glb",
+      "bytes": 47908,
+      "category": "binary"
+    },
+    {
+      "path": "public/models/avatars/male/uniforms/secondary-trousers/trousers.glb",
+      "bytes": 827388,
+      "category": "binary"
+    },
+    {
+      "path": "scripts/blender/student_uniforms.py",
+      "bytes": 22292,
+      "category": "authored"
+    },
+    {
+      "path": "scripts/blender/student_uniforms_motion.py",
+      "bytes": 15217,
+      "category": "authored"
+    }
+  ],
+  "scenes_before": 61,
+  "scenes_after": 102,
+  "active_scene": "Scene",
+  "fit_correction_limit_reached": true,
+  "acceptance": "Knee length observed; motion fit not approved",
+  "risk": "No app/shared runtime code changes. Asset exports retain known visual fit limitations."
+}

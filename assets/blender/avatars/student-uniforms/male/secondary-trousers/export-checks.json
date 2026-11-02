@@ -1,34 +1,30 @@
-{
-  "polo-sweater.glb": {
-    "finite_vertices": 3130,
+[
+  {
+    "path": "public\\models\\avatars\\male\\uniforms\\secondary-trousers\\polo-sweater.glb",
+    "bytes": 190664,
+    "canonical_joints": 34,
     "inverse_bind_max_error": 3.5762786865234375e-07,
-    "weight_sum_max_error": 1.1827796697616577e-07,
-    "canonical_joint_count": 34,
-    "reimport_meshes": 5,
-    "unchanged_rigid_base_primitives": 0
+    "weight_sum_max_error": 1.1827796697616577e-07
   },
-  "shoes.glb": {
-    "finite_vertices": 672,
+  {
+    "path": "public\\models\\avatars\\male\\uniforms\\secondary-trousers\\shoes.glb",
+    "bytes": 47908,
+    "canonical_joints": 34,
     "inverse_bind_max_error": 3.5762786865234375e-07,
-    "weight_sum_max_error": 1.043081283569336e-07,
-    "canonical_joint_count": 34,
-    "reimport_meshes": 2,
-    "unchanged_rigid_base_primitives": 0
+    "weight_sum_max_error": 1.043081283569336e-07
   },
-  "trousers.glb": {
-    "finite_vertices": 14556,
+  {
+    "path": "public\\models\\avatars\\male\\uniforms\\secondary-trousers\\trousers.glb",
+    "bytes": 827388,
+    "canonical_joints": 34,
     "inverse_bind_max_error": 3.5762786865234375e-07,
-    "weight_sum_max_error": 1.3431417755782604e-07,
-    "canonical_joint_count": 34,
-    "reimport_meshes": 1,
-    "unchanged_rigid_base_primitives": 0
+    "weight_sum_max_error": 1.3431417755782604e-07
   },
-  "dressed.glb": {
-    "finite_vertices": 33435,
+  {
+    "path": "odd\\previews\\student-uniforms\\male\\secondary-trousers\\dressed.glb",
+    "bytes": 2205196,
+    "canonical_joints": 34,
     "inverse_bind_max_error": 3.5762786865234375e-07,
-    "weight_sum_max_error": 1.3431417755782604e-07,
-    "canonical_joint_count": 34,
-    "reimport_meshes": 13,
-    "unchanged_rigid_base_primitives": 3
+    "weight_sum_max_error": 1.3431417755782604e-07
   }
-}
+]

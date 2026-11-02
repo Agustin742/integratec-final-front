@@ -1,0 +1,122 @@
+[
+  {
+    "path": "public\\models\\avatars\\male\\uniforms\\primary-trousers\\coat-tie.glb",
+    "blender_reimport": "pass",
+    "joints": 34
+  },
+  {
+    "path": "public\\models\\avatars\\male\\uniforms\\primary-trousers\\shoes.glb",
+    "blender_reimport": "pass",
+    "joints": 34
+  },
+  {
+    "path": "public\\models\\avatars\\male\\uniforms\\primary-trousers\\trousers.glb",
+    "blender_reimport": "pass",
+    "joints": 34
+  },
+  {
+    "path": "odd\\previews\\student-uniforms\\male\\primary-trousers\\dressed.glb",
+    "blender_reimport": "pass",
+    "joints": 34
+  },
+  {
+    "path": "public\\models\\avatars\\male\\uniforms\\secondary-trousers\\polo-sweater.glb",
+    "blender_reimport": "pass",
+    "joints": 34
+  },
+  {
+    "path": "public\\models\\avatars\\male\\uniforms\\secondary-trousers\\shoes.glb",
+    "blender_reimport": "pass",
+    "joints": 34
+  },
+  {
+    "path": "public\\models\\avatars\\male\\uniforms\\secondary-trousers\\trousers.glb",
+    "blender_reimport": "pass",
+    "joints": 34
+  },
+  {
+    "path": "odd\\previews\\student-uniforms\\male\\secondary-trousers\\dressed.glb",
+    "blender_reimport": "pass",
+    "joints": 34
+  },
+  {
+    "path": "public\\models\\avatars\\female\\uniforms\\primary-trousers\\coat-tie.glb",
+    "blender_reimport": "pass",
+    "joints": 41
+  },
+  {
+    "path": "public\\models\\avatars\\female\\uniforms\\primary-trousers\\shoes.glb",
+    "blender_reimport": "pass",
+    "joints": 41
+  },
+  {
+    "path": "public\\models\\avatars\\female\\uniforms\\primary-trousers\\trousers.glb",
+    "blender_reimport": "pass",
+    "joints": 41
+  },
+  {
+    "path": "odd\\previews\\student-uniforms\\female\\primary-trousers\\dressed.glb",
+    "blender_reimport": "pass",
+    "joints": 41
+  },
+  {
+    "path": "public\\models\\avatars\\female\\uniforms\\secondary-trousers\\polo-sweater.glb",
+    "blender_reimport": "pass",
+    "joints": 41
+  },
+  {
+    "path": "public\\models\\avatars\\female\\uniforms\\secondary-trousers\\shoes.glb",
+    "blender_reimport": "pass",
+    "joints": 41
+  },
+  {
+    "path": "public\\models\\avatars\\female\\uniforms\\secondary-trousers\\trousers.glb",
+    "blender_reimport": "pass",
+    "joints": 41
+  },
+  {
+    "path": "odd\\previews\\student-uniforms\\female\\secondary-trousers\\dressed.glb",
+    "blender_reimport": "pass",
+    "joints": 41
+  },
+  {
+    "path": "public\\models\\avatars\\female\\uniforms\\primary-skirt\\coat-tie.glb",
+    "blender_reimport": "pass",
+    "joints": 41
+  },
+  {
+    "path": "public\\models\\avatars\\female\\uniforms\\primary-skirt\\shoes.glb",
+    "blender_reimport": "pass",
+    "joints": 41
+  },
+  {
+    "path": "public\\models\\avatars\\female\\uniforms\\primary-skirt\\skirt.glb",
+    "blender_reimport": "pass",
+    "joints": 41
+  },
+  {
+    "path": "odd\\previews\\student-uniforms\\female\\primary-skirt\\dressed.glb",
+    "blender_reimport": "pass",
+    "joints": 41
+  },
+  {
+    "path": "public\\models\\avatars\\female\\uniforms\\secondary-skirt\\polo-sweater.glb",
+    "blender_reimport": "pass",
+    "joints": 41
+  },
+  {
+    "path": "public\\models\\avatars\\female\\uniforms\\secondary-skirt\\shoes.glb",
+    "blender_reimport": "pass",
+    "joints": 41
+  },
+  {
+    "path": "public\\models\\avatars\\female\\uniforms\\secondary-skirt\\skirt.glb",
+    "blender_reimport": "pass",
+    "joints": 41
+  },
+  {
+    "path": "odd\\previews\\student-uniforms\\female\\secondary-skirt\\dressed.glb",
+    "blender_reimport": "pass",
+    "joints": 41
+  }
+]

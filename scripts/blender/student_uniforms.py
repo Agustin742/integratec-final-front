@@ -218,8 +218,9 @@ def garments(sex, level, bottom, body, rig, donors):
         tops.append(detail('Polo beneath V-neck', [(-.058,.735),(.058,.735),(0,.666)], rows, cream, surface=top))
         tops.append(box('Polo button', (0,front_at(rows,0,.713)-.012,.713), (.009,.008,.009), navy))
     if bottom == 'skirt':
+        knee = knee_height(rig)
         bottoms = [rings('Institutional pleated skirt', [(.507,0,.225,.19,.18),
-            (.45,0,.255,.205,.20),(.30,0,.295,.229,.222),(.17,0,.335,.246,.24)], navy, .025)]
+            (.45,0,.255,.205,.20),(.30,0,.295,.229,.222),(knee,0,.335,.246,.24)], navy, .025)]
     else:
         volumes = [rings('New trouser yoke', [(.508,0,.20,.16,.15),
             (.45,0,.255,.185,.18),(.325,0,.235,.17,.16)], navy, cap=True)]
@@ -270,16 +271,42 @@ def garments(sex, level, bottom, body, rig, donors):
                     name = f'DEF-{part[0]}.{side}'+('.'+part[1] if len(part)>1 else '')
                     weights[name] = hip*w*fraction
             set_weights(bottoms[0],v,weights)
-    # Limited thigh rotation prevents the lower hem inverting above the waist.
-    for obj in tops + (bottoms if bottom == 'skirt' else []):
-        for v in obj.data.vertices:
-            if v.co.z >= .52:
-                continue
-            blend = min(.18,max(0,(.52-v.co.z)/.14)*.18)
-            left = .5 + .5*math.tanh(v.co.x/.09)
-            weights = {'DEF-spine':1-blend,'DEF-thigh.L':blend*left,'DEF-thigh.R':blend*(1-left)}
-            set_weights(obj,v,weights)
+    fit_lower_panels(tops + (bottoms if bottom == 'skirt' else []))
     return {'coat-tie' if primary else 'polo-sweater':tops, bottom:bottoms, 'shoes':shoes}
+
+
+def knee_height(rig):
+    """Canonical shin heads mark the knee, not the subdivided shin midpoint."""
+    points = [rig.matrix_world @ rig.data.bones[name].head_local
+              for name in ('DEF-shin.L', 'DEF-shin.R')]
+    return sum(point.z for point in points) / len(points)
+
+
+def shorten_skirt(obj, rig):
+    """Move only the lowest pattern row; preserve waist and pleat widths."""
+    old = min(v.co.z for v in obj.data.vertices)
+    knee = knee_height(rig)
+    for vertex in obj.data.vertices:
+        if abs(vertex.co.z - old) < 1e-5:
+            vertex.co.z = knee
+    obj.data.update()
+    return knee
+
+
+def fit_lower_panels(objects):
+    """Bounded skinning study: hem follows thighs instead of mostly pelvis.
+
+    Apply the same field to pockets/placket so details follow their panel.
+    This is linear skinning, not a collision solver or a cloth-fit guarantee.
+    """
+    for obj in objects:
+        for vertex in obj.data.vertices:
+            if vertex.co.z >= .52:
+                continue
+            blend = min(.45, max(0, (.52 - vertex.co.z) / .14) * .45)
+            left = .5 + .5 * math.tanh(vertex.co.x / .09)
+            set_weights(obj, vertex, {'DEF-spine': 1 - blend,
+                'DEF-thigh.L': blend * left, 'DEF-thigh.R': blend * (1 - left)})
 
 
 def set_weights(obj, vertex, weights):
