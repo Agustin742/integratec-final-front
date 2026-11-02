@@ -28,6 +28,8 @@ Rules describe **how the project must be designed and built**. They are not impl
 
 ## Rule index
 
+The [rule routing index](./index.md) maps tasks and touched areas to the rules below.
+
 ### Product behavior
 
 - [Classrooms, roles, and permissions](./classrooms-and-roles.md) — organization paths, role-specific interface, invitations and classroom join code, parent area, 2D/3D mode, and server-authorized access.
@@ -75,7 +77,7 @@ Rules describe **how the project must be designed and built**. They are not impl
 
 ## How to use the rules
 
-Read the relevant rules before designing, implementing, modifying, or reviewing a part of the project. Apply them consistently regardless of whether the work is performed manually or with an AI coding assistant.
+Use the [rule routing index](./index.md) to find which rules apply to a task and which to skip. Read the relevant rules before designing, implementing, modifying, or reviewing a part of the project. Apply them consistently regardless of whether the work is performed manually or with an AI coding assistant.
 
 When a rule needs to change, update its source document explicitly rather than silently deviating in code.
 
