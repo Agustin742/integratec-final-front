@@ -118,4 +118,4 @@ These checks guide implementation evidence under [Quality and testing](./quality
 - Default state and rewards of mini-games.
 - Visibility of other students' balances.
 - Who may buy and equip pet accessories.
-- Cross-repository contract distribution remains unresolved; examples are not published API contracts.
+- Realtime contract distribution remains unresolved (REST contracts are decided ([API contracts](./api-contracts.md))); examples are not published API contracts.

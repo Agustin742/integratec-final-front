@@ -78,5 +78,5 @@ La [ERS v0.2](./functional-requirements.md) y el catálogo de [historias de usua
 
 ## Estado de la documentación de requisitos
 
-- **ERS (`docs/functional-requirements.md`):** actualizada a la versión `0.2` bajo el modelo de **Aula Virtual 3D para Escuelas**, incluyendo matriz de permisos escolar, reglas de negocio `RN-01` a `RN-20`, catálogo `RF-AUT` a `RF-BOT`, requerimientos no funcionales `RNF-001` a `RNF-010`, entidades conceptuales alineadas con el modelo de datos y matriz de trazabilidad completa.
+- **ERS (`docs/functional-requirements.md`):** actualizada a la versión `0.2` bajo el modelo de **Aula Virtual 3D para Escuelas**, incluyendo matriz de permisos escolar, reglas de negocio `RN-01` a `RN-20`, catálogo `RF-AUT` a `RF-BOT`, requerimientos no funcionales `RNF-001` a `RNF-010`, entidades conceptuales alineadas con `rules/data.md` y matriz de trazabilidad completa.
 - **Historias de usuario (`docs/user-stories.md`):** actualizadas a la versión `0.2`, mapeadas 1 a 1 con los módulos `HU-AUT`, `HU-AUL`, `HU-ESP`, `HU-ACT`, `HU-GAM`, `HU-COM`, `HU-VIV` y `HU-BOT`, con criterios `Dado / Cuando / Entonces`, trazabilidad a `RF`/`RN` y descomposición en tareas técnicas `[back]` y `[front]`.

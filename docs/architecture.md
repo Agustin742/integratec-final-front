@@ -41,5 +41,7 @@ flowchart LR
 
 ## Open items
 
-- Distribution of contracts between the frontend and backend repositories is undecided.
-- Session mechanism details follow [Authentication and session](../rules/authentication-and-session.md) and the backend agreement.
+- Distribution of realtime message and state types, and whether generated API types are committed or generated in CI.
+- Availability of Amplify Hosting in `sa-east-1` must be verified before provisioning.
+
+Decided: REST contracts come from the backend OpenAPI document (D4, FD2); the session follows D1 with both tokens in `sessionStorage` (FD1) ([Authentication and session](../rules/authentication-and-session.md)); see the [architecture decisions](./technical-justification.md#architecture-decisions).

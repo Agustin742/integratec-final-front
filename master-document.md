@@ -11,6 +11,8 @@
 | 0.2 | 2026-10-26 | Luis Calegari | Alineación con la ERS (`docs/functional-requirements.md`): modelo de Oficinas y Habitaciones, matriz de roles por oficina sin Superadmin, invitaciones por enlace único con vencimiento, chat de oficina/habitación para MVP y bot de IA acotado a consultas y resúmenes. |
 | 0.3 | 2026-10-30 | Agustin Tabarcache | Cambio de nicho a educación: escuelas, profesores, alumnos y padres. Se reemplazan Oficinas/Habitaciones, Kanban, tareas genéricas y reuniones por aulas, actividades (TP y exámenes), calificaciones, puntos y tienda, mascota, herramientas de clase en vivo y modo 2D clásico. Bot con RAG sobre material aprobado. División del MVP en núcleo y extendido. |
 
+**Fuentes y estado:** la [ERS de Luis](docs/functional-requirements.md) define el comportamiento funcional, las reglas RN y las prioridades del MVP. Las [decisiones de requisitos](docs/requirements-decision.md#confirmaciones-para-la-alineación-documental) registran las confirmaciones de Three.js + React Three Fiber, propiedad no transferible y conciliación posterior con las reglas del PR #5. Las restricciones se consultan en [rules/](rules/README.md) y sus motivos en la [justificación técnica](docs/technical-justification.md). Este documento conserva el alcance y las decisiones generales; los diagramas son vistas derivadas, no los reemplazan. Lo descrito es objetivo de entrega, no evidencia de implementación. Los supuestos de la ERS no confirmados expresamente siguen pendientes.
+
 ## 1. Visión y objetivo
 
 Aplicación web de **aulas virtuales tridimensionales para escuelas**, presentada desde una **cámara isométrica**. Profesores, alumnos y padres se organizan en escuelas y aulas; profesores y alumnos se representan mediante avatares personalizables, se desplazan por el aula y acceden a las herramientas educativas mediante interacciones con el entorno.
@@ -40,7 +42,7 @@ Al registrarse se elige entre **dos caminos de organización**:
 - Cada aula tiene **una mascota** propia.
 - El acceso al aula se verifica siempre en el servidor según la membresía del usuario.
 - **Distinción técnica importante:** un aula almacenada en PostgreSQL no equivale necesariamente a una instancia `Room` de Colyseus. Esta última gestiona la sesión de tiempo real asociada al aula y sus usuarios conectados.
-- **Incorporación por invitación por email:** profesores, alumnos y padres se suman mediante invitaciones enviadas por correo (ver 2.2).
+- **Incorporación por invitación:** profesores y padres se suman siempre mediante invitaciones de un solo uso enviadas por correo; los alumnos, además, pueden unirse con un **código de aula** compartible que solo otorga el rol Alumno, con vencimiento, revocación y máximo de usos opcional (decisión D7, ver 2.2).
 
 ### 2.2 Roles, permisos e invitaciones
 
@@ -171,7 +173,7 @@ Las acciones con efectos de negocio se validan en el backend; interactuar con un
 ### 3.1 Entorno tridimensional isométrico
 
 - **Representación:** escenas tridimensionales con geometría, modelos, materiales, iluminación y animaciones 3D.
-- **Tecnología principal:** **Three.js**, integrada en una aplicación **React**. **React Three Fiber** permite organizar declarativamente la escena Three.js desde React.
+- **Tecnología elegida:** **Three.js + React Three Fiber**, integrada en una aplicación **React**. React Three Fiber organiza declarativamente la escena Three.js desde React; la selección no está pendiente ni implica que la escena esté implementada.
 - **Cámara:** perspectiva isométrica, con proyección ortográfica y encuadre definido en `rules/`.
 - **Referencia de estética:** el lenguaje visual 3D de **Pokémon Pokopia** como referencia general de tono, claridad y legibilidad; no se copiarán personajes, modelos ni recursos del juego.
 - **Dirección artística detallada:** se especifica en `rules/art-direction.md`, sin fijar aquí paleta, proporciones, materiales ni características particulares.
@@ -227,7 +229,7 @@ El bot utiliza un servicio de IA coordinado por NestJS. Las claves del proveedor
 | Tiempo real adicional | **Socket.IO (uso puntual)** | Solo funcionalidades independientes para las que resulte técnicamente necesario; no sustituye a Colyseus. |
 | Base de datos | **Amazon RDS for PostgreSQL** | Persistencia de usuarios, escuelas, aulas, actividades, notas, puntos y mensajes. |
 | Acceso a datos | **Prisma ORM** | Consultas, relaciones y migraciones sobre PostgreSQL alojado en RDS; Prisma **no es** la base de datos. |
-| Repositorios | **Frontend:** `Agustin742/integratec-final-front`; **backend:** `Agustin742/integratec-final-back`. | Repositorios independientes, con CI, build y responsabilidad de despliegue propios. La distribución y propiedad de contratos entre repositorios siguen pendientes de decisión. |
+| Repositorios | **Frontend:** `Agustin742/integratec-final-front`; **backend:** `Agustin742/integratec-final-back`. | Repositorios independientes, con CI, build y responsabilidad de despliegue propios. La distribución de contratos entre repositorios (OpenAPI generado por NestJS) está decidida a la espera de aprobación del equipo; ver `docs/technical-justification.md`. |
 | IA | **Amazon Bedrock + herramientas NestJS** | Inferencia del bot (guía de estudio). |
 | RAG | **Bedrock Knowledge Bases o equivalente** *(candidato, a definir)* | Recuperación sobre material aprobado por el profesor. |
 | Video y voz | **Servicio de medios WebRTC** *(a definir; candidatos: LiveKit, Amazon Chime SDK)* | Videollamadas, llamadas de voz y presentaciones en vivo. |
@@ -238,13 +240,15 @@ El bot utiliza un servicio de IA coordinado por NestJS. Las claves del proveedor
 | Sonido | **Librerías de audio web** | Efectos y control de reproducción del entorno. |
 | Pruebas | **Vitest + Playwright** | Pruebas unitarias/integración y recorridos end-to-end. |
 | Calidad de código | **ESLint + Prettier** | Análisis estático y formato. |
-| Automatización | **GitHub Actions** | Ejecución de lint, tests y pipeline de despliegue. |
+| Automatización | **GitHub Actions** | CI documental y verificaciones de tooling existentes; lint/tests de aplicación y despliegue como objetivo al introducir los servicios. |
 | Infraestructura | **AWS** | Frontend, servicios persistentes, datos, archivos, identidad de servicios y observabilidad. |
 | Infraestructura como código | **Terraform** | Definición versionada y revisable de los recursos AWS; estado remoto en S3 y planes revisados antes de aplicar. Vive en el repositorio backend. |
 
 Las filas marcadas como *candidato* o *a definir* no constituyen decisiones tomadas; se resolverán y justificarán en `docs/technical-justification.md`.
 
 ## 6. Arquitectura general actualizada
+
+La arquitectura siguiente describe el diseño previsto, no servicios ya implementados o desplegados. El estado observado del repositorio y su CI se documenta en el [README](README.md#ci).
 
 ### 6.1 Componentes
 
@@ -277,7 +281,7 @@ Las filas marcadas como *candidato* o *a definir* no constituyen decisiones toma
          └── Amazon SES: email (a definir)
 ```
 
-**Decisión de separación:** NestJS y Colyseus son responsabilidades lógicas distintas y, de inicio, **servicios desplegables separados**. Colyseus no reemplaza la API REST ni PostgreSQL. Los contratos lógicos entre NestJS y Colyseus pertenecen al backend; la distribución y propiedad de contratos necesarios entre los repositorios frontend y backend siguen sin decidirse. Para coordinar operaciones persistentes, Colyseus utilizará contratos y servicios de aplicación seguros; nunca confiará en permisos aportados solo por el cliente. La integración específica entre ambos servicios se documentará en `rules/architecture.md`.
+**Decisión de separación:** NestJS y Colyseus son responsabilidades lógicas distintas y, de inicio, **servicios desplegables separados**. Colyseus no reemplaza la API REST ni PostgreSQL. Los contratos lógicos entre NestJS y Colyseus pertenecen al backend; la distribución de contratos entre los repositorios frontend y backend (OpenAPI generado por NestJS) está decidida a la espera de aprobación del equipo; ver `docs/technical-justification.md`. Para coordinar operaciones persistentes, Colyseus utilizará contratos y servicios de aplicación seguros; nunca confiará en permisos aportados solo por el cliente. La integración específica entre ambos servicios se documentará en `rules/architecture.md`.
 
 ### 6.2 Canales y propiedad de los datos
 
@@ -419,7 +423,7 @@ AWS aloja y conecta **las mismas tecnologías elegidas para el producto**: el na
 
 El núcleo debe completar **un recorrido utilizable en producción**:
 
-1. Caminos de organización (profesor independiente o escuela), roles e **invitaciones por email**.
+1. Caminos de organización (profesor independiente o escuela), roles, **invitaciones por email** y **código de aula** para alumnos.
 2. Aula 3D con avatares y **modo 2D clásico**, con presencia en tiempo real.
 3. Chat del aula con moderación, silenciado del chat y @menciones; tablón de anuncios.
 4. Subida de material (S3).
@@ -513,7 +517,7 @@ El **README obligatorio** contendrá al menos: descripción, enlaces de frontend
 - [ ] Dos usuarios autorizados comparten un aula y se sincroniza su presencia.
 - [ ] El repaso diario se activa una sola vez por día y usuario para los roles distintos de Padre.
 - [ ] El bot se bloquea durante un examen y no entrega soluciones.
-- [ ] La invitación por email llega y permite unirse al aula con el rol correcto.
+- [ ] La invitación por email llega y permite unirse al aula con el rol correcto, y el código de aula inscribe al alumno solo como Alumno.
 
 **Repositorio, infraestructura y documentación**
 
@@ -567,6 +571,7 @@ Este documento es el **índice conceptual y fuente de decisiones generales**. El
 ```text
 master-document.md
 rules/
+  index.md                             # índice de enrutamiento: qué reglas leer según la tarea
   architecture.md
   3d-world-and-camera.md
   movement-and-interactions.md
