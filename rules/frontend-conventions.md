@@ -4,7 +4,7 @@ Organize frontend code by responsibility and feature, without prescribing an una
 
 ## Modules and names
 
-- Code language follows [Quality and testing](./quality-and-testing.md#code-language).
+- Code language follows [Quality and testing](./quality-and-testing.md#code-language). User-facing strings are Spanish (`es-AR`) and **MUST** be centralized, not scattered through components (decision FD10).
 - Feature code **SHOULD** keep its UI, integration, and tests discoverable together; shared code **MUST** have a genuinely cross-feature responsibility.
 - Components **MUST** use PascalCase names. Hooks **MUST** use the use prefix and follow React hook rules.
 - Contributors **MUST NOT** add generic utilities, base classes, or wrappers solely for hypothetical reuse.

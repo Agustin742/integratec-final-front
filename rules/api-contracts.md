@@ -18,6 +18,7 @@ Frontend and backend must agree on observable contracts before either side treat
 - IDs and date values follow [Data and time](./data-and-time.md).
 - Realtime contracts **MUST** distinguish commands, acknowledgements, and notifications, including duplicate or out-of-order handling where relevant.
 - Frontend adapters **MUST** handle invalid or unsupported responses without silently treating them as valid domain data.
+- Decision FD9 (approved by Agustin on 2026-11-02; see the [technical justification](../docs/technical-justification.md#fd9-contract-mocks)): frontend stories build MSW handlers from the published contract (the backend publishes DTOs and OpenAPI entries, stubs allowed, before or with the implementation), so UI work proceeds before the backend lands. MSW **MUST** be used in development and tests only, never in production builds.
 - Mocks **MUST** reflect an identified contract and include relevant failures. A passing mock **MUST NOT** be claimed as proof of backend integration.
 
 ## Compatibility and verification

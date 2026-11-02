@@ -78,9 +78,9 @@ Frontend-side justification for course requirement R6. Decisions come from the [
 
 Decided and approved by Agustin (decision owner) on 2026-11-02. This is not a claim of team-wide approval; per [Documentation and decisions](../rules/documentation-and-decisions.md), a conflict with the team **MUST** be resolved before dependent implementation proceeds.
 
-### Backend decisions D1-D8 and their frontend impact
+### Backend decisions D1-D10 and their frontend impact
 
-The backend repository records decisions D1-D8 in its `docs/technical-justification.md` section 7 (a relative link to that repository is not possible, so it is cited here). They affect the frontend as follows.
+The backend repository records decisions D1-D10 in its `docs/technical-justification.md` section 7 (a relative link to that repository is not possible, so it is cited here). They affect the frontend as follows.
 
 | ID | Backend decision | Frontend impact |
 |---|---|---|
@@ -92,6 +92,8 @@ The backend repository records decisions D1-D8 in its `docs/technical-justificat
 | D6 | GitHub Actions OIDC federation to an IAM role, no long-lived access keys | The frontend deploy pipeline authenticates the same way (FD5) |
 | D7 | Two ways to join: single-use email invitations (mandatory for teachers and parents) and a per-classroom join code that grants only the `Student` role | The interface supports entering a classroom code and the teacher's code management, and keeps email invitations for other roles ([Classrooms, roles, and permissions](../rules/classrooms-and-roles.md)) |
 | D8 | The backend commits `openapi.json` (CI fails if stale), generates Colyseus room state types with `schema-codegen`, exports realtime message payload types from `packages/contracts`, and commits them | The frontend pulls these artifacts with `pnpm api:sync` and commits the generated types (FD7) |
+| D9 | Contract-first: the backend publishes each endpoint's DTOs and OpenAPI entry (a `501` stub is allowed) before or with its implementation; the committed `openapi.json` carries it | The frontend builds MSW handlers from the contract and proceeds before the backend implementation lands (FD9) |
+| D10 | Timestamps stored in UTC and returned as ISO 8601 UTC; each School has a persisted IANA time zone (default `America/Argentina/Buenos_Aires`); the server decides lateness in UTC | The frontend displays deadlines in the school's time zone and indicates the zone (FD11) |
 
 ### FD1. Token storage
 
@@ -170,6 +172,36 @@ The backend repository records decisions D1-D8 in its `docs/technical-justificat
 - **Trade-offs:** Less visual richness and tighter asset authoring; the runtime measurement adds code and needs tuning.
 - **Affected contracts:** [3D world and camera](../rules/3d-world-and-camera.md), [Art direction](../rules/art-direction.md), [Classrooms, roles, and permissions](../rules/classrooms-and-roles.md) for the 2D mode.
 - **Open:** The runtime measurement method and thresholds that trigger the offer are defined during implementation; the budget numbers are limits to verify, not yet measured results.
+- **Approval:** Approved by Agustin (decision owner) on 2026-11-02.
+
+### FD9. Contract mocks
+
+- **Question:** How does the frontend build screens before the backend implements an endpoint, without drifting from the real contract (backend D9)?
+- **Decision:** The backend publishes each endpoint's DTOs and OpenAPI entry (a stub returning `501` is allowed) in a pull request before or together with its implementation; the committed `openapi.json` (backend D8) carries it. Frontend stories build MSW (Mock Service Worker) handlers from that contract so UI work proceeds before the backend implementation lands. MSW is a development and test dependency only and **MUST NOT** be part of production builds.
+- **Rationale:** Both teams work in parallel from one authoritative contract, and mocks that follow the generated types cannot silently drift.
+- **Alternatives:** The frontend waits for backend merges (rejected: serializes the teams); hand-written mocks without a contract (rejected: drift).
+- **Trade-offs:** Handlers must be updated when the contract changes, and a passing mock is not proof of backend integration.
+- **Affected contracts:** [API contracts](../rules/api-contracts.md), [Quality and testing](../rules/quality-and-testing.md), and backend decision D9.
+- **Approval:** Approved by Agustin (decision owner) on 2026-11-02.
+
+### FD10. UI language
+
+- **Question:** In which language and locale is the interface written?
+- **Decision:** UI copy is in Spanish (Argentina, `es-AR`), a single locale for the MVP. Strings are centralized so another locale can be added later. Code, identifiers, and comments stay in English.
+- **Rationale:** The product is sold in Argentina and there is no second locale to serve yet; centralized strings keep a later addition cheap.
+- **Alternatives:** A full i18n framework from day one (rejected: cost without a second locale).
+- **Trade-offs:** Adding a locale later requires extracting any strings that were not centralized.
+- **Affected contracts:** [Quality and testing](../rules/quality-and-testing.md#code-language), [Frontend conventions](../rules/frontend-conventions.md), [Data and time](../rules/data-and-time.md) for locale formatting.
+- **Approval:** Approved by Agustin (decision owner) on 2026-11-02.
+
+### FD11. Deadline time zone
+
+- **Question:** In which time zone does the interface show deadlines (backend D10)?
+- **Decision:** The API returns ISO 8601 UTC instants. The frontend displays deadlines in the school's persisted IANA time zone (default `America/Argentina/Buenos_Aires`) and indicates the zone; the server decides lateness using UTC, never the browser clock.
+- **Rationale:** Students and teachers of one school see the same deadline time regardless of their device settings.
+- **Alternatives:** Display in each viewer's browser time zone (rejected: students and teachers could see different deadline times).
+- **Trade-offs:** The client must receive the school's time zone and format with it explicitly.
+- **Affected contracts:** [Data and time](../rules/data-and-time.md), [Activities and grading](../rules/activities-and-grading.md), and backend decision D10.
 - **Approval:** Approved by Agustin (decision owner) on 2026-11-02.
 
 ## Open items

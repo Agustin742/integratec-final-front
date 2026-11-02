@@ -1,5 +1,13 @@
 # Tracker — Agustin
 
+## 2026-11-02 — Record contract mocks, UI language and deadline time zone (FD9–FD11)
+
+- **Status:** completed
+- **Area / files:** `docs/technical-justification.md`, `docs/architecture.md`, `rules/` (api-contracts, quality-and-testing, frontend-conventions, data-and-time, deployment-and-operations)
+- **Change:** Recorded FD9 (MSW handlers built from the published contract; dev and test only), FD10 (UI in Spanish `es-AR`, centralized strings, single locale), FD11 (deadlines shown in the school's IANA time zone with the zone indicated; server decides lateness in UTC) and mirrored backend D9 and D10. Fixed the Amplify `sa-east-1` wording to "verified" in the deployment rule. Done with AI assistance (Claude Code), reviewed by Agustin.
+- **Reason:** UI work must proceed before backend endpoints land, and the interface language and deadline time zone were undecided.
+- **Next step:** Centralize strings and add MSW handlers when the application is scaffolded.
+
 ## 2026-11-02 — Record contract sync, 3D performance budget and verified hosting region
 
 - **Status:** completed
