@@ -1,0 +1,34 @@
+{
+  "coat-tie.glb": {
+    "finite_vertices": 3658,
+    "inverse_bind_max_error": 1.1920928955078125e-06,
+    "weight_sum_max_error": 1.30385160446167e-07,
+    "canonical_joint_count": 41,
+    "reimport_meshes": 13,
+    "unchanged_rigid_base_primitives": 0
+  },
+  "shoes.glb": {
+    "finite_vertices": 672,
+    "inverse_bind_max_error": 1.1920928955078125e-06,
+    "weight_sum_max_error": 1.2293457984924316e-07,
+    "canonical_joint_count": 41,
+    "reimport_meshes": 2,
+    "unchanged_rigid_base_primitives": 0
+  },
+  "skirt.glb": {
+    "finite_vertices": 192,
+    "inverse_bind_max_error": 1.1920928955078125e-06,
+    "weight_sum_max_error": 7.450580596923828e-08,
+    "canonical_joint_count": 41,
+    "reimport_meshes": 1,
+    "unchanged_rigid_base_primitives": 0
+  },
+  "dressed.glb": {
+    "finite_vertices": 19683,
+    "inverse_bind_max_error": 1.1920928955078125e-06,
+    "weight_sum_max_error": 1.341104507446289e-07,
+    "canonical_joint_count": 41,
+    "reimport_meshes": 22,
+    "unchanged_rigid_base_primitives": 4
+  }
+}

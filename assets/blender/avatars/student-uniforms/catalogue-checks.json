@@ -1,0 +1,68 @@
+{
+  "male/primary-trousers": {
+    "garment_meshes": 16,
+    "joints": 34,
+    "exports_reloaded": 4,
+    "max_inverse_bind_error": 3.5762786865234375e-07,
+    "max_weight_sum_error": 1.3431417755782604e-07,
+    "static_views": [
+      "front.png",
+      "rest.png"
+    ]
+  },
+  "male/secondary-trousers": {
+    "garment_meshes": 8,
+    "joints": 34,
+    "exports_reloaded": 4,
+    "max_inverse_bind_error": 3.5762786865234375e-07,
+    "max_weight_sum_error": 1.3431417755782604e-07,
+    "static_views": [
+      "front.png",
+      "rest.png"
+    ]
+  },
+  "female/primary-trousers": {
+    "garment_meshes": 16,
+    "joints": 41,
+    "exports_reloaded": 4,
+    "max_inverse_bind_error": 1.1920928955078125e-06,
+    "max_weight_sum_error": 1.3431417755782604e-07,
+    "static_views": [
+      "front.png",
+      "rest.png"
+    ]
+  },
+  "female/primary-skirt": {
+    "garment_meshes": 16,
+    "joints": 41,
+    "exports_reloaded": 4,
+    "max_inverse_bind_error": 1.1920928955078125e-06,
+    "max_weight_sum_error": 1.341104507446289e-07,
+    "static_views": [
+      "front.png",
+      "rest.png"
+    ]
+  },
+  "female/secondary-trousers": {
+    "garment_meshes": 8,
+    "joints": 41,
+    "exports_reloaded": 4,
+    "max_inverse_bind_error": 1.1920928955078125e-06,
+    "max_weight_sum_error": 1.3431417755782604e-07,
+    "static_views": [
+      "front.png",
+      "rest.png"
+    ]
+  },
+  "female/secondary-skirt": {
+    "garment_meshes": 8,
+    "joints": 41,
+    "exports_reloaded": 4,
+    "max_inverse_bind_error": 1.1920928955078125e-06,
+    "max_weight_sum_error": 1.341104507446289e-07,
+    "static_views": [
+      "front.png",
+      "rest.png"
+    ]
+  }
+}

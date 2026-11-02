@@ -1,0 +1,19 @@
+{
+  "scene": "Continuous uniform female secondary-skirt",
+  "variant": "female/secondary-skirt",
+  "source_sha256": {
+    "D:\\ALEJO\\AleMart\\Documents\\GITHUB\\IntegrarTec\\ProyectoFinal\\prueba-3d\\odd\\worktrees\\avatar-customization\\public\\models\\avatars\\female\\body.glb": "14629b65ebfba412b0acb6c9242f4a55e3e03110f332dbb97288c9275285a29b",
+    "D:\\ALEJO\\AleMart\\Documents\\GITHUB\\IntegrarTec\\ProyectoFinal\\prueba-3d\\odd\\worktrees\\avatar-customization\\assets\\blender\\avatars\\female-editable.blend": "e605b66b5319bcd07777ffec71124327bbc35708e547a3c83aae6319c6e7a021"
+  },
+  "base_geometry_weights_and_binds_unchanged": true,
+  "source_hashes_unchanged": true,
+  "garment_meshes": 8,
+  "motion_acceptance": "Deferred by S8; not checked in this stage.",
+  "static_views": [
+    "rest.png",
+    "front.png"
+  ],
+  "visual_acceptance": "Worker static inspection PASS: front and three-quarter rest renders; no visible gaps or body penetration. Parent Chrome/design review pending.",
+  "continuous_top_connected_components": 1,
+  "known_motion_limits": "Animated fit deferred by S8. Prior male primary Sit had thigh/coat clipping; new variants motion unverified. No new motion tests run."
+}
