@@ -14,8 +14,8 @@ Treat browser input as untrusted and keep secrets outside the repository and cli
 
 - Protected frontend routes **MUST** handle missing or expired sessions and redirect unauthenticated users to login.
 - The backend **MUST** validate identity, role, and resource ownership or membership for every protected operation. Hidden controls and client-side checks are not authorization.
-- Protected APIs **MUST** return `401` for missing or invalid authentication and `403` for insufficient role permissions.
-- Users **MUST NOT** gain access to another user's private resources by changing an identifier. Realtime room access and actions **MUST** enforce the same permission boundaries when implemented.
+- Protected APIs **MUST** return `401` for missing or invalid authentication and `403` for insufficient role permissions, and `404` for a resource outside the caller's access so its existence is not revealed.
+- Users **MUST NOT** gain access to another user's private resources by changing an identifier. Realtime classroom access and actions **MUST** enforce the same permission boundaries when implemented.
 - Passwords **MUST** use an appropriate password hash, never plaintext or reversible encryption. Sessions or tokens **MUST** expire, and logout **MUST** remove access to protected frontend content.
 - API responses **MUST NOT** include password hashes, secrets, stack traces, database queries, or internal diagnostics.
 
