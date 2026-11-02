@@ -147,7 +147,6 @@ A structured fallback MUST obey the same authorization and daily duplicate-preve
 - Optional structured fallback content and presentation, manual reconsultation behavior, and treatment of partially available context.
 - Review delivery on an exam day and what the bot shows when the first connection of the day happens during an exam.
 - Retrieval technology, model selection, extent of answer-key output checks and misuse flagging, conversation retention, and consumption-limit values; none is inferred from an example.
-- Distribution of realtime contracts remains unresolved; REST contracts come from the backend OpenAPI document ([API contracts](./api-contracts.md)).
 
 ## Observable acceptance checks
 

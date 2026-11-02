@@ -15,6 +15,7 @@ Data representations must preserve meaning across API boundaries, storage, and d
 - Instants **MUST** use an unambiguous timezone-aware representation; formatting for display **MUST NOT** change the represented instant.
 - Date-only values **MUST NOT** be shifted by an incidental browser timezone conversion.
 - Locale, display formatting, and timezone assumptions **MUST** be explicit for scheduling and date-bound rules.
+- Deadlines arrive as ISO 8601 UTC instants and **MUST** be displayed in the school's persisted IANA time zone (default `America/Argentina/Buenos_Aires`), with the zone indicated; the browser time zone **MUST NOT** decide the displayed deadline, and lateness is decided by the server in UTC (decision FD11, approved by Agustin on 2026-11-02; see the [technical justification](../docs/technical-justification.md#fd11-deadline-time-zone)). Dates and numbers use the `es-AR` locale (FD10).
 - The daily briefing uses America/Argentina/Buenos_Aires as specified in the [project document](../master-document.md). Other features **MUST NOT** silently inherit that policy without agreement.
 - Frontend clocks **MUST NOT** be the authority for access expiration or once-per-day execution.
 

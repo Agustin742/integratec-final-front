@@ -15,7 +15,7 @@ Frontend-side justification for course requirement R6. Decisions come from the [
 | Drag and drop (optional) | dnd-kit | Only if a future feature needs drag and drop; no current requirement does |
 | Testing | Vitest + Playwright | Unit/integration and end-to-end tests |
 | Router | React Router | Routes and protected navigation (FD4) |
-| API client | openapi-typescript + openapi-fetch | Types generated from the backend OpenAPI document (FD2) |
+| API client | openapi-typescript + openapi-fetch | Types generated from the backend OpenAPI document (FD2, FD7) |
 | Hosting | AWS Amplify Hosting (`sa-east-1`) | Static build served over HTTPS |
 
 ## Decisions
@@ -78,19 +78,24 @@ Frontend-side justification for course requirement R6. Decisions come from the [
 
 Decided and approved by Agustin (decision owner) on 2026-11-02. This is not a claim of team-wide approval; per [Documentation and decisions](../rules/documentation-and-decisions.md), a conflict with the team **MUST** be resolved before dependent implementation proceeds.
 
-### Backend decisions D1-D7 and their frontend impact
+### Backend decisions D1-D12 and their frontend impact
 
-The backend repository records decisions D1-D7 in its `docs/technical-justification.md` section 7 (a relative link to that repository is not possible, so it is cited here). They affect the frontend as follows.
+The backend repository records decisions D1-D12 in its `docs/technical-justification.md` section 7 (a relative link to that repository is not possible, so it is cited here). They affect the frontend as follows.
 
 | ID | Backend decision | Frontend impact |
 |---|---|---|
 | D1 | Short-lived JWT access token plus a rotated, hashed opaque refresh token; the server checks a session identifier on every protected request and a revoked session yields `401` | The client holds both tokens (FD1), sends the access token as `Authorization: Bearer`, refreshes on expiry, and ends the session when refresh fails ([Authentication and session](../rules/authentication-and-session.md)) |
 | D2 | Colyseus `onAuth` calls an internal NestJS endpoint to verify the session and access before admitting a join | The client supplies the access token when joining (FD3); admission is decided by the server |
 | D3 | Backend pnpm monorepo (`apps/api`, `apps/realtime`, `packages/contracts`) | None, except the contract types the frontend consumes (D4) |
-| D4 | NestJS generates an OpenAPI document served with the Scalar reference UI; the frontend generates its types from it | The frontend generates API types from that document (FD2); realtime message and state types remain open on the backend side |
+| D4 | NestJS generates an OpenAPI document served with the Scalar reference UI; the frontend generates its types from it | The frontend generates API types from that document (FD2); the backend also commits the document and the realtime type artifacts (backend D8), which the frontend syncs (FD7) |
 | D5 | AWS region `sa-east-1` | The frontend hosting is placed in the same region (FD5) |
 | D6 | GitHub Actions OIDC federation to an IAM role, no long-lived access keys | The frontend deploy pipeline authenticates the same way (FD5) |
 | D7 | Two ways to join: single-use email invitations (mandatory for teachers and parents) and a per-classroom join code that grants only the `Student` role | The interface supports entering a classroom code and the teacher's code management, and keeps email invitations for other roles ([Classrooms, roles, and permissions](../rules/classrooms-and-roles.md)) |
+| D8 | The backend commits `openapi.json` (CI fails if stale), generates Colyseus room state types with `schema-codegen`, exports realtime message payload types from `packages/contracts`, and commits them | The frontend pulls these artifacts with `pnpm api:sync` and commits the generated types (FD7) |
+| D9 | Contract-first: the backend publishes each endpoint's DTOs and OpenAPI entry (a `501` stub is allowed) before or with its implementation; the committed `openapi.json` carries it | The frontend builds MSW handlers from the contract and proceeds before the backend implementation lands (FD9) |
+| D10 | Timestamps stored in UTC and returned as ISO 8601 UTC; each School has a persisted IANA time zone (default `America/Argentina/Buenos_Aires`); the server decides lateness in UTC | The frontend displays deadlines in the school's time zone and indicates the zone (FD11) |
+| D11 | Auto-graded multiple choice in activities and exams is MVP Core; ungraded self-assessed practice quizzes stay MVP Extendido | The interface renders multiple choice as a quiz or exam and shows the server's result (FD12) |
+| D12 | `GET /classrooms/:id/members` returns id, display name, classroom role, and avatar summary to every classroom member; paginated, optional `q` prefix filter, `404` for non-members | Mention autocomplete consumes it (FD12) |
 
 ### FD1. Token storage
 
@@ -105,11 +110,11 @@ The backend repository records decisions D1-D7 in its `docs/technical-justificat
 ### FD2. API types
 
 - **Question:** How does the frontend obtain typed access to the backend API (D4)?
-- **Decision:** `openapi-typescript` generates types from the backend OpenAPI document and `openapi-fetch` is the typed HTTP client; TanStack Query wraps the calls. Generated output lives in `src/api/` and is regenerated by a script.
+- **Decision:** `openapi-typescript` generates types from the backend OpenAPI document and `openapi-fetch` is the typed HTTP client; TanStack Query wraps the calls. Generated output lives in `src/api/`, is committed, and is regenerated by the sync script (FD7).
 - **Rationale:** One authoritative specification owned by the backend; type drift becomes a compile-time failure.
 - **Alternatives:** Orval, rejected because its generated layer is heavier.
 - **Trade-offs:** The frontend depends on the backend publishing an accurate OpenAPI document.
-- **Open:** Whether the generated output is committed or generated in CI.
+- **Update:** Whether the generated output is committed or generated in CI is closed by [FD7](#fd7-contract-sync): it is committed.
 - **Approval:** Approved by Agustin (decision owner) on 2026-11-02.
 
 ### FD3. Colyseus join credential
@@ -137,7 +142,7 @@ The backend repository records decisions D1-D7 in its `docs/technical-justificat
 - **Rationale:** Keeps the frontend in the same region and under the same credential model as the backend.
 - **Alternatives:** S3 + CloudFront configured manually; other static hosts (see "AWS Amplify Hosting" above).
 - **Trade-offs:** Less control than a hand-built distribution; tied to AWS.
-- **Open:** Availability of Amplify Hosting in `sa-east-1` **MUST** be verified before provisioning; if it is unavailable, this decision is revisited.
+- **Verified:** AWS Amplify Hosting is available in `sa-east-1` (Sao Paulo), per the AWS documentation "AWS Amplify endpoints and quotas" (https://docs.aws.amazon.com/general/latest/gr/amplify.html), checked on 2026-11-02. Availability only; cost and quotas are not assessed here.
 - **Approval:** Approved by Agustin (decision owner) on 2026-11-02.
 
 ### FD6. Repository layout
@@ -149,9 +154,69 @@ The backend repository records decisions D1-D7 in its `docs/technical-justificat
 - **Trade-offs:** Introducing a second package later requires restructuring.
 - **Approval:** Approved by Agustin (decision owner) on 2026-11-02.
 
+### FD7. Contract sync
+
+- **Question:** How does the frontend obtain the REST and realtime contracts of the backend (D4, backend D8) without depending on a running backend?
+- **Decision:** The backend generates `openapi.json` from NestJS and commits it in its repository (planned path, for example `apps/api/openapi.json`; the exact path is set by the backend monorepo bootstrap); backend CI fails if the committed file is stale versus the code. The frontend runs a sync script (`pnpm api:sync`) that fetches that committed file from the backend repository (`develop` branch, through the raw GitHub URL or a local checkout path) and regenerates types with `openapi-typescript` into `src/api/`. The backend also generates client-side TypeScript for Colyseus room state with `@colyseus/schema` codegen (`schema-codegen`) and exports realtime message payload types from `packages/contracts`, committing both; the same script pulls them into `src/realtime/`. Generated types in `src/api/` and `src/realtime/` **ARE committed** in this repository, so contract changes appear in pull request diffs, and the frontend build does not depend on a running backend.
+- **Rationale:** Contract changes become reviewable diffs, builds are reproducible offline from committed files, and the backend stays the single source of the specification.
+- **Alternatives:** Generating types in frontend CI from the deployed backend, rejected because the build would depend on backend availability and contract changes would not be visible in pull requests; publishing `packages/contracts` to GitHub Packages, rejected because of publishing, versioning, and registry authentication overhead; hand-written realtime types in the frontend, rejected because of drift and runtime errors.
+- **Trade-offs:** Someone must run the sync; types are stale until then.
+- **Affected contracts:** [API contracts](../rules/api-contracts.md), [Realtime and presence](../rules/realtime-and-presence.md), [Frontend conventions](../rules/frontend-conventions.md) for generated code, and backend decision D8. This closes the open sub-choice of FD2 and the open item on realtime type distribution.
+- **Open:** The script itself and the exact artifact paths on the backend side do not exist yet; they are set when the backend monorepo is bootstrapped and when this application is scaffolded.
+- **Approval:** Approved by Agustin (decision owner) on 2026-11-02.
+
+### FD8. 3D performance budget
+
+- **Question:** What measurable limits must the 3D scene meet on school hardware?
+- **Decision:** A conservative budget. Frame rate: target 30 fps on integrated GPUs and 60 fps on mid-range machines. On screen: at most 100 draw calls and 200k triangles. Assets: avatar GLB at most 1 MB; the full classroom scene at most 8 MB compressed (Draco or meshopt geometry, KTX2 textures). GPU memory: at most 256 MB. If the device cannot sustain the target, measured at runtime, the client automatically **offers** the 2D Classic Mode and the user can decline. The measurable rules live in [3D world and camera](../rules/3d-world-and-camera.md#performance-and-mobile).
+- **Rationale:** School devices are often low-end and integrated-GPU machines; a stuttering scene is worse than a simpler one.
+- **Alternatives:** A standard budget (60 fps on mid-range, 300 draw calls, 500k triangles, 20 MB), rejected because school devices would stutter.
+- **Trade-offs:** Less visual richness and tighter asset authoring; the runtime measurement adds code and needs tuning.
+- **Affected contracts:** [3D world and camera](../rules/3d-world-and-camera.md), [Art direction](../rules/art-direction.md), [Classrooms, roles, and permissions](../rules/classrooms-and-roles.md) for the 2D mode.
+- **Open:** The runtime measurement method and thresholds that trigger the offer are defined during implementation; the budget numbers are limits to verify, not yet measured results.
+- **Approval:** Approved by Agustin (decision owner) on 2026-11-02.
+
+### FD9. Contract mocks
+
+- **Question:** How does the frontend build screens before the backend implements an endpoint, without drifting from the real contract (backend D9)?
+- **Decision:** The backend publishes each endpoint's DTOs and OpenAPI entry (a stub returning `501` is allowed) in a pull request before or together with its implementation; the committed `openapi.json` (backend D8) carries it. Frontend stories build MSW (Mock Service Worker) handlers from that contract so UI work proceeds before the backend implementation lands. MSW is a development and test dependency only and **MUST NOT** be part of production builds.
+- **Rationale:** Both teams work in parallel from one authoritative contract, and mocks that follow the generated types cannot silently drift.
+- **Alternatives:** The frontend waits for backend merges (rejected: serializes the teams); hand-written mocks without a contract (rejected: drift).
+- **Trade-offs:** Handlers must be updated when the contract changes, and a passing mock is not proof of backend integration.
+- **Affected contracts:** [API contracts](../rules/api-contracts.md), [Quality and testing](../rules/quality-and-testing.md), and backend decision D9.
+- **Approval:** Approved by Agustin (decision owner) on 2026-11-02.
+
+### FD10. UI language
+
+- **Question:** In which language and locale is the interface written?
+- **Decision:** UI copy is in Spanish (Argentina, `es-AR`), a single locale for the MVP. Strings are centralized so another locale can be added later. Code, identifiers, and comments stay in English.
+- **Rationale:** The product is sold in Argentina and there is no second locale to serve yet; centralized strings keep a later addition cheap.
+- **Alternatives:** A full i18n framework from day one (rejected: cost without a second locale).
+- **Trade-offs:** Adding a locale later requires extracting any strings that were not centralized.
+- **Affected contracts:** [Quality and testing](../rules/quality-and-testing.md#code-language), [Frontend conventions](../rules/frontend-conventions.md), [Data and time](../rules/data-and-time.md) for locale formatting.
+- **Approval:** Approved by Agustin (decision owner) on 2026-11-02.
+
+### FD11. Deadline time zone
+
+- **Question:** In which time zone does the interface show deadlines (backend D10)?
+- **Decision:** The API returns ISO 8601 UTC instants. The frontend displays deadlines in the school's persisted IANA time zone (default `America/Argentina/Buenos_Aires`) and indicates the zone; the server decides lateness using UTC, never the browser clock.
+- **Rationale:** Students and teachers of one school see the same deadline time regardless of their device settings.
+- **Alternatives:** Display in each viewer's browser time zone (rejected: students and teachers could see different deadline times).
+- **Trade-offs:** The client must receive the school's time zone and format with it explicitly.
+- **Affected contracts:** [Data and time](../rules/data-and-time.md), [Activities and grading](../rules/activities-and-grading.md), and backend decision D10.
+- **Approval:** Approved by Agustin (decision owner) on 2026-11-02.
+
+### FD12. Multiple-choice quizzes and mention autocomplete
+
+- **Question:** How does the frontend present auto-graded multiple choice, and where do @mention suggestions come from (backend D11 and D12)?
+- **Decision:** Auto-graded multiple choice is MVP Core (backend D11). The frontend renders it as a quiz or exam interface, and results come from the server: the browser **MUST NOT** grade answers or submit a computed score. Optional self-assessed practice quizzes remain MVP Extendido. Mention autocomplete in the chat composer consumes backend `GET /classrooms/:id/members` (backend D12, backend issue #52; frontend issue #51), which is paginated and accepts an optional `q` case-insensitive display-name prefix filter. The interface shows only the fields the endpoint returns (id, display name, classroom role, avatar summary) and treats a typed `@name` as a confirmed mention only after the server accepts the message.
+- **Rationale:** Server-side grading keeps answer keys and scores authoritative, and a single member directory gives suggestions without exposing personal data or building a client-side roster.
+- **Alternatives:** Grading in the browser (rejected: exposes answer keys and allows forged scores); building the suggestion list from chat history or other endpoints (rejected: incomplete and may expose data the directory deliberately omits).
+- **Trade-offs:** Suggestions need a network request (debounced, with cached pages), and the quiz result is available only after the server responds; the number of attempts and partial credit stay open.
+- **Affected contracts:** [Activities and grading](../rules/activities-and-grading.md), [Communication and notifications](../rules/communication-and-notifications.md#mentions), and backend decisions D11 and D12.
+- **Approval:** Approved by Agustin (decision owner) on 2026-11-02.
+
 ## Open items
 
-- Whether generated API types are committed or generated in CI (FD2).
-- Availability of AWS Amplify Hosting in `sa-east-1` must be verified before provisioning (FD5).
-- Distribution of realtime message and state types remains open on the backend side (D4).
-- Performance budgets for the 3D scene require measurement and a team decision.
+- The `pnpm api:sync` script and the exact backend artifact paths are planned, not implemented (FD7).
+- The runtime performance measurement that triggers the 2D Classic Mode offer is to be defined at implementation (FD8).

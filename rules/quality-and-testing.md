@@ -6,7 +6,7 @@ A change is complete when its intended behavior has been checked, its limitation
 
 - All project code **MUST** be written in English: identifiers, source filenames, comments, documentation comments, test descriptions, and developer-facing messages.
 - Names **MUST** describe their responsibility clearly and follow the established conventions of the relevant language.
-- User-facing text **MUST** follow the product's chosen language; English code does not require an English interface.
+- User-facing text is Spanish (Argentina, `es-AR`), a single locale for the MVP, with strings centralized so another locale can be added later (decision FD10, approved by Agustin on 2026-11-02; see the [technical justification](../docs/technical-justification.md#fd10-ui-language)); English code does not require an English interface.
 - External contract names and literal user data **MUST NOT** be translated in ways that break compatibility or change their meaning.
 - Commit messages follow [Git workflow](./git-workflow.md#commits). Rule documents follow the language convention in the [rules index](./README.md).
 
@@ -17,6 +17,7 @@ A change is complete when its intended behavior has been checked, its limitation
 - When a deterministic automated test is practical, contributors **SHOULD** reproduce a bug or express the new behavior in a failing test before implementing the change.
 - Authentication, authorization, user-data isolation, and the main CRUD flow **SHOULD** receive automated tests as application code is introduced.
 - UI verification **MUST** cover applicable loading, empty, success, validation, and error states. Responsive layout, labels, keyboard access, and contrast **SHOULD** be checked for affected screens.
+- Mock Service Worker (MSW) handlers are a development and test tool only; they **MUST NOT** ship in production builds, and a passing mock is not integration proof (FD9, [API contracts](./api-contracts.md)).
 - Documentation-only changes **MUST** be checked for correct links, examples, and consistency; application tests are not required when no application behavior is affected.
 
 ## Definition of done

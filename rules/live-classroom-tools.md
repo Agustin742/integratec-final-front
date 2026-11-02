@@ -126,4 +126,4 @@ Use [Quality and testing](./quality-and-testing.md); these are verification expe
 - Hand raising, selective unmuting, and student presenters.
 - Accessible alternatives for drawing-based content.
 - Recording of calls (not in scope).
-- Distribution of realtime contracts remains unresolved (REST contracts are decided ([API contracts](./api-contracts.md))); event names are illustrative.
+- Contract artifacts are distributed as decided in [API contracts](./api-contracts.md); event names are illustrative until the backend publishes them.

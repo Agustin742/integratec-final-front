@@ -5,7 +5,7 @@ A successful merge or build is not evidence that the product is working in a dep
 ## Ownership and readiness
 
 - Frontend and backend **MUST** identify their deployment owners and compatible integration versions independently.
-- Deployment configuration **MUST** reflect agreed infrastructure choices; this rule does not provision services. The frontend is planned for AWS Amplify Hosting in `sa-east-1` (FD5; availability in that region is to be verified before provisioning), and the deploy pipeline **MUST** authenticate to AWS through GitHub Actions OIDC with no long-lived access keys (backend decision D6); see the [technical justification](../docs/technical-justification.md#architecture-decisions).
+- Deployment configuration **MUST** reflect agreed infrastructure choices; this rule does not provision services. The frontend is planned for AWS Amplify Hosting in `sa-east-1` (FD5; availability in that region is verified, see [AWS endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/amplify.html)), and the deploy pipeline **MUST** authenticate to AWS through GitHub Actions OIDC with no long-lived access keys (backend decision D6); see the [technical justification](../docs/technical-justification.md#architecture-decisions).
 - Release candidates **MUST** satisfy [Git workflow](./git-workflow.md) and applicable [quality checks](./quality-and-testing.md).
 - Deployment automation **MUST NOT** be claimed unless its actual trigger, permissions, and results have been verified.
 - Data-changing migrations **MUST** have a backend-owned execution and recovery plan before deployment.

@@ -27,7 +27,7 @@ Users must be able to exchange authorized classroom messages, consult persisted 
 - A received realtime event **MUST NOT** independently establish permanent storage or grant access to another resource.
 - Socket.IO **MAY** serve a justified independent channel under the master; it **MUST NOT** be installed by default or duplicate Colyseus synchronization.
 - Client caches and local conversation arrays **MUST NOT** become authoritative message or notification stores.
-- Frontend and backend owners **MUST** agree on observable contracts; REST contracts come from the backend OpenAPI document ([API contracts](./api-contracts.md)), and no shared package is assumed for realtime contracts.
+- Frontend and backend owners **MUST** agree on observable contracts; REST and realtime contract artifacts come from the backend and are synced as described in [API contracts](./api-contracts.md); no published shared package is assumed.
 
 ## Classroom chat and history
 
@@ -62,6 +62,7 @@ Users must be able to exchange authorized classroom messages, consult persisted 
 ### @mentions
 
 - The composer **MAY** offer mention suggestions limited to the classroom roster the server returns; it **MUST NOT** expose users outside the classroom or members the actor may not see.
+- The suggestion source is backend `GET /classrooms/:id/members` (backend decision D12, FD12): paginated, with the optional `q` case-insensitive display-name prefix filter. The interface shows only the fields it returns (id, display name, classroom role, avatar summary) and **MUST NOT** assume emails or other personal data are available.
 - The server resolves mentions; the interface **MUST** render unresolved text as plain text and **MUST NOT** treat a typed `@name` as a confirmed mention until the server accepts it.
 - A mentioned user receives an in-app notification (see below) only if they still have access to the classroom.
 - A bound on mentions per message is an open decision; the interface **MUST** show the server's rejection if exceeded.
@@ -164,6 +165,6 @@ Use [Quality and testing](./quality-and-testing.md); these are verification expe
 - Parent visibility of announcements.
 - Mentions bound per message.
 - Email service confirmation (candidate: Amazon SES), digest policy, opt-out, and bounce handling.
-- Transport deduplication, reconnect recovery details, and distribution of realtime contracts.
+- Transport deduplication and reconnect recovery details.
 
 These choices **MUST** be resolved explicitly by the responsible product and backend/frontend owners before examples or UI placeholders are treated as commitments.

@@ -1,5 +1,29 @@
 # Tracker — Agustin
 
+## 2026-11-02 — Record multiple-choice quizzes and mention autocomplete source (FD12)
+
+- **Status:** completed
+- **Area / files:** `docs/technical-justification.md`, `docs/functional-requirements.md`, `rules/` (activities-and-grading, communication-and-notifications)
+- **Change:** Recorded FD12: auto-graded multiple choice is MVP Core and rendered as a quiz or exam UI with server-provided results (never graded client-side); mention autocomplete consumes backend `GET /classrooms/:id/members`. Mirrored backend D11 and D12 and fixed the requirements wording on self-assessed quizzes. Done with AI assistance (Claude Code), reviewed by Agustin.
+- **Reason:** The requirements contradicted themselves on multiple-choice scope, and the chat composer needs a defined, minimal source for mention suggestions (frontend issue #51, backend issue #52).
+- **Next step:** Build the quiz/exam interface and the mention autocomplete against the published contract and MSW handlers (FD9).
+
+## 2026-11-02 — Record contract mocks, UI language and deadline time zone (FD9–FD11)
+
+- **Status:** completed
+- **Area / files:** `docs/technical-justification.md`, `docs/architecture.md`, `rules/` (api-contracts, quality-and-testing, frontend-conventions, data-and-time, deployment-and-operations)
+- **Change:** Recorded FD9 (MSW handlers built from the published contract; dev and test only), FD10 (UI in Spanish `es-AR`, centralized strings, single locale), FD11 (deadlines shown in the school's IANA time zone with the zone indicated; server decides lateness in UTC) and mirrored backend D9 and D10. Fixed the Amplify `sa-east-1` wording to "verified" in the deployment rule. Done with AI assistance (Claude Code), reviewed by Agustin.
+- **Reason:** UI work must proceed before backend endpoints land, and the interface language and deadline time zone were undecided.
+- **Next step:** Centralize strings and add MSW handlers when the application is scaffolded.
+
+## 2026-11-02 — Record contract sync, 3D performance budget and verified hosting region
+
+- **Status:** completed
+- **Area / files:** `docs/technical-justification.md`, `docs/architecture.md`, `README.md`, `rules/` (api-contracts, realtime-and-presence, 3d-world-and-camera, art-direction, and the rules that listed realtime contract distribution as open)
+- **Change:** Recorded FD7 (backend commits `openapi.json` and realtime type artifacts; `pnpm api:sync` pulls them and generated types are committed in `src/api/` and `src/realtime/`), FD8 (conservative 3D performance budget with an automatic offer of the 2D Classic Mode), and marked the Amplify availability in `sa-east-1` as verified (FD5). Closed the FD2 open sub-choice and the realtime type distribution items. Done with AI assistance (Claude Code), reviewed by Agustin.
+- **Reason:** Contract changes must be visible in pull requests without a running backend, and school hardware needs measurable 3D limits.
+- **Next step:** Implement `pnpm api:sync` and the runtime performance check when the application is scaffolded.
+
 ## 2026-11-02 — Record frontend decisions and sync with backend
 
 - **Status:** completed
