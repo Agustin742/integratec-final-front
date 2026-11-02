@@ -6,6 +6,9 @@ export interface AvatarResource {
   mixer: AnimationMixer;
   update(delta: number): void;
   setMoving?(moving: boolean): void;
+  /** Optional wardrobe inspection controls; legacy reception resources remain unchanged. */
+  readonly availableMotions?: readonly string[];
+  setMotion?(name: string | null): boolean;
   dispose(): void;
 }
 
