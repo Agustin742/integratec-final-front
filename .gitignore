@@ -1,4 +1,6 @@
 .codegraph/
+__pycache__/
+/.opencode/opencode.json
 /.vscode/
 /odd/
 /node_modules/
@@ -6,6 +8,7 @@
 /.vite/
 /coverage/
 /src/test/*.log
+/scripts/blender/
 /assets/blender/**/*.png
 /assets/blender/**/*.json
 /assets/blender/**/motion-*/

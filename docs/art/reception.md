@@ -8,9 +8,8 @@ An original, warm reception diorama authored in Blender for the [room foundation
 |---|---|
 | [reception.blend](../../assets/blender/reception.blend) | Separate source scene `ITReception_Scene`, materials, studio camera/lights and the original avatar as a scale reference. |
 | [reception.glb](../../public/models/rooms/reception.glb) | Room geometry/materials only: 144 mesh nodes, one scene; no avatar, animations, cameras or lights. |
-| [author_reception.py](../../scripts/blender/author_reception.py) | Authoring recipe, output guards, export validation, camera framing and shared material-assignment resolver. |
-| [recolor_reception.py](../../scripts/blender/recolor_reception.py) | Explicit two-phase material-only revision with read-only baseline, staged export/source checks and guarded promotion. |
-| [test_reception_palette.py](../../scripts/blender/test_reception_palette.py) | Blender-independent assignment and export-invariance regression tests. |
+
+Offline Blender authoring and palette helpers (`author_reception.py`, `recolor_reception.py`, and `test_reception_palette.py`) are kept locally under the untracked `odd/scripts/blender/` directory so only `.blend` and `.glb` deliverables are committed to the repository.
 
 Open the source in a separate Blender window if another unsaved scene is open. The connected authoring run restored the original active scene and left its file path unchanged; the original `character.glb` was not edited.
 
@@ -40,7 +39,7 @@ From Blender's Python console, substitute your actual checkout path:
 from pathlib import Path
 import runpy
 project_root = Path(r"C:\path\to\integratec-final-front")
-recipe = runpy.run_path(str(project_root / "scripts/blender/author_reception.py"))
+recipe = runpy.run_path(str(project_root / "odd/scripts/blender/author_reception.py"))
 evidence = recipe["build"](project_root)
 print(evidence)
 ```
@@ -49,12 +48,12 @@ The recipe imports the existing avatar only for reference renders. Its approved 
 
 ## Material-only revision workflow
 
-Run `python -B scripts/blender/test_reception_palette.py` from the checkout for the deterministic contract. It uses only Python's standard library and writes no bytecode. Actual RED was observed for the missing assignment resolver (five errors), then GREEN for five tests; adding the export-invariance contract produced two missing-comparator errors before seven tests passed. Aesthetic appearance has no meaningful automated RED.
+Run `python -B odd/scripts/blender/test_reception_palette.py` from the checkout for the deterministic contract. It uses only Python's standard library and writes no bytecode. Actual RED was observed for the missing assignment resolver (five errors), then GREEN for five tests; adding the export-invariance contract produced two missing-comparator errors before seven tests passed. Aesthetic appearance has no meaningful automated RED.
 
 Use the connected Blender session with the clean, existing canonical source open. Loading the helper has no scene side effects:
 
 ```python
-revision = runpy.run_path(str(project_root / "scripts/blender/recolor_reception.py"))
+revision = runpy.run_path(str(project_root / "odd/scripts/blender/recolor_reception.py"))
 receipt = revision["dry_run"](project_root)
 print(receipt)  # Inspect exact baseline hashes and material changes before approval.
 # Only after inspection and approval:

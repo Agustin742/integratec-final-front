@@ -1,5 +1,14 @@
 # Tracker — Alejo
 
+## 2026-11-02 — Remove duplicate avatar catalogues and untracked Blender helper scripts
+
+- **Status:** completed
+- **Area / files:** `public/models/avatars/`, `scripts/blender/`, `.gitignore`, `docs/art/avatar-wardrobe.md`, `docs/art/student-uniforms.md`, `docs/art/reception.md`, `docs/development/reception-navigation.md`.
+- **Change:** Remove unused duplicate avatar catalogues under `public/models/avatars/` (`catalogue.json` and `integration-catalogue.json`) so `src/features/avatar/integration-catalogue.json` is the single source of truth, move offline Blender authoring scripts out of Git into `odd/scripts/blender/`, ignore `/scripts/blender/`, and update documentation references.
+- **Reason:** Resolve PR review feedback on duplicate catalogues shipping in `public/` and keep only `.blend` and `.glb` 3D deliverables tracked in the repository.
+- **Verification:** `check_docs.py` passed across the 5 updated Markdown files, `5/5` CI regression tests (`scripts/ci/test_checks.py`) passed, `80/80` focused avatar catalogue/loader/entry tests passed, both TypeScript checks (`tsconfig.app.json`, `tsconfig.node.json`) and `git diff --check` exited 0. An initial combined command chaining `check_docs.py`, `unittest`, the full 19-file Vitest run, and both `tsc` invocations timed out at 30 seconds during the full Vitest run and was not automatically retried.
+- **Next step:** Committed and pushed to `feat/student-uniforms-wardrobe` to resolve PR review feedback.
+
 ## 2026-11-02 — Recover the original wardrobe and revise school uniforms
 
 - **Status:** completed

@@ -60,7 +60,7 @@ T3b must map WASD to world XZ (e.g. W → negative Z), give pointer/touch the sa
 
 ## Geometry source and collision policy
 
-[The Blender recipe](../../scripts/blender/author_reception.py), `compose()`, defines the layout. Blender XY maps to Three XZ as `(X, -Y)`; Blender Z becomes Three Y. The actual [reception GLB](../../public/models/rooms/reception.glb) already uses these coordinates and has identity mesh nodes. Do not apply this conversion twice.
+The Reception Blender authoring recipe (`odd/scripts/blender/author_reception.py`, `compose()`) defines the layout in [reception.blend](../../assets/blender/reception.blend). Blender XY maps to Three XZ as `(X, -Y)`; Blender Z becomes Three Y. The actual [reception GLB](../../public/models/rooms/reception.glb) already uses these coordinates and has identity mesh nodes. Do not apply this conversion twice.
 
 [reception-layout.ts](../../src/features/world/reception-layout.ts) uses conservative horizontal rectangles:
 

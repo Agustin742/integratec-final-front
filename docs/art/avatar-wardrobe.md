@@ -15,7 +15,7 @@ The wardrobe is the first screen when the page loads (`/` or `/wardrobe`), like 
 
 ## School uniforms in the wardrobe
 
-Both `male/body.glb` and `female/body.glb` keep their original base `Pants` and `boots` from the waist down; the wardrobe never hides, replaces or re-loads them. The two school uniforms are ordinary single-file upper-body **Prenda** (`tops`) options in both catalogues, appended after the original garments: **Uniforme primaria** (`coat-tie.glb`) and **Uniforme secundaria** (`polo-sweater.glb`). Each loads one GLB over the unmodified base body, with no `extraPaths` and no `hideBodyMeshes`. Uniforms declare no tint, so the clothing color control does not recolor them. The trousers, skirt and shoes modules from the design study are not offered in the wardrobe.
+Both `male/body.glb` and `female/body.glb` keep their original base `Pants` and `boots` from the waist down; the wardrobe never hides, replaces or re-loads them. The two school uniforms are ordinary single-file upper-body **Prenda** (`tops`) options in [`src/features/avatar/integration-catalogue.json`](../../src/features/avatar/integration-catalogue.json), appended after the original garments: **Uniforme primaria** (`coat-tie.glb`) and **Uniforme secundaria** (`polo-sweater.glb`). Each loads one GLB over the unmodified base body, with no `extraPaths` and no `hideBodyMeshes`. Uniforms declare no tint, so the clothing color control does not recolor them. The trousers, skirt and shoes modules from the design study are not offered in the wardrobe.
 
 | Body | Option ID (label) |
 |---|---|
@@ -41,8 +41,8 @@ The optional `AvatarResource.availableMotions` / `setMotion` interface is additi
 ## Source assets and provenance
 
 - Read-only source: `D:/ALEJO/AleMart/Documents/GITHUB/IntegrarTec/ProyectoFinal/prueba-3d/odd/worktrees/avatar-customization`.
-- Copied 32 original body/hair/top/accessory GLBs, both catalogue JSON files, the original customizer/entry, browser preferences, modular loader, rotation helper, preview, styles and their tests. Existing target calibration/world helpers were preserved.
-- The source integration catalogue intentionally offers a smaller candidate subset, not every copied GLB. Both manifests resolve to existing local files (38 references each: 20 original plus 18 uniform GLBs). Original selection order and labels remain source-owned; uniform options are appended.
+- Copied 32 original body/hair/top/accessory GLBs, [`src/features/avatar/integration-catalogue.json`](../../src/features/avatar/integration-catalogue.json), the original customizer/entry, browser preferences, modular loader, rotation helper, preview, styles and their tests. Existing target calibration/world helpers were preserved.
+- [`src/features/avatar/integration-catalogue.json`](../../src/features/avatar/integration-catalogue.json) is the single source of truth for the avatar catalogue and intentionally offers a curated candidate subset, not every copied GLB. Its 24 asset references (20 original plus 4 uniform GLBs) resolve to existing local files under `public/models/avatars/`. Original selection order and labels remain source-owned; uniform options are appended.
 - Corrected source `public/models/avatars-hem-correction/female/top-hoodie.glb` is relocated byte-for-byte to `public/models/avatars/female/top-hoodie.glb`; strict validation, integration manifest and tests use that allowed local path. SHA-256: `3b07baa3ee68c9da5e2abd046403cb8d6b85cca70d0608de1d8b5d0719a33ce5` (156,060 bytes).
 - Copy-time source/destination mappings, sizes and SHA-256 values are in the local-only evidence file `odd/previews/wardrobe/source-copy.json`. It is deliberately not a durable published artifact.
 - Body GLB metadata reports `Khronos glTF Blender I/O v5.2.40`, glTF 2.0. Both bodies contain Idle, Walk and Sit (plus other clips not exposed by this inspection UI).
@@ -57,10 +57,10 @@ node node_modules/vitest/vitest.mjs run src/features/avatar src/features/world s
 node node_modules/typescript/bin/tsc --noEmit -p tsconfig.app.json
 node node_modules/typescript/bin/tsc --noEmit -p tsconfig.node.json
 python scripts/ci/check_docs.py docs/art/avatar-wardrobe.md docs/art/student-uniforms.md
-git diff --check -- src/features/avatar src/features/world src/app vite.config.ts public/models/avatars/catalogue.json public/models/avatars/integration-catalogue.json docs/art/avatar-wardrobe.md docs/art/student-uniforms.md
+git diff --check -- src/features/avatar src/features/world src/app vite.config.ts docs/art/avatar-wardrobe.md docs/art/student-uniforms.md
 ```
 
-The imported catalogue lives at `src/features/avatar/integration-catalogue.json`, because Vite rejects JavaScript imports from `public/`; the copy under `public/models/avatars/` stays for static serving and must be kept identical.
+The avatar catalogue lives solely at [`src/features/avatar/integration-catalogue.json`](../../src/features/avatar/integration-catalogue.json) (imported by `AvatarEntry.tsx`, because Vite rejects JavaScript imports from `public/`); no duplicate catalogue JSON files are kept under `public/models/avatars/`.
 
 Tests cover uniform catalogue validation (exact single-file paths, rejected companion fields, five-option bound), three-GLB loading (body, hair, top) with base `Pants` and `boots` kept visible, and cleanup, plus original selector keyboard isolation, required nickname, draft preservation, preferences corruption/storage failure, stale/late loads, WebGL failure, rotation, real modular GLB assembly and cleanup, the wardrobe-first entry, confirmed-avatar handoff into reception, the **Vestidor** button and the removed motion buttons. Structural checks are not visual fit acceptance. Historical seated garment intersections and incomplete fit remain limitations; no finite-coordinate, mixer or test result approves garment deformation.
 
