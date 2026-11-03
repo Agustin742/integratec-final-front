@@ -30,6 +30,6 @@ Agents **MUST** keep the acting participant's tracker current, as defined in [th
 
 Before editing an area someone else touched recently, review the relevant trackers.
 
-## Local work plans
+## Local work plans and inspection artifacts
 
-The root `odd/` directory contains local agent work plans. Keep it untracked; do not commit its contents or force-add ignored files.
+The root `odd/` directory contains local agent work plans, Blender test renders (`*.png`), check reports (`*.json`), and browser preview captures (`odd/previews/`, `odd/artifacts/`). Keep `odd/` untracked; agents **MUST** write all temporary renders, screenshots, and JSON verification reports under `odd/` and **MUST NOT** commit them into `assets/blender/`, `public/`, or `docs/`. Do not commit `odd/` contents or force-add ignored files.

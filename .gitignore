@@ -6,3 +6,11 @@
 /.vite/
 /coverage/
 /src/test/*.log
+/assets/blender/**/*.png
+/assets/blender/**/*.json
+/assets/blender/**/motion-*/
+/assets/blender/**/previous-study/
+/public/models/avatars/**/uniforms/**/trousers.glb
+/public/models/avatars/**/uniforms/**/skirt.glb
+/public/models/avatars/**/uniforms/**/shoes.glb
+/public/models/avatars/**/uniforms/*-skirt/
