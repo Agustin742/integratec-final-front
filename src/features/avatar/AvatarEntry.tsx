@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import manifest from '../../../public/models/avatars/integration-catalogue.json';
+import manifest from './integration-catalogue.json';
 import { AvatarCustomizer, type AvatarConfiguration } from './AvatarCustomizer';
 import type { AppearanceCatalogue } from './avatar-appearance';
 import { parseAppearanceCatalogue, toAppearanceChoices } from './avatar-catalogue';

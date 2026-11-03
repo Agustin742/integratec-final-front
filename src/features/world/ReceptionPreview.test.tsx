@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { Group } from 'three';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { loadAvatar, type AvatarResource } from '../avatar/load-avatar';
-import manifest from '../../../public/models/avatars/integration-catalogue.json';
+import manifest from '../avatar/integration-catalogue.json';
 import { parseAppearanceCatalogue } from '../avatar/avatar-catalogue';
 import { defaultAvatarConfiguration } from '../avatar/avatar-preferences';
 import { loadCustomizedAvatar } from '../avatar/load-customized-avatar';

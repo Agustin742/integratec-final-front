@@ -2,7 +2,7 @@ import { StrictMode } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { Group, OrthographicCamera, Vector3 } from 'three';
 import { beforeEach, expect, it, vi } from 'vitest';
-import manifest from '../../../public/models/avatars/integration-catalogue.json';
+import manifest from './integration-catalogue.json';
 import { parseAppearanceCatalogue } from './avatar-catalogue';
 import { defaultAvatarConfiguration } from './avatar-preferences';
 import { loadCustomizedAvatar } from './load-customized-avatar';

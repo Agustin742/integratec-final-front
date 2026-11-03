@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import manifest from '../../../public/models/avatars/integration-catalogue.json';
+import manifest from './integration-catalogue.json';
 import { parseAppearanceCatalogue } from './avatar-catalogue';
 import { appearancePreferenceKey, defaultAvatarConfiguration, loadAvatarPreferences, saveAvatarPreferences, validateAvatarConfiguration } from './avatar-preferences';
 

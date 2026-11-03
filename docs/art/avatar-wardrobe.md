@@ -57,8 +57,10 @@ node node_modules/vitest/vitest.mjs run src/features/avatar src/features/world s
 node node_modules/typescript/bin/tsc --noEmit -p tsconfig.app.json
 node node_modules/typescript/bin/tsc --noEmit -p tsconfig.node.json
 python scripts/ci/check_docs.py docs/art/avatar-wardrobe.md docs/art/student-uniforms.md
-git diff --check -- src/features/avatar src/features/world src/app public/models/avatars/catalogue.json public/models/avatars/integration-catalogue.json docs/art/avatar-wardrobe.md docs/art/student-uniforms.md
+git diff --check -- src/features/avatar src/features/world src/app vite.config.ts public/models/avatars/catalogue.json public/models/avatars/integration-catalogue.json docs/art/avatar-wardrobe.md docs/art/student-uniforms.md
 ```
+
+The imported catalogue lives at `src/features/avatar/integration-catalogue.json`, because Vite rejects JavaScript imports from `public/`; the copy under `public/models/avatars/` stays for static serving and must be kept identical.
 
 Tests cover uniform catalogue validation (exact single-file paths, rejected companion fields, five-option bound), three-GLB loading (body, hair, top) with base `Pants` and `boots` kept visible, and cleanup, plus original selector keyboard isolation, required nickname, draft preservation, preferences corruption/storage failure, stale/late loads, WebGL failure, rotation, real modular GLB assembly and cleanup, the wardrobe-first entry, confirmed-avatar handoff into reception, the **Vestidor** button and the removed motion buttons. Structural checks are not visual fit acceptance. Historical seated garment intersections and incomplete fit remain limitations; no finite-coordinate, mixer or test result approves garment deformation.
 

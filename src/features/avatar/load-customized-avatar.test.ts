@@ -6,7 +6,7 @@ import type { AppearanceBody, AppearanceCatalogue } from './avatar-appearance';
 import type { AvatarConfiguration } from './AvatarCustomizer';
 import { loadCustomizedAvatar } from './load-customized-avatar';
 
-const catalogue: AppearanceCatalogue = JSON.parse(readFileSync('public/models/avatars/integration-catalogue.json', 'utf8'));
+const catalogue: AppearanceCatalogue = JSON.parse(readFileSync('src/features/avatar/integration-catalogue.json', 'utf8'));
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
 function configuration(body: AppearanceBody, patch: Partial<AvatarConfiguration> = {}): AvatarConfiguration {

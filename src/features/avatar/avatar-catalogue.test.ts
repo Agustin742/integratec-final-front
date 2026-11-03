@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import manifest from '../../../public/models/avatars/integration-catalogue.json';
+import manifest from './integration-catalogue.json';
 import { parseAppearanceCatalogue, toAppearanceChoices } from './avatar-catalogue';
 
 const fixture = () => structuredClone(manifest);
