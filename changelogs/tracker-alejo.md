@@ -1,5 +1,14 @@
 # Tracker — Alejo
 
+## 2026-11-04 — Bootstrap frontend application (#11)
+
+- **Status:** completed (local implementation and functional verification; issue remains open).
+- **Area / files:** application tooling, `src/`, `README.md`, `docs/development.md`.
+- **Change:** Implement [issue #11](https://github.com/Agustin742/integratec-final-front/issues/11) on `feat/11-bootstrap-frontend` from updated `develop`: React/Vite/strict TypeScript placeholder, pinned Node 22.23.4/pnpm 10.34.9, lockfile, quality scripts, and setup docs. Assigned to AlejoElPaisano and marked In progress in the Project; [team start notice](https://github.com/Agustin742/integratec-final-front/issues/11#issuecomment-6644424425).
+- **Reason:** Provide the runnable frontend base without taking on F02/F03/F04/F10. AI assistance: el Gentleman/Pi implementation and an independent verifier; human review remains required.
+- **Verification:** Root and isolated clean-copy frozen install, lint, formatting, typecheck, and build passed on Node 22. Strict-null fixture rejected by typecheck/build (TS2322, exit 2), leaving prior output unchanged; any/hooks/img-alt lint probes rejected (exit 1), and restored checks passed. Existing Python CI tests passed 5/5. Desktop/mobile/200% CSS zoom and production preview passed; semantic placeholder has no controls or async states. See [setup evidence and limitations](../docs/development.md#bootstrap-verification-evidence), including ESLint 9 peer-compatibility maintenance, absent application tests, unavailable actionlint, and the closed browser tab preventing a later console query.
+- **Next step:** Assess the local candidate for native review, then obtain authorization for push/PR and a teammate's review before merge. No push, PR, merge, deployment, or issue completion is claimed. Existing modules were preserved under ignored `odd/preexisting-node_modules/`; unrelated local artifacts remain uncommitted.
+
 ## 2026-10-22 — Develop source-grounded functional rules
 
 - **Status:** completed
