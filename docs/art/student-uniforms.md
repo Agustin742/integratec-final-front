@@ -32,12 +32,14 @@ Both `male/body.glb` (`34`-joint runtime rig) and `female/body.glb` (`41`-joint 
 | Male (`34` joints) | School uniforms | `male/uniforms/primary-trousers/coat-tie.glb`, `male/uniforms/secondary-trousers/polo-sweater.glb` |
 | Male (`34` joints) | Accessories | `male/accessory-backpack.glb`, `male/accessory-cap.glb`, `male/accessory-headphones.glb`, `male/accessory-round-glasses.glb`, `male/accessory-square-glasses.glb` |
 
-## Design and technical decisions
+## Asset structure
+
+The following describes the assets delivered in this PR, not an approved project-wide catalog, slot system, rig standard, or asset pipeline. Those choices remain [open decisions](../../rules/avatars-and-customization.md#open-decisions--not-implied-requirements).
 
 - **Upper-body uniform modules over base legs:** Primary (`coat-tie.glb`, ivory smock with navy tie) and secondary (`polo-sweater.glb`, indigo V-neck sweater over cream polo collar) school uniforms are authored as single-file upper-body `top` modules so the base avatar's `Pants` and `boots` remain intact without mesh replacement or hiding.
 - **Distinct female anatomy and rig:** Female assets use the dedicated female body mesh, facial geometry, and `41`-joint skeleton rather than a rescaled male mesh.
 - **Curated asset set:** Twelve unaligned candidate `.glb` exports (whose sleeves remained in a rigid T-pose or whose hair meshes clipped into the head) were excluded after Blender lineup inspection so only verified modules ship under `public/models/avatars/`.
-- **Repository hygiene:** Temporary Blender test renders (`*.png`), JSON check reports (`*.json`), and local agent work plans live exclusively under the gitignored `odd/` directory.
+- **Repository hygiene:** The gitignored `odd/` directory is the intended location for local agent work plans, offline Blender scripts, temporary test renders, and check reports. Additional patterns in [`.gitignore`](../../.gitignore) exclude `/scripts/blender/` and PNG/JSON files under `assets/blender/` to prevent accidental commits from those locations; editable `.blend` sources and delivered runtime `.glb` assets remain versioned.
 
 ## Verification and limitations
 

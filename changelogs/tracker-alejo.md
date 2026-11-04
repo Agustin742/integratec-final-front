@@ -1,5 +1,15 @@
 # Tracker — Alejo
 
+## 2026-11-04 — Clarify PR #60 asset documentation
+
+- **Status:** completed
+- **Area / files:** `docs/art/student-uniforms.md`, `changelogs/tracker-alejo.md`.
+- **Change:** Clarify that the documented asset structure describes this delivery rather than approved project-wide decisions, and align the repository hygiene description with existing ignore patterns.
+- **Reason:** Address [PR #60 review feedback](https://github.com/Agustin742/integratec-final-front/pull/60#issuecomment-6635107254) without changing assets, ignore rules, or open team decisions.
+- **Verification:** Documentation checks passed across 48 tracked Markdown files; `git diff --check` passed. Readback confirmed both review points are addressed without changing assets, `.gitignore`, or authoritative open decisions. Native assessment reported passive risk and no review due. Application tests and RED/GREEN do not apply to this wording-only change.
+- **Delivery:** User authorized committing and pushing this correction to `feat/avatar-uniform-assets` for PR #60.
+- **Next step:** Reviewer confirmation on PR #60 after delivery; merge remains subject to approval and applicable checks.
+
 ## 2026-11-02 — Deliver male and female modular avatar and school uniform 3D assets
 
 - **Status:** completed
