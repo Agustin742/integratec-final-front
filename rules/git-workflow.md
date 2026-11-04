@@ -39,6 +39,7 @@ docs(rules): document pull request reviews
 
 ## Pull requests and merges
 
+- A pull request **SHOULD** focus on a single functionality slice and stay within roughly 400 authored changed lines (excluding lockfiles and binary assets). Larger features **SHOULD** be split into smaller, reviewable pull requests so reviews stay fast and thorough.
 - A pull request **MUST** explain its purpose, relevant issue when one exists, changes, and verification results, including failed or unavailable checks.
 - UI changes **SHOULD** include screenshots or a short recording.
 - At least one other team member **MUST** review and approve the current changes before merge. Material changes after approval **MUST** be reviewed again.

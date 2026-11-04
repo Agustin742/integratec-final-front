@@ -1,13 +1,13 @@
 # Tracker — Alejo
 
-## 2026-11-02 — Remove duplicate avatar catalogues and untracked Blender helper scripts
+## 2026-11-02 — Scope PR #59 exclusively to male and female avatar `.glb` and `.blend` assets
 
 - **Status:** completed
-- **Area / files:** `public/models/avatars/`, `scripts/blender/`, `.gitignore`, `docs/art/avatar-wardrobe.md`, `docs/art/student-uniforms.md`, `docs/art/reception.md`, `docs/development/reception-navigation.md`.
-- **Change:** Remove unused duplicate avatar catalogues under `public/models/avatars/` (`catalogue.json` and `integration-catalogue.json`) so `src/features/avatar/integration-catalogue.json` is the single source of truth, move offline Blender authoring scripts out of Git into `odd/scripts/blender/`, ignore `/scripts/blender/`, and update documentation references.
-- **Reason:** Resolve PR review feedback on duplicate catalogues shipping in `public/` and keep only `.blend` and `.glb` 3D deliverables tracked in the repository.
-- **Verification:** `check_docs.py` passed across the 5 updated Markdown files, `5/5` CI regression tests (`scripts/ci/test_checks.py`) passed, `80/80` focused avatar catalogue/loader/entry tests passed, both TypeScript checks (`tsconfig.app.json`, `tsconfig.node.json`) and `git diff --check` exited 0. An initial combined command chaining `check_docs.py`, `unittest`, the full 19-file Vitest run, and both `tsc` invocations timed out at 30 seconds during the full Vitest run and was not automatically retried.
-- **Next step:** Committed and pushed to `feat/student-uniforms-wardrobe` to resolve PR review feedback.
+- **Area / files:** `public/models/avatars/male/`, `public/models/avatars/female/`, `assets/blender/avatars/student-uniforms/`, `.gitignore`, `rules/git-workflow.md`, `AGENTS.md`.
+- **Change:** Scope the branch exclusively to the 24 verified male and female avatar `.glb` assets (bodies, hairstyles, tops, accessories, and `coat-tie.glb` / `polo-sweater.glb` school uniforms) and the 4 editable school uniform `.blend` files (`uniform.blend`). Remove the 12 discarded/broken `.glb` assets, remove the imported `prueba-3d` wardrobe/reception React application (`src/`, `package.json`, `pnpm-lock.yaml`, configs, and reception assets), untrack offline Blender `.py` helper scripts, and record the ~400-line single-functionality PR guideline in `rules/git-workflow.md`.
+- **Reason:** Keep PR #59 strictly focused on delivering the male and female character, clothing, uniform, and accessory 3D assets (`.glb` and `.blend`) on top of `develop`.
+- **Verification:** `python -B scripts/ci/check_docs.py` passed across all tracked Markdown files, `5/5` CI regression tests (`scripts/ci/test_checks.py`) passed, Blender visual lineup renders verified the 12 discarded GLBs before removal, and `git diff --check origin/develop` exited 0.
+- **Next step:** Commit and push the scoped asset-only diff to `feat/student-uniforms-wardrobe` and update the PR #59 description.
 
 ## 2026-11-02 — Recover the original wardrobe and revise school uniforms
 
