@@ -3,11 +3,11 @@
 ## 2026-11-02 — Deliver male and female modular avatar and school uniform 3D assets
 
 - **Status:** completed
-- **Area / files:** `public/models/avatars/male/`, `public/models/avatars/female/`, `assets/blender/avatars/student-uniforms/`, `.gitignore`, `rules/git-workflow.md`, `AGENTS.md`.
-- **Change:** Add the 24 verified male (`34`-joint rig) and female (`41`-joint rig) modular avatar `.glb` assets (bodies, hairstyles, casual tops, accessories, and primary `coat-tie.glb` / secondary `polo-sweater.glb` school uniforms) and the 4 editable school uniform `.blend` files (`uniform.blend`). Keep offline Blender `.py` scripts, test renders, and task notes gitignored under `odd/`, and record the ~400-line single-functionality PR guideline in `rules/git-workflow.md`.
-- **Reason:** Deliver the male and female character, clothing, school uniform, and accessory 3D assets in a clean, single-commit branch off `develop`.
-- **Verification:** `python -B scripts/ci/check_docs.py` passed across all 47 tracked Markdown files, `5/5` CI regression tests (`scripts/ci/test_checks.py`) passed, Blender visual lineup inspection verified the exported `.glb` assets, and `git diff --check origin/develop` exited 0.
-- **Next step:** Open the clean single-commit PR into `develop` and close superseded PR #59.
+- **Area / files:** `public/models/avatars/male/`, `public/models/avatars/female/`, `assets/blender/avatars/student-uniforms/`, `docs/art/student-uniforms.md`, `.gitignore`, `rules/git-workflow.md`, `AGENTS.md`.
+- **Change:** Add the 24 verified male (`34`-joint rig) and female (`41`-joint rig) modular avatar `.glb` assets (bodies, hairstyles, casual tops, accessories, and primary `coat-tie.glb` / secondary `polo-sweater.glb` school uniforms), the 4 editable school uniform `.blend` files (`uniform.blend`), and their technical/verification documentation in `docs/art/student-uniforms.md`. Keep local agent plans and temporary Blender renders/scripts gitignored under `odd/`, and record the ~400-line single-functionality PR guideline in `rules/git-workflow.md`.
+- **Reason:** Deliver the male and female character, clothing, school uniform, and accessory 3D assets and their verification documentation in a clean branch off `develop`, aligned with `rules/quality-and-testing.md` and `rules/documentation-and-decisions.md`.
+- **Verification:** `python -B scripts/ci/check_docs.py` passed across all 48 tracked Markdown files, `5/5` CI regression tests (`scripts/ci/test_checks.py`) passed, Blender visual lineup inspection verified the exported `.glb` assets, and `git diff --check origin/develop` exited 0.
+- **Next step:** Update PR #60 into `develop`.
 
 ## 2026-10-22 — Develop source-grounded functional rules
 
