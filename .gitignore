@@ -2,6 +2,13 @@
 __pycache__/
 /.opencode/opencode.json
 /.vscode/
+/.opencode/
+/node_modules/
+/dist/
+*.log
+.env
+.env.*
+!.env.example
 /odd/
 /node_modules/
 /dist/
