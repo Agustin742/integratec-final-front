@@ -22,7 +22,7 @@ The environment-assignment syntax above uses Bash (including Git Bash on Windows
 
 - Vitest merges the existing Vite configuration, retaining the React plugin. Its jsdom suite includes only `src/**/*.test.{ts,tsx}`; Playwright discovers tests separately in `e2e/`.
 - `src/test/setup.ts` imports jest-dom's Vitest matchers and registers RTL cleanup explicitly because Vitest globals are disabled. Import `test`, `expect`, and timer utilities from `vitest`.
-- `src/test/render.tsx` accepts RTL render options and renders in StrictMode. No providers are needed today; add real providers incrementally with F07/F10, not hypothetical wrappers.
+- `src/test/render.tsx` accepts RTL render options plus an optional `queryClient` and wraps the tree in StrictMode and `ApiQueryProvider` (`createAppQueryClient()` by default, preserving the provider across `rerender` calls). Add future providers incrementally (such as routing in F10), not hypothetical wrappers.
 - Prefer role/name queries and observable outcomes. `src/app/App.test.tsx` is the sample, not feature coverage.
 - `expectAccessible(container)` awaits typed axe-core results and throws rule IDs and affected HTML for violations. The negative helper regression checks an unnamed button. jsdom cannot check layout or contrast; only `color-contrast` is disabled. A clean result is not a full accessibility audit: check keyboard/focus, contrast, and applicable states in a browser when features introduce them.
 
@@ -42,7 +42,13 @@ Replace the reserved example with an authorized public frontend URL. `PLAYWRIGHT
 
 ## Contract mocks and delivery boundaries
 
-Follow [API contract policy](../rules/api-contracts.md): identify the authoritative contract/version and owner before deriving mocks; include relevant failure cases as well as success. Use synthetic data. Passing mocks are not backend integration proof. Transport setup (including MSW dependency/handlers) waits for F07's typed client; no mock transport is selected by this infrastructure.
+Follow [API contract policy](../rules/api-contracts.md): identify the authoritative contract/version and owner before deriving mocks; include relevant failure cases as well as success. Use synthetic data. Passing mocks are not backend integration proof.
+
+[F07 typed API client](../src/api/client.ts) selects **Mock Service Worker (`msw`, dev/test only per FD9)** as the contract-mocking transport under `src/test/msw/`:
+
+- `src/test/msw/handlers.ts` builds handlers and `ErrorEnvelope` responses (`createErrorEnvelopeResponse`, `createHealthHandler`) directly from the generated OpenAPI types in `src/api/schema.generated.ts`.
+- `src/test/msw/server.ts` exports `mswServer` (`setupServer(...defaultHandlers)`) for Vitest suites (`mswServer.listen({ onUnhandledFrame: 'error' })`).
+- Frontend stories build MSW handlers against the backend's published DTOs and OpenAPI entries (including `501` stubs published before backend implementation per D9/FD9) so UI work can proceed without waiting for backend merges. MSW must never be imported by production application code or shipped in `dist/`.
 
 Feature tests belong to their stories. The placeholder has no controls, forms, API calls, loading, validation, or error states; focus flows and those states are not applicable now. This harness does not prove backend integration, deployment, visual regression, or WebGL rendering. Disclose failing, skipped, and unavailable checks per [quality requirements](../rules/quality-and-testing.md).
 
