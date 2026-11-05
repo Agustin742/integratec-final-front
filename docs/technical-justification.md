@@ -16,7 +16,7 @@ Frontend-side justification for course requirement R6. Decisions come from the [
 | Testing | Vitest + Playwright | Unit/integration and end-to-end tests |
 | Router | React Router | Routes and protected navigation (FD4) |
 | API client | openapi-typescript + openapi-fetch | Types generated from the backend OpenAPI document (FD2, FD7) |
-| Hosting | AWS Amplify Hosting (`sa-east-1`) | Static build served over HTTPS |
+| Hosting | AWS Amplify Hosting (`us-east-2`) | Static build served over HTTPS |
 
 ## Decisions
 
@@ -88,8 +88,8 @@ The backend repository records decisions D1-D12 in its `docs/technical-justifica
 | D2 | Colyseus `onAuth` calls an internal NestJS endpoint to verify the session and access before admitting a join | The client supplies the access token when joining (FD3); admission is decided by the server |
 | D3 | Backend pnpm monorepo (`apps/api`, `apps/realtime`, `packages/contracts`) | None, except the contract types the frontend consumes (D4) |
 | D4 | NestJS generates an OpenAPI document served with the Scalar reference UI; the frontend generates its types from it | The frontend generates API types from that document (FD2); the backend also commits the document and the realtime type artifacts (backend D8), which the frontend syncs (FD7) |
-| D5 | AWS region `sa-east-1` | The frontend hosting is placed in the same region (FD5) |
-| D6 | GitHub Actions OIDC federation to an IAM role, no long-lived access keys | The frontend deploy pipeline authenticates the same way (FD5) |
+| D5 | AWS region `us-east-2` (changed from `sa-east-1` on 2026-11-04: the AWS account assigns the Region and denies others) | The frontend hosting is placed in the same region (FD5) |
+| D6 | No long-lived AWS access keys; GitHub Actions OIDC is the target, but the AWS account currently denies creating the OIDC provider (backend D6 update, 2026-11-04) | The frontend deploys through Amplify Hosting's GitHub App connection, with no AWS credentials in GitHub (FD5) |
 | D7 | Two ways to join: single-use email invitations (mandatory for teachers and parents) and a per-classroom join code that grants only the `Student` role | The interface supports entering a classroom code and the teacher's code management, and keeps email invitations for other roles ([Classrooms, roles, and permissions](../rules/classrooms-and-roles.md)) |
 | D8 | The backend commits `openapi.json` (CI fails if stale), generates Colyseus room state types with `schema-codegen`, exports realtime message payload types from `packages/contracts`, and commits them | The frontend pulls these artifacts with `pnpm api:sync` and commits the generated types (FD7) |
 | D9 | Contract-first: the backend publishes each endpoint's DTOs and OpenAPI entry (a `501` stub is allowed) before or with its implementation; the committed `openapi.json` carries it | The frontend builds MSW handlers from the contract and proceeds before the backend implementation lands (FD9) |
@@ -144,6 +144,7 @@ The backend repository records decisions D1-D12 in its `docs/technical-justifica
 - **Trade-offs:** Less control than a hand-built distribution; tied to AWS.
 - **Verified:** AWS Amplify Hosting is available in `sa-east-1` (Sao Paulo), per the AWS documentation "AWS Amplify endpoints and quotas" (https://docs.aws.amazon.com/general/latest/gr/amplify.html), checked on 2026-11-02. Availability only; cost and quotas are not assessed here.
 - **Approval:** Approved by Agustin (decision owner) on 2026-11-02.
+- **Update (2026-11-04):** The AWS account uses the AWS "new sign-up experience", which assigns `us-east-2` by country and denies other Regions and the creation of the GitHub OIDC provider through AWS-managed policies (backend D5 and D6 updates). Hosting moves to Amplify Hosting in `us-east-2`; the region and credential decision above is superseded. Deployment uses Amplify Hosting's own GitHub connection: the Amplify GitHub App gets read-only access to the selected repository and Amplify builds and deploys the connected branch, so no AWS credentials are stored in GitHub. Creating the app from the Amplify console needs no token; creating it through the CLI, CloudFormation, or an SDK requires a GitHub personal access token at creation time, which **MUST NOT** be committed. Verified on 2026-11-04: Amplify is available in `us-east-2` ("AWS Amplify endpoints and quotas", https://docs.aws.amazon.com/general/latest/gr/amplify.html) and the GitHub App connection is documented in "Setting up Amplify access to GitHub repositories" (https://docs.aws.amazon.com/amplify/latest/userguide/setting-up-GitHub-access.html). Cost and Free Tier limits are not assessed. Approved by Agustin (decision owner) on 2026-11-04.
 
 ### FD6. Repository layout
 

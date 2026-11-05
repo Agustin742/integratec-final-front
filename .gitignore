@@ -1,4 +1,6 @@
 .codegraph/
+__pycache__/
+/.opencode/opencode.json
 /.vscode/
 /.opencode/
 /node_modules/
@@ -8,3 +10,17 @@
 .env.*
 !.env.example
 /odd/
+/node_modules/
+/dist/
+/.vite/
+/coverage/
+/src/test/*.log
+/scripts/blender/
+/assets/blender/**/*.png
+/assets/blender/**/*.json
+/assets/blender/**/motion-*/
+/assets/blender/**/previous-study/
+/public/models/avatars/**/uniforms/**/trousers.glb
+/public/models/avatars/**/uniforms/**/skirt.glb
+/public/models/avatars/**/uniforms/**/shoes.glb
+/public/models/avatars/**/uniforms/*-skirt/

@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-04 — Move frontend hosting to us-east-2 with keyless Amplify deploy (FD5 update)
+
+- **Status:** completed
+- **Area / files:** `docs/technical-justification.md` (FD5, D5/D6 impact), `docs/architecture.md`, `rules/deployment-and-operations.md`
+- **Change:** Recorded the FD5 update: Amplify Hosting in `us-east-2` and deployment through the Amplify GitHub App connection instead of GitHub Actions OIDC, with no AWS credentials in GitHub. Mirrored the backend D5/D6 updates. Done with AI assistance (Claude Code), reviewed by Agustin.
+- **Reason:** The AWS account (new sign-up experience) assigns `us-east-2` and denies other Regions and the GitHub OIDC provider through AWS-managed policies (backend #16, PR #57); frontend issue #22 was updated accordingly.
+- **Verification:** Amplify availability in `us-east-2` and the GitHub App connection checked in the AWS documentation on 2026-11-04; docs link check passed. Cost and Free Tier limits are not assessed.
+- **Next step:** Provision Amplify Hosting under frontend issue #22.
+
 ## 2026-11-02 — Record multiple-choice quizzes and mention autocomplete source (FD12)
 
 - **Status:** completed
