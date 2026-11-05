@@ -4,3 +4,5 @@ odd/
 test-results/
 playwright-report/
 *.log
+src/api/*.generated.ts
+src/realtime/*.generated.ts
