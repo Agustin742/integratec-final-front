@@ -1,7 +1,7 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import { expect, test } from 'vitest';
-import { expectAccessible } from '../../test/accessibility';
-import { render } from '../../test/render';
+import { expectAccessible } from '@/test/accessibility';
+import { render } from '@/test/render';
 import { BaseLayout } from './base-layout';
 import { layoutMessages } from './messages';
 
