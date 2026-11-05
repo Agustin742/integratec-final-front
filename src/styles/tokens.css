@@ -1,0 +1,72 @@
+:root {
+  color-scheme: light;
+  --palette-cream: #fff0d8;
+  --palette-creamPale: #fff9eb;
+  --palette-sand: #e9c99b;
+  --palette-wood: #af7b52;
+  --palette-coral: #e66861;
+  --palette-teal: #62cfc7;
+  --palette-butter: #f7d86b;
+  --palette-lavender: #b5a7d6;
+  --palette-grass: #a6d96a;
+  --palette-leaf: #65b96a;
+  --palette-green: #3e8654;
+  --palette-ink: #382f3f;
+
+  --background: var(--palette-cream);
+  --foreground: var(--palette-ink);
+  --card: var(--palette-creamPale);
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  /* Darkened semantic tones preserve the palette while meeting text contrast. */
+  --primary: #28603b;
+  --primary-foreground: var(--palette-creamPale);
+  --secondary: var(--palette-sand);
+  --secondary-foreground: var(--foreground);
+  --muted: var(--palette-creamPale);
+  --muted-foreground: #655462;
+  --accent: var(--palette-teal);
+  --accent-foreground: var(--foreground);
+  --destructive: #a33630;
+  --destructive-foreground: var(--palette-creamPale);
+  --border: var(--palette-wood);
+  --input: #806348;
+  --ring: var(--primary);
+  --radius: 0.75rem;
+  --spacing: 0.25rem;
+  --font-body:
+    system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --text-body: 1rem;
+  --text-small: 0.875rem;
+  --text-heading: clamp(1.5rem, 4vw, 2.25rem);
+  --panel-shadow: 0 0.25rem 1rem #b5a7d633;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-body);
+  --radius-sm: calc(var(--radius) - 0.25rem);
+  --radius-md: calc(var(--radius) - 0.125rem);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 0.25rem);
+  --shadow-panel: var(--panel-shadow);
+}

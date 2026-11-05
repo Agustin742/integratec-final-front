@@ -1,5 +1,40 @@
 # Tracker — Alejo
 
+## 2026-11-05 — Pi subagent runtime recovered for #14 (cause unproven)
+
+- **Status:** completed (T1 independently verified; incident cause not established).
+- **Change:** Read-only investigation, local backup under ignored `odd/backups/`, and one independent verification launched from the worktree. No package, settings or Engram changes.
+- **Verification:** Independent verifier completed: lint, typecheck, 13/13 tests and build exit 0, once each. Frozen-lockfile install, browser and Playwright not run.
+- **Next step:** Continue T2 (components) and T4 (layout, es-AR strings, browser checks); native review only on committed work units. Report Pi findings (override 0.1.8 vs 0.1.16, `.pi/tools` prompt) to maintainers if wanted.
+
+## 2026-11-05 — Prepare local Pi subagent failure report
+
+- **Status:** completed (local draft only; incident unresolved).
+- **Area / files:** ignored `odd/diagnostics/pi-subagent-startup-report.md` and existing diagnostic evidence.
+- **Change:** Preparing a sanitized maintainer-facing report after Alejo's explicit request, distinguishing the original native exit from the separate bounded startup timeout.
+- **Reason:** Preserve useful evidence without claiming an established cause or attempting speculative package changes.
+- **Verification:** Four JSON examples parsed; nine supplementary probe fields match the saved result; native-code conversion and original elapsed time checked. Markdown fence/whitespace checks and private-identifier/absolute-path/credential-pattern scans passed. Installed Pi version confirmed as 1.5.0. No new process reproduction or application verification performed.
+- **Next step:** Alejo reviews the local draft before any separate authorization for exact remote discovery/publication. No issue created or remote searches performed. Original verifier remains unavailable and incident cause unknown.
+
+## 2026-11-05 — Investigate Pi subagent startup failure
+
+- **Status:** blocked (native cause unresolved; bounded standalone startup probe did not become ready).
+- **Area / files:** authorized external `gentle-engram` override, installed Pi runtime/documentation, and `gentle-pi` launcher source; local issue #14 task record.
+- **Change:** Investigating the failed verifier process (exit 3221226505 before agent settlement), without relaunching verification or modifying installed packages. Alejo explicitly authorized reading `C:/Users/alema/.pi/agent/overrides/gentle-engram` and `D:/AppData_Moved/Npm_Roaming/node_modules/@earendil-works/pi-coding-agent`.
+- **Reason:** Distinguish a confirmed manifest warning from the actual startup failure before proposing maintenance.
+- **Findings:** Source inspection confirms the warning detects manifest declarations only, not loaded duplicate modules; the inspected interactive path displays it nonfatally. `pi-tui` and `typebox` are incorrectly declared as dependencies rather than host peers. No proof connects that defect to exit `0xC0000409`. With separate explicit consent, queried Application events 1000/1001 for the last two hours; no events found. Terminal task metadata now confirms 0 turns and 0 tool calls for the failed verifier; no application verification was performed. The launcher reports an observed child exit, distinct from a spawn failure, and keeps only a bounded in-memory stderr tail. No verifier retry or runtime edit performed.
+- **Additional evidence:** With separate explicit read consent, the persisted failed task reports 0 turns, 0 tool calls and no saved child session path. Global agent profiles differ, but no causal model fault is proven. Alejo then separately authorized a no-task Pi RPC startup diagnostic: no response within 20 seconds, no orderly exit within 5 more seconds, stopped with SIGTERM; no stdout events or stderr. This timeout did not reproduce the original native exit. Sanitized diagnostics stay in ignored `odd/diagnostics/`.
+- **Next step:** Local report prepared separately below the investigation scope; human review and separate exact remote authorization are still required before publication. Native cause and independent verification remain unresolved. No speculative package/model changes or automatic startup/verifier retry; issue #14 remains partial and blocked.
+
+## 2026-11-05 — Implement warm UI foundations (#14)
+
+- **Status:** in-progress (resuming T2/T4 after the successful independent T1 check recorded above).
+- **Area / files:** `package.json`, `pnpm-lock.yaml`, `components.json`, Vite/TypeScript configuration, `src/styles/`, `src/lib/utils.ts`, `src/main.tsx`, `src/vite-env.d.ts`, `docs/ui-foundations.md`.
+- **Change:** Implementing [issue #14](https://github.com/Agustin742/integratec-final-front/issues/14) in isolated `feat/14-ui-foundations`, updated to develop `2e4b2b0` after #13 merged. Alejo approved the documented warm panel direction and implementation. AI assistance: el Gentleman/Pi orchestration and scoped agents.
+- **Reason:** Establish reusable, accessible application panels without router, guards, 3D changes or dark mode.
+- **Verification:** Token RED observed, followed by corrected 11/11 focused and 13/13 full tests; lint, typecheck, build and whitespace checks passed. First broad RED command timed out at 30 seconds; subsequent path-rewrite and hex-case assertion failures were corrected and disclosed. Browser/components/layout are not yet implemented or verified. Independent verifier `mw3q2bej-2-dr3m` failed before agent settlement (Pi exit 3221226505), producing no verification verdict; its stderr includes a host-extension dependency warning, not a proven root cause. Native assessment escalated dependency/build risk (item 5); RDD is on, no native review started.
+- **Next step:** Preserve T1 as a separate tooling/token commit, assess its exact committed range and follow native review if due; then implement T2 controls/overlays and T4 layout in small tested work units. The original failed verifier remains unavailable; the later successful T1 verification is recorded above. Preserve original #13 authority. No publication or merge authorized.
+
 ## 2026-11-05 — Extend frontend CI (#13)
 
 - **Status:** blocked (formal RDD closure; implementation and Ubuntu CI complete, teammate review pending).
@@ -39,6 +74,7 @@
 - **Verification:** Root and isolated clean-copy frozen install, lint, formatting, typecheck, and build passed on Node 22. Strict-null fixture rejected by typecheck/build (TS2322, exit 2), leaving prior output unchanged; any/hooks/img-alt lint probes rejected (exit 1), and restored checks passed. Existing Python CI tests passed 5/5. Desktop/mobile/200% CSS zoom and production preview passed; semantic placeholder has no controls or async states. See [setup evidence and limitations](../docs/development.md#bootstrap-verification-evidence), including ESLint 9 peer-compatibility maintenance, absent application tests, unavailable actionlint, and the closed browser tab preventing a later console query.
 - **Review / commit:** Implementation committed locally as `bbd76bb`. Native RDD `review-f18a26eba435bed8` approved the committed candidate through risk, readability, and reliability lenses; exact approved acknowledgement completed. No corrections required.
 - **Next step:** Obtain authorization for push/PR and a teammate's review before merge. No push, PR, merge, deployment, or issue completion is claimed. Existing modules were preserved under ignored `odd/preexisting-node_modules/`; unrelated local artifacts remain uncommitted.
+
 ## 2026-11-04 — Clarify PR #60 asset documentation
 
 - **Status:** completed
