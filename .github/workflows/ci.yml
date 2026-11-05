@@ -118,6 +118,10 @@ jobs:
       - name: Build frontend
         id: build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          VITE_APP_ENV: test
+          VITE_API_BASE_URL: https://api.example.invalid
+          VITE_REALTIME_URL: wss://realtime.example.invalid
         run: bash scripts/ci/run_frontend_check.sh build
 
       - name: Report docs-only frontend
