@@ -38,7 +38,7 @@ Before delivery, run a frozen install and every listed quality command on Node 2
 
 The placeholder has no controls, network requests, forms, or asynchronous states. Keyboard focus interactions, loading, validation, and error flows are therefore not introduced here; they must be checked when those behaviors are implemented. Check the document language and heading semantics now.
 
-[F02 testing infrastructure](testing.md) provides `pnpm test` (Vitest/Testing Library with jsdom) and `pnpm e2e` (Playwright against production preview). Follow that guide for the project-local Chromium install, helpers, optional remote URL, fake timers, and contract-mocking policy. Lint, strict typecheck, and formatting include both runner configs and browser tests. Existing Python CI-tooling tests remain applicable. CI discovers the non-watch test script; no workflow changes or CI lint/typecheck/build jobs (F03) are introduced.
+[F02 testing infrastructure](testing.md) provides `pnpm test` (Vitest/Testing Library with jsdom) and `pnpm e2e` (Playwright against production preview). Follow that guide for the project-local Chromium install, helpers, optional remote URL, fake timers, and contract-mocking policy. Lint, strict typecheck, and formatting include both runner configs and browser tests. Existing Python CI-tooling tests remain applicable. [F03 frontend CI](ci.md) now runs separate lint, formatting, typecheck, non-watch test and build steps after a frozen install on Node 22, with explicit skip notices and a result summary. Playwright remains optional and local, not a CI gate.
 
 ## Bootstrap verification evidence
 

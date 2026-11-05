@@ -40,9 +40,9 @@ Work branches enter `develop` through reviewed pull requests. Changes are promot
 
 ## CI
 
-The `checks` job runs Python standard-library CI regressions and checks tracked Markdown documents for internal inline link paths and ATX (`#`) heading anchors. External URLs are ignored (no network requests); inline code and fenced examples are not links. This limited checker covers the current documentation syntax, not reference-style links, HTML anchors, or all Markdown dialects. It does not enforce document whitespace or final newlines.
+The `checks` job preserves promotion, Python regression, documentation-link, proposed-diff whitespace and actionlint **1.7.7** gates. With an application present, it installs frozen dependencies on Node **22** and independently runs lint, formatting, types, tests and build. Documentation-only PRs do not bypass these checks; missing scripts are reported as skipped, not passed.
 
-CI fetches full history and runs `git diff --check` on proposed changes: PR base SHA to the checked-out merge result, or push `before` SHA to HEAD. An initial push uses the empty tree. Only added/changed lines are checked, preserving unchanged existing whitespace. CI also validates the workflow using actionlint **1.7.7**, installed into the runner's temporary directory using Go.
+See the [CI guide](docs/ci.md) for triggers, Corepack/cache ordering, skip/failure behavior, summaries, diagnosis and observed evidence. Optional local Playwright checks remain in the [testing guide](docs/testing.md); deployment and branch-protection settings are outside this workflow change.
 
 Run locally from the repository root (Python 3, Git, and Bash required):
 
@@ -56,8 +56,6 @@ actionlint .github/workflows/ci.yml
 ```
 
 Use the actual target ref (`origin/test` or `origin/main` for promotions) instead of `origin/develop` when appropriate. The diff command includes uncommitted tracked edits; untracked files are not included. For each new file, also run `git diff --no-index --check -- /dev/null path/to/new-file` before staging (`--no-index` exit 1 alone means files differ; whitespace errors include diagnostics). Stage new Markdown files for inclusion in the default tracked-file link check, or pass their paths explicitly to `check_docs.py`. Report unavailable tools honestly; local validation does not prove a GitHub run or branch protection.
-
-The job uses Node.js 22 and Corepack/pnpm when both `package.json` and `pnpm-lock.yaml` are present. A package without its lockfile fails clearly. When no package or test script is configured, CI reports that no application tests were run in a GitHub notice and the job summary; CI-tooling regressions still run.
 
 ## Cross-repository contracts
 
