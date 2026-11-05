@@ -129,5 +129,29 @@ audit or remote-deployment proof is claimed. Long-text stress targets the banner
 not every possible consumer payload. Automated Chromium desktop checks replace
 missing functional desktop proof, not visual design approval. This bounded writer
 is not a replacement independent verifier and does not close review or tracker
-lifecycle. The parent owns final T4 disposition and must rerun affected checks
-after any separately authorized develop integration; none was performed here.
+lifecycle. That run preceded develop integration. The later, separately authorized
+integration checks are recorded below.
+
+## Develop integration evidence
+
+The local merge combines UI candidate `b4deb9b` with develop `5a6ee7b`
+(PR #65 public configuration and PR #66 contract sync). Four conflicts were
+reconciled by preserving both parents: manifest scripts/dependencies, exact lock
+blocks, startup validation plus stylesheet, and Vite validation/React/Tailwind/alias.
+No package versions were upgraded. Frozen installation added the incoming pinned
+`zod` and `openapi-typescript`; an initial offline attempt reported a missing cache
+tarball. Before installation, missing `zod` prevented typecheck/build/test collection;
+those failed attempts are not counted as passes.
+
+After installation, lint, typecheck, **83/83 unit/component tests** and build exited 0. Build used only CI's safe public placeholders: `VITE_APP_ENV=test`,
+`VITE_API_BASE_URL=https://api.example.invalid` and
+`VITE_REALTIME_URL=wss://realtime.example.invalid`. No backend connectivity is claimed.
+The new production preview then passed the same **14/14 browser scenarios** in
+**8.9s**, with no retries or skipped cases, through the supported preview-URL command.
+
+Global formatting and documentation checks (58 files) passed. Six incoming files
+initially failed formatting only because of checkout CRLF; their local line endings
+were normalized after proving equality with the merged index. This added no authored
+changes to those incoming files and did not change Git configuration.
+No additional review agent, dependency upgrade, remote contract sync, push or PR
+was run for this integration. The screenshot/device/audit limits above still apply.

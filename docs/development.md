@@ -13,24 +13,26 @@
 
 ## Source layout
 
-| Path                  | Responsibility                                                     |
-| --------------------- | ------------------------------------------------------------------ |
-| `src/main.tsx`        | Mount React with StrictMode                                        |
-| `src/app/App.tsx`     | Minimal semantic placeholder, without routing or feature behavior  |
-| `src/app/messages.ts` | Centralized Spanish (Argentina) placeholder strings                |
-| `src/api/`            | Reserved for generated REST types, not hand-written business logic |
-| `src/realtime/`       | Reserved for generated realtime contracts                          |
-| `vite.config.ts`      | React integration with Vite                                        |
+| Path                                  | Responsibility                                                    |
+| ------------------------------------- | ----------------------------------------------------------------- |
+| `src/main.tsx`                        | Validate public configuration and mount React with StrictMode     |
+| `src/config/public-config.ts`         | Typed, Zod-validated `VITE_` public configuration boundary        |
+| `src/app/App.tsx`                     | Minimal semantic placeholder, without routing or feature behavior |
+| `src/app/messages.ts`                 | Centralized Spanish (Argentina) placeholder strings               |
+| `src/api/schema.generated.ts`         | Generated REST OpenAPI TypeScript definitions (`pnpm api:sync`)   |
+| `src/realtime/contracts.generated.ts` | Generated shared realtime payload contracts (`pnpm api:sync`)     |
+| `scripts/api-sync/sync-contracts.mjs` | Contract synchronization resolver and generator (`pnpm api:sync`) |
+| `vite.config.ts`                      | Build/dev configuration validation plugin and React integration   |
 
 Add feature UI, integration, and tests together when their issues start. Do not pre-create hypothetical feature scaffolding. Follow [frontend conventions](../rules/frontend-conventions.md) and [architecture boundaries](../rules/architecture.md).
 
 ## Configuration and commands
 
-No environment variables, backend endpoints, credentials, or running backend are required by this placeholder. No runtime configuration contract is introduced. Keep real `.env` files out of Git; future public configuration follows [environment rules](../rules/configuration-and-environments.md).
+Public build-time configuration ([issue #15](https://github.com/Agustin742/integratec-final-front/issues/15)) is read exclusively through [`src/config/public-config.ts`](../src/config/public-config.ts) (`VITE_APP_ENV`, `VITE_API_BASE_URL`, `VITE_REALTIME_URL`). Copy [`.env.example`](../.env.example) to `.env` for local development; keep real `.env` files out of Git and never place secrets in `VITE_` variables. Missing or invalid values fail fast during `pnpm dev`, `pnpm build`, and application startup without silently falling back to a production service. ESLint forbids direct `import.meta.env` reads outside `src/config/`. See [README public configuration](../README.md#public-configuration) and [environment rules](../rules/configuration-and-environments.md).
 
 The [README command table](../README.md#local-development) matches `package.json`. Vite alone transpiles TypeScript without checking types, so `pnpm build` explicitly runs the same `tsc --noEmit` check as `pnpm typecheck` before bundling. A strict type error must stop the build before Vite emits output.
 
-Prettier checks only the application, its configuration, and setup docs, not unrelated historical documents or local artifacts. ESLint applies recommended TypeScript, React hook, and JSX accessibility rules. Generated contracts are not present yet.
+`pnpm api:sync` ([issue #16](https://github.com/Agustin742/integratec-final-front/issues/16)) fetches the backend's committed `apps/api/openapi.json` and realtime contract artifacts from `Agustin742/integratec-final-back` (`develop` by default, or a local checkout via `--backend-dir <path>` / `BACKEND_CHECKOUT_DIR`) and regenerates committed TypeScript files in `src/api/schema.generated.ts` and `src/realtime/contracts.generated.ts` (plus `src/realtime/room-state.generated.ts` once backend Colyseus room-state codegen is published). Prettier and ESLint ignore `src/api/*.generated.ts` and `src/realtime/*.generated.ts` so generated contracts are never hand-edited or reformatted, while `pnpm typecheck` and `pnpm build` validate them offline without a running backend.
 
 ## Verification boundaries
 

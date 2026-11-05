@@ -1,5 +1,16 @@
 # Tracker — Alejo
 
+## 2026-11-05 — Integrate develop into UI foundations (#14)
+
+- **Status:** in-progress (conflicts resolved and functional checks passed; local merge closure and final assessment pending).
+- **Area / files:** `feat/14-ui-foundations`; incoming public configuration (#15 / PR #65) and API contract sync (#16 / PR #66).
+- **Change:** Alejo explicitly authorized integrating `origin/develop` and resolving conflicts locally. Fetch completed; target is `5a6ee7b`, current UI candidate `b4deb9b`.
+- **Reason:** Preserve both teammates' work before preparing small, focused UI PRs.
+- **Scope / measurements:** Before integration, nine own commits; 2,528 additions and six deletions excluding generated lockfile (1,006 code/config additions, 1,014 tests, 508 docs/tracker). No push, PR creation or shared-branch merge authorized. The cancelled redundant verifier is not restarted.
+- **Resolution:** Four conflicts reconciled: exact parent union in `package.json` and `pnpm-lock.yaml`, public-config startup validation plus styles in `src/main.tsx`, validation/React/Tailwind/alias in `vite.config.ts`. Manifest has nine scripts, nine dependencies and 23 devDependencies; lock union has 498 package keys and 513 snapshots, without new versions. Parent verified the manifest union and staged the four resolutions; no unmerged paths remain. Other incoming files and Mati's tracker were preserved.
+- **Checks:** Initial tests collected zero because incoming `zod` was not installed; typecheck/build also failed on that prerequisite. Offline install lacked `supports-color@10.2.2`; frozen install then succeeded without resolution/upgrades. Integrated lint, typecheck, 83/83 unit tests, build and 14/14 browser cases passed. Build used only documented safe public CI values, with no backend connectivity claim. Global format and documentation (58 files) passed after local-only CRLF normalization of six incoming files, each first verified equal to the merged index; no authored content or Git configuration changed. `.env.example` access was blocked and not bypassed. Earlier failures are not passed checks.
+- **Next step:** Validate the final documentation/staged diff, save the local merge and assess its exact candidate. No redundant final-UI verifier was relaunched; any genuinely new required independent check must be distinguished from the cancelled review and its cost agreed with Alejo before launching. No push, PR, shared-branch merge or remote contract synchronization.
+
 ## 2026-11-05 — Pi subagent runtime recovered for #14 (cause unproven)
 
 - **Status:** completed (T1 independently verified; incident cause not established).

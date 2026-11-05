@@ -41,7 +41,7 @@ flowchart LR
 
 ## Open items
 
-- The `pnpm api:sync` script and the backend artifact paths are planned, not implemented (FD7).
+- Backend Colyseus room-state codegen (`apps/realtime/src/rooms/schema/generated.ts`) will be pulled automatically by `pnpm api:sync` once backend issues #24/#25 publish the room schema (FD7).
 - The runtime performance measurement that triggers the 2D Classic Mode offer is to be defined (FD8).
 
 Decided: REST contracts come from the backend's committed OpenAPI document (D4, FD2) and realtime types from backend-generated committed artifacts, both synced with `pnpm api:sync` and committed as generated types (FD7); the 3D scene follows a conservative performance budget (FD8); frontend mocks are built from the published contract (FD9), the UI is Spanish `es-AR` (FD10), and deadlines are shown in the school's time zone (FD11); the frontend is hosted on Amplify Hosting in `us-east-2` and deployed through its GitHub App connection (FD5, updated 2026-11-04); the session follows D1 with both tokens in `sessionStorage` (FD1) ([Authentication and session](../rules/authentication-and-session.md)); see the [architecture decisions](./technical-justification.md#architecture-decisions).
