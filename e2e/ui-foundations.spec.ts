@@ -23,7 +23,7 @@ for (const width of [360, 1280]) {
     // Stress consumer text without changing production copy or shared components.
     await page
       .getByRole('banner')
-      .locator('p')
+      .getByRole('heading')
       .evaluate((element) => {
         element.textContent = 'LongUnbrokenContent'.repeat(30);
       });
@@ -142,6 +142,43 @@ test.describe('touch-equivalent interaction at 360px', () => {
       .tap();
     await expect(page.getByText(copy.toast, { exact: true })).toHaveCount(0);
   });
+});
+
+test('honours the reduced-motion preference for animation and scrolling', async ({
+  page,
+}) => {
+  const busyIndicator = () =>
+    page
+      .getByRole('button', { name: messages.showcase.loading })
+      .locator('span[aria-hidden="true"]');
+
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('./');
+  await expect(busyIndicator()).toBeVisible();
+  expect(
+    await busyIndicator().evaluate((element) => {
+      const styles = getComputedStyle(element);
+      return {
+        animationName: styles.animationName,
+        animationDuration: styles.animationDuration,
+      };
+    }),
+  ).toMatchObject({ animationName: 'spin' });
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const reduced = await busyIndicator().evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return {
+      animationName: styles.animationName,
+      animationDuration: styles.animationDuration,
+      scrollBehavior: getComputedStyle(document.documentElement).scrollBehavior,
+    };
+  });
+  expect(reduced.animationName).toBe('none');
+  expect(Number.parseFloat(reduced.animationDuration)).toBeLessThanOrEqual(
+    0.01,
+  );
+  expect(reduced.scrollBehavior).toBe('auto');
 });
 
 test('supports keyboard skip, modal focus containment and trigger restoration', async ({

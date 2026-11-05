@@ -9,7 +9,9 @@ test('serves the semantic placeholder without horizontal overflow', async ({
   const main = page.getByRole('main');
   await expect(main).toBeVisible();
   await expect(
-    main.getByRole('heading', { level: 1, name: 'IntegrarTec', exact: true }),
+    page
+      .getByRole('banner')
+      .getByRole('heading', { level: 1, name: 'IntegrarTec', exact: true }),
   ).toBeVisible();
   expect(
     await page.evaluate(
