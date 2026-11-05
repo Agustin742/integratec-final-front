@@ -135,6 +135,18 @@ describe('retry policy', () => {
       code: 'SERVICE_UNAVAILABLE',
       userMessage: apiErrorMessages.unexpected,
     });
+    const badGatewayError = new ApiError({
+      kind: 'unexpected',
+      status: 502,
+      code: null,
+      userMessage: apiErrorMessages.unexpected,
+    });
+    const gatewayTimeoutError = new ApiError({
+      kind: 'unexpected',
+      status: 504,
+      code: null,
+      userMessage: apiErrorMessages.unexpected,
+    });
     const unauthenticatedError = new ApiError({
       kind: 'unauthenticated',
       status: 401,
@@ -165,6 +177,8 @@ describe('retry policy', () => {
     expect(shouldRetryQuery(MAX_QUERY_RETRIES, networkError)).toBe(false);
 
     expect(shouldRetryQuery(0, serviceUnavailableError)).toBe(true);
+    expect(shouldRetryQuery(0, badGatewayError)).toBe(true);
+    expect(shouldRetryQuery(0, gatewayTimeoutError)).toBe(true);
     expect(shouldRetryQuery(0, unauthenticatedError)).toBe(false);
     expect(shouldRetryQuery(0, forbiddenError)).toBe(false);
     expect(shouldRetryQuery(0, notFoundError)).toBe(false);

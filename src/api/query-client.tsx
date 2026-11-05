@@ -3,10 +3,12 @@ import {
   QueryClientProvider,
   type QueryClientConfig,
 } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ApiError } from './errors';
 
 export const MAX_QUERY_RETRIES = 2;
+
+const TRANSIENT_GATEWAY_STATUSES = new Set([502, 503, 504]);
 
 export interface MutationRetryMeta {
   readonly idempotent?: boolean;
@@ -15,7 +17,7 @@ export interface MutationRetryMeta {
 /**
  * Bounded query retry policy (`rules/error-handling-and-feedback.md`):
  * - Retries at most `MAX_QUERY_RETRIES` (2) times.
- * - Retries only transient `'network'` errors or HTTP `503` (`'unexpected'`).
+ * - Retries only transient `'network'` errors or HTTP `502`/`503`/`504` (`'unexpected'`).
  * - Never retries `400`, `401`, `403`, `404`, `409`, `429`, or `500`.
  */
 export function shouldRetryQuery(
@@ -29,7 +31,11 @@ export function shouldRetryQuery(
     if (error.kind === 'network') {
       return true;
     }
-    if (error.kind === 'unexpected' && error.status === 503) {
+    if (
+      error.kind === 'unexpected' &&
+      error.status !== null &&
+      TRANSIENT_GATEWAY_STATUSES.has(error.status)
+    ) {
       return true;
     }
     return false;
@@ -86,7 +92,8 @@ export interface ApiQueryProviderProps {
  * Provides a TanStack `QueryClient` to the React component tree.
  */
 export function ApiQueryProvider({ client, children }: ApiQueryProviderProps) {
-  const resolvedClient = client ?? createAppQueryClient();
+  const [defaultClient] = useState(() => createAppQueryClient());
+  const resolvedClient = client ?? defaultClient;
   return (
     <QueryClientProvider client={resolvedClient}>
       {children}
