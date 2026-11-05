@@ -13,6 +13,21 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       ...jsxA11y.configs.recommended.rules,
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "MemberExpression[object.type='MetaProperty'][object.meta.name='import'][object.property.name='meta'][property.name='env']",
+          message:
+            'Do not read import.meta.env directly in feature code. Use getPublicConfig() from src/config/public-config.ts.',
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/config/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': 'off',
     },
   },
   {

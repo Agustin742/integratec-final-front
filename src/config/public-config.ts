@@ -179,5 +179,9 @@ export function loadPublicConfig(env: RawEnv): PublicConfig {
  * Reads and validates the application's public configuration from `import.meta.env`.
  */
 export function getPublicConfig(): PublicConfig {
-  return loadPublicConfig(import.meta.env);
+  return loadPublicConfig({
+    VITE_APP_ENV: import.meta.env.VITE_APP_ENV,
+    VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
+    VITE_REALTIME_URL: import.meta.env.VITE_REALTIME_URL,
+  });
 }
