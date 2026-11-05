@@ -51,7 +51,11 @@ custom skip targets, first-control ordering, activation focus and axe semantics
 physical Tab traversal, actual viewport fit or rendered contrast.
 
 Integration scenarios live in `e2e/ui-foundations.spec.ts` alongside the
-subsequent showcase slice. They target 360px/desktop overflow, long text and
-keyboard focus. Browser execution, zoom and visual inspection remain
-parent-owned acceptance evidence, not claimed by component tests.
+showcase slice. The full suite passed 14/14 against the parent's built preview:
+360px/1280px fit, unbroken banner text, keyboard focus, physical background
+pointer blocking, touch-equivalent modal/notice interaction and 200% CSS zoom.
+CSS zoom is not browser UI zoom; emulated taps are not physical-device proof.
+See [observed integration evidence](ui-showcase.md#observed-integration-evidence)
+for exact commands, earlier failed attempts and remaining limits. These are
+rendered Chromium checks, not claims made by component tests or visual approval.
 See [UI accessibility](../rules/ui-and-accessibility.md).
