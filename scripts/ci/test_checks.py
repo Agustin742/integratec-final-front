@@ -77,13 +77,14 @@ class PackageTests(unittest.TestCase):
         for step, notice, summary in cases:
             script = workflow.split(f'      - name: {step}\n', 1)[1]
             script = script.split('        run: |\n', 1)[1].split('\n      - name:', 1)[0]
+            script = script.replace('bash scripts/ci/', 'bash ../')
             with self.subTest(step=step), tempfile.TemporaryDirectory(
                     prefix='.fixtures-', dir=CHECKER.parent) as scratch:
                 folder = Path(scratch)
                 result = subprocess.run(['bash'], cwd=ROOT,
                     input=(f'cd {shlex.quote(folder.relative_to(ROOT).as_posix())}\n'
-                           'GITHUB_STEP_SUMMARY=summary\n'
-                           'node() { return 1; }\n' + script).encode(), capture_output=True)
+                           'export GITHUB_STEP_SUMMARY=summary GITHUB_OUTPUT=output\n'
+                           'node() { return 1; }\nexport -f node\n' + script).encode(), capture_output=True)
                 self.assertEqual((result.returncode, result.stdout.decode(), result.stderr.decode()),
                                  (0, notice, ''))
                 self.assertEqual((folder / 'summary').read_text(), summary)

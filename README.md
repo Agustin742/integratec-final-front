@@ -57,7 +57,11 @@ actionlint .github/workflows/ci.yml
 
 Use the actual target ref (`origin/test` or `origin/main` for promotions) instead of `origin/develop` when appropriate. The diff command includes uncommitted tracked edits; untracked files are not included. For each new file, also run `git diff --no-index --check -- /dev/null path/to/new-file` before staging (`--no-index` exit 1 alone means files differ; whitespace errors include diagnostics). Stage new Markdown files for inclusion in the default tracked-file link check, or pass their paths explicitly to `check_docs.py`. Report unavailable tools honestly; local validation does not prove a GitHub run or branch protection.
 
-The job uses Node.js 22 and Corepack/pnpm when both `package.json` and `pnpm-lock.yaml` are present. A package without its lockfile fails clearly. When no package or test script is configured, CI reports that no application tests were run in a GitHub notice and the job summary; CI-tooling regressions still run.
+The job enables Corepack **before** `actions/setup-node`, selects Node.js **22**, and caches pnpm's store using `pnpm-lock.yaml`. Installation uses `pnpm install --frozen-lockfile`; a package without its lockfile fails clearly.
+
+After installation, separate steps run `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`, and `pnpm build`. Each checks whether its script exists: missing scripts produce a GitHub notice rather than a false passing-test claim. A configured command's failure fails `checks`; the other application checks still run so one failure does not hide additional results. The always-run **Frontend checks** summary lists all five checks as passed, failed, or skipped (script absent or setup unavailable).
+
+Documentation-only PRs still run these checks when the application exists; no path filter bypasses quality gates. Without `package.json`, application setup/checks are skipped with an explicit notice and summary, while documentation and CI-tooling checks remain active. Playwright stays a local command for now; issue #13 does not make it a merge requirement or install browsers in CI. Deployment and branch-protection settings are unchanged.
 
 ## Cross-repository contracts
 

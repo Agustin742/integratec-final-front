@@ -1,5 +1,13 @@
 # Tracker — Alejo
 
+## 2026-11-05 — Extend frontend CI (#13)
+
+- **Status:** in-progress
+- **Area / files:** `.github/workflows/ci.yml`, `scripts/ci/`, README.
+- **Change:** Implement [issue #13](https://github.com/Agustin742/integratec-final-front/issues/13): preserve existing CI gates, add conditional application checks, pnpm cache and execution summary.
+- **Reason:** Make frontend quality commands mandatory when configured, with explicit skipped-check reporting. AI assistance: el Gentleman/Pi implementation and independent verification.
+- **Next step:** Observe regression RED/GREEN and verify application tooling, actionlint and documentation. No deployment or branch-protection changes.
+
 ## 2026-11-04 — Set up frontend test infrastructure (#12)
 
 - **Status:** completed (local implementation and independent verification)
