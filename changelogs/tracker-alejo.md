@@ -1,5 +1,24 @@
 # Tracker — Alejo
 
+## 2026-11-04 — Set up frontend test infrastructure (#12)
+
+- **Status:** completed (local implementation and independent verification)
+- **Area / files:** `package.json`, testing configuration/utilities, Playwright smoke test, README and development documentation.
+- **Change:** Implemented authorized [issue #12](https://github.com/Agustin742/integratec-final-front/issues/12) infrastructure through a bounded writer: Vitest/jsdom/RTL/jest-dom, render and axe helpers, Playwright preview smoke and test documentation. No product source or CI workflow changes.
+- **Reason:** Enable repeatable unit/component and end-to-end checks for future stories. AI assistance: el Gentleman/Pi orchestration with bounded implementation and independent verification.
+- **Verification:** Independent fresh-copy frozen install (353 packages, zero reused), Vitest 2/2, lint, formatting, typecheck, build, Playwright desktop/mobile 2/2, documentation links (50 files) and Python CI regressions 5/5 passed on Node 22.23.4/pnpm 10.34.9. Invalid remote URL rejected with the expected diagnostic. Original bytes/status/index preserved; production bundle excludes test tools. Parent seam test 2/2, typecheck and whitespace passed. Initial formatting errors and Playwright's global-pnpm mismatch were corrected; initial lint timed out at 30 seconds, and an explicitly authorized rerun passed in 7 seconds. Initial missing-helper RED was import-level, not assertion-level. Interactive/async states are N/A for the unchanged placeholder; remote deployment, backend integration and full accessibility audit are not claimed.
+- **Review / commit:** Local work unit `60db6bddaef88303f38e7d0b745e731d2290b1f0` on `test/12-testing-infrastructure`, 266 authored changed lines excluding lockfile, based on merged develop `e26d3c9`. Committed-range native assessment reports medium native risk and reviewDue false (under_budget); item-5 escalation's independent verification passed. No native review approval claimed. Tracker evidence and the preceding board-cleanup record accompany the implementation in a separate documentation commit for the same delivery; existing history is preserved.
+- **Next step:** Obtain authorization for push/PR into develop and teammate review. No push, PR, merge, remote CI run, deployment or board completion is claimed.
+
+## 2026-11-04 — Reconcile Project items and analyze testing infrastructure (#12)
+
+- **Status:** completed
+- **Area / files:** frontend GitHub Project, issue #12, `changelogs/tracker-alejo.md`.
+- **Change:** Confirmed [PR #62](https://github.com/Agustin742/integratec-final-front/pull/62) merged, set #11 and Design School Uniforms for Female and Male Avatars to Done, and removed Trial task-scoped rule loading for Alejo from the Project as requested. Analyzed [#12](https://github.com/Agustin742/integratec-final-front/issues/12) without implementing it.
+- **Reason:** Reconcile Alejo's completed work and establish the next issue's exact boundaries.
+- **Verification:** Project readback returned both requested Done items and no trial item. Read-only exploration confirmed no test script yet; #12 introduces Vitest/Testing Library and Playwright infrastructure, not feature tests, backend integration, CI redesign, or an MSW transport decision. A deployed URL must be configurable/documented; an actual deployment is not required by #12. No application behavior changed or application tests run.
+- **Next step:** Analysis accepted by Alejo; implementation and verification are recorded above. Publication remains pending authorization.
+
 ## 2026-11-04 — Bootstrap frontend application (#11)
 
 - **Status:** completed (local implementation and functional verification; issue remains open).
