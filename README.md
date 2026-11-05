@@ -12,10 +12,11 @@ nvm install
 nvm use
 corepack enable
 pnpm install --frozen-lockfile
+cp .env.example .env
 pnpm dev
 ```
 
-On nvm-windows, use `nvm install 22.23.4` and `nvm use 22.23.4` instead. Open the local URL printed by Vite. See [development setup](docs/development.md) for commands, layout, configuration, and verification boundaries.
+On nvm-windows, use `nvm install 22.23.4` and `nvm use 22.23.4` instead. Copy `.env.example` to `.env` before starting `pnpm dev` or running `pnpm build`. Open the local URL printed by Vite. See [development setup](docs/development.md) for commands, layout, configuration, and verification boundaries.
 
 | Command             | Purpose                                                                |
 | ------------------- | ---------------------------------------------------------------------- |
@@ -27,6 +28,24 @@ On nvm-windows, use `nvm install 22.23.4` and `nvm use 22.23.4` instead. Open th
 | `pnpm typecheck`    | Check types with TypeScript strict mode                                |
 | `pnpm build`        | Check types, then generate static output in `dist/`                    |
 | `pnpm preview`      | Serve the production build locally, not a production server            |
+
+## Public configuration
+
+The application reads build-time public configuration through one typed, Zod-validated module ([`src/config/public-config.ts`](src/config/public-config.ts)). Both Vite (`pnpm dev` and `pnpm build`) and the browser entrypoint ([`src/main.tsx`](src/main.tsx)) validate the configuration and fail fast with a `ConfigValidationError` naming every missing or invalid variable. Feature code must call `getPublicConfig()` rather than reading `import.meta.env` directly; ESLint enforces this boundary. See [Configuration and environments](rules/configuration-and-environments.md) and [Security](rules/security.md).
+
+Copy [`.env.example`](.env.example) to `.env` for local development. Real `.env` and `.env.*` files are git-ignored; `.env.example` is tracked with safe placeholders only. All `VITE_` variables are statically embedded into the public client bundle at build time, so **secrets, private keys, or credentials must never be placed in frontend configuration**, and **changing any variable requires a rebuild (or restarting the Vite dev server)**.
+
+| Variable            | Required / format                                                                                 | Purpose                                 | Classification | Rebuild / restart |
+| ------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------- | -------------- | ----------------- |
+| `VITE_APP_ENV`      | Required; `development`, `test`, or `production` (no default fallback)                            | Target environment name                 | Public         | Yes               |
+| `VITE_API_BASE_URL` | Required; absolute `http(s)` URL without credentials, query, hash, or trailing `/` (`https` prod) | Base URL of the backend NestJS REST API | Public         | Yes               |
+| `VITE_REALTIME_URL` | Required; absolute `ws(s)` URL without credentials, query, hash, or trailing `/` (`wss` prod)     | Base URL of the Colyseus WebSocket room | Public         | Yes               |
+
+Explicit endpoint examples by environment:
+
+- **Local (`VITE_APP_ENV=development`):** `VITE_API_BASE_URL=http://localhost:3000`, `VITE_REALTIME_URL=ws://localhost:2567`
+- **Test (`VITE_APP_ENV=test`):** `VITE_API_BASE_URL=https://api.test.example.invalid`, `VITE_REALTIME_URL=wss://realtime.test.example.invalid`
+- **Production (`VITE_APP_ENV=production`):** `VITE_API_BASE_URL=https://api.example.invalid`, `VITE_REALTIME_URL=wss://realtime.example.invalid` (`https://` and `wss://` are mandatory in `production`)
 
 ## Development rules
 

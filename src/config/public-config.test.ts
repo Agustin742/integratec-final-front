@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   ConfigValidationError,
@@ -214,5 +216,32 @@ describe('getPublicConfig', () => {
     vi.stubEnv('VITE_REALTIME_URL', '');
 
     expect(() => getPublicConfig()).toThrowError(ConfigValidationError);
+  });
+});
+
+describe('.env.example alignment', () => {
+  test('declares the exact same variables as PUBLIC_CONFIG_VARIABLES with valid placeholders', () => {
+    const envExamplePath = resolve(process.cwd(), '.env.example');
+    const content = readFileSync(envExamplePath, 'utf8');
+    const entries: Record<string, string> = {};
+
+    for (const rawLine of content.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (line === '' || line.startsWith('#')) {
+        continue;
+      }
+      const separatorIndex = line.indexOf('=');
+      expect(separatorIndex).toBeGreaterThan(0);
+      const key = line.slice(0, separatorIndex).trim();
+      const value = line.slice(separatorIndex + 1).trim();
+      entries[key] = value;
+    }
+
+    expect(Object.keys(entries)).toEqual([...PUBLIC_CONFIG_VARIABLES]);
+    expect(loadPublicConfig(entries)).toEqual({
+      appEnv: 'development',
+      apiBaseUrl: 'http://localhost:3000',
+      realtimeUrl: 'ws://localhost:2567',
+    });
   });
 });

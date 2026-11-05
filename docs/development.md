@@ -13,20 +13,21 @@
 
 ## Source layout
 
-| Path                  | Responsibility                                                     |
-| --------------------- | ------------------------------------------------------------------ |
-| `src/main.tsx`        | Mount React with StrictMode                                        |
-| `src/app/App.tsx`     | Minimal semantic placeholder, without routing or feature behavior  |
-| `src/app/messages.ts` | Centralized Spanish (Argentina) placeholder strings                |
-| `src/api/`            | Reserved for generated REST types, not hand-written business logic |
-| `src/realtime/`       | Reserved for generated realtime contracts                          |
-| `vite.config.ts`      | React integration with Vite                                        |
+| Path                          | Responsibility                                                     |
+| ----------------------------- | ------------------------------------------------------------------ |
+| `src/main.tsx`                | Validate public configuration and mount React with StrictMode      |
+| `src/config/public-config.ts` | Typed, Zod-validated `VITE_` public configuration boundary         |
+| `src/app/App.tsx`             | Minimal semantic placeholder, without routing or feature behavior  |
+| `src/app/messages.ts`         | Centralized Spanish (Argentina) placeholder strings                |
+| `src/api/`                    | Reserved for generated REST types, not hand-written business logic |
+| `src/realtime/`               | Reserved for generated realtime contracts                          |
+| `vite.config.ts`              | Build/dev configuration validation plugin and React integration    |
 
 Add feature UI, integration, and tests together when their issues start. Do not pre-create hypothetical feature scaffolding. Follow [frontend conventions](../rules/frontend-conventions.md) and [architecture boundaries](../rules/architecture.md).
 
 ## Configuration and commands
 
-No environment variables, backend endpoints, credentials, or running backend are required by this placeholder. No runtime configuration contract is introduced. Keep real `.env` files out of Git; future public configuration follows [environment rules](../rules/configuration-and-environments.md).
+Public build-time configuration ([issue #15](https://github.com/Agustin742/integratec-final-front/issues/15)) is read exclusively through [`src/config/public-config.ts`](../src/config/public-config.ts) (`VITE_APP_ENV`, `VITE_API_BASE_URL`, `VITE_REALTIME_URL`). Copy [`.env.example`](../.env.example) to `.env` for local development; keep real `.env` files out of Git and never place secrets in `VITE_` variables. Missing or invalid values fail fast during `pnpm dev`, `pnpm build`, and application startup without silently falling back to a production service. ESLint forbids direct `import.meta.env` reads outside `src/config/`. See [README public configuration](../README.md#public-configuration) and [environment rules](../rules/configuration-and-environments.md).
 
 The [README command table](../README.md#local-development) matches `package.json`. Vite alone transpiles TypeScript without checking types, so `pnpm build` explicitly runs the same `tsc --noEmit` check as `pnpm typecheck` before bundling. A strict type error must stop the build before Vite emits output.
 
