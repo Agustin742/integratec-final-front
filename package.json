@@ -9,8 +9,10 @@
   },
   "scripts": {
     "dev": "vite",
-    "lint": "eslint src vite.config.ts",
-    "format:check": "prettier --check package.json tsconfig.json vite.config.ts eslint.config.js .prettierrc.json index.html src README.md docs/development.md",
+    "test": "vitest run",
+    "e2e": "playwright test",
+    "lint": "eslint src e2e vite.config.ts vitest.config.ts playwright.config.ts eslint.config.js",
+    "format:check": "prettier --check package.json tsconfig.json vite.config.ts vitest.config.ts playwright.config.ts eslint.config.js .prettierrc.json index.html src e2e README.md docs/development.md docs/testing.md",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview"
@@ -21,16 +23,24 @@
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
+    "@playwright/test": "1.64.1",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@types/node": "22.20.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.2.1",
+    "axe-core": "4.14.0",
     "eslint": "9.39.5",
     "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "17.4.0",
+    "jsdom": "30.1.3",
     "prettier": "3.9.10",
     "typescript": "5.9.3",
     "typescript-eslint": "8.72.1",
-    "vite": "8.3.5"
+    "vite": "8.3.5",
+    "vitest": "5.1.0"
   }
 }

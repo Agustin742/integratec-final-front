@@ -1,6 +1,6 @@
 # Frontend repository
 
-A single React + TypeScript application built with Vite, using Node 22 and pnpm (FD6). The current UI is a minimal bootstrap placeholder, not a feature screen. Application test tooling is tracked separately in F02.
+A single React + TypeScript application built with Vite, using Node 22 and pnpm (FD6). The current UI is a minimal bootstrap placeholder, not a feature screen. Component and browser test infrastructure is available; see the [testing guide](docs/testing.md).
 
 ## Local development
 
@@ -20,6 +20,8 @@ On nvm-windows, use `nvm install 22.23.4` and `nvm use 22.23.4` instead. Open th
 | Command             | Purpose                                                                |
 | ------------------- | ---------------------------------------------------------------------- |
 | `pnpm dev`          | Start the local development server                                     |
+| `pnpm test`         | Run Vitest component checks once (no watch mode)                       |
+| `pnpm e2e`          | Run Playwright smoke against preview after building                    |
 | `pnpm lint`         | Check TypeScript, React hooks, and JSX accessibility rules             |
 | `pnpm format:check` | Check formatting of the application, its configuration, and setup docs |
 | `pnpm typecheck`    | Check types with TypeScript strict mode                                |

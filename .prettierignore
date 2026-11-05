@@ -1,4 +1,6 @@
 node_modules/
 dist/
 odd/
+test-results/
+playwright-report/
 *.log
