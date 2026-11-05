@@ -32,6 +32,8 @@ toast.success(messages.changesSaved); // Call from an event or completed operati
 Tabs preserve Radix `value`/`onValueChange`, `orientation`, `activationMode`,
 disabled triggers, roving focus and panel associations. Label every tab list.
 Automatic activation is the default; use manual activation for expensive panels.
+The active trigger is signalled by surface, weight and an underline in addition to
+colour, so the selected state survives greyscale and colour-vision differences.
 
 `Toast` wraps the Sonner toaster; `toast` is its native notification API, including
 `error`, `loading`, `promise`, and `dismiss(id)`. Feature messages and action

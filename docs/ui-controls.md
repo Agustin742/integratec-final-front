@@ -11,9 +11,11 @@ UI copy: callers provide centralized es-AR labels, descriptions, errors and cont
 - `Button` (`ButtonProps`): native button, default `type="button"`. Set
   `type="submit"` explicitly in forms. Variants: `default`, `secondary`, `outline`,
   `ghost`, `destructive`, `link`; sizes: `default`, `sm`, `lg`, `icon`.
-  `busy` displays a decorative spinner, sets `aria-busy`, and disables activation;
-  retain an accessible name and supply visible pending copy. `disabled` also uses
-  native semantics. Icon-only buttons require a caller-provided accessible name.
+  `busy` displays a decorative spinner, sets `aria-busy` and `aria-disabled`, and
+  ignores activation while keeping the control focusable; retain an accessible
+  name and supply visible pending copy. `disabled` uses native `disabled`
+  semantics and removes the control from the Tab order. Icon-only buttons require
+  a caller-provided accessible name.
 - `Input` (`InputProps`): native input, default text type; supports controlled and
   uncontrolled values, validation attributes, disabled state, and refs.
 - `Label` (`LabelProps`): Radix label; connect standalone controls with `htmlFor`.
@@ -41,10 +43,11 @@ UI copy: callers provide centralized es-AR labels, descriptions, errors and cont
 ## Verification boundary
 
 The colocated `controls.test.tsx` exercises public semantics, pending/disabled
-transitions, form activation, label/help/error associations, independent IDs,
-refs and axe checks (excluding contrast in jsdom). Existing global focus and
-reduced-motion styles remain unchanged. Semantic color pairs reuse the tested
-foundation tokens; this is not a new visual contrast measurement.
+activation guards, retained focus while pending, form activation, label/help/error
+associations, independent IDs, refs and axe checks (excluding contrast in jsdom).
+Existing global focus and reduced-motion styles remain unchanged. Semantic color
+pairs reuse the tested foundation tokens; this is not a new visual contrast
+measurement.
 
 Browser keyboard activation, contrast on rendered backgrounds, layout integration,
 360px/desktop overflow, full regression checks and build remain parent integration

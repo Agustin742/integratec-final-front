@@ -1,6 +1,6 @@
 # Frontend testing
 
-Run component checks with `pnpm test` and a read-only production-preview smoke with `pnpm e2e`. Use the [declared Node 22/pnpm toolchain](development.md#toolchain); no backend or credentials are needed.
+Run component checks with `pnpm test` and a read-only browser smoke with `pnpm e2e`, which builds the showcase bundle before starting Playwright. Use the [declared Node 22/pnpm toolchain](development.md#toolchain); no backend or credentials are needed.
 
 ## Quick path
 
@@ -30,7 +30,7 @@ Use real timers by default, and always for axe. For timer-dependent behavior, op
 
 ## Browser smoke and optional deployed target
 
-Build first: Playwright starts `pnpm preview` on `http://127.0.0.1:4173`, refuses to reuse another server, and stops its managed preview afterward. Desktop Chrome and mobile-emulated Chromium projects check title, `es-AR`, main/heading roles, and horizontal overflow. Mobile emulation is not a physical-device test. Results are ignored under `e2e/test-results/`; no screenshots or WebGL pixel assertions are generated.
+`pnpm e2e` runs `pnpm build:e2e` — the `showcase` Vite build mode, which includes the component showcase — and then Playwright, which starts `pnpm preview` on `http://127.0.0.1:4173`, refuses to reuse another server, and stops its managed preview afterward. A plain `pnpm build` produces the production bundle: it resolves the showcase flag to `false` and emits no showcase chunk. Desktop Chrome and mobile-emulated Chromium projects check title, `es-AR`, banner and main roles, horizontal overflow, and the showcase interaction scenarios including reduced motion. Mobile emulation is not a physical-device test. Results are ignored under `e2e/test-results/`; no screenshots or WebGL pixel assertions are generated.
 
 To check an already deployed frontend instead:
 

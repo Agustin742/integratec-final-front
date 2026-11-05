@@ -11,8 +11,10 @@ not fabricate messages or data. For form interactions, see [UI controls](ui-cont
 
 - `Alert`, `AlertTitle`, `AlertDescription`: default polite `status`; destructive
   variant defaults to urgent `alert`. Override `role` for static content or other
-  announcement needs. Title uses `h2`; place it in a suitable heading hierarchy.
-  Supply actionable failure text; do not duplicate the same live announcement.
+  announcement needs. `AlertTitle` renders `h2` by default and accepts
+  `as="h3"`…`as="h6"` so the alert can sit under an existing section title
+  without breaking heading order. Supply actionable failure text; do not
+  duplicate the same live announcement.
 - `Badge` (`BadgeProps`): non-interactive span with `default`, `secondary`,
   `destructive`, or `outline` variant. Communicate state in text, not color alone.
 - `Skeleton`: decorative, `aria-hidden`, caller-sized using `className`; pulse is

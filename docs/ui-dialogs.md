@@ -52,7 +52,8 @@ Both bodies scroll within the viewport; long consumer content must wrap.
 Radix owns initial focus, trapping, Escape, outside dismissal, background
 isolation, and focus restoration. Do not suppress its focus callbacks unless a
 feature intentionally supplies and tests an equivalent accessible destination.
-Both close buttons are native controls independent of the controls module.
+Both close buttons are 44px square native controls, independent of the controls
+module, so they meet the minimum touch target in both modals.
 
 ## Verification and limits
 

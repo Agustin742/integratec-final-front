@@ -1,9 +1,13 @@
 # Local UI foundations showcase
 
 The current `App` composes [BaseLayout](ui-layout.md) with `UiFoundations` to make
-the accepted warm component set inspectable. The original IntegrarTec heading and
-bootstrap text remain in main, preserving the existing smoke contract. This is a
-local component demonstration, not a classroom flow or a completed business action.
+the accepted warm component set inspectable. The IntegrarTec name is now a single
+`h1` in the banner and the bootstrap text stays in main, so the app name is not
+duplicated and the existing smoke contract still reads a level-one heading. The
+showcase is gated behind `__UI_SHOWCASE__` (see
+[the showcase gate](ui-foundations.md#showcase-gate)): the dev server and
+`pnpm build:e2e` include it, a production build does not. This is a local
+component demonstration, not a classroom flow or a completed business action.
 
 ## Inspect the examples
 
@@ -21,7 +25,7 @@ catalogs. Code, tests and this documentation stay English.
 
 | Area         | Usage                                                                                                                                                                   |
 | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Loading      | Disabled busy `Button`, containing `aria-busy` and decorative `Skeleton`.                                                                                               |
+| Loading      | Busy `Button` with `aria-busy`/`aria-disabled` that ignores clicks yet keeps keyboard focus, plus decorative `Skeleton`.                                                |
 | Success      | Textual `Badge` identifying component readiness as an example, not a saved operation.                                                                                   |
 | Empty        | Captioned `Table` with a named keyboard-focusable overflow region and explicit empty row.                                                                               |
 | Validation   | `Field` render-prop attributes spread directly onto editable `Input`; associated fixed illustrative error and help. Typing does not submit or clear that demonstration. |
@@ -40,17 +44,19 @@ Component contracts: [controls](ui-controls.md), [feedback and tables](ui-displa
 
 ## Verification and remaining proof
 
-- `App.test.tsx` protects the prior heading/text and checks integrated landmarks,
-  showcase anchor, one notification region and axe semantics (not contrast).
+- `App.test.tsx` protects the banner heading, bootstrap text and integrated
+  landmarks, and checks the showcase anchor, one notification region and axe
+  semantics (not contrast).
 - `ui-foundations.test.tsx` checks the five labeled states, validation associations
   and editable text, table semantics, keyboard tab selection, modal descriptions,
   background removal from accessible queries and focus restoration.
 - `e2e/ui-foundations.spec.ts` checks 360px/1280px fit and long-text wrapping,
   real keyboard skip focus, dialog Tab boundaries, Escape/restoration and Sheet
   interaction. Additional cases exercise 200% CSS zoom, coordinate clicks on
-  background actions behind both modals, and 360px touch-equivalent modal/notice
-  interaction. It uses the existing Playwright configuration and leaves
-  `e2e/smoke.spec.ts` unchanged.
+  background actions behind both modals, 360px touch-equivalent modal/notice
+  interaction, and the reduced-motion preference for animation and scrolling. It
+  runs against the `showcase` build and leaves `e2e/smoke.spec.ts` on the production
+  contract.
 
 ## Observed integration evidence
 
@@ -179,3 +185,51 @@ The candidate was also compared against both parents of `c6d2d1e`:
 
 This check ran in a separate isolated snapshot, not in the conflict writer's working
 tree. No code change resulted from it.
+
+## Review follow-up on PR #68
+
+The review asked for the showcase to be kept out of the delivered bundle, the
+reduced-motion behavior to be proven in a browser, the contrast numbers to be
+recorded and weak pairs enforced, one focus-ring definition, a non-colour active
+tab, the unused icon dependency removed, and a set of component nits fixed. The
+delivered behavior is described in [the foundations guide](ui-foundations.md),
+[controls](ui-controls.md), [feedback](ui-display.md),
+[dialogs](ui-dialogs.md), [tabs and notifications](ui-overlays.md) and
+[layout](ui-layout.md).
+
+Checks on the current candidate, once each:
+
+| Check            | Observed result                                                                     |
+| ---------------- | ----------------------------------------------------------------------------------- |
+| `pnpm lint`      | exit 0, no output                                                                   |
+| `pnpm typecheck` | exit 0, no diagnostics                                                              |
+| `pnpm test`      | 11 files, **91/91** tests passed                                                    |
+| `pnpm build`     | `index-*.js` 366.31 kB; **no** `ui-foundations-*.js` chunk, showcase marker count 0 |
+| `pnpm build:e2e` | emits `ui-foundations-*.js` 64.37 kB; showcase marker count 1                       |
+| Playwright suite | **16/16** passed, desktop and mobile projects, no retries or skips                  |
+
+The Playwright run used `pnpm build:e2e` followed by
+`pnpm exec playwright test` against a preview started with
+`node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 4173 --strictPort`
+and `PLAYWRIGHT_BASE_URL=http://127.0.0.1:4173`. The bundled `pnpm e2e` script
+performs the same two steps; it was split here because this environment's Node
+version does not satisfy the manifest engine range.
+
+### Environment deviation
+
+These checks ran on Node **v24.15.0** with pnpm 10.34.9, not the declared
+`>=22.23.4 <23`. The repository sets `engine-strict=true`, so pnpm was invoked with
+`--config.engine-strict=false`; the nested `pnpm build:e2e` inside `pnpm e2e`
+therefore refuses to run under this Node. No dependency version was changed and the
+lockfile was not resolved against a different Node. The declared Node 22 toolchain
+is the supported one; this run is evidence of behavior, not a claim that Node 24 is
+supported.
+
+### Remaining limits
+
+No screenshots are committed by this work; the author attaches them in the pull
+request because the API cannot upload images. Browser UI zoom, physical touch
+hardware, a full accessibility audit, screen-reader interoperability and remote
+deployment are still not claimed. The 200% check uses CSS `zoom`. The size
+exception for this branch needs maintainer approval in the pull request thread; it
+is not self-approved here.
