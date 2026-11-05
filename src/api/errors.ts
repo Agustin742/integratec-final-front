@@ -42,7 +42,8 @@ export interface ApiErrorInit {
 
 /**
  * Typed frontend API error mapped from the backend `ErrorEnvelope`, HTTP status,
- * or network failure. Network failures never set `isInvalidCredentials: true`.
+ * or network failure. Network failures map to `kind: 'network'` and are never
+ * classified as `'unauthenticated'` or invalid credentials.
  */
 export class ApiError extends Error {
   readonly kind: ApiErrorKind;
@@ -52,7 +53,6 @@ export class ApiError extends Error {
   readonly details: readonly BackendErrorDetail[];
   readonly fieldErrors: Readonly<Record<string, readonly string[]>>;
   readonly correlationId: string | null;
-  readonly isInvalidCredentials: boolean;
 
   constructor(init: ApiErrorInit) {
     super(
@@ -67,7 +67,6 @@ export class ApiError extends Error {
     this.details = Object.freeze([...(init.details ?? [])]);
     this.fieldErrors = Object.freeze({ ...(init.fieldErrors ?? {}) });
     this.correlationId = init.correlationId ?? null;
-    this.isInvalidCredentials = init.kind === 'unauthenticated';
   }
 }
 
@@ -210,7 +209,7 @@ export function mapApiError(
 
 /**
  * Maps a fetch/transport failure into a `'network'` `ApiError`.
- * Network errors are never treated as invalid credentials (`isInvalidCredentials === false`).
+ * Network errors are never treated as `'unauthenticated'` or invalid credentials.
  */
 export function mapNetworkError(cause: unknown): ApiError {
   if (cause instanceof ApiError) {

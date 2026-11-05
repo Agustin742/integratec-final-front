@@ -20,7 +20,7 @@
 | `src/app/App.tsx`                     | Minimal semantic placeholder, without routing or feature behavior                    |
 | `src/app/messages.ts`                 | Centralized Spanish (Argentina) placeholder strings                                  |
 | `src/api/schema.generated.ts`         | Generated REST OpenAPI TypeScript definitions (`pnpm api:sync`)                      |
-| `src/api/client.ts`                   | Typed `openapi-fetch` client and `requestApi` helper                                 |
+| `src/api/client.ts`                   | Typed `openapi-fetch` client and `requestApi` / `requestApiVoid` helpers             |
 | `src/api/errors.ts`                   | Backend `ErrorEnvelope` and network error mapper (`ApiError`)                        |
 | `src/api/messages.ts`                 | Centralized `es-AR` user-facing API error messages                                   |
 | `src/api/idempotency.ts`              | `Idempotency-Key` UUID helper for idempotent mutations                               |

@@ -14,7 +14,7 @@ import {
   createErrorEnvelopeResponse,
 } from '../test/msw/handlers';
 import { mswServer } from '../test/msw/server';
-import { createApiClient, requestApi } from './client';
+import { createApiClient, requestApi, requestApiVoid } from './client';
 import { ApiError, mapApiError } from './errors';
 import {
   IDEMPOTENCY_HEADER,
@@ -92,7 +92,7 @@ describe('createApiClient and requestApi', () => {
     );
 
     const client = createApiClient();
-    expect.assertions(8);
+    expect.assertions(7);
 
     try {
       await requestApi(() => client.GET('/health'));
@@ -104,7 +104,6 @@ describe('createApiClient and requestApi', () => {
       expect(apiError.code).toBe('VALIDATION_FAILED');
       expect(apiError.userMessage).toBe(apiErrorMessages.validation);
       expect(apiError.correlationId).toBe('corr-validation-1');
-      expect(apiError.isInvalidCredentials).toBe(false);
       expect(apiError.fieldErrors).toEqual({
         'school.name': ['name must not be empty'],
         'address.city': [
@@ -121,66 +120,47 @@ describe('createApiClient and requestApi', () => {
       'BAD_REQUEST' as const,
       'bad-request' as const,
       apiErrorMessages.badRequest,
-      false,
     ],
     [
       401,
       'UNAUTHENTICATED' as const,
       'unauthenticated' as const,
       apiErrorMessages.unauthenticated,
-      true,
     ],
     [
       403,
       'FORBIDDEN' as const,
       'forbidden' as const,
       apiErrorMessages.forbidden,
-      false,
     ],
     [
       404,
       'NOT_FOUND' as const,
       'not-found' as const,
       apiErrorMessages.notFound,
-      false,
     ],
-    [
-      409,
-      'CONFLICT' as const,
-      'conflict' as const,
-      apiErrorMessages.conflict,
-      false,
-    ],
+    [409, 'CONFLICT' as const, 'conflict' as const, apiErrorMessages.conflict],
     [
       429,
       'TOO_MANY_REQUESTS' as const,
       'rate-limited' as const,
       apiErrorMessages.rateLimited,
-      false,
     ],
     [
       500,
       'INTERNAL_ERROR' as const,
       'unexpected' as const,
       apiErrorMessages.unexpected,
-      false,
     ],
     [
       503,
       'SERVICE_UNAVAILABLE' as const,
       'unexpected' as const,
       apiErrorMessages.unexpected,
-      false,
     ],
   ])(
-    'maps HTTP %i (%s) to kind %s with safe UI message and isInvalidCredentials=%s',
-    async (
-      status,
-      code,
-      expectedKind,
-      expectedMessage,
-      expectedInvalidCreds,
-    ) => {
+    'maps HTTP %i (%s) to kind %s with safe UI message',
+    async (status, code, expectedKind, expectedMessage) => {
       mswServer.use(
         http.get(`${TEST_API_BASE_URL}/health`, () =>
           createErrorEnvelopeResponse(status, {
@@ -192,7 +172,7 @@ describe('createApiClient and requestApi', () => {
       );
 
       const client = createApiClient();
-      expect.assertions(7);
+      expect.assertions(6);
 
       try {
         await requestApi(() => client.GET('/health'));
@@ -206,12 +186,11 @@ describe('createApiClient and requestApi', () => {
         expect(apiError.userMessage).not.toContain(
           'Internal backend diagnostic',
         );
-        expect(apiError.isInvalidCredentials).toBe(expectedInvalidCreds);
       }
     },
   );
 
-  test('maps network failures to kind="network" and never treats them as invalid credentials', async () => {
+  test('maps network failures to kind="network" and never treats them as unauthenticated or invalid credentials', async () => {
     mswServer.use(
       http.get(`${TEST_API_BASE_URL}/health`, () => HttpResponse.error()),
     );
@@ -225,11 +204,54 @@ describe('createApiClient and requestApi', () => {
       expect(error).toBeInstanceOf(ApiError);
       const apiError = error as ApiError;
       expect(apiError.kind).toBe('network');
+      expect(apiError.kind).not.toBe('unauthenticated');
       expect(apiError.status).toBeNull();
       expect(apiError.code).toBeNull();
       expect(apiError.userMessage).toBe(apiErrorMessages.network);
-      expect(apiError.isInvalidCredentials).toBe(false);
     }
+  });
+
+  test('throws an unexpected ApiError when requestApi receives a 2xx response with undefined data', async () => {
+    await expect(
+      requestApi(async () => ({
+        data: undefined,
+        error: undefined,
+        response: new Response(null, { status: 204 }),
+      })),
+    ).rejects.toMatchObject({
+      name: 'ApiError',
+      kind: 'unexpected',
+      status: 204,
+      userMessage: apiErrorMessages.unexpected,
+    });
+  });
+
+  test('requestApiVoid resolves cleanly on bodiless 204 responses and throws ApiError on failures', async () => {
+    await expect(
+      requestApiVoid(async () => ({
+        data: undefined,
+        error: undefined,
+        response: new Response(null, { status: 204 }),
+      })),
+    ).resolves.toBeUndefined();
+
+    await expect(
+      requestApiVoid(async () => ({
+        data: undefined,
+        error: {
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Forbidden',
+            correlationId: 'corr-void-403',
+          },
+        },
+        response: new Response(null, { status: 403 }),
+      })),
+    ).rejects.toMatchObject({
+      name: 'ApiError',
+      kind: 'forbidden',
+      status: 403,
+    });
   });
 
   test('falls back to HTTP status and x-request-id header when error body is not an ErrorEnvelope', () => {

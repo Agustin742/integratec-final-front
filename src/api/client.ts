@@ -35,6 +35,8 @@ export interface OpenApiFetchResult<TData> {
 /**
  * Executes an `openapi-fetch` request callback, returning the typed `data` on
  * success or throwing a mapped `ApiError` on HTTP or network failure.
+ * If a 2xx response unexpectedly omits a body, throws an `'unexpected'` `ApiError`
+ * rather than returning an unverified `undefined as TData`.
  */
 export async function requestApi<TData>(
   execute: () => Promise<OpenApiFetchResult<TData>>,
@@ -51,8 +53,27 @@ export async function requestApi<TData>(
   }
 
   if (result.data === undefined) {
-    return undefined as TData;
+    throw mapApiError(undefined, result.response);
   }
 
   return result.data;
+}
+
+/**
+ * Executes an `openapi-fetch` request callback for bodiless (`204 No Content`)
+ * endpoints, resolving with `void` on success or throwing a mapped `ApiError`.
+ */
+export async function requestApiVoid(
+  execute: () => Promise<OpenApiFetchResult<unknown>>,
+): Promise<void> {
+  let result: OpenApiFetchResult<unknown>;
+  try {
+    result = await execute();
+  } catch (cause) {
+    throw mapNetworkError(cause);
+  }
+
+  if (result.error !== undefined || !result.response.ok) {
+    throw mapApiError(result.error, result.response);
+  }
 }
