@@ -1,4 +1,37 @@
 export const messages = {
   title: 'IntegrarTec',
   bootstrapReady: 'La base de la aplicación está lista para comenzar.',
+  showcase: {
+    title: 'Componentes de interfaz',
+    navigation: 'Ejemplos de interfaz',
+    localOnly: 'Ejemplos locales de componentes. No envían ni guardan datos.',
+    states: 'Estados de ejemplo',
+    loading: 'Ejemplo: cargando',
+    empty: 'Ejemplo vacío: no hay elementos para mostrar.',
+    success: 'Ejemplo de éxito: componente listo.',
+    validation: 'Ejemplo de validación: completá este campo.',
+    error: 'Ejemplo de error: contenido no disponible.',
+    errorHelp:
+      'Este estado es ilustrativo. Podés seguir probando los otros componentes.',
+    controls: 'Controles',
+    overlays: 'Paneles y avisos',
+    tabs: 'Grupos de componentes',
+    fieldLabel: 'Texto de prueba',
+    fieldHelp: 'Campo editable con un error ilustrativo fijo; no se envía.',
+    disabled: 'Ejemplo deshabilitado',
+    tableRegion: 'Tabla de ejemplo desplazable',
+    tableCaption: 'Tabla vacía de ejemplo',
+    column: 'Contenido',
+    openDialog: 'Abrir diálogo de ejemplo',
+    dialogTitle: 'Diálogo de ejemplo',
+    dialogDescription:
+      'Panel modal local. Cerralo con Escape o con el botón de cierre.',
+    dialogBody: 'El foco permanece en este panel hasta que lo cierres.',
+    openSheet: 'Abrir panel lateral de ejemplo',
+    sheetTitle: 'Panel lateral de ejemplo',
+    sheetDescription:
+      'Este panel es modal; no es la barra lateral permanente del diseño.',
+    showToast: 'Mostrar aviso de ejemplo',
+    toast: 'Aviso local de ejemplo. No se guardaron datos.',
+  },
 } as const;
