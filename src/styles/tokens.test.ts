@@ -35,6 +35,7 @@ const textPairs = [
   ['primary-foreground', 'primary'],
   ['secondary-foreground', 'secondary'],
   ['muted-foreground', 'muted'],
+  ['muted-foreground', 'secondary'],
   ['accent-foreground', 'accent'],
   ['destructive-foreground', 'destructive'],
 ] as const;
@@ -74,7 +75,27 @@ test('maps the documented warm palette and defines shape, space and type tokens'
   expect(value('--font-body')).toContain('system-ui');
 });
 
-test.each(['background', 'card'])(
+const nonTextPairs = [
+  ['border', 'background'],
+  ['border', 'card'],
+  ['input', 'background'],
+  ['input', 'card'],
+] as const;
+
+test.each(nonTextPairs)(
+  '%s on %s meets WCAG AA non-text contrast',
+  (ui, background) => {
+    const colors = [
+      luminance(value(`--${ui}`)),
+      luminance(value(`--${background}`)),
+    ];
+    expect(
+      (Math.max(...colors) + 0.05) / (Math.min(...colors) + 0.05),
+    ).toBeGreaterThanOrEqual(3);
+  },
+);
+
+test.each(['background', 'card', 'secondary'])(
   'focus ring contrasts with %s',
   (background) => {
     const colors = [

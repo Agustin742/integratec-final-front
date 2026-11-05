@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactElement } from 'react';
 import { Toaster as Sonner, toast, type ToasterProps } from 'sonner';
-import { cn } from '../../lib/utils';
+import { cn } from '@/lib/utils';
 import { uiMessages } from './ui-messages';
 
 export { toast };
@@ -33,12 +33,6 @@ export function Toast({
         classNames: {
           toast: 'font-sans shadow-panel',
           description: 'text-popover-foreground!',
-          closeButton:
-            'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-          actionButton:
-            'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-          cancelButton:
-            'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
           ...toastOptions?.classNames,
         },
         actionButtonStyle: {

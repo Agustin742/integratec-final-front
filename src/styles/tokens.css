@@ -25,7 +25,7 @@
   --secondary: var(--palette-sand);
   --secondary-foreground: var(--foreground);
   --muted: var(--palette-creamPale);
-  --muted-foreground: #655462;
+  --muted-foreground: #5c4b59;
   --accent: var(--palette-teal);
   --accent-foreground: var(--foreground);
   --destructive: #a33630;

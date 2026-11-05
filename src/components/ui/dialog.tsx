@@ -1,6 +1,6 @@
 import type { ComponentProps, ReactElement } from 'react';
 import { Dialog as DialogPrimitive } from 'radix-ui';
-import { cn } from '../../lib/utils';
+import { cn } from '@/lib/utils';
 import { uiMessages } from './ui-messages';
 
 export function Dialog(
@@ -22,7 +22,7 @@ export function DialogContent({
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-foreground/35" />
       <DialogPrimitive.Content
         className={cn(
-          'fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border bg-popover p-6 pt-14 text-popover-foreground shadow-panel focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+          'fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border bg-popover p-6 pt-14 text-popover-foreground shadow-panel',
           className,
         )}
         {...props}
@@ -30,7 +30,7 @@ export function DialogContent({
         {children}
         <DialogPrimitive.Close
           aria-label={uiMessages.close}
-          className="absolute top-3 right-3 inline-flex size-9 items-center justify-center rounded-md border border-border bg-popover text-popover-foreground hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          className="absolute top-2 right-2 inline-flex size-11 items-center justify-center rounded-md border border-border bg-popover text-popover-foreground hover:bg-secondary"
         >
           <span aria-hidden="true">×</span>
         </DialogPrimitive.Close>
