@@ -1,5 +1,24 @@
 # Tracker — Alejo
 
+## 2026-11-04 — Clarify PR #60 asset documentation
+
+- **Status:** completed
+- **Area / files:** `docs/art/student-uniforms.md`, `changelogs/tracker-alejo.md`.
+- **Change:** Clarify that the documented asset structure describes this delivery rather than approved project-wide decisions, and align the repository hygiene description with existing ignore patterns.
+- **Reason:** Address [PR #60 review feedback](https://github.com/Agustin742/integratec-final-front/pull/60#issuecomment-6635107254) without changing assets, ignore rules, or open team decisions.
+- **Verification:** Documentation checks passed across 48 tracked Markdown files; `git diff --check` passed. Readback confirmed both review points are addressed without changing assets, `.gitignore`, or authoritative open decisions. Native assessment reported passive risk and no review due. Application tests and RED/GREEN do not apply to this wording-only change.
+- **Delivery:** User authorized committing and pushing this correction to `feat/avatar-uniform-assets` for PR #60.
+- **Next step:** Reviewer confirmation on PR #60 after delivery; merge remains subject to approval and applicable checks.
+
+## 2026-11-02 — Deliver male and female modular avatar and school uniform 3D assets
+
+- **Status:** completed
+- **Area / files:** `public/models/avatars/male/`, `public/models/avatars/female/`, `assets/blender/avatars/student-uniforms/`, `docs/art/student-uniforms.md`, `.gitignore`, `rules/git-workflow.md`, `AGENTS.md`.
+- **Change:** Add the 24 verified male (`34`-joint rig) and female (`41`-joint rig) modular avatar `.glb` assets (bodies, hairstyles, casual tops, accessories, and primary `coat-tie.glb` / secondary `polo-sweater.glb` school uniforms), the 4 editable school uniform `.blend` files (`uniform.blend`), and their technical/verification documentation in `docs/art/student-uniforms.md`. Keep local agent plans and temporary Blender renders/scripts gitignored under `odd/`, and record the ~400-line single-functionality PR guideline in `rules/git-workflow.md`.
+- **Reason:** Deliver the male and female character, clothing, school uniform, and accessory 3D assets and their verification documentation in a clean branch off `develop`, aligned with `rules/quality-and-testing.md` and `rules/documentation-and-decisions.md`.
+- **Verification:** `python -B scripts/ci/check_docs.py` passed across all 48 tracked Markdown files, `5/5` CI regression tests (`scripts/ci/test_checks.py`) passed, Blender visual lineup inspection verified the exported `.glb` assets, and `git diff --check origin/develop` exited 0.
+- **Next step:** Update PR #60 into `develop`.
+
 ## 2026-10-22 — Develop source-grounded functional rules
 
 - **Status:** completed
@@ -22,11 +41,12 @@
 
 ## 2026-10-22 — Preserve literal Markdown in CI summaries
 
-- **Status:** in-progress
+- **Status:** completed
 - **Area / files:** `.github/workflows/ci.yml`, `scripts/ci/test_checks.py`.
-- **Change:** Correct two shell quoting warnings without changing the notices or job summaries.
+- **Change:** Correct two shell quoting warnings without changing the notices or job summaries; pin their literal output in regression fixtures.
 - **Reason:** GitHub run 39814978244 failed with ShellCheck SC2016; local Windows actionlint did not include ShellCheck.
-- **Next step:** Pin the exact existing notice/summary output, correct the quoting, and verify the targeted fix before publishing.
+- **Evidence:** Repository commit `67dc20c` contains the workflow correction and regression tests. This bookkeeping update does not assert a new test run or a successful remote GitHub run.
+- **Next step:** Check the applicable GitHub run when remote verification is authorized; the local code correction is committed.
 
 ## 2026-10-22 — Check work pull requests and documentation
 
