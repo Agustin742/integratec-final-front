@@ -155,3 +155,27 @@ were normalized after proving equality with the merged index. This added no auth
 changes to those incoming files and did not change Git configuration.
 No additional review agent, dependency upgrade, remote contract sync, push or PR
 was run for this integration. The screenshot/device/audit limits above still apply.
+
+### Independent integration verification
+
+The four reconciled files were verified in an isolated tree rather than in place.
+`git archive --format=tar -o` wrote the 94 MB candidate tree to disk (an earlier
+in-memory pipe had exceeded a subprocess's 32 MiB buffer), the archive was extracted
+outside the repository, and `pnpm install --frozen-lockfile --offline` ran on Node
+22.23.4 with pnpm 10.34.9 without changing any resolution. The isolated copy then
+passed, once each: lint, typecheck, build (exit 0) and the full unit/component
+suite (11 files, **83/83 tests**).
+
+The candidate was also compared against both parents of `c6d2d1e`:
+
+- `package.json`: exact superset — nine scripts, nine dependencies and 23
+  devDependencies; no key lost from either parent and no conflicting value.
+- `pnpm-lock.yaml`: exact union — 498 packages and 513 snapshots; none missing from
+  either parent, no merged-only entry and no conflicting specifier.
+- `src/main.tsx`: both parents' startup behavior — public-config validation and the
+  stylesheet/StrictMode entry point.
+- `vite.config.ts`: both parents' configuration — public-config validation plus
+  React, Tailwind and the `@` alias.
+
+This check ran in a separate isolated snapshot, not in the conflict writer's working
+tree. No code change resulted from it.
