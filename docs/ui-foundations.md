@@ -35,4 +35,6 @@ The component source is maintained in this repository, not consumed as an opaque
 
 ## Verification status
 
-Implementation and integration checks are in progress. Passing token tests are not a completed accessibility audit. Component interaction, responsive browser evidence, full checks and native review outcomes will be recorded before completion.
+The token setup, local component set, BaseLayout and explicitly local showcase are implemented. Usage: [controls](ui-controls.md), [feedback and tables](ui-display.md), [dialogs and sheets](ui-dialogs.md), [tabs and notifications](ui-overlays.md), [layout](ui-layout.md), and [showcase evidence](ui-showcase.md#observed-integration-evidence).
+
+Component tests passed 45/45; lint, typecheck and build passed before develop integration. Chrome DevTools supplied partial 360px keyboard/focus/overflow proof. Playwright scenarios could not launch with the missing browser installation; Chrome capture and subsequent desktop emulation timed out. Desktop/zoom and remaining browser acceptance are not verified. Native assessment requested no additional review for the assessed work units; this is not native approval or merge readiness. No develop integration, publication or full accessibility audit is claimed.
