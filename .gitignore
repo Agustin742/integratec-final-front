@@ -14,6 +14,8 @@ __pycache__/
 /dist/
 /.vite/
 /coverage/
+/e2e/test-results/
+/playwright-report/
 /src/test/*.log
 /scripts/blender/
 /assets/blender/**/*.png

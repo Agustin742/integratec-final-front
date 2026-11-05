@@ -38,9 +38,11 @@ Before delivery, run a frozen install and every listed quality command on Node 2
 
 The placeholder has no controls, network requests, forms, or asynchronous states. Keyboard focus interactions, loading, validation, and error flows are therefore not introduced here; they must be checked when those behaviors are implemented. Check the document language and heading semantics now.
 
-Application test tooling belongs to F02. No application `test` script is configured, and absence of a suite is not a passing suite. Existing Python CI-tooling tests remain applicable. The current CI conditionally installs the package and runs a test script if present; this issue does not add CI lint/typecheck/build jobs (F03).
+[F02 testing infrastructure](testing.md) provides `pnpm test` (Vitest/Testing Library with jsdom) and `pnpm e2e` (Playwright against production preview). Follow that guide for the project-local Chromium install, helpers, optional remote URL, fake timers, and contract-mocking policy. Lint, strict typecheck, and formatting include both runner configs and browser tests. Existing Python CI-tooling tests remain applicable. CI discovers the non-watch test script; no workflow changes or CI lint/typecheck/build jobs (F03) are introduced.
 
 ## Bootstrap verification evidence
+
+The following records the original #11 bootstrap, before F02 added the test harness; statements about absent application tests are historical.
 
 Verified locally on Node 22.23.4 and pnpm 10.34.9, including a separate verifier's isolated clean copy:
 
