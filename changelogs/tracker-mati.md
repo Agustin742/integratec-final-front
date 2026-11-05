@@ -1,16 +1,28 @@
 # Tracker — Mati
 
+## 2026-11-05 — Create the typed API client, TanStack Query setup and error envelope mapping (#17)
+
+- **Status:** in-progress (local implementation, verification, and PR publication ready; issue #17 completion awaits teammate PR review and merge into `develop`)
+- **Area / files:** `package.json`, `pnpm-lock.yaml`, `src/api/messages.ts`, `src/api/errors.ts`, `src/api/idempotency.ts`, `src/api/client.ts`, `src/api/client.test.ts`, `src/api/query-keys.ts`, `src/api/query-client.tsx`, `src/api/query-client.test.tsx`, `src/main.tsx`, `src/test/msw/handlers.ts`, `src/test/msw/server.ts`, `src/test/render.tsx`, `README.md`, `docs/development.md`, `docs/testing.md`, `changelogs/tracker-mati.md`
+- **Change:** Implemented [issue #17](https://github.com/Agustin742/integratec-final-front/issues/17) in three reviewable work units on `feat/17-api-client-query`:
+  1. Added `openapi-fetch` (`0.17.0`), `@tanstack/react-query` (`5.106.1`), and dev-only `msw` (`3.0.3`); implemented the typed API client (`src/api/client.ts`), backend `ErrorEnvelope` and network error mapper (`src/api/errors.ts`) with centralized `es-AR` messages (`src/api/messages.ts`), `Idempotency-Key` UUID helper (`src/api/idempotency.ts`), contract-faithful MSW handlers (`src/test/msw/`), and 15 unit/integration tests (`src/api/client.test.ts`).
+  2. Added the user-, classroom-, and linked-child-scoped query-key factory (`src/api/query-keys.ts`), TanStack Query client and `ApiQueryProvider` (`src/api/query-client.tsx`) mounted in `src/main.tsx` and `src/test/render.tsx`, and 6 cache-isolation/retry tests (`src/api/query-client.test.tsx`).
+  3. Documented the typed API client, error mapping policy (`404` without revealing foreign resources, `403` insufficient role, network failure never treated as invalid credentials), scoped query keys, and MSW mocking policy in `README.md`, `docs/development.md`, and `docs/testing.md`.
+- **Reason:** Give all features one typed way to call the REST API with consistent loading/error handling, safely scoped caching across users/classrooms/linked children, and contract-faithful MSW mocks (FD2, FD9).
+- **Verification:** On Node `22.23.4` and pnpm `10.34.9`: `pnpm test` (6 files, 61 tests passed), `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm build` (production bundle verified free of MSW), and `pnpm e2e` (2/2 desktop and mobile) passed; `git diff --check` passed. Local `python3` (`C:\Python314\python.exe` missing) and `actionlint` 1.7.7 are unavailable on this Windows workstation and run in the Ubuntu GitHub Actions `checks` job.
+- **Next step:** Publish the PR from `feat/17-api-client-query` into `develop`, verify GitHub Actions checks, and await teammate review and merge to complete #17.
+
 ## 2026-11-05 — Implement `pnpm api:sync` to pull committed REST and realtime contract artifacts (#16)
 
-- **Status:** in-progress (local implementation, verification, and PR publication ready; issue #16 completion awaits teammate PR review and merge into `develop`)
+- **Status:** completed (merged into `develop` via [PR #66](https://github.com/Agustin742/integratec-final-front/pull/66), commit `5a6ee7b`)
 - **Area / files:** `package.json`, `pnpm-lock.yaml`, `scripts/api-sync/sync-contracts.mjs`, `scripts/api-sync/sync-contracts.d.mts`, `src/api/sync-contracts.test.ts`, `src/api/schema.generated.ts`, `src/realtime/contracts.generated.ts`, `eslint.config.js`, `.prettierignore`, `README.md`, `docs/development.md`, `docs/architecture.md`, `changelogs/tracker-mati.md`
 - **Change:** Implemented [issue #16](https://github.com/Agustin742/integratec-final-front/issues/16) in three reviewable work units on `feat/16-api-sync`:
   1. Added `openapi-typescript` (`7.13.0`) and `scripts/api-sync/sync-contracts.mjs` with configurable constants (`DEFAULT_BACKEND_REPO`, `DEFAULT_BACKEND_BRANCH`, `BACKEND_ARTIFACT_PATHS`, `FRONTEND_OUTPUT_PATHS`), `--backend-dir <path>` local checkout support, OpenAPI 3.x validation, graceful notice when optional realtime room-state artifacts are not yet published, and 12 unit tests in `src/api/sync-contracts.test.ts`.
   2. Wired `pnpm api:sync`, generated and committed `src/api/schema.generated.ts` and `src/realtime/contracts.generated.ts` from `Agustin742/integratec-final-back` (`develop`), removed `.gitkeep` placeholders, and ignored `*.generated.ts` in ESLint and Prettier.
   3. Documented `pnpm api:sync`, configurable constants, and CLI flags in `README.md`, `docs/development.md`, and `docs/architecture.md`.
 - **Reason:** Synchronize the backend's committed OpenAPI specification and realtime contracts into deterministic, committed frontend TypeScript definitions (FD7) so builds and typechecks never require network access or a running backend.
-- **Verification:** On Node `22.23.4` and pnpm `10.34.9`: two consecutive runs of `pnpm api:sync` produced zero git diff; `pnpm test` (4 files, 40 tests passed), `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm build` (offline with committed generated contracts), and `pnpm e2e` passed; `git diff --check` passed.
-- **Next step:** Publish the PR from `feat/16-api-sync` into `develop`, verify GitHub Actions checks, and await teammate review and merge to complete #16.
+- **Verification:** On Node `22.23.4` and pnpm `10.34.9`: two consecutive runs of `pnpm api:sync` produced zero git diff; `pnpm test` (4 files, 40 tests passed), `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm build` (offline with committed generated contracts), and `pnpm e2e` passed; `git diff --check` passed; GitHub Actions [run 42086214391](https://github.com/Agustin742/integratec-final-front/actions/runs/42086214391) passed all checks.
+- **Next step:** Completed and merged in [PR #66](https://github.com/Agustin742/integratec-final-front/pull/66); unblocks #17.
 
 ## 2026-11-05 — Add validated public configuration boundary and `.env.example` (#15)
 
