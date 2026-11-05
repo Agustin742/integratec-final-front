@@ -2,12 +2,12 @@
 
 ## 2026-11-05 — Address PR #68 review findings (#14)
 
-- **Status:** completed (code, tests and documentation; publication of the new commits pending).
+- **Status:** completed (code, tests and documentation pushed; screenshots and size-exception approval pending in the pull request).
 - **Area / files:** `src/app/`, `src/components/ui/`, `src/styles/`, `e2e/`, `docs/ui-*.md`, `README.md`, `docs/testing.md`, `package.json`.
 - **Change:** Applied the PR #68 review: the showcase is gated behind `__UI_SHOWCASE__` and dropped from production builds, reduced motion is covered by a browser scenario, contrast is measured and the weak pairs are enforced, the global focus ring is the single definition, the active tab gained a non-colour signal, `lucide-react` was removed, imports use the `@/` alias, and the component nits were fixed.
 - **Reason:** Blocking review comments must be resolved before merge; several claims in the pull request were not backed by code or tests.
 - **Checks:** `lint`, `typecheck`, `format:check` (UI guides included), documentation links (58 files) and `test` **91/91** passed. Production build emits no showcase chunk; `build:e2e` emits `ui-foundations-*.js` 64.37 kB. Playwright **16/16** passed against the showcase preview. Runs used Node v24.15.0 with `--config.engine-strict=false` instead of the declared Node 22 range; this deviation is recorded in `docs/ui-showcase.md`.
-- **Next step:** Reply to and resolve the three inline review threads, ask the maintainer for the size exception, and attach the author-captured screenshots in the pull request.
+- **Next step:** Upload the 1280 px and 360 px captures to the PR thread (the API cannot attach images) and wait for the maintainer's size-exception approval.
 
 ## 2026-11-05 — Integrate develop into UI foundations (#14)
 
