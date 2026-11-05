@@ -6,6 +6,9 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
+    ignores: ['src/api/*.generated.ts', 'src/realtime/*.generated.ts'],
+  },
+  {
     files: ['src/**/*.{ts,tsx}', 'e2e/**/*.ts', '*.config.{ts,js}'],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     languageOptions: { globals: globals.browser },
