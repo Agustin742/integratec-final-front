@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
-import { expectAccessible } from '../../test/accessibility';
-import { render } from '../../test/render';
+import { expectAccessible } from '@/test/accessibility';
+import { render } from '@/test/render';
 import { Alert, AlertDescription, AlertTitle } from './alert';
 import { Badge } from './badge';
 import { Skeleton } from './skeleton';
@@ -39,7 +39,9 @@ describe('display feedback', () => {
       </Alert>,
     );
     expect(screen.getByRole('status')).toHaveTextContent(copy.detail);
-    expect(screen.getByRole('heading', { name: copy.title })).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: copy.title, level: 2 }),
+    ).toBeVisible();
     await expectAccessible(container);
     rerender(
       <Alert variant="destructive">
@@ -48,6 +50,18 @@ describe('display feedback', () => {
     );
     expect(screen.getByRole('alert')).toHaveTextContent(copy.error);
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  test('lets the caller keep heading order when the alert sits under a title', () => {
+    render(
+      <Alert>
+        <AlertTitle as="h3">{copy.title}</AlertTitle>
+        <AlertDescription>{copy.detail}</AlertDescription>
+      </Alert>,
+    );
+    expect(screen.getByRole('heading', { name: copy.title }).tagName).toBe(
+      'H3',
+    );
   });
 
   test('supports explicit announcement semantics and non-interactive badges', () => {

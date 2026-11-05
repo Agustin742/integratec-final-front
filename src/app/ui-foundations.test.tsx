@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { expect, test } from 'vitest';
-import { render } from '../test/render';
+import { render } from '@/test/render';
 import { UiFoundations } from './ui-foundations';
 import { messages } from './messages';
 
@@ -8,7 +8,10 @@ test('identifies every feedback state as a local example', () => {
   render(<UiFoundations />);
   const copy = messages.showcase;
   expect(screen.getByText(copy.localOnly)).toBeVisible();
-  expect(screen.getByRole('button', { name: copy.loading })).toBeDisabled();
+  expect(screen.getByRole('button', { name: copy.loading })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
   expect(screen.getByRole('button', { name: copy.loading })).toHaveAttribute(
     'aria-busy',
     'true',

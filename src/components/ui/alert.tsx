@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
-import { cn } from '../../lib/utils';
+import { cn } from '@/lib/utils';
 
 const alertVariants = cva('rounded-lg border p-4 text-sm shadow-panel', {
   variants: {
@@ -25,15 +25,20 @@ export function Alert({ className, variant, role, ...props }: AlertProps) {
   );
 }
 
+export type AlertTitleProps = ComponentProps<'h2'> & {
+  as?: 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+};
+
 export function AlertTitle({
+  as: Heading = 'h2',
   className,
   children,
   ...props
-}: ComponentProps<'h2'>) {
+}: AlertTitleProps) {
   return (
-    <h2 {...props} className={cn('mb-1 font-semibold', className)}>
+    <Heading {...props} className={cn('mb-1 font-semibold', className)}>
       {children}
-    </h2>
+    </Heading>
   );
 }
 

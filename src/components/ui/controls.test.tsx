@@ -1,8 +1,8 @@
 import { createRef, StrictMode, useState } from 'react';
 import { fireEvent, screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
-import { expectAccessible } from '../../test/accessibility';
-import { render } from '../../test/render';
+import { expectAccessible } from '@/test/accessibility';
+import { render } from '@/test/render';
 import { Button } from './button';
 import { Field } from './field';
 import { Input } from './input';
@@ -54,7 +54,7 @@ describe('Button', () => {
   });
 
   test.each(['disabled', 'busy'] as const)(
-    'prevents clicks while %s',
+    'prevents activation while %s',
     (state) => {
       const click = vi.fn();
       render(
@@ -63,12 +63,24 @@ describe('Button', () => {
         </Button>,
       );
       const button = screen.getByRole('button', { name: copy.saving });
-      expect(button).toBeDisabled();
-      if (state === 'busy') expect(button).toHaveAttribute('aria-busy', 'true');
+      expect(button).toHaveAttribute('aria-disabled', 'true');
+      if (state === 'busy') {
+        expect(button).not.toHaveAttribute('disabled');
+        expect(button).toHaveAttribute('aria-busy', 'true');
+      } else {
+        expect(button).toBeDisabled();
+      }
       fireEvent.click(button);
       expect(click).not.toHaveBeenCalled();
     },
   );
+
+  test('keeps keyboard focus reachable while pending', () => {
+    render(<Button busy>{copy.saving}</Button>);
+    const button = screen.getByRole('button', { name: copy.saving });
+    button.focus();
+    expect(button).toHaveFocus();
+  });
 
   test('returns to an operable state when pending work finishes', () => {
     const click = vi.fn();
