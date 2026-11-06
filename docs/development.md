@@ -13,16 +13,23 @@
 
 ## Source layout
 
-| Path                                  | Responsibility                                                    |
-| ------------------------------------- | ----------------------------------------------------------------- |
-| `src/main.tsx`                        | Validate public configuration and mount React with StrictMode     |
-| `src/config/public-config.ts`         | Typed, Zod-validated `VITE_` public configuration boundary        |
-| `src/app/App.tsx`                     | Minimal semantic placeholder, without routing or feature behavior |
-| `src/app/messages.ts`                 | Centralized Spanish (Argentina) placeholder strings               |
-| `src/api/schema.generated.ts`         | Generated REST OpenAPI TypeScript definitions (`pnpm api:sync`)   |
-| `src/realtime/contracts.generated.ts` | Generated shared realtime payload contracts (`pnpm api:sync`)     |
-| `scripts/api-sync/sync-contracts.mjs` | Contract synchronization resolver and generator (`pnpm api:sync`) |
-| `vite.config.ts`                      | Build/dev configuration validation plugin and React integration   |
+| Path                                  | Responsibility                                                                       |
+| ------------------------------------- | ------------------------------------------------------------------------------------ |
+| `src/main.tsx`                        | Validate public configuration and mount React with StrictMode and `ApiQueryProvider` |
+| `src/config/public-config.ts`         | Typed, Zod-validated `VITE_` public configuration boundary                           |
+| `src/app/App.tsx`                     | Minimal semantic placeholder, without routing or feature behavior                    |
+| `src/app/messages.ts`                 | Centralized Spanish (Argentina) placeholder strings                                  |
+| `src/api/schema.generated.ts`         | Generated REST OpenAPI TypeScript definitions (`pnpm api:sync`)                      |
+| `src/api/client.ts`                   | Typed `openapi-fetch` client and `requestApi` / `requestApiVoid` helpers             |
+| `src/api/errors.ts`                   | Backend `ErrorEnvelope` and network error mapper (`ApiError`)                        |
+| `src/api/messages.ts`                 | Centralized `es-AR` user-facing API error messages                                   |
+| `src/api/idempotency.ts`              | `Idempotency-Key` UUID helper for idempotent mutations                               |
+| `src/api/query-keys.ts`               | User-, classroom-, and child-scoped TanStack Query key factory                       |
+| `src/api/query-client.tsx`            | TanStack Query client defaults (`MAX_QUERY_RETRIES = 2`) and `ApiQueryProvider`      |
+| `src/realtime/contracts.generated.ts` | Generated shared realtime payload contracts (`pnpm api:sync`)                        |
+| `src/test/msw/`                       | Contract-faithful Mock Service Worker (MSW) handlers and server for tests (FD9)      |
+| `scripts/api-sync/sync-contracts.mjs` | Contract synchronization resolver and generator (`pnpm api:sync`)                    |
+| `vite.config.ts`                      | Build/dev configuration validation plugin and React integration                      |
 
 Add feature UI, integration, and tests together when their issues start. Do not pre-create hypothetical feature scaffolding. Follow [frontend conventions](../rules/frontend-conventions.md) and [architecture boundaries](../rules/architecture.md).
 

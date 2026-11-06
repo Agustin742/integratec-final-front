@@ -1,4 +1,4 @@
-import { createRef, StrictMode, useState } from 'react';
+import { createRef, useState } from 'react';
 import { fireEvent, screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 import { expectAccessible } from '@/test/accessibility';
@@ -86,11 +86,9 @@ describe('Button', () => {
     const click = vi.fn();
     const { rerender } = render(<Button busy>{copy.saving}</Button>);
     rerender(
-      <StrictMode>
-        <Button busy={false} onClick={click}>
-          {copy.save}
-        </Button>
-      </StrictMode>,
+      <Button busy={false} onClick={click}>
+        {copy.save}
+      </Button>,
     );
     const button = screen.getByRole('button', { name: copy.save });
     expect(button).toBeEnabled();
@@ -127,9 +125,7 @@ describe('Input, Label and Field', () => {
     input.focus();
     expect(input).toHaveFocus();
     rerender(
-      <StrictMode>
-        <Input aria-label={copy.name} disabled defaultValue={copy.value} />
-      </StrictMode>,
+      <Input aria-label={copy.name} disabled defaultValue={copy.value} />,
     );
     expect(screen.getByRole('textbox', { name: copy.name })).toBeDisabled();
   });
@@ -148,17 +144,15 @@ describe('Input, Label and Field', () => {
     expect(input).toHaveAccessibleDescription(copy.description);
     expect(input).not.toHaveAttribute('aria-invalid', 'true');
     rerender(
-      <StrictMode>
-        <Field
-          label={copy.name}
-          description={copy.description}
-          error={copy.error}
-        >
-          {(controlProps) => (
-            <Input {...controlProps} defaultValue={copy.value} />
-          )}
-        </Field>
-      </StrictMode>,
+      <Field
+        label={copy.name}
+        description={copy.description}
+        error={copy.error}
+      >
+        {(controlProps) => (
+          <Input {...controlProps} defaultValue={copy.value} />
+        )}
+      </Field>,
     );
     expect(input.id).toBe(id);
     expect(input).toHaveAttribute('aria-invalid', 'true');
@@ -168,11 +162,9 @@ describe('Input, Label and Field', () => {
     expect(input).toHaveValue(copy.value);
     await expectAccessible(container);
     rerender(
-      <StrictMode>
-        <Field label={copy.name}>
-          {(controlProps) => <Input {...controlProps} />}
-        </Field>
-      </StrictMode>,
+      <Field label={copy.name}>
+        {(controlProps) => <Input {...controlProps} />}
+      </Field>,
     );
     expect(input).not.toHaveAttribute('aria-invalid', 'true');
     expect(input).not.toHaveAttribute('aria-describedby');
