@@ -41,6 +41,13 @@ labels remain centralized consumer content in es-AR. The polite notification
 region and dismiss label are centralized Spanish; Alt+T is Sonner's default focus
 shortcut.
 
+Sonner's own visual layer is disabled (`unstyled`); the toast is a clay panel
+(pale cream, sand edge, `shadow-float`, `rounded-2xl`) with a Fredoka title, a
+round icon chip per type and the close control as a small ghost key inside the
+panel. Sonner still owns positioning, stacking, swipe and enter/exit motion.
+Error toasts use the `danger` tint (`#8a2a25` on `#fde3dc`, 7.05:1); success,
+info and warning keep the cream surface and change the edge and chip colour.
+
 Feedback uses popover/foreground tokens, with primary and secondary token pairs
 for actions rather than light text over bright accents. Rich colors and dark
 mode are intentionally not exposed. Overrides and per-toast options can change

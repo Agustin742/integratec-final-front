@@ -96,6 +96,20 @@ describe('Toast', () => {
     );
   });
 
+  it('renders as a clay panel with a display title and an in-panel close key', async () => {
+    render(<Toast />);
+    act(() => {
+      toast.success('Cambios guardados', { duration: Infinity });
+    });
+    const title = await screen.findByText('Cambios guardados');
+    const panel = title.closest('[data-sonner-toast]');
+    expect(panel).toHaveAttribute('data-styled', 'false');
+    expect(panel).toHaveClass('shadow-float', 'rounded-2xl');
+    expect(title).toHaveClass('font-display');
+    const dismiss = screen.getByRole('button', { name: 'Cerrar notificación' });
+    expect(dismiss).toHaveClass('key-bevel');
+  });
+
   it('renders error feedback without relying on an accent background', async () => {
     render(<Toast />);
     act(() => {
