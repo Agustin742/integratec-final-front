@@ -26,7 +26,9 @@ export function SheetContent({
     <DialogContent
       className={cn(
         'top-0 h-dvh max-h-dvh w-[min(90vw,24rem)] max-w-none translate-x-0 translate-y-0 rounded-none',
-        side === 'right' ? 'right-0 left-auto' : 'left-0',
+        side === 'right'
+          ? 'right-0 left-auto data-[state=closed]:animate-sheet-right-out data-[state=open]:animate-sheet-right-in'
+          : 'left-0 data-[state=closed]:animate-sheet-left-out data-[state=open]:animate-sheet-left-in',
         className,
       )}
       {...props}

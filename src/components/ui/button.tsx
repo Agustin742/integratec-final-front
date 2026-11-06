@@ -55,7 +55,11 @@ export function Button({
         }
         onClick?.(event);
       }}
-      className={cn(buttonVariants({ variant, size }), className)}
+      className={cn(
+        buttonVariants({ variant, size }),
+        !blocked && 'motion-press',
+        className,
+      )}
     >
       {busy && (
         <span

@@ -31,7 +31,7 @@ export function TabsTrigger({
   return (
     <TabsPrimitive.Trigger
       className={cn(
-        'inline-flex min-h-9 shrink-0 items-center justify-center rounded-md px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 data-[state=active]:bg-card data-[state=active]:font-semibold data-[state=active]:text-card-foreground data-[state=active]:underline data-[state=active]:underline-offset-4 data-[state=active]:shadow-panel',
+        'motion-colors inline-flex min-h-9 shrink-0 items-center justify-center rounded-md px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 data-[state=active]:bg-card data-[state=active]:font-semibold data-[state=active]:text-card-foreground data-[state=active]:underline data-[state=active]:underline-offset-4 data-[state=active]:shadow-panel',
         className,
       )}
       {...props}
@@ -45,7 +45,10 @@ export function TabsContent({
 }: ComponentProps<typeof TabsPrimitive.Content>): ReactElement {
   return (
     <TabsPrimitive.Content
-      className={cn('mt-3 min-w-0 rounded-md', className)}
+      className={cn(
+        'mt-3 min-w-0 rounded-md data-[state=active]:animate-fade-in',
+        className,
+      )}
       {...props}
     />
   );

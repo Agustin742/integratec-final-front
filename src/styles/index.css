@@ -31,6 +31,46 @@
   }
 }
 
+/* Tactile press: scale down on press, springy rebound on release. */
+@utility motion-press {
+  transition:
+    scale var(--motion-duration-base) var(--motion-ease-spring),
+    translate var(--motion-duration-base) var(--motion-ease-out),
+    background-color var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out),
+    border-color var(--motion-duration-fast) var(--motion-ease-out),
+    box-shadow var(--motion-duration-base) var(--motion-ease-out),
+    filter var(--motion-duration-fast) var(--motion-ease-out);
+
+  &:hover {
+    filter: brightness(1.06);
+    translate: 0 -1px;
+  }
+  &:active {
+    filter: brightness(0.96);
+    scale: 0.95;
+    translate: 0 0;
+  }
+}
+
+@utility motion-colors {
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out),
+    box-shadow var(--motion-duration-base) var(--motion-ease-out);
+}
+
+@utility motion-field {
+  transition:
+    border-color var(--motion-duration-fast) var(--motion-ease-out),
+    box-shadow var(--motion-duration-base) var(--motion-ease-out),
+    outline-color var(--motion-duration-fast) var(--motion-ease-out);
+
+  &:focus-visible {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 18%, transparent);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -39,5 +79,12 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  .motion-press,
+  .motion-press:hover,
+  .motion-press:active {
+    scale: none !important;
+    translate: none !important;
+    filter: none !important;
   }
 }
