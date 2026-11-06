@@ -104,3 +104,47 @@ Contrast measured for the new pairs (`tokens.test.ts` enforces them):
 | Field border `#a9835f` on cream / pale cream               | 3.07 / 3.28               | non-text    |
 
 The field border is wood-light but kept at 3:1 so the input boundary stays identifiable; a sand-only border would measure about 1.4:1. The previous `--border` and `--input` tokens are unchanged.
+
+## Motion
+
+Motion tokens live in `tokens.css`; components animate only `transform`/`scale`/`translate` and `opacity`, so nothing shifts layout.
+
+| Token                    | Value                               | Use                              |
+| ------------------------ | ----------------------------------- | -------------------------------- |
+| `--motion-duration-fast` | `120ms`                             | exits, press                     |
+| `--motion-duration-base` | `180ms`                             | dialog enter, fades, sheet exit  |
+| `--motion-duration-slow` | `250ms`                             | sheet enter                      |
+| `--motion-ease-out`      | `cubic-bezier(0.22, 1, 0.36, 1)`    | enters                           |
+| `--motion-ease-in`       | `cubic-bezier(0.4, 0, 1, 1)`        | exits                            |
+| `--motion-ease-spring`   | `cubic-bezier(0.34, 1.56, 0.64, 1)` | button pop rebound, dialog enter |
+
+Theme animations: `animate-fade-in/out` (overlays, tab content), `animate-dialog-in/out` (scale .95 → 1 in, → .97 out), `animate-sheet-{left,right}-{in,out}` (slide from the sheet's side). Radix waits for the exit animation through `data-state="closed"`. Utilities in `index.css`: `motion-press` (key pop), `motion-colors` (color transitions) and `motion-field` (border/ring transition on focus). `cn()` registers the custom `animate-*` names with tailwind-merge so a consumer class does not silently drop a component's animation. The toast keeps Sonner's own enter, exit and swipe motion. Under `prefers-reduced-motion` all durations collapse and press scale, lift and travel are removed.
+
+## Changes from the initial foundations
+
+The tactile pass (on top of PR #68) changed the look, not the component APIs, copy or accessibility behavior:
+
+| Area          | Before                                        | After                                                                                                |
+| ------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Fonts         | `system-ui` stack                             | Fredoka Variable (display) + Figtree Variable (body), self-hosted via `@fontsource-variable/*` 5.3.0 |
+| Borders       | Wood `--border` 1px on every panel            | Sand `--edge #e8d3ac` by default; `--field-border #a9835f` on inputs; `--border` kept                |
+| Depth         | One `--panel-shadow`                          | `--shadow-ambient/float/inset/inset-deep/raised` and `--key-*` bevels (lavender/brown tints)         |
+| New surfaces  | —                                             | `--tray`, `--tray-hover`, `--row-hover`; success/info/warning/danger tint, ink and edge triples      |
+| Motion        | Spinner and skeleton pulse only               | Motion tokens, key pop, overlay enter/exit, tab fade, field transitions, skeleton shimmer            |
+| Buttons       | Flat shadcn                                   | Resin keys with bevel and press travel; disabled flat, busy without pop                              |
+| Tabs / inputs | Generic list, thin outline                    | Recessed tray with raised active pill; recessed well input                                           |
+| Badge / Alert | Primary/destructive only, colored edge        | Palette variants; alert tinted surface with icon chip, no side stripe                                |
+| Toast         | Sonner default styling                        | `unstyled` clay panel, display title, per-type icon chip, in-panel close key                         |
+| Layout        | Underlined link in a full-height sidebar card | `SidebarNav` pills with `aria-current`; sidebar sized to content, sticky at `lg`                     |
+
+## Current verification
+
+On the tactile candidate: lint, typecheck, **146/146** unit/component tests, production build, and **16/16** Playwright scenarios (desktop and Pixel 7 projects) against the showcase preview at `http://127.0.0.1:4173` through `PLAYWRIGHT_BASE_URL`; the default launcher still fails on Windows when `npm_execpath` points to a standalone `pnpm.exe`. A manual keyboard pass confirmed every interactive stop shows the shared focus outline, including bevelled keys. The mechanical design detector reports only the intentional spring easing.
+
+Screenshots of the showcase build:
+
+![Showcase at 1280px](assets/ui-foundations/showcase-1280.webp)
+![Showcase at 360px](assets/ui-foundations/showcase-360.webp)
+![Dialog](assets/ui-foundations/dialog-1280.webp)
+![Sheet](assets/ui-foundations/sheet-1280.webp)
+![Toast](assets/ui-foundations/toast-1280.webp)
