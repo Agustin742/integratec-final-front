@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { ApiQueryProvider } from './api/query-client';
 import { App } from './app/App';
 import { getPublicConfig } from './config/public-config';
+import './styles/index.css';
 
 getPublicConfig();
 

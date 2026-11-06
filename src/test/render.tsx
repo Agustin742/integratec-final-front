@@ -11,6 +11,14 @@ export interface AppRenderOptions extends RenderOptions {
   readonly queryClient?: QueryClient;
 }
 
+/**
+ * Renders a tree with the application providers under `StrictMode`.
+ *
+ * `StrictMode` is applied through the React Testing Library `wrapper`, so it
+ * survives `rerender`. Do not wrap a `rerender` target in `StrictMode` as well:
+ * the extra element changes the child type at that position, React remounts the
+ * subtree, and any element reference captured before the rerender goes stale.
+ */
 export function render(
   ui: ReactElement,
   options: AppRenderOptions = {},

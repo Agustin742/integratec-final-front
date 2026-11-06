@@ -1,0 +1,114 @@
+@import '@fontsource-variable/fredoka/wght.css';
+@import '@fontsource-variable/figtree/wght.css';
+@import 'tailwindcss' source('../');
+@import './tokens.css';
+
+@layer base {
+  * {
+    border-color: var(--edge);
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-body);
+    font-size: var(--text-body);
+    line-height: 1.6;
+  }
+  :focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 3px;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: var(--weight-display);
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+    text-wrap: balance;
+  }
+  h1 {
+    font-size: var(--text-heading);
+    font-weight: 700;
+  }
+  h2 {
+    font-size: var(--text-title);
+  }
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+}
+
+/* Resin key: a hard bevel in the darker shade set by --key, plus a lavender ambient shadow. */
+@utility key-bevel {
+  --bevel-depth: 3px;
+  box-shadow:
+    0 var(--bevel-depth) 0 var(--key, var(--key-sand)),
+    var(--key-shadow-ambient);
+}
+
+/* Tactile press: the key rises on hover and travels down on press while the bevel shrinks. */
+@utility motion-press {
+  transition:
+    scale var(--motion-duration-base) var(--motion-ease-spring),
+    translate var(--motion-duration-base) var(--motion-ease-out),
+    background-color var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out),
+    border-color var(--motion-duration-fast) var(--motion-ease-out),
+    box-shadow var(--motion-duration-base) var(--motion-ease-out),
+    filter var(--motion-duration-fast) var(--motion-ease-out);
+
+  &:hover {
+    --bevel-depth: 4px;
+    filter: brightness(1.05);
+    translate: 0 -1px;
+  }
+  &:active {
+    --bevel-depth: 1px;
+    filter: brightness(0.97);
+    scale: 0.98;
+    translate: 0 2px;
+  }
+}
+
+@utility motion-colors {
+  transition:
+    background-color var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out),
+    box-shadow var(--motion-duration-base) var(--motion-ease-out);
+}
+
+@utility motion-field {
+  transition:
+    border-color var(--motion-duration-fast) var(--motion-ease-out),
+    box-shadow var(--motion-duration-base) var(--motion-ease-out),
+    outline-color var(--motion-duration-fast) var(--motion-ease-out);
+
+  &:focus-visible {
+    box-shadow: var(--shadow-inset-deep);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .motion-press,
+  .motion-press:hover,
+  .motion-press:active {
+    scale: none !important;
+    translate: none !important;
+    filter: none !important;
+  }
+}

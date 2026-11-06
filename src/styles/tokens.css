@@ -1,0 +1,208 @@
+:root {
+  color-scheme: light;
+  --palette-cream: #fff0d8;
+  --palette-creamPale: #fff9eb;
+  --palette-sand: #e9c99b;
+  --palette-wood: #af7b52;
+  --palette-coral: #e66861;
+  --palette-teal: #62cfc7;
+  --palette-butter: #f7d86b;
+  --palette-lavender: #b5a7d6;
+  --palette-grass: #a6d96a;
+  --palette-leaf: #65b96a;
+  --palette-green: #3e8654;
+  --palette-ink: #382f3f;
+
+  --background: var(--palette-cream);
+  --foreground: var(--palette-ink);
+  --card: var(--palette-creamPale);
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  /* Darkened semantic tones preserve the palette while meeting text contrast. */
+  --primary: #28603b;
+  --primary-foreground: var(--palette-creamPale);
+  --secondary: var(--palette-sand);
+  --secondary-foreground: var(--foreground);
+  --muted: var(--palette-creamPale);
+  --muted-foreground: #5c4b59;
+  --accent: var(--palette-teal);
+  --accent-foreground: var(--foreground);
+  --destructive: #a33630;
+  --destructive-foreground: var(--palette-creamPale);
+  --border: var(--palette-wood);
+  /* Warm surfaces and edges for the clay-panel / resin-key language. */
+  --edge: #e8d3ac;
+  --tray: #efd9b4;
+  --tray-hover: #f6e7c8;
+  --row-hover: var(--palette-cream);
+  --field-border: #a9835f;
+  --input: #806348;
+  /* Soft semantic tints: dark ink on a light tint, bevel one step darker. */
+  --success: #e0f1cc;
+  --success-foreground: #24542f;
+  --success-edge: #b9d996;
+  --info: #d8f3f0;
+  --info-foreground: #1d5a58;
+  --info-edge: #a0dbd5;
+  --warning: #fdf0bd;
+  --warning-foreground: #5e4a0a;
+  --warning-edge: #e8cb62;
+  --danger: #fde3dc;
+  --danger-foreground: #8a2a25;
+  --danger-edge: #f0aa9f;
+  /* Resin key bevels: a darker shade of each key surface. */
+  --key-primary: #173a24;
+  --key-secondary: #b98a5a;
+  --key-destructive: #6e211d;
+  --key-sand: #d4b17c;
+  --key-raised: #dcbf8e;
+  --ring: var(--primary);
+  --radius: 0.75rem;
+  --bevel-depth: 3px;
+  --spacing: 0.25rem;
+  --font-body:
+    'Figtree Variable', system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', sans-serif;
+  --text-body: 1rem;
+  --text-small: 0.875rem;
+  --text-title: 1.375rem;
+  --text-heading: clamp(1.75rem, 4vw, 2.5rem);
+  --weight-display: 600;
+  /* Tactile depth: soft lavender ambient (always offset, never black), brown inset wells, hard bevels. */
+  --shadow-ambient: 0 8px 20px -6px #b5a7d655;
+  --shadow-inset-deep: inset 0 3px 6px #af7b5240;
+  --key-shadow-ambient: 0 8px 14px -8px #b5a7d6aa;
+  --panel-shadow: var(--shadow-ambient);
+  /* Motion: transform/opacity only, 120-250ms. */
+  --motion-duration-fast: 120ms;
+  --motion-duration-base: 180ms;
+  --motion-duration-slow: 250ms;
+  --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --motion-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-edge: var(--edge);
+  --color-tray: var(--tray);
+  --color-tray-hover: var(--tray-hover);
+  --color-row-hover: var(--row-hover);
+  --color-field-border: var(--field-border);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-edge: var(--success-edge);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-edge: var(--info-edge);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-edge: var(--warning-edge);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-edge: var(--danger-edge);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-body);
+  --radius-sm: calc(var(--radius) - 0.25rem);
+  --radius-md: calc(var(--radius) - 0.125rem);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 0.25rem);
+  --shadow-panel: var(--panel-shadow);
+}
+
+/* Static theme keys double as the display font and depth tokens (utilities: font-display, shadow-float, shadow-inset, shadow-raised). */
+@theme static {
+  --font-display:
+    'Fredoka Variable', ui-rounded, 'Segoe UI Rounded', system-ui, sans-serif;
+  --shadow-float: 0 18px 40px -12px #b5a7d699, 0 6px 14px -6px #af7b5233;
+  --shadow-inset: inset 0 2px 4px #af7b5233;
+  --shadow-raised: 0 2px 0 var(--key-raised), 0 6px 10px -4px #b5a7d666;
+}
+
+@theme {
+  --animate-shimmer: shimmer 1.8s ease-in-out infinite;
+  --animate-fade-in: fade-in var(--motion-duration-base) var(--motion-ease-out);
+  --animate-fade-out: fade-out var(--motion-duration-fast) var(--motion-ease-in)
+    forwards;
+  --animate-dialog-in: dialog-in var(--motion-duration-base)
+    var(--motion-ease-spring);
+  --animate-dialog-out: dialog-out var(--motion-duration-fast)
+    var(--motion-ease-in) forwards;
+  --animate-sheet-right-in: sheet-right-in var(--motion-duration-slow)
+    var(--motion-ease-out);
+  --animate-sheet-right-out: sheet-right-out var(--motion-duration-base)
+    var(--motion-ease-in) forwards;
+  --animate-sheet-left-in: sheet-left-in var(--motion-duration-slow)
+    var(--motion-ease-out);
+  --animate-sheet-left-out: sheet-left-out var(--motion-duration-base)
+    var(--motion-ease-in) forwards;
+
+  @keyframes shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes fade-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes dialog-in {
+    from {
+      opacity: 0;
+      scale: 0.95;
+    }
+  }
+  @keyframes dialog-out {
+    to {
+      opacity: 0;
+      scale: 0.97;
+    }
+  }
+  @keyframes sheet-right-in {
+    from {
+      translate: 100% 0;
+    }
+  }
+  @keyframes sheet-right-out {
+    to {
+      translate: 100% 0;
+    }
+  }
+  @keyframes sheet-left-in {
+    from {
+      translate: -100% 0;
+    }
+  }
+  @keyframes sheet-left-out {
+    to {
+      translate: -100% 0;
+    }
+  }
+}

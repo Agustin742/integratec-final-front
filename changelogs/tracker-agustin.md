@@ -1,5 +1,15 @@
 # Tracker — Agustin
 
+## 2026-11-05 — Tactile design pass for the base UI components
+
+- **Status:** completed
+- **Area / files:** `src/styles/tokens.css`, `src/styles/index.css`, `src/components/ui/*`, `src/components/layout/`, `src/app/App.tsx`, `docs/ui-*.md`, `package.json`
+- **Change:** Self-hosted Fredoka and Figtree fonts, tactile depth tokens (bevels, lavender ambient, inset wells), resin-key buttons, recessed inputs, tray tabs, pill badges with palette variants, tinted alerts with icon chip, clay table/dialog/sheet, shimmer skeleton and pill sidebar nav. Contrast pairs recorded in `docs/ui-foundations.md`.
+- **Reason:** The components looked like stock shadcn; they now follow the painted-toy / soft-resin art direction.
+- **Follow-up:** The toast now drops Sonner's stock styling for a clay panel with a display title, a per-type icon chip and an in-panel close key (`src/components/ui/toast.tsx`, `docs/ui-overlays.md`).
+- **Verification:** lint, typecheck, 146/146 unit tests, build and 16/16 Playwright scenarios against the showcase preview; manual keyboard focus pass. Screenshots in `docs/assets/ui-foundations/`.
+- **Next step:** Team review on PR #68.
+
 ## 2026-11-04 — Move frontend hosting to us-east-2 with keyless Amplify deploy (FD5 update)
 
 - **Status:** completed
