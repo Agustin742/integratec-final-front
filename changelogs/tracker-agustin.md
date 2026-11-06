@@ -1,5 +1,13 @@
 # Tracker — Agustin
 
+## 2026-11-05 — Tactile design pass for the base UI components
+
+- **Status:** completed
+- **Area / files:** `src/styles/tokens.css`, `src/styles/index.css`, `src/components/ui/*`, `src/components/layout/`, `src/app/App.tsx`, `docs/ui-*.md`, `package.json`
+- **Change:** Self-hosted Fredoka and Figtree fonts, tactile depth tokens (bevels, lavender ambient, inset wells), resin-key buttons, recessed inputs, tray tabs, pill badges with palette variants, tinted alerts with icon chip, clay table/dialog/sheet, shimmer skeleton and pill sidebar nav. Contrast pairs recorded in `docs/ui-foundations.md`.
+- **Reason:** The components looked like stock shadcn; they now follow the painted-toy / soft-resin art direction.
+- **Next step:** Review in the PR (#68); check the browser suite at 360px.
+
 ## 2026-11-04 — Move frontend hosting to us-east-2 with keyless Amplify deploy (FD5 update)
 
 - **Status:** completed

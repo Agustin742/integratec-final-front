@@ -62,3 +62,7 @@ rule. Data fetching, validation, empty and loading states belong to consuming
 features, not these containers. See
 [UI accessibility rules](../rules/ui-and-accessibility.md) and
 [verification policy](../rules/quality-and-testing.md).
+
+## Tactile styling
+
+The tab list is a recessed sand tray (`--tray`, inset shadow); the active trigger is a raised pale-cream pill with a bevel and heavier weight, inactive triggers use muted text (5.85:1 on the tray) with a hover tint. The underline treatment is removed. Toasts use the float shadow.

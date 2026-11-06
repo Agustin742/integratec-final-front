@@ -61,3 +61,7 @@ See [observed integration evidence](ui-showcase.md#observed-integration-evidence
 for exact commands, earlier failed attempts and remaining limits. These are
 rendered Chromium checks, not claims made by component tests or visual approval.
 See [UI accessibility](../rules/ui-and-accessibility.md).
+
+## Tactile styling
+
+The header carries the Fredoka wordmark on a clay surface. `SidebarNav` and `SidebarNavItem` (`src/components/layout/sidebar-nav.tsx`) render pill links; the current item sets `aria-current="page"` and is shown as a raised pill with heavier weight and a leading dot, so it does not depend on color alone. The sidebar sizes to its content and is sticky at the large breakpoint.

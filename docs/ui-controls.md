@@ -54,3 +54,7 @@ Browser keyboard activation, contrast on rendered backgrounds, layout integratio
 checks, not proven by these jsdom tests. See
 [UI accessibility](../rules/ui-and-accessibility.md) and
 [quality requirements](../rules/quality-and-testing.md).
+
+## Tactile styling
+
+Solid variants (`default`, `secondary`, `outline`, `destructive`) render as resin keys: Fredoka 600 label, `rounded-xl`, a hard bevel from the matching `--key-*` token and a lavender ambient shadow. `ghost` and `link` stay flat. Press moves the key down 2px while the bevel shrinks; disabled is flat and does not pop. `Input` is a recessed well: 2px `--field-border`, inset shadow, border turns primary on focus (plus the global 3px ring), coral border when `aria-invalid`. Tokens and contrast: [foundations](ui-foundations.md#tactile-design-resin-keys-and-clay-panels).

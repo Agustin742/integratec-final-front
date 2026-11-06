@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { BaseLayout } from '@/components/layout/base-layout';
+import { SidebarNav, SidebarNavItem } from '@/components/layout/sidebar-nav';
 import { Toast } from '@/components/ui/toast';
 import { messages } from './messages';
 
@@ -22,18 +23,19 @@ export function App() {
   return (
     <>
       <BaseLayout
-        header={<h1 className="font-semibold">{messages.title}</h1>}
+        header={
+          <h1 className="text-2xl font-bold text-primary">{messages.title}</h1>
+        }
         sidebarLabel={
           showcaseEnabled ? messages.showcase.navigation : undefined
         }
         sidebar={
           showcaseEnabled ? (
-            <a
-              href="#ui-foundations"
-              className="rounded-sm underline underline-offset-4"
-            >
-              {messages.showcase.title}
-            </a>
+            <SidebarNav>
+              <SidebarNavItem href="#ui-foundations" current>
+                {messages.showcase.title}
+              </SidebarNavItem>
+            </SidebarNav>
           ) : undefined
         }
       >

@@ -16,7 +16,7 @@ export function TabsList({
   return (
     <TabsPrimitive.List
       className={cn(
-        'flex max-w-full gap-1 overflow-x-auto rounded-lg border border-border bg-secondary p-1 text-secondary-foreground data-[orientation=vertical]:flex-col',
+        'flex max-w-full gap-1 overflow-x-auto rounded-2xl bg-tray p-1.5 text-muted-foreground shadow-inset data-[orientation=vertical]:flex-col',
         className,
       )}
       {...props}
@@ -31,7 +31,7 @@ export function TabsTrigger({
   return (
     <TabsPrimitive.Trigger
       className={cn(
-        'motion-colors inline-flex min-h-9 shrink-0 items-center justify-center rounded-md px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 data-[state=active]:bg-card data-[state=active]:font-semibold data-[state=active]:text-card-foreground data-[state=active]:underline data-[state=active]:underline-offset-4 data-[state=active]:shadow-panel',
+        'motion-colors inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl px-4 py-2 font-display text-base font-medium hover:bg-tray-hover hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60 data-[state=active]:bg-card data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-raised',
         className,
       )}
       {...props}
@@ -46,7 +46,7 @@ export function TabsContent({
   return (
     <TabsPrimitive.Content
       className={cn(
-        'mt-3 min-w-0 rounded-md data-[state=active]:animate-fade-in',
+        'mt-4 min-w-0 rounded-xl data-[state=active]:animate-fade-in',
         className,
       )}
       {...props}

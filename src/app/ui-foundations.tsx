@@ -41,7 +41,7 @@ export function UiFoundations() {
       className="min-w-0 space-y-6"
     >
       <div>
-        <h2 id="ui-foundations-title" className="text-xl font-semibold">
+        <h2 id="ui-foundations-title" className="text-2xl">
           {copy.title}
         </h2>
         <p className="text-muted-foreground">{copy.localOnly}</p>
@@ -53,14 +53,14 @@ export function UiFoundations() {
       >
         <div
           aria-busy="true"
-          className="min-w-0 space-y-3 rounded-lg border bg-card p-4 text-card-foreground shadow-panel"
+          className="min-w-0 space-y-3 rounded-2xl border border-edge bg-card p-5 text-card-foreground shadow-panel"
         >
           <Button busy className="max-w-full whitespace-normal">
             {copy.loading}
           </Button>
           <Skeleton className="h-4 w-3/4" />
         </div>
-        <div className="min-w-0 rounded-lg border bg-card p-4 text-card-foreground shadow-panel">
+        <div className="min-w-0 rounded-2xl border border-edge bg-card p-5 text-card-foreground shadow-panel">
           <Badge className="max-w-full whitespace-normal">{copy.success}</Badge>
         </div>
       </div>

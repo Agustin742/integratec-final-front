@@ -10,7 +10,7 @@ export function Table({ className, containerLabel, ...props }: TableProps) {
       role="region"
       aria-label={containerLabel}
       tabIndex={0}
-      className="w-full min-w-0 overflow-x-auto rounded-lg focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
+      className="w-full min-w-0 overflow-x-auto rounded-2xl border border-edge bg-card shadow-panel focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
     >
       <table
         {...props}
@@ -30,7 +30,7 @@ export function TableHeader({ className, ...props }: ComponentProps<'thead'>) {
     <thead
       {...props}
       className={cn(
-        'bg-secondary text-secondary-foreground [&_tr]:border-b',
+        'bg-secondary font-display text-secondary-foreground [&_tr]:border-b [&_tr]:border-edge',
         className,
       )}
     />
@@ -53,13 +53,24 @@ export function TableFooter({ className, ...props }: ComponentProps<'tfoot'>) {
   return (
     <tfoot
       {...props}
-      className={cn('border-t bg-muted font-medium text-foreground', className)}
+      className={cn(
+        'border-t border-edge bg-muted font-medium text-foreground',
+        className,
+      )}
     />
   );
 }
 
 export function TableRow({ className, ...props }: ComponentProps<'tr'>) {
-  return <tr {...props} className={cn('border-b', className)} />;
+  return (
+    <tr
+      {...props}
+      className={cn(
+        'motion-colors border-b border-edge hover:bg-row-hover',
+        className,
+      )}
+    />
+  );
 }
 
 export function TableHead({
@@ -72,7 +83,7 @@ export function TableHead({
       {...props}
       scope={scope}
       className={cn(
-        'px-4 py-3 text-left align-middle font-semibold',
+        'px-5 py-3.5 text-left align-middle font-semibold',
         className,
       )}
     />
@@ -80,7 +91,7 @@ export function TableHead({
 }
 
 export function TableCell({ className, ...props }: ComponentProps<'td'>) {
-  return <td {...props} className={cn('px-4 py-3 align-middle', className)} />;
+  return <td {...props} className={cn('px-5 py-4 align-middle', className)} />;
 }
 
 export function TableCaption({

@@ -3,27 +3,39 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60',
+  'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 py-2 font-display text-base font-semibold focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60',
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground',
-        secondary: 'bg-secondary text-secondary-foreground',
-        outline: 'border border-input bg-card text-card-foreground',
-        ghost: 'text-foreground hover:bg-secondary',
-        destructive: 'bg-destructive text-destructive-foreground',
-        link: 'text-primary underline underline-offset-4',
+        default:
+          '[--key:var(--key-primary)] bg-primary text-primary-foreground',
+        secondary:
+          '[--key:var(--key-secondary)] bg-secondary text-secondary-foreground',
+        outline:
+          '[--key:var(--key-sand)] border-2 border-edge bg-card text-card-foreground',
+        ghost: 'text-foreground hover:bg-tray',
+        destructive:
+          '[--key:var(--key-destructive)] bg-destructive text-destructive-foreground',
+        link: 'rounded-md text-primary underline underline-offset-4',
       },
       size: {
-        default: 'px-4',
-        sm: 'px-3',
-        lg: 'min-h-12 px-6 text-base',
+        default: '',
+        sm: 'px-4 text-sm',
+        lg: 'min-h-12 px-7 text-lg',
         icon: 'size-11 shrink-0 p-0',
       },
     },
     defaultVariants: { variant: 'default', size: 'default' },
   },
 );
+
+// Variants that render as a raised resin key; ghost and link stay flat.
+const bevelledVariants = new Set([
+  'default',
+  'secondary',
+  'outline',
+  'destructive',
+]);
 
 export type ButtonProps = ComponentProps<'button'> &
   VariantProps<typeof buttonVariants> & { busy?: boolean };
@@ -40,6 +52,7 @@ export function Button({
   ...props
 }: ButtonProps) {
   const blocked = Boolean(disabled) || busy;
+  const bevelled = !disabled && bevelledVariants.has(variant ?? 'default');
 
   return (
     <button
@@ -57,6 +70,7 @@ export function Button({
       }}
       className={cn(
         buttonVariants({ variant, size }),
+        bevelled && 'key-bevel',
         !blocked && 'motion-press',
         className,
       )}

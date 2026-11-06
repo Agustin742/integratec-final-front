@@ -43,3 +43,7 @@ measurement. Browser keyboard access, actual overflow at 360px/desktop, contrast
 rendered backgrounds, layout integration, full regression checks and build remain
 parent integration checks. See [UI accessibility](../rules/ui-and-accessibility.md)
 and [quality requirements](../rules/quality-and-testing.md).
+
+## Tactile styling
+
+`Badge` is a chunky Fredoka pill with a 2px bevel and adds `success`, `info`, `warning` and `danger` variants (dark ink on a light palette tint). `Alert` adds `success`, `info` and `warning`; every variant uses a tinted surface (no side stripe), a decorative round icon chip and a Fredoka title; only `destructive` defaults to `role="alert"`. `Table` sits in a rounded clay panel with a Fredoka header on sand, roomier cells, warm dividers and a row hover tint. `Skeleton` is a warm sand shimmer that only animates under `motion-safe`. Contrast pairs: [foundations](ui-foundations.md#tactile-design-resin-keys-and-clay-panels).

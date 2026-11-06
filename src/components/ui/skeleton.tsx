@@ -10,7 +10,7 @@ export function Skeleton({
       {...props}
       aria-hidden="true"
       className={cn(
-        'rounded-md bg-secondary motion-safe:animate-pulse',
+        'rounded-xl bg-tray bg-[linear-gradient(90deg,var(--tray)_30%,var(--tray-hover)_50%,var(--tray)_70%)] bg-[length:200%_100%] motion-safe:animate-shimmer',
         className,
       )}
     />

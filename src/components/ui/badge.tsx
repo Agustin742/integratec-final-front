@@ -3,15 +3,24 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const badgeVariants = cva(
-  'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold',
+  'inline-flex items-center rounded-full border-0 px-3 py-1 font-display text-sm leading-tight font-semibold shadow-[0_2px_0_var(--bevel)]',
   {
     variants: {
       variant: {
-        default: 'border-transparent bg-primary text-primary-foreground',
-        secondary: 'border-transparent bg-secondary text-secondary-foreground',
+        default:
+          '[--bevel:var(--key-primary)] bg-primary text-primary-foreground',
+        secondary:
+          '[--bevel:var(--key-secondary)] bg-secondary text-secondary-foreground',
         destructive:
-          'border-transparent bg-destructive text-destructive-foreground',
-        outline: 'border-border bg-card text-card-foreground',
+          '[--bevel:var(--key-destructive)] bg-destructive text-destructive-foreground',
+        outline:
+          '[--bevel:var(--key-sand)] border-2 border-edge bg-card text-card-foreground',
+        success:
+          '[--bevel:var(--success-edge)] bg-success text-success-foreground',
+        info: '[--bevel:var(--info-edge)] bg-info text-info-foreground',
+        warning:
+          '[--bevel:var(--warning-edge)] bg-warning text-warning-foreground',
+        danger: '[--bevel:var(--danger-edge)] bg-danger text-danger-foreground',
       },
     },
     defaultVariants: { variant: 'default' },

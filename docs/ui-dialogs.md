@@ -71,3 +71,7 @@ No new overlay animations are added. Data fetching, validation, empty and loadin
 states belong to consumers, not these containers. See
 [UI accessibility rules](../rules/ui-and-accessibility.md) and
 [verification policy](../rules/quality-and-testing.md).
+
+## Tactile styling
+
+Dialog and sheet are clay panels: pale cream, `rounded-3xl` (sheets round the inner edge), `--shadow-float`, an ink-tinted overlay and a Fredoka title. The close control is a small ghost-key (sand, bevelled, 44px). Focus trap and focus return are unchanged.

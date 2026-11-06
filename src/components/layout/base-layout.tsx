@@ -34,25 +34,25 @@ export function BaseLayout({
       <a
         href={`#${contentId}`}
         onClick={() => mainRef.current?.focus()}
-        className="sr-only z-50 rounded-md bg-primary px-4 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:top-4 focus:left-4"
+        className="sr-only z-50 rounded-xl bg-primary px-4 py-2 font-display text-primary-foreground focus:not-sr-only focus:fixed focus:top-4 focus:left-4"
       >
         {layoutMessages.skipToContent}
       </a>
-      <header className="border-b bg-card text-card-foreground">
+      <header className="border-b border-edge bg-card text-card-foreground shadow-panel">
         <div className="mx-auto w-full max-w-6xl min-w-0 px-4 py-4 sm:px-6">
           {header}
         </div>
       </header>
       <div
         className={cn(
-          'mx-auto grid w-full max-w-6xl min-w-0 gap-6 px-4 py-6 sm:px-6',
-          hasSidebar && 'lg:grid-cols-[14rem_minmax(0,1fr)]',
+          'mx-auto grid w-full max-w-6xl min-w-0 gap-6 px-4 py-6 sm:px-6 lg:gap-8',
+          hasSidebar && 'lg:grid-cols-[15rem_minmax(0,1fr)]',
         )}
       >
         {hasSidebar && (
           <aside
             aria-label={sidebarLabel}
-            className="min-w-0 rounded-lg border bg-card p-4 text-card-foreground shadow-panel"
+            className="min-w-0 self-start rounded-2xl border border-edge bg-card p-3 text-card-foreground shadow-panel lg:sticky lg:top-6"
           >
             {sidebar}
           </aside>

@@ -31,7 +31,7 @@ export function Toast({
         ...toastOptions,
         closeButtonAriaLabel: uiMessages.closeNotification,
         classNames: {
-          toast: 'font-sans shadow-panel',
+          toast: 'font-sans shadow-float',
           description: 'text-popover-foreground!',
           ...toastOptions?.classNames,
         },

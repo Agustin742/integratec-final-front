@@ -37,6 +37,13 @@ const textPairs = [
   ['muted-foreground', 'muted'],
   ['muted-foreground', 'secondary'],
   ['accent-foreground', 'accent'],
+  ['muted-foreground', 'tray'],
+  ['foreground', 'tray-hover'],
+  ['muted-foreground', 'tray-hover'],
+  ['success-foreground', 'success'],
+  ['info-foreground', 'info'],
+  ['warning-foreground', 'warning'],
+  ['danger-foreground', 'danger'],
   ['destructive-foreground', 'destructive'],
 ] as const;
 
@@ -72,7 +79,9 @@ test('maps the documented warm palette and defines shape, space and type tokens'
     expect(value(`--palette-${name}`).toUpperCase()).toBe(hex);
   expect(value('--radius')).toBe('0.75rem');
   expect(value('--spacing')).toBe('0.25rem');
+  expect(value('--font-body')).toContain('Figtree Variable');
   expect(value('--font-body')).toContain('system-ui');
+  expect(value('--font-display')).toContain('Fredoka Variable');
 });
 
 const nonTextPairs = [
@@ -80,6 +89,8 @@ const nonTextPairs = [
   ['border', 'card'],
   ['input', 'background'],
   ['input', 'card'],
+  ['field-border', 'background'],
+  ['field-border', 'card'],
 ] as const;
 
 test.each(nonTextPairs)(
@@ -107,3 +118,23 @@ test.each(['background', 'card', 'secondary'])(
     ).toBeGreaterThanOrEqual(3);
   },
 );
+
+test('defines a tactile depth system with offset, lavender or brown shadows only', () => {
+  const depth = [
+    'shadow-ambient',
+    'shadow-float',
+    'shadow-inset',
+    'shadow-raised',
+    'key-shadow-ambient',
+  ];
+  for (const name of depth) {
+    const shadow = value(`--${name}`);
+    expect(shadow, name).not.toMatch(/#000(000)?\b|rgba?\(/i);
+    // Every layer carries a vertical offset: no zero-offset glow halo.
+    for (const layer of shadow.split(','))
+      expect(layer.trim(), name).toMatch(/^(inset )?0 -?[1-9]\d*px/);
+  }
+  expect(value('--shadow-ambient')).toContain('#b5a7d6');
+  for (const key of ['primary', 'secondary', 'destructive', 'sand'])
+    expect(value(`--key-${key}`)).toMatch(/^#[\da-f]{6}$/i);
+});
