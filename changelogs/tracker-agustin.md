@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-09 — Native Colyseus join credential (FD3) and realtime contract sync path
+
+- **Status:** completed
+- **Area / files:** `docs/technical-justification.md`, `rules/realtime-and-presence.md`, `scripts/api-sync/sync-contracts.mjs`, `src/api/sync-contracts.test.ts`, `README.md`, `docs/architecture.md`
+- **Change:** FD3 now sends the access token as `client.auth.token` (SDK `Authorization: Bearer` header on matchmaking) instead of in the `join` options, which carry only `classroomId`. `pnpm api:sync` reads the room state from `packages/contracts/src/realtime/generated/ClassroomState.ts`, the path published by backend #24 (#71).
+- **Reason:** Match the backend implementation of the Colyseus join gate (backend PR #77): framework-native auth path, same Bearer shape as REST, credentials kept out of room options and URLs.
+- **Verification:** lint, typecheck, 147/147 unit tests, format check, docs check; a real sync against the backend #24 branch writes all three generated files with no warnings.
+- **Next step:** After backend #77 merges, run `pnpm api:sync` and commit the generated types together with the Colyseus client dependency (`@colyseus/schema`).
+
 ## 2026-11-05 — Tactile design pass for the base UI components
 
 - **Status:** completed

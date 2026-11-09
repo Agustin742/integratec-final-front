@@ -85,7 +85,7 @@ The backend repository records decisions D1-D12 in its `docs/technical-justifica
 | ID | Backend decision | Frontend impact |
 |---|---|---|
 | D1 | Short-lived JWT access token plus a rotated, hashed opaque refresh token; the server checks a session identifier on every protected request and a revoked session yields `401` | The client holds both tokens (FD1), sends the access token as `Authorization: Bearer`, refreshes on expiry, and ends the session when refresh fails ([Authentication and session](../rules/authentication-and-session.md)) |
-| D2 | Colyseus `onAuth` calls an internal NestJS endpoint to verify the session and access before admitting a join | The client supplies the access token when joining (FD3); admission is decided by the server |
+| D2 | Colyseus `onAuth` calls an internal NestJS endpoint to verify the session and access before admitting a join | The client supplies the access token when joining, as the SDK `Authorization` header (FD3); admission is decided by the server |
 | D3 | Backend pnpm monorepo (`apps/api`, `apps/realtime`, `packages/contracts`) | None, except the contract types the frontend consumes (D4) |
 | D4 | NestJS generates an OpenAPI document served with the Scalar reference UI; the frontend generates its types from it | The frontend generates API types from that document (FD2); the backend also commits the document and the realtime type artifacts (backend D8), which the frontend syncs (FD7) |
 | D5 | AWS region `us-east-2` (changed from `sa-east-1` on 2026-11-04: the AWS account assigns the Region and denies others) | The frontend hosting is placed in the same region (FD5) |
@@ -125,6 +125,7 @@ The backend repository records decisions D1-D12 in its `docs/technical-justifica
 - **Alternatives:** A NestJS-issued join ticket, rejected for consistency with D2.
 - **Trade-offs:** A join attempt with an expired token fails and requires a refresh and a rejoin.
 - **Approval:** Approved by Agustin (decision owner) on 2026-11-02.
+- **Update (2026-11-09):** The credential transport changed. The client sets `client.auth.token` on the Colyseus SDK client, which sends it as an `Authorization: Bearer <access token>` header on the matchmaking HTTP request; Colyseus receives it as the `token` argument of `static onAuth` and forwards it to NestJS. The `join` options carry only `classroomId` and never the token. Rationale: it is the framework-native path, it matches the Bearer shape of the REST API, and it keeps credentials out of room options (less log exposure) and out of URLs. The previous "token in the `join` options" transport is rejected for those reasons; the refresh-and-rejoin behavior is unchanged. Implemented by backend issue #24. Approved by Agustin (decision owner) on 2026-11-09.
 
 ### FD4. Router
 
@@ -219,5 +220,4 @@ The backend repository records decisions D1-D12 in its `docs/technical-justifica
 
 ## Open items
 
-- The `pnpm api:sync` script and the exact backend artifact paths are planned, not implemented (FD7).
 - The runtime performance measurement that triggers the 2D Classic Mode offer is to be defined at implementation (FD8).

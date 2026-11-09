@@ -47,7 +47,7 @@ How permission changes reach live sessions is an integration decision. The invar
 
 ## Join credential
 
-- The client MUST send its current access token in the `join` options (FD3). Colyseus `onAuth` forwards it to NestJS for verification (backend decision D2); the client MUST NOT treat sending it as admission, which the server decides.
+- The client MUST set its current access token as `client.auth.token` on the Colyseus SDK client, which sends it as an `Authorization: Bearer` header on the matchmaking request (FD3, updated 2026-11-09). The client MUST NOT put the token in the `join` options or in any URL; the `join` options carry only `classroomId`. Colyseus `onAuth` forwards the token to NestJS for verification (backend decision D2); the client MUST NOT treat sending it as admission, which the server decides.
 - The client MUST NOT request or rely on a separate join ticket.
 - When the access token has expired, the client MUST refresh it ([Authentication and session](./authentication-and-session.md)) and then rejoin; a rejected join MUST NOT be shown as an empty classroom.
 
