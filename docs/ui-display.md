@@ -52,6 +52,9 @@ not fabricate messages or data. For form interactions, see [UI controls](ui-cont
   formats `YYYY-MM-DD` calendar dates in `UTC` so browser offsets never shift
   the displayed day ([data and time](../rules/data-and-time.md)).
 
+![Shared feedback, pagination, and form primitives at 1280px](assets/ui-foundations/feedback-forms-1280.png)
+![Shared feedback, pagination, and form primitives at 360px](assets/ui-foundations/feedback-forms-360.png)
+
 ## Verification boundary
 
 The colocated `display.test.tsx` exercises status/error announcements, explicit

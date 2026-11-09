@@ -69,14 +69,17 @@ describe('pagination helpers and controls', () => {
   });
 
   describe('getPaginationMeta', () => {
-    it('computes range and page flags for empty, first, middle, and last pages', () => {
+    it('computes range and page flags for empty, first, middle, last, out-of-range, and NaN pages', () => {
       expect(getPaginationMeta({ page: 1, pageSize: 20, total: 0 })).toEqual({
         page: 1,
         pageSize: 20,
         total: 0,
         totalPages: 1,
+        isOutOfRange: false,
         hasPreviousPage: false,
         hasNextPage: false,
+        previousPage: 1,
+        nextPage: 1,
         rangeStart: 0,
         rangeEnd: 0,
       });
@@ -86,8 +89,11 @@ describe('pagination helpers and controls', () => {
         pageSize: 20,
         total: 42,
         totalPages: 3,
+        isOutOfRange: false,
         hasPreviousPage: false,
         hasNextPage: true,
+        previousPage: 1,
+        nextPage: 2,
         rangeStart: 1,
         rangeEnd: 20,
       });
@@ -97,10 +103,49 @@ describe('pagination helpers and controls', () => {
         pageSize: 20,
         total: 42,
         totalPages: 3,
+        isOutOfRange: false,
         hasPreviousPage: true,
         hasNextPage: false,
+        previousPage: 2,
+        nextPage: 3,
         rangeStart: 41,
         rangeEnd: 42,
+      });
+
+      // Out-of-range page (e.g., page 5 when totalPages is 3)
+      expect(getPaginationMeta({ page: 5, pageSize: 20, total: 42 })).toEqual({
+        page: 5,
+        pageSize: 20,
+        total: 42,
+        totalPages: 3,
+        isOutOfRange: true,
+        hasPreviousPage: true,
+        hasNextPage: false,
+        previousPage: 3,
+        nextPage: 3,
+        rangeStart: 0,
+        rangeEnd: 0,
+      });
+
+      // NaN inputs fall back safely without producing NaN metadata
+      expect(
+        getPaginationMeta({
+          page: Number.NaN,
+          pageSize: Number.NaN,
+          total: Number.NaN,
+        }),
+      ).toEqual({
+        page: 1,
+        pageSize: 20,
+        total: 0,
+        totalPages: 1,
+        isOutOfRange: false,
+        hasPreviousPage: false,
+        hasNextPage: false,
+        previousPage: 1,
+        nextPage: 1,
+        rangeStart: 0,
+        rangeEnd: 0,
       });
     });
   });
@@ -156,6 +201,37 @@ describe('pagination helpers and controls', () => {
       expect(onPageChange).toHaveBeenCalledWith(2);
 
       await expectAccessible(container);
+    });
+
+    it('surfaces an out-of-range page and jumps back to the last valid page on previous click', () => {
+      const onPageChange = vi.fn();
+      render(
+        <PaginationControls
+          page={5}
+          pageSize={20}
+          total={42}
+          onPageChange={onPageChange}
+        />,
+      );
+
+      const nav = screen.getByRole('navigation', { name: 'Paginación' });
+      expect(nav).toHaveTextContent(
+        'Sin resultados en esta página (42 en total)',
+      );
+      expect(nav).toHaveTextContent('Página 5 de 3');
+
+      const prevButton = screen.getByRole('button', {
+        name: 'Página anterior',
+      });
+      const nextButton = screen.getByRole('button', {
+        name: 'Página siguiente',
+      });
+
+      expect(prevButton).toBeEnabled();
+      expect(nextButton).toBeDisabled();
+
+      fireEvent.click(prevButton);
+      expect(onPageChange).toHaveBeenCalledWith(3);
     });
 
     it('renders zero-results summary cleanly when total is 0', () => {

@@ -20,7 +20,11 @@ test('identifies every feedback state as a local example', () => {
   expect(screen.getByText(copy.success)).toBeVisible();
   expect(screen.getByText(copy.error)).toBeVisible();
   expect(screen.getByText(copy.errorHelp)).toBeVisible();
+  expect(screen.getByText(copy.loadingStateLabel)).toBeVisible();
+  expect(screen.getByText(copy.emptyStateTitle)).toBeVisible();
+  expect(screen.getByText(copy.errorStateTitle)).toBeVisible();
   expect(screen.getByText(copy.staleTitle)).toBeVisible();
+  expect(screen.getByText(copy.formRootErrorTitle)).toBeVisible();
   expect(screen.getByRole('navigation', { name: 'Paginación' })).toBeVisible();
   expect(screen.getByText(/America\/Argentina\/Buenos_Aires/)).toBeVisible();
 });

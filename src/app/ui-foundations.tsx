@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import { StaleDataNotice } from '@/components/feedback/states';
+import {
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  StaleDataNotice,
+} from '@/components/feedback/states';
+import { FormRootError } from '@/components/forms/form-primitives';
 import { PaginationControls } from '@/components/pagination/pagination-controls';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -117,9 +123,26 @@ export function UiFoundations() {
             total={42}
             onPageChange={setExamplePage}
           />
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+            <LoadingState label={copy.loadingStateLabel} skeletonLines={2} />
+            <EmptyState
+              title={copy.emptyStateTitle}
+              description={copy.emptyStateDescription}
+            />
+          </div>
+          <ErrorState
+            title={copy.errorStateTitle}
+            description={copy.errorStateDescription}
+            nextAction={copy.errorStateNextAction}
+            onRetry={() => setExamplePage(1)}
+          />
           <StaleDataNotice
             title={copy.staleTitle}
             description={copy.staleDescription}
+          />
+          <FormRootError
+            title={copy.formRootErrorTitle}
+            error={copy.formRootErrorDescription}
           />
           <div className="rounded-2xl border border-edge bg-card p-4 text-sm text-card-foreground shadow-panel">
             <p>

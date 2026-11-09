@@ -12,7 +12,7 @@ import {
 } from './states';
 
 describe('feedback state primitives', () => {
-  it('renders LoadingState, EmptyState, and ErrorState as visually and programmatically distinct regions', async () => {
+  it('renders LoadingState, EmptyState, and ErrorState as visually and programmatically distinct regions without aria-busy on the live status node', async () => {
     const { container } = render(
       <div>
         <LoadingState label="Cargando actividades..." skeletonLines={2} />
@@ -29,11 +29,14 @@ describe('feedback state primitives', () => {
       </div>,
     );
 
-    const loadingRegion = screen.getByRole('status', {
-      name: 'Cargando actividades...',
-    });
-    expect(loadingRegion).toHaveAttribute('aria-busy', 'true');
-    expect(loadingRegion).toHaveAttribute('data-state-kind', 'loading');
+    const loadingStatus = screen.getByRole('status');
+    expect(loadingStatus).toHaveTextContent('Cargando actividades...');
+    expect(loadingStatus).not.toHaveAttribute('aria-busy');
+
+    const loadingContainer = loadingStatus.closest(
+      '[data-state-kind="loading"]',
+    );
+    expect(loadingContainer).toHaveAttribute('aria-busy', 'true');
 
     const emptyRegion = screen.getByRole('region', {
       name: 'Todavía no hay entregas',

@@ -37,8 +37,11 @@ export interface PaginationMeta {
   readonly pageSize: number;
   readonly total: number;
   readonly totalPages: number;
+  readonly isOutOfRange: boolean;
   readonly hasPreviousPage: boolean;
   readonly hasNextPage: boolean;
+  readonly previousPage: number;
+  readonly nextPage: number;
   readonly rangeStart: number;
   readonly rangeEnd: number;
 }
@@ -108,32 +111,52 @@ export function createPaginatedQueryKey<
 }
 
 /**
- * Computes derived pagination metadata (`totalPages`, `rangeStart`, `rangeEnd`,
- * `hasPreviousPage`, `hasNextPage`) from `{ page, pageSize, total }`.
+ * Computes derived pagination metadata (`totalPages`, `isOutOfRange`,
+ * `rangeStart`, `rangeEnd`, `hasPreviousPage`, `hasNextPage`, `previousPage`,
+ * `nextPage`) from `{ page, pageSize, total }`.
+ *
+ * Preserves the caller's `page` when `page > totalPages` (`isOutOfRange: true`)
+ * so out-of-range states are visible and `previousPage` jumps directly back to
+ * `totalPages`.
  */
 export function getPaginationMeta(params: {
   readonly page: number;
   readonly pageSize: number;
   readonly total: number;
 }): PaginationMeta {
-  const safePageSize = Math.max(1, Math.trunc(params.pageSize));
-  const safeTotal = Math.max(0, Math.trunc(params.total));
+  const safePageSize = clampInteger(
+    params.pageSize,
+    DEFAULT_PAGE_SIZE,
+    1,
+    MAX_PAGE_SIZE,
+  );
+  const safeTotal = clampInteger(params.total, 0, 0, Number.MAX_SAFE_INTEGER);
   const totalPages = Math.max(1, Math.ceil(safeTotal / safePageSize));
-  const safePage = Math.max(1, Math.min(Math.trunc(params.page), totalPages));
+  const safePage = clampInteger(params.page, DEFAULT_PAGE, 1, MAX_PAGE);
 
+  const isOutOfRange = safePage > totalPages;
   const hasPreviousPage = safePage > 1;
   const hasNextPage = safePage < totalPages && safeTotal > 0;
-  const rangeStart = safeTotal === 0 ? 0 : (safePage - 1) * safePageSize + 1;
+  const previousPage = isOutOfRange ? totalPages : Math.max(1, safePage - 1);
+  const nextPage = Math.min(totalPages, safePage + 1);
+
+  const rangeStart =
+    safeTotal === 0 || isOutOfRange ? 0 : (safePage - 1) * safePageSize + 1;
   const rangeEnd =
-    safeTotal === 0 ? 0 : Math.min(safeTotal, safePage * safePageSize);
+    safeTotal === 0 || isOutOfRange
+      ? 0
+      : Math.min(safeTotal, safePage * safePageSize);
 
   return Object.freeze({
     page: safePage,
     pageSize: safePageSize,
     total: safeTotal,
     totalPages,
+    isOutOfRange,
     hasPreviousPage,
     hasNextPage,
+    previousPage,
+    nextPage,
     rangeStart,
     rangeEnd,
   });

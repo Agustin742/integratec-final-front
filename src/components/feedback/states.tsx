@@ -13,8 +13,9 @@ export type LoadingStateProps = Omit<ComponentProps<'div'>, 'children'> & {
 
 /**
  * Presentational loading state (`rules/error-handling-and-feedback.md`).
- * Marks the container `role="status"` and `aria-busy="true"` while keeping
- * `Skeleton` bars purely decorative (`aria-hidden="true"`).
+ * Marks the container `aria-busy="true"` while keeping the polite `role="status"`
+ * live region on a separate child element so screen readers do not suppress the
+ * announcement due to `aria-busy="true"` on the live region itself.
  */
 export function LoadingState({
   label = feedbackMessages.loading,
@@ -28,8 +29,6 @@ export function LoadingState({
   return (
     <div
       {...props}
-      role="status"
-      aria-live="polite"
       aria-busy="true"
       aria-labelledby={labelId}
       data-state-kind="loading"
@@ -38,7 +37,13 @@ export function LoadingState({
         className,
       )}
     >
-      <p id={labelId} className="font-display text-sm font-semibold">
+      <p
+        id={labelId}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="font-display text-sm font-semibold"
+      >
         {label}
       </p>
       <div className="space-y-2" aria-hidden="true">

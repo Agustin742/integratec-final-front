@@ -8,6 +8,8 @@ export const paginationMessages = {
   previousPage: 'Página anterior',
   nextPage: 'Página siguiente',
   emptySummary: 'Sin resultados',
+  outOfRangeSummary: (total: number): string =>
+    `Sin resultados en esta página (${total} en total)`,
   formatRange: (start: number, end: number, total: number): string =>
     `Mostrando ${start}–${end} de ${total}`,
   formatPageIndicator: (page: number, totalPages: number): string =>
@@ -46,6 +48,17 @@ export function PaginationControls({
   const prevDisabled = disabled || busy || !meta.hasPreviousPage;
   const nextDisabled = disabled || busy || !meta.hasNextPage;
 
+  const summaryText =
+    meta.total === 0
+      ? paginationMessages.emptySummary
+      : meta.isOutOfRange
+        ? paginationMessages.outOfRangeSummary(meta.total)
+        : paginationMessages.formatRange(
+            meta.rangeStart,
+            meta.rangeEnd,
+            meta.total,
+          );
+
   return (
     <nav
       {...props}
@@ -61,15 +74,7 @@ export function PaginationControls({
         aria-atomic="true"
         className="flex flex-wrap items-center gap-2 text-muted-foreground"
       >
-        <span>
-          {meta.total === 0
-            ? paginationMessages.emptySummary
-            : paginationMessages.formatRange(
-                meta.rangeStart,
-                meta.rangeEnd,
-                meta.total,
-              )}
-        </span>
+        <span>{summaryText}</span>
         <span aria-hidden="true">·</span>
         <span className="font-display font-semibold text-foreground">
           {paginationMessages.formatPageIndicator(meta.page, meta.totalPages)}
@@ -83,7 +88,7 @@ export function PaginationControls({
           disabled={prevDisabled}
           onClick={() => {
             if (!prevDisabled) {
-              onPageChange(meta.page - 1);
+              onPageChange(meta.previousPage);
             }
           }}
         >
@@ -96,7 +101,7 @@ export function PaginationControls({
           disabled={nextDisabled}
           onClick={() => {
             if (!nextDisabled) {
-              onPageChange(meta.page + 1);
+              onPageChange(meta.nextPage);
             }
           }}
         >

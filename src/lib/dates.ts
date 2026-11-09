@@ -4,8 +4,8 @@
  * Policy:
  * - Default locale is Spanish (Argentina, `es-AR`) per FD10.
  * - Default school time zone is `America/Argentina/Buenos_Aires` per FD11.
- * - Instants must carry an explicit UTC (`Z`) or numeric offset so display
- *   never guesses a browser-local interpretation.
+ * - Instants must carry an explicit UTC (`Z`/`z`) or numeric offset (`±HH:MM` or `±HHMM`)
+ *   so display never guesses a browser-local interpretation.
  * - Deadlines arrive as ISO 8601 UTC instants and are displayed in the school's
  *   IANA time zone with the time zone indicated. Client clocks are never used
  *   as an authority for deadline expiration.
@@ -16,7 +16,7 @@ export const DEFAULT_LOCALE = 'es-AR';
 export const DEFAULT_SCHOOL_TIME_ZONE = 'America/Argentina/Buenos_Aires';
 
 const ISO_INSTANT_OFFSET_PATTERN =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+  /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?)(Z|z|([+-]\d{2}):?(\d{2}))$/;
 
 const ISO_DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -38,12 +38,17 @@ export interface FormatDateOnlyOptions {
 
 function parseValidatedInstant(isoInstant: string): Date {
   const trimmed = isoInstant.trim();
-  if (!ISO_INSTANT_OFFSET_PATTERN.test(trimmed)) {
+  const match = ISO_INSTANT_OFFSET_PATTERN.exec(trimmed);
+  if (!match) {
     throw new Error(
       `Invalid ISO 8601 instant "${isoInstant}": an explicit time zone offset (Z or ±HH:MM) is required.`,
     );
   }
-  const parsed = new Date(trimmed);
+  const normalizedOffset =
+    match[2].toUpperCase() === 'Z' ? 'Z' : `${match[3]}:${match[4]}`;
+  const normalizedIso = `${match[1]}${normalizedOffset}`;
+
+  const parsed = new Date(normalizedIso);
   if (Number.isNaN(parsed.getTime())) {
     throw new Error(
       `Invalid ISO 8601 instant "${isoInstant}": calendar timestamp is out of range.`,
@@ -72,7 +77,7 @@ export function formatInstant(
     hour: '2-digit',
     minute: '2-digit',
     second: options.includeSeconds ? '2-digit' : undefined,
-    hour12: false,
+    hourCycle: 'h23',
   });
 
   return formatter.format(date);

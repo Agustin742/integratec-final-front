@@ -26,6 +26,8 @@ import { Field, type FieldControlProps } from '@/components/ui/field';
 
 export const formMessages = {
   rootErrorTitle: 'No pudimos procesar el formulario',
+  rootErrorFallback:
+    'Ocurrió un problema al enviar los datos. Revisá la información e intentá de nuevo.',
   unsavedChangesConfirm:
     'Tenés cambios sin guardar. ¿Seguro que querés salir sin guardar?',
 } as const;
@@ -61,8 +63,9 @@ export type FormFieldRenderProps<
 export type FormFieldProps<
   TFieldValues extends FieldValues,
   TName extends FieldPath<TFieldValues>,
+  TTransformedValues = TFieldValues,
 > = Omit<ComponentProps<'div'>, 'children'> & {
-  control: Control<TFieldValues, unknown, TFieldValues>;
+  control: Control<TFieldValues, unknown, TTransformedValues>;
   name: TName;
   label: ReactNode;
   description?: ReactNode;
@@ -79,6 +82,7 @@ export type FormFieldProps<
 export function FormField<
   TFieldValues extends FieldValues,
   TName extends FieldPath<TFieldValues>,
+  TTransformedValues = TFieldValues,
 >({
   control,
   name,
@@ -89,7 +93,7 @@ export function FormField<
   className,
   children,
   ...props
-}: FormFieldProps<TFieldValues, TName>) {
+}: FormFieldProps<TFieldValues, TName, TTransformedValues>) {
   return (
     <Controller
       control={control}
@@ -116,11 +120,14 @@ export function FormField<
   );
 }
 
-export type FormRootErrorProps<TFieldValues extends FieldValues> = Omit<
-  ComponentProps<'div'>,
-  'title'
-> & {
-  form?: Pick<UseFormReturn<TFieldValues>, 'formState'>;
+export type FormRootErrorProps<
+  TFieldValues extends FieldValues,
+  TTransformedValues = TFieldValues,
+> = Omit<ComponentProps<'div'>, 'title'> & {
+  form?: Pick<
+    UseFormReturn<TFieldValues, unknown, TTransformedValues>,
+    'formState'
+  >;
   error?: ReactNode;
   title?: ReactNode;
   headingLevel?: 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
@@ -130,14 +137,17 @@ export type FormRootErrorProps<TFieldValues extends FieldValues> = Omit<
  * Renders form-level or unmapped backend errors in an accessible `role="alert"` slot
  * so unknown server rejections are never silently discarded (`rules/forms-and-validation.md`).
  */
-export function FormRootError<TFieldValues extends FieldValues>({
+export function FormRootError<
+  TFieldValues extends FieldValues,
+  TTransformedValues = TFieldValues,
+>({
   form,
   error,
   title = formMessages.rootErrorTitle,
   headingLevel = 'h3',
   className,
   ...props
-}: FormRootErrorProps<TFieldValues>) {
+}: FormRootErrorProps<TFieldValues, TTransformedValues>) {
   const rootServerMessage =
     form?.formState.errors.root?.serverError?.message ??
     form?.formState.errors.root?.message;
@@ -163,38 +173,107 @@ export interface ApplyServerErrorsOptions<TFieldValues extends FieldValues> {
   readonly knownFields?: readonly Path<TFieldValues>[];
 }
 
-function resolveKnownFields<TFieldValues extends FieldValues>(
-  form: UseFormReturn<TFieldValues>,
-  options?: ApplyServerErrorsOptions<TFieldValues>,
-): ReadonlySet<string> {
-  if (options?.knownFields) {
-    return new Set<string>(options.knownFields);
+function collectDottedPaths(
+  value: unknown,
+  prefix: string,
+  target: Set<string>,
+): void {
+  if (prefix !== '') {
+    target.add(prefix);
   }
-  const values = form.getValues();
-  if (typeof values === 'object' && values !== null) {
-    return new Set(Object.keys(values));
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      const childPath = prefix === '' ? String(index) : `${prefix}.${index}`;
+      collectDottedPaths(value[index], childPath, target);
+    }
+    return;
   }
-  return new Set();
+  if (typeof value === 'object' && value !== null) {
+    for (const [key, childValue] of Object.entries(value)) {
+      const childPath = prefix === '' ? key : `${prefix}.${key}`;
+      collectDottedPaths(childValue, childPath, target);
+    }
+  }
+}
+
+function hasDottedPath(root: unknown, dottedPath: string): boolean {
+  const segments = dottedPath.split('.').filter(Boolean);
+  if (segments.length === 0) {
+    return false;
+  }
+  let current: unknown = root;
+  for (const segment of segments) {
+    if (Array.isArray(current)) {
+      const index = Number(segment);
+      if (!Number.isInteger(index) || index < 0 || index >= current.length) {
+        return false;
+      }
+      current = current[index];
+      continue;
+    }
+    if (
+      typeof current === 'object' &&
+      current !== null &&
+      Object.prototype.hasOwnProperty.call(current, segment)
+    ) {
+      current = (current as Record<string, unknown>)[segment];
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
+function isKnownFieldPath<
+  TFieldValues extends FieldValues,
+  TTransformedValues = TFieldValues,
+>(
+  form: UseFormReturn<TFieldValues, unknown, TTransformedValues>,
+  fieldPath: string,
+  explicitKnownFields: ReadonlySet<string> | null,
+  discoveredPaths: ReadonlySet<string>,
+): boolean {
+  if (explicitKnownFields !== null) {
+    return explicitKnownFields.has(fieldPath);
+  }
+  if (discoveredPaths.has(fieldPath)) {
+    return true;
+  }
+  return (
+    hasDottedPath(form.getValues(), fieldPath) ||
+    hasDottedPath(form.control._fields, fieldPath)
+  );
 }
 
 /**
  * Maps a backend `ApiError` onto React Hook Form fields (`error.fieldErrors`) and
  * routes any unknown field paths or general failure messages to `root.serverError`.
  */
-export function applyServerErrorsToForm<TFieldValues extends FieldValues>(
-  form: UseFormReturn<TFieldValues>,
+export function applyServerErrorsToForm<
+  TFieldValues extends FieldValues,
+  TTransformedValues = TFieldValues,
+>(
+  form: UseFormReturn<TFieldValues, unknown, TTransformedValues>,
   error: unknown,
   options?: ApplyServerErrorsOptions<TFieldValues>,
 ): void {
   if (!(error instanceof ApiError)) {
     form.setError('root.serverError', {
       type: 'server',
-      message: formMessages.rootErrorTitle,
+      message: formMessages.rootErrorFallback,
     });
     return;
   }
 
-  const knownFields = resolveKnownFields(form, options);
+  const explicitKnownFields = options?.knownFields
+    ? new Set<string>(options.knownFields)
+    : null;
+  const discoveredPaths = new Set<string>();
+  if (explicitKnownFields === null) {
+    collectDottedPaths(form.getValues(), '', discoveredPaths);
+    collectDottedPaths(form.control._fields, '', discoveredPaths);
+  }
+
   const unmappedMessages: string[] = [];
   let mappedAnyField = false;
 
@@ -203,7 +282,9 @@ export function applyServerErrorsToForm<TFieldValues extends FieldValues>(
     if (!joined) {
       continue;
     }
-    if (knownFields.has(fieldPath)) {
+    if (
+      isKnownFieldPath(form, fieldPath, explicitKnownFields, discoveredPaths)
+    ) {
       form.setError(fieldPath as Path<TFieldValues>, {
         type: 'server',
         message: joined,
@@ -236,6 +317,9 @@ export interface ProtectedSubmitResult {
  * Wraps `form.handleSubmit` with a synchronous in-flight lock (`submittingRef`)
  * so rapid double-clicks send only one request, and automatically maps `ApiError`
  * rejections onto the form while preserving user input (`rules/forms-and-validation.md`).
+ *
+ * Non-`ApiError` programming exceptions thrown by `onValid` are rethrown so bugs
+ * are never silently masked as server validation errors.
  */
 export function useProtectedSubmit<
   TFieldValues extends FieldValues,
@@ -246,6 +330,14 @@ export function useProtectedSubmit<
   options?: ApplyServerErrorsOptions<TFieldValues>,
 ): ProtectedSubmitResult {
   const submittingRef = useRef(false);
+  const onValidRef = useRef(onValid);
+  const optionsRef = useRef(options);
+
+  useEffect(() => {
+    onValidRef.current = onValid;
+    optionsRef.current = options;
+  }, [onValid, options]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = useCallback(
@@ -263,20 +355,20 @@ export function useProtectedSubmit<
 
       try {
         await form.handleSubmit(async (values) => {
-          await onValid(values);
+          await onValidRef.current(values);
         })(event);
       } catch (error) {
-        applyServerErrorsToForm(
-          form as unknown as UseFormReturn<TFieldValues>,
-          error,
-          options,
-        );
+        if (error instanceof ApiError) {
+          applyServerErrorsToForm(form, error, optionsRef.current);
+          return;
+        }
+        throw error;
       } finally {
         submittingRef.current = false;
         setIsSubmitting(false);
       }
     },
-    [form, onValid, options],
+    [form],
   );
 
   return {

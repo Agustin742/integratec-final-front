@@ -33,13 +33,28 @@ describe('dates formatting helpers', () => {
       expect(inUtc).toContain('01:30');
     });
 
-    it('accepts ISO 8601 instants with explicit numeric offsets', () => {
-      const formatted = formatInstant('2026-11-05T19:45:00-03:00', {
+    it('accepts ISO 8601 instants with explicit numeric offsets, compact ±HHMM offsets, and lowercase z', () => {
+      const colonOffset = formatInstant('2026-11-05T19:45:00-03:00', {
         locale: 'es-AR',
         timeZone: 'UTC',
       });
-      expect(formatted).toContain('05/11/2026');
-      expect(formatted).toContain('22:45');
+      expect(colonOffset).toContain('05/11/2026');
+      expect(colonOffset).toContain('22:45');
+
+      const compactOffset = formatInstant('2026-11-05T19:45:00+0000', {
+        locale: 'es-AR',
+        timeZone: 'UTC',
+      });
+      expect(compactOffset).toContain('05/11/2026');
+      expect(compactOffset).toContain('19:45');
+
+      const lowercaseZ = formatInstant('2026-11-05T00:05:00.000z', {
+        locale: 'es-AR',
+        timeZone: 'UTC',
+      });
+      expect(lowercaseZ).toContain('05/11/2026');
+      expect(lowercaseZ).toContain('00:05');
+      expect(lowercaseZ).not.toContain('24:05');
     });
 
     it('rejects strings without an explicit time zone offset or invalid dates', () => {
