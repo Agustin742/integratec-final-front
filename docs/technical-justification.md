@@ -220,5 +220,4 @@ The backend repository records decisions D1-D12 in its `docs/technical-justifica
 
 ## Open items
 
-- The `pnpm api:sync` script and the exact backend artifact paths are planned, not implemented (FD7).
 - The runtime performance measurement that triggers the 2D Classic Mode offer is to be defined at implementation (FD8).

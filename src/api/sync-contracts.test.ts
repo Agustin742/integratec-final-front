@@ -229,6 +229,12 @@ describe('sync-contracts', () => {
       expect(generatedContractsSecond).toBe(generatedContractsFirst);
     });
 
+    it('reads the Colyseus room state from the path published by the backend (#24)', () => {
+      expect(BACKEND_ARTIFACT_PATHS.realtimeState).toBe(
+        'packages/contracts/src/realtime/generated/ClassroomState.ts',
+      );
+    });
+
     it('syncs Colyseus room-state artifacts when published in the backend checkout', async () => {
       const backendDir = await createTempDir('backend-with-realtime-');
       const frontendDir = await createTempDir('frontend-with-realtime-');

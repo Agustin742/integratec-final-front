@@ -8,7 +8,7 @@ export const DEFAULT_BACKEND_BRANCH = 'develop';
 export const BACKEND_ARTIFACT_PATHS = Object.freeze({
   openapi: 'apps/api/openapi.json',
   contracts: 'packages/contracts/src/index.ts',
-  realtimeState: 'apps/realtime/src/rooms/schema/generated.ts',
+  realtimeState: 'packages/contracts/src/realtime/generated/ClassroomState.ts',
 });
 
 export const FRONTEND_OUTPUT_PATHS = Object.freeze({
