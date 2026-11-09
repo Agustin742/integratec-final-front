@@ -40,6 +40,28 @@ UI copy: callers provide centralized es-AR labels, descriptions, errors and cont
 </Button>
 ```
 
+## React Hook Form + Zod integration
+
+`src/components/forms/form-primitives.tsx` layers React Hook Form (`7.91.0`) and
+Zod (`@hookform/resolvers` `7.0.5`) over `Field` and `Alert` per
+[forms and validation](../rules/forms-and-validation.md):
+
+- `useZodForm({ schema, ...options })`: typed `useForm` wrapper bound to
+  `zodResolver(schema)`.
+- `FormField`: connects a React Hook Form `control` and field `name` to `Field`,
+  passing `id`, `aria-describedby`, `aria-invalid`, and rendering field-level
+  validation errors in `role="alert"`.
+- `FormRootError`: renders unmapped or form-level server errors
+  (`errors.root.serverError`) in a destructive `Alert` (`role="alert"`).
+- `applyServerErrorsToForm(form, error, options)`: maps `ApiError.fieldErrors`
+  next to matching fields and routes unknown field paths or general failure
+  messages to `root.serverError` so server rejections are never discarded.
+- `useProtectedSubmit(form, onValid, options)`: guards against rapid duplicate
+  submissions with a synchronous in-flight lock (`submittingRef`) plus
+  `isSubmitting` busy state, while preserving user input on failure.
+- `useUnsavedChangesGuard(isDirty, options)`: registers a `beforeunload` browser
+  listener when dirty and provides `confirmNavigation()` for in-app transitions.
+
 ## Verification boundary
 
 The colocated `controls.test.tsx` exercises public semantics, pending/disabled

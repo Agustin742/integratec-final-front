@@ -33,5 +33,10 @@ export const messages = {
       'Este panel es modal; no es la barra lateral permanente del diseño.',
     showToast: 'Mostrar aviso de ejemplo',
     toast: 'Aviso local de ejemplo. No se guardaron datos.',
+    staleTitle: 'Ejemplo de datos en caché',
+    staleDescription:
+      'Falló la actualización en segundo plano; se conservan los datos visibles.',
+    deadlineLabel: 'Vencimiento escolar de ejemplo:',
+    dateOnlyLabel: 'Fecha calendario de ejemplo:',
   },
 } as const;
