@@ -26,6 +26,10 @@
 | `src/api/idempotency.ts`              | `Idempotency-Key` UUID helper for idempotent mutations                               |
 | `src/api/query-keys.ts`               | User-, classroom-, and child-scoped TanStack Query key factory                       |
 | `src/api/query-client.tsx`            | TanStack Query client defaults (`MAX_QUERY_RETRIES = 2`) and `ApiQueryProvider`      |
+| `src/lib/dates.ts`                    | `es-AR` instant, school-timezone deadline (FD11), and date-only formatting helpers   |
+| `src/components/feedback/`            | Shared loading, empty, error, stale-data notice, and live-region primitives          |
+| `src/components/pagination/`          | Offset pagination helpers (`Paginated<T>`) and accessible `PaginationControls`       |
+| `src/components/forms/`               | React Hook Form + Zod helpers, `FormField`, server error mapper, and submit guards   |
 | `src/realtime/contracts.generated.ts` | Generated shared realtime payload contracts (`pnpm api:sync`)                        |
 | `src/test/msw/`                       | Contract-faithful Mock Service Worker (MSW) handlers and server for tests (FD9)      |
 | `scripts/api-sync/sync-contracts.mjs` | Contract synchronization resolver and generator (`pnpm api:sync`)                    |

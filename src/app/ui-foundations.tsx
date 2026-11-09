@@ -1,3 +1,12 @@
+import { useState } from 'react';
+import {
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  StaleDataNotice,
+} from '@/components/feedback/states';
+import { FormRootError } from '@/components/forms/form-primitives';
+import { PaginationControls } from '@/components/pagination/pagination-controls';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,10 +38,12 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/components/ui/toast';
+import { formatDateOnly, formatDeadline } from '@/lib/dates';
 import { messages } from './messages';
 
 export function UiFoundations() {
   const copy = messages.showcase;
+  const [examplePage, setExamplePage] = useState(1);
 
   return (
     <section
@@ -106,6 +117,43 @@ export function UiFoundations() {
               </TableRow>
             </TableBody>
           </Table>
+          <PaginationControls
+            page={examplePage}
+            pageSize={20}
+            total={42}
+            onPageChange={setExamplePage}
+          />
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+            <LoadingState label={copy.loadingStateLabel} skeletonLines={2} />
+            <EmptyState
+              title={copy.emptyStateTitle}
+              description={copy.emptyStateDescription}
+            />
+          </div>
+          <ErrorState
+            title={copy.errorStateTitle}
+            description={copy.errorStateDescription}
+            nextAction={copy.errorStateNextAction}
+            onRetry={() => setExamplePage(1)}
+          />
+          <StaleDataNotice
+            title={copy.staleTitle}
+            description={copy.staleDescription}
+          />
+          <FormRootError
+            title={copy.formRootErrorTitle}
+            error={copy.formRootErrorDescription}
+          />
+          <div className="rounded-2xl border border-edge bg-card p-4 text-sm text-card-foreground shadow-panel">
+            <p>
+              <span className="font-semibold">{copy.deadlineLabel}</span>{' '}
+              {formatDeadline('2026-11-10T02:59:00.000Z')}
+            </p>
+            <p>
+              <span className="font-semibold">{copy.dateOnlyLabel}</span>{' '}
+              {formatDateOnly('2026-11-05')}
+            </p>
+          </div>
         </TabsContent>
         <TabsContent value="overlays" className="min-w-0 space-y-4">
           <Sheet>

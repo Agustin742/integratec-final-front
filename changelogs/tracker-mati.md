@@ -1,8 +1,22 @@
 # Tracker — Mati
 
+## 2026-11-09 — Add shared feedback and form primitives (states, form fields, server errors, date formatting) (#19)
+
+- **Status:** in-progress
+- **Area / files:** `package.json`, `pnpm-lock.yaml`, `src/lib/dates.ts`, `src/lib/dates.test.ts`, `src/components/feedback/`, `src/components/pagination/`, `src/components/forms/`, `src/app/`, `e2e/ui-foundations.spec.ts`, `README.md`, `docs/`, `changelogs/tracker-mati.md`
+- **Change:** Implementing [issue #19](https://github.com/Agustin742/integratec-final-front/issues/19) on `feat/19-feedback-form-primitives` in four work units:
+  1. `es-AR` date/time display helpers (`formatInstant`, `formatDeadline` in school time zone with zone label per FD11, and unshifted `formatDateOnly`).
+  2. Presentational feedback state primitives (`LoadingState`, `EmptyState`, `ErrorState`, `StaleDataNotice`, and `LiveRegion`).
+  3. Paginated list query/meta helpers and accessible `PaginationControls` aligned with the backend `Paginated<T>` contract.
+  4. React Hook Form + Zod form primitives (`useZodForm`, `FormField`, `FormRootError`, `applyServerErrorsToForm`, `useProtectedSubmit`, `useUnsavedChangesGuard`), showcase examples, tests, and documentation.
+  5. PR #69 review follow-up: nested dotted field path resolution in `applyServerErrorsToForm` (using `form.getValues()` and `options.knownFields` without walking `form.control._fields` DOM refs), out-of-range page visibility and `NaN` clamping in `PaginationControls` / `getPaginationMeta`, sibling `aria-busy="true"` placeholder container separate from the `role="status"` live announcement in `LoadingState`, rethrowing non-`ApiError` programming exceptions and stabilizing `handleSubmit` in `useProtectedSubmit`, `hourCycle: 'h23'` and compact/lowercase offset parsing in `formatInstant`, `.transform` schema compatibility in `FormField`, and `1280px` / `360px` showcase screenshots in `docs/assets/ui-foundations/`.
+- **Reason:** Provide shared, accessible feedback, pagination, date/time, and form primitives so feature screens do not reinvent them (`rules/forms-and-validation.md`, `rules/error-handling-and-feedback.md`, `rules/data-and-time.md`, `rules/ui-and-accessibility.md`).
+- **Verification:** On Node `22.23.4` and pnpm `10.34.9`: `pnpm test` (19 files, 172 tests passed), `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm build`, and `pnpm e2e` (16/16 Playwright desktop and mobile scenarios) passed; `git diff --check` passed. Local `python3` (`C:\Python314\python.exe` missing) and `actionlint` 1.7.7 are unavailable on this Windows workstation and run in the Ubuntu GitHub Actions `checks` job.
+- **Next step:** Publish the PR from `feat/19-feedback-form-primitives` into `develop`, verify GitHub Actions checks, and await teammate review and merge to complete #19.
+
 ## 2026-11-05 — Create the typed API client, TanStack Query setup and error envelope mapping (#17)
 
-- **Status:** in-progress (local implementation, verification, and PR publication ready; issue #17 completion awaits teammate PR review and merge into `develop`)
+- **Status:** completed (merged into `develop` via [PR #67](https://github.com/Agustin742/integratec-final-front/pull/67), commit `4f894b3`)
 - **Area / files:** `package.json`, `pnpm-lock.yaml`, `src/api/messages.ts`, `src/api/errors.ts`, `src/api/idempotency.ts`, `src/api/client.ts`, `src/api/client.test.ts`, `src/api/query-keys.ts`, `src/api/query-client.tsx`, `src/api/query-client.test.tsx`, `src/main.tsx`, `src/test/msw/handlers.ts`, `src/test/msw/server.ts`, `src/test/render.tsx`, `README.md`, `docs/development.md`, `docs/testing.md`, `changelogs/tracker-mati.md`
 - **Change:** Implemented [issue #17](https://github.com/Agustin742/integratec-final-front/issues/17) in three reviewable work units on `feat/17-api-client-query` plus a PR #67 review fix:
   1. Added `openapi-fetch` (`0.17.0`), `@tanstack/react-query` (`5.106.1`), and dev-only `msw` (`3.0.3`); implemented the typed API client (`src/api/client.ts` with `createApiClient`, `requestApi`, and `requestApiVoid`), backend `ErrorEnvelope` and network error mapper (`src/api/errors.ts`) with centralized `es-AR` messages (`src/api/messages.ts`), `Idempotency-Key` UUID helper (`src/api/idempotency.ts`), contract-faithful MSW handlers (`src/test/msw/`), and 17 unit/integration tests (`src/api/client.test.ts`).
@@ -10,7 +24,7 @@
   3. Documented the typed API client, error mapping policy (`404` without revealing foreign resources, `403` insufficient role, network failure mapped to `kind: 'network'` and never treated as unauthenticated or invalid credentials), scoped query keys, and MSW mocking policy in `README.md`, `docs/development.md`, and `docs/testing.md`.
 - **Reason:** Give all features one typed way to call the REST API with consistent loading/error handling, safely scoped caching across users/classrooms/linked children, and contract-faithful MSW mocks (FD2, FD9).
 - **Verification:** On Node `22.23.4` and pnpm `10.34.9`: `pnpm test` (6 files, 63 tests passed), `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm build` (production bundle verified free of MSW), and `pnpm e2e` (2/2 desktop and mobile) passed; `git diff --check` passed. Local `python3` (`C:\Python314\python.exe` missing) and `actionlint` 1.7.7 are unavailable on this Windows workstation and run in the Ubuntu GitHub Actions `checks` job.
-- **Next step:** Publish the PR from `feat/17-api-client-query` into `develop`, verify GitHub Actions checks, and await teammate review and merge to complete #17.
+- **Next step:** Completed and merged in [PR #67](https://github.com/Agustin742/integratec-final-front/pull/67); unblocks #19 and feature stories.
 
 ## 2026-11-05 — Implement `pnpm api:sync` to pull committed REST and realtime contract artifacts (#16)
 

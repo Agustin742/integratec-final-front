@@ -33,5 +33,19 @@ export const messages = {
       'Este panel es modal; no es la barra lateral permanente del diseño.',
     showToast: 'Mostrar aviso de ejemplo',
     toast: 'Aviso local de ejemplo. No se guardaron datos.',
+    loadingStateLabel: 'Ejemplo de estado cargando...',
+    emptyStateTitle: 'Ejemplo de estado vacío',
+    emptyStateDescription: 'Todavía no hay entregas registradas en esta vista.',
+    errorStateTitle: 'Ejemplo de estado de error con reintento',
+    errorStateDescription: 'No pudimos sincronizar los datos de ejemplo.',
+    errorStateNextAction: 'Podés volver a intentar con el botón de abajo.',
+    staleTitle: 'Ejemplo de datos en caché',
+    staleDescription:
+      'Falló la actualización en segundo plano; se conservan los datos visibles.',
+    formRootErrorTitle: 'Ejemplo de error general de formulario',
+    formRootErrorDescription:
+      'Error del servidor no asociado a un campo individual.',
+    deadlineLabel: 'Vencimiento escolar de ejemplo:',
+    dateOnlyLabel: 'Fecha calendario de ejemplo:',
   },
 } as const;

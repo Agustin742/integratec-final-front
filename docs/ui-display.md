@@ -30,6 +30,32 @@ not fabricate messages or data. For form interactions, see [UI controls](ui-cont
   associations. Loading, empty, error and data rows are caller-owned; no data
   fetching, sorting or pagination is included.
 
+## Shared state, pagination, and date/time primitives
+
+- `src/components/feedback/states.tsx` (`LoadingState`, `EmptyState`,
+  `ErrorState`, `StaleDataNotice`, `LiveRegion`) provides visually and
+  programmatically distinct observable states per
+  [error handling and feedback](../rules/error-handling-and-feedback.md).
+  `LoadingState` places its polite `role="status"` live region as a sibling of
+  the `aria-busy="true"` decorative `Skeleton` placeholder container so no
+  ancestor of the live announcement is marked busy; `ErrorState` maps
+  `ApiError.userMessage`, presents a next action, and supports a bounded
+  `onRetry` callback; `StaleDataNotice` warns when a background refresh fails
+  while preserving existing content; `LiveRegion` announces async outcomes
+  (`polite` or `assertive`).
+- `src/components/pagination/pagination.ts` and `pagination-controls.tsx`
+  (`normalizePaginationQuery`, `createPaginatedQueryKey`, `getPaginationMeta`,
+  `PaginationControls`) match the backend offset pagination contract
+  (`{ items, page, pageSize, total }`, query `{ page, pageSize, sort }`).
+- `src/lib/dates.ts` (`formatInstant`, `formatDeadline`, `formatDateOnly`)
+  formats instants and deadlines in `es-AR` (`DEFAULT_SCHOOL_TIME_ZONE =
+'America/Argentina/Buenos_Aires'` with the time zone indicated per FD11) and
+  formats `YYYY-MM-DD` calendar dates in `UTC` so browser offsets never shift
+  the displayed day ([data and time](../rules/data-and-time.md)).
+
+![Shared feedback, pagination, and form primitives at 1280px](assets/ui-foundations/feedback-forms-1280.png)
+![Shared feedback, pagination, and form primitives at 360px](assets/ui-foundations/feedback-forms-360.png)
+
 ## Verification boundary
 
 The colocated `display.test.tsx` exercises status/error announcements, explicit
