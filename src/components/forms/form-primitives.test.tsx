@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { useForm } from 'react-hook-form';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { ApiError } from '@/api/errors';
@@ -325,5 +326,58 @@ describe('form primitives (React Hook Form + Zod)', () => {
     );
 
     confirmSpy.mockRestore();
+  });
+
+  it('maps server field errors safely on forms using native register() without cyclic DOM traversal', () => {
+    function NativeRegisterProbe() {
+      const form = useForm<{ email: string; address: { street: string } }>({
+        defaultValues: { email: '', address: { street: '' } },
+      });
+      return (
+        <form aria-label="Native register form">
+          <input aria-label="Email" {...form.register('email')} />
+          <input aria-label="Street" {...form.register('address.street')} />
+          <button
+            type="button"
+            onClick={() => {
+              applyServerErrorsToForm(
+                form,
+                new ApiError({
+                  kind: 'validation',
+                  status: 400,
+                  code: 'VALIDATION_FAILED',
+                  userMessage: 'Revisá los campos marcados e intentá de nuevo.',
+                  fieldErrors: {
+                    email: ['Correo inválido'],
+                    'address.street': ['Calle obligatoria'],
+                  },
+                }),
+              );
+            }}
+          >
+            Aplicar errores
+          </button>
+          <output aria-label="Email error">
+            {form.formState.errors.email?.message ?? ''}
+          </output>
+          <output aria-label="Street error">
+            {form.formState.errors.address?.street?.message ?? ''}
+          </output>
+        </form>
+      );
+    }
+
+    render(<NativeRegisterProbe />);
+
+    expect(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'Aplicar errores' }));
+    }).not.toThrow();
+
+    expect(screen.getByLabelText('Email error')).toHaveTextContent(
+      'Correo inválido',
+    );
+    expect(screen.getByLabelText('Street error')).toHaveTextContent(
+      'Calle obligatoria',
+    );
   });
 });

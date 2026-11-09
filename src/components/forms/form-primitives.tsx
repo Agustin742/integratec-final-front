@@ -239,10 +239,7 @@ function isKnownFieldPath<
   if (discoveredPaths.has(fieldPath)) {
     return true;
   }
-  return (
-    hasDottedPath(form.getValues(), fieldPath) ||
-    hasDottedPath(form.control._fields, fieldPath)
-  );
+  return hasDottedPath(form.getValues(), fieldPath);
 }
 
 /**
@@ -271,7 +268,6 @@ export function applyServerErrorsToForm<
   const discoveredPaths = new Set<string>();
   if (explicitKnownFields === null) {
     collectDottedPaths(form.getValues(), '', discoveredPaths);
-    collectDottedPaths(form.control._fields, '', discoveredPaths);
   }
 
   const unmappedMessages: string[] = [];

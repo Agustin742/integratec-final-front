@@ -32,11 +32,16 @@ describe('feedback state primitives', () => {
     const loadingStatus = screen.getByRole('status');
     expect(loadingStatus).toHaveTextContent('Cargando actividades...');
     expect(loadingStatus).not.toHaveAttribute('aria-busy');
+    expect(loadingStatus.closest('[aria-busy="true"]')).toBeNull();
 
     const loadingContainer = loadingStatus.closest(
       '[data-state-kind="loading"]',
     );
-    expect(loadingContainer).toHaveAttribute('aria-busy', 'true');
+    expect(loadingContainer).not.toBeNull();
+    expect(loadingContainer).not.toHaveAttribute('aria-busy');
+    expect(
+      loadingContainer?.querySelector('[data-loading-placeholder="true"]'),
+    ).toHaveAttribute('aria-busy', 'true');
 
     const emptyRegion = screen.getByRole('region', {
       name: 'Todavía no hay entregas',
