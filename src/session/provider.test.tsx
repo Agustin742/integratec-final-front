@@ -146,6 +146,8 @@ test.each(['logout', 'account change'] as const)(
     });
     const view = mount(service, <Probe release={release} />);
     await screen.findByText('authenticated');
+    // StrictMode's setup/cleanup probe also releases private owners.
+    release.mockClear();
     const late = deferred<string>();
     let signal: AbortSignal | undefined;
     const pending = view.queryClient
@@ -204,7 +206,7 @@ test.each(['logout', 'account change'] as const)(
     unregister();
     view.unmount();
     await service.controller.logout();
-    expect(release).toHaveBeenCalledTimes(1);
+    expect(release).toHaveBeenCalledTimes(2);
   },
 );
 
@@ -221,7 +223,8 @@ test('service replacement and unmount unregister only their own cleanup owners',
     await first.controller.logout();
   });
   expect(view.queryClient.getQueryData(['new owner'])).toBe('preserve');
-  expect(release).not.toHaveBeenCalled();
+  expect(release).toHaveBeenCalledTimes(2); // StrictMode probe and A replacement.
+  release.mockClear();
   await act(async () => {
     await second.controller.logout();
   });
@@ -231,7 +234,119 @@ test('service replacement and unmount unregister only their own cleanup owners',
   view.queryClient.setQueryData(['after unmount'], 'preserve');
   await second.controller.logout();
   expect(view.queryClient.getQueryData(['after unmount'])).toBe('preserve');
+  expect(release).toHaveBeenCalledTimes(2);
+});
+
+test('protected 401 and uncertain refresh remove tokens, caches and private owners', async () => {
+  let rejected = false;
+  const fixture = harness(
+    (request) =>
+      request.url.endsWith('/auth/refresh')
+        ? json({}, 503)
+        : json(rejected ? {} : profile, rejected ? 401 : 200),
+    saved(),
+  );
+  const service = createSession(fixture);
+  const release = vi.fn();
+  const view = mount(service, <Probe release={release} />);
+  await screen.findByText('authenticated');
+  release.mockClear();
+  view.queryClient.setQueryData(['private'], profile);
+  await view.queryClient
+    .getMutationCache()
+    .build(view.queryClient, { mutationFn: async () => profile })
+    .execute(undefined);
+  rejected = true;
+  await act(async () => {
+    await expect(service.client.GET('/users/me')).rejects.toThrow();
+  });
+  expect(screen.getByText('unable-to-verify')).toBeInTheDocument();
+  expect(screen.queryByText('Private content')).not.toBeInTheDocument();
+  expect(fixture.storage.getItem(storageKey)).toBeNull();
+  expect(view.queryClient.getQueryCache().getAll()).toHaveLength(0);
+  expect(view.queryClient.getMutationCache().getAll()).toHaveLength(0);
   expect(release).toHaveBeenCalledTimes(1);
+});
+
+test('authenticated replacement clears caches before B renders and releases only A ownership', async () => {
+  const first = createSession(harness(undefined, saved()));
+  const secondProfile = {
+    ...profile,
+    id: '00000000-0000-4000-8000-000000000002',
+  };
+  const second = createSession(harness(() => json(secondProfile), saved()));
+  await first.controller.initialize();
+  await second.controller.initialize();
+  const queryClient = createAppQueryClient();
+  const releaseA = vi.fn();
+  const releaseB = vi.fn();
+  const observations: number[] = [];
+  function Owner() {
+    const service = useSessionService();
+    useSessionCleanup(service === first ? releaseA : releaseB);
+    const snapshot = useSessionSnapshot();
+    if (service === second)
+      observations.push(
+        queryClient.getQueryCache().getAll().length +
+          queryClient.getMutationCache().getAll().length,
+      );
+    return (
+      <p>
+        {snapshot.status === 'authenticated'
+          ? snapshot.user.id
+          : snapshot.status}
+      </p>
+    );
+  }
+  const tree = (service: SessionService) => (
+    <ApiQueryProvider client={queryClient}>
+      <SessionProvider service={service}>
+        <Owner />
+      </SessionProvider>
+    </ApiQueryProvider>
+  );
+  const view = render(tree(first));
+  queryClient.setQueryData(['private', 'A'], profile);
+  const late = deferred<string>();
+  let signal: AbortSignal | undefined;
+  let started = 0;
+  const pending = queryClient
+    .fetchQuery({
+      queryKey: ['pending', 'A'],
+      queryFn: (context) => {
+        started++;
+        signal = context.signal;
+        return late.promise;
+      },
+    })
+    .catch(() => 'cancelled');
+  await queryClient
+    .getMutationCache()
+    .build(queryClient, { mutationFn: async () => profile })
+    .execute(undefined);
+  expect(started).toBe(1);
+  expect(queryClient.getMutationCache().getAll()).toHaveLength(1);
+  view.rerender(tree(second));
+  expect(screen.getByText(secondProfile.id)).toBeInTheDocument();
+  expect(observations.length).toBeGreaterThan(0);
+  expect(observations.every((count) => count === 0)).toBe(true);
+  expect(signal?.aborted).toBe(true);
+  expect(releaseA).toHaveBeenCalledTimes(1);
+  expect(releaseB).not.toHaveBeenCalled();
+  queryClient.setQueryData(['private', 'B'], secondProfile);
+  await act(async () => {
+    await first.controller.logout();
+  });
+  expect(queryClient.getQueryData(['private', 'B'])).toEqual(secondProfile);
+  late.resolve('late A');
+  await pending;
+  expect(queryClient.getQueryData(['pending', 'A'])).toBeUndefined();
+  view.unmount();
+  expect(releaseB).toHaveBeenCalledTimes(1);
+  expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
+  queryClient.setQueryData(['detached'], 'preserve');
+  await second.controller.logout();
+  expect(queryClient.getQueryData(['detached'])).toBe('preserve');
 });
 
 test('cleanup exceptions remain safely observable without skipping other owners', async () => {

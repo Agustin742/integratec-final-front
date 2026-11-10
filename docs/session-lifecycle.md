@@ -75,8 +75,13 @@ resources without delaying local removal. One throwing owner does not skip other
 `src/main.tsx` constructs one `SessionService` outside rendering and passes it to
 `SessionProvider` inside the existing `ApiQueryProvider`. The public App/showcase
 is not gated. Provider effects register cleanup, invoke core single-flight
-`initialize()`, and unregister on teardown; StrictMode does not duplicate the
-pending identity request. Unmount detaches integration, not an implicit logout.
+`initialize()`, and release private owners on replacement/unmount before
+unregistering. Replacement children are withheld until the old service's Query
+and Mutation caches have been cleared; no cache cleanup happens during render.
+StrictMode does not duplicate the pending identity request. Its cleanup probe also
+releases private owners, so release callbacks must be idempotent. Unmount detaches
+integration and clears private data, not an implicit server logout. The service
+remains application-owned; its pending identity initialization is shared on remount.
 
 - `useSessionService()` exposes the existing controller and typed client;
   `useSessionSnapshot()` subscribes without starting network work.
@@ -87,14 +92,19 @@ pending identity request. Unmount detaches integration, not an implicit logout.
 - The provider uses the actual context QueryClient: transitions synchronously
   cancel queries and clear both Query and Mutation caches, without awaiting
   cancellation. Non-abortable server mutations cannot be undone by clearing a
-  browser cache; future mutation owners must not write stale completion data.
+  browser cache. Clearing MutationCache does not cancel arbitrary mutation callbacks,
+  including an async `onSuccess` already executing. Consumer owners must capture
+  session/account ownership and recheck it after every await, before writing Query
+  data or private state. No production mutation owner/framework is introduced here.
 - `useSessionCleanup(release)` registers a synchronous private-state/subscription
   release callback in an effect. Keep its identity stable where practical. Future
   Zustand, realtime and scene owners register their own callbacks and unregister
   on teardown; non-React owners use `controller.registerCleanup` directly. No
   hypothetical consumer is installed. Core catches exceptions and reports them
   through `getCleanupFailure()` and operation results; consumers must handle that
-  safe flag, not assume cleanup succeeded.
+  safe flag, not assume cleanup succeeded. `controller.releasePrivateState()`
+  invokes these callbacks without changing credentials/identity; the provider uses
+  it for replacement/unmount while registrations still belong to the old service.
 - `safeSessionRedirect(unknown)` accepts exactly `/`; everything else falls back
   to `/`. There is no caller-controlled fallback or URL normalization. External,
   protocol-relative, backslash/encoded, query/hash and unapproved paths are not
@@ -102,9 +112,20 @@ pending identity request. Unmount detaches integration, not an implicit logout.
 
 ## Credentials and recovery
 
-- Only a validated pair and expiry hint live under `integratec.session` in
-  `sessionStorage`. Identity is never persisted. No cookies or `localStorage` are
-  used; fetch requests explicitly omit browser credentials and reject redirects.
+- A validated pair, expiry hint and nonsecret tab-owner metadata live under
+  `integratec.session` in `sessionStorage`. Identity is never persisted. No cookies
+  or `localStorage` are used; fetch requests explicitly omit browser credentials
+  and reject redirects. Browser storage must match the current tab's random nonce
+  before `/users/me` or any Bearer use. The nonce is appended to `window.name`
+  (preserving unrelated name text); no credential is put there. A normal
+  `window.open('/', '_blank')` child has no matching name and discards cloned
+  credentials before requests. Missing/mismatched metadata is discarded; unavailable
+  ownership fails closed as `unable-to-verify`, including login. Same-tab reload
+  retains the nonce. Cross-origin navigation resetting the name requires login.
+  This metadata is a continuity discriminator, never backend authentication.
+- Injected memory storage has no implicit window dependency. Tests may supply
+  `tabOwner: () => ownerId` to model tabs deterministically; adapters without it
+  remain isolated caller-owned memory storage, not proof of browser ownership.
 - The protected client's middleware injects Bearer access credentials. Public
   `/auth/*` endpoints receive none (logout is the authenticated exception).
   Off-origin request overrides are rejected before fetch. Use controller methods
@@ -121,10 +142,12 @@ pending identity request. Unmount detaches integration, not an implicit logout.
   renewal and one GET/HEAD replay; writes are never replayed, even with an arbitrary
   idempotency header. A `401` remaining after recovery clears both credentials.
   `403` does not trigger renewal.
-- Network/5xx renewal failures hide identity as `unable-to-verify`, retaining the
-  last validated credentials for an explicit later initialization attempt.
-  Definitive renewal rejection clears credentials; malformed successful token
-  payloads cannot authenticate. Invalid profiles never become snapshots.
+- Network/5xx renewal failures hide identity as `unable-to-verify`. If a protected
+  `401` was observed, both credentials are removed and private owners are released,
+  even when that `401` joins a refresh first started by expiry. Only expiry-only
+  uncertainty without an observed `401` retains credentials for explicit later
+  initialization. Definitive renewal rejection clears credentials; malformed
+  successful token payloads cannot authenticate. Invalid profiles never become snapshots.
 - Logout removes local identity, credentials and private consumer state before
   awaiting the server. Unconfirmed logout must not be presented as server revocation.
   Unavailable storage fails closed and removal failures are reported, not hidden.
@@ -154,7 +177,35 @@ Query/Mutation removal, late-result isolation, account replacement, cleanup rele
 and failures, service replacement/unmount, and exact redirect matching. S14 remains
 excluded. T4/parent still own full-suite/build checks, independent verification and
 applicable browser/manual checks for S13. No screen, controls or layout were added;
-caller-provided fallback accessibility remains the caller's responsibility. Tab-close/new-tab behavior has
-not been manually verified here. Browser session restoration and opener-cloned
-`sessionStorage` need explicit browser verification; do not claim every new tab
-starts empty solely because storage is tab-scoped. No live backend was contacted.
+caller-provided fallback accessibility remains the caller's responsibility.
+
+The original parent Chromium 156/mock-API probe passed 5/6 scenarios and failed
+opener cloning; its ignored report/script remain unchanged. Correction tests model
+opener-copy rejection, same-owner reload, unavailable ownership and cache isolation;
+the corrected real-browser reproduction is still parent-owned and unverified here.
+
+**S11 limitation requiring a product/browser-policy decision:** browsers may restore
+both `sessionStorage` and `window.name` on tab recovery or duplication. A copied
+storage/name pair is indistinguishable from a reload to this mechanism. Therefore
+this correction addresses ordinary opener cloning but does not establish the
+mandatory login-on-every-new/recovered-tab rule. That rule remains open, not waived.
+Do not claim all duplicate/restore behavior is solved; no broadcast infrastructure
+or implicit requirement exception was added. Manual-human checks, live role/foreign
+resource authorization, deployment CSP and browser restore behavior remain
+unverified. No live backend was contacted.
+
+## Open question for the future pull request
+
+Alejo explicitly deferred the unresolved recovery/duplication policy while asking
+that the remaining implementation and verification be finished. S11 remains open;
+this is neither an approved exception nor a claim that issue #18 is complete.
+
+Ask the team when preparing the separately authorized pull request:
+
+> Should recovering a closed tab or using the browser's Duplicate Tab action keep
+> the session, or must both require a new login? The implementation rejects
+> ordinary fresh/opener tabs and preserves same-tab reloads, but cannot distinguish
+> a reload from recovery that restores both storage and continuity metadata.
+
+Until the team resolves this question, retain the existing requirement and disclose
+this limitation in the PR. This local note does not authorize publishing or a merge.

@@ -8,7 +8,11 @@ export interface SessionMiddlewarePort {
   access(): string | undefined;
   revision(): number;
   expired(): boolean;
-  renew(epoch: number, sentRevision: number): Promise<void>;
+  renew(
+    epoch: number,
+    sentRevision: number,
+    cause: 'expiry' | 'unauthorized',
+  ): Promise<void>;
   invalidate(): void;
 }
 export function assertSessionEpoch(
@@ -44,7 +48,7 @@ export function createSessionMiddleware(
           !schemaPath.startsWith('/auth/') || schemaPath === '/auth/logout',
       };
       if (context.protected && port.expired()) {
-        await port.renew(context.epoch, context.revision);
+        await port.renew(context.epoch, context.revision, 'expiry');
         context.renewed = true;
       }
       assertSessionEpoch(port, context.epoch);
@@ -68,7 +72,7 @@ export function createSessionMiddleware(
       let result = response;
       if (context.protected && response.status === 401 && context.access) {
         if (!context.renewed) {
-          await port.renew(context.epoch, context.revision);
+          await port.renew(context.epoch, context.revision, 'unauthorized');
           context.renewed = true;
           assertSessionEpoch(port, context.epoch);
           if (request.method === 'GET' || request.method === 'HEAD') {

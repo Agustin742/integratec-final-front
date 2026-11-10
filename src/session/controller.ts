@@ -27,6 +27,8 @@ export interface SessionOptions {
   readonly baseUrl?: string;
   readonly fetch?: typeof globalThis.fetch;
   readonly storage?: SessionStorage;
+  /** Inject alongside memory storage to model browser-tab ownership deterministically. */
+  readonly tabOwner?: () => string | undefined;
   readonly now?: () => number;
 }
 export interface SessionController {
@@ -34,6 +36,7 @@ export interface SessionController {
   getCleanupFailure(): boolean;
   subscribe(listener: () => void): () => void;
   registerCleanup(cleanup: () => void): () => void;
+  releasePrivateState(): void;
   initialize(): Promise<void>;
   login(input: LoginInput): Promise<{ ok: boolean; cleanupFailed: boolean }>;
   logout(): Promise<{ serverConfirmed: boolean; cleanupFailed: boolean }>;
@@ -48,7 +51,7 @@ export function createSession(options: SessionOptions = {}): SessionService {
   const clientOptions = { baseUrl, fetch: options.fetch };
   const client = createApiClient(clientOptions);
   const auth = createAuthTransport(clientOptions);
-  const storage = createSessionStorage(options.storage);
+  const storage = createSessionStorage(options.storage, options.tabOwner);
   const initial = storage.read();
   let credentials = initial.credentials;
   let storageUnavailable = initial.unavailable;
@@ -58,6 +61,7 @@ export function createSession(options: SessionOptions = {}): SessionService {
   let revision = 0;
   let abort = new AbortController();
   let refreshing: Promise<void> | undefined;
+  let refreshUnauthorized = false;
   let initializing: Promise<void> | undefined;
   let cleanupFailed = false;
   const listeners = new Set<() => void>();
@@ -70,6 +74,15 @@ export function createSession(options: SessionOptions = {}): SessionService {
         listener();
       } catch {
         /* A subscriber must not interrupt credential cleanup. */
+      }
+    }
+  }
+  function releasePrivateState(): void {
+    for (const cleanup of [...cleanups]) {
+      try {
+        cleanup();
+      } catch {
+        cleanupFailed = true;
       }
     }
   }
@@ -90,13 +103,7 @@ export function createSession(options: SessionOptions = {}): SessionService {
     }
     // Remove identity before invoking external owners; publish their safe result afterward.
     snapshot = Object.freeze({ status });
-    for (const cleanup of [...cleanups]) {
-      try {
-        cleanup();
-      } catch {
-        cleanupFailed = true;
-      }
-    }
+    releasePrivateState();
     publish(snapshot);
   }
   const epochPort = { epoch: () => epoch };
@@ -115,10 +122,19 @@ export function createSession(options: SessionOptions = {}): SessionService {
     revision++;
     storageUnavailable = false;
   }
-  function renew(expectedEpoch: number, sentRevision: number): Promise<void> {
+  function renew(
+    expectedEpoch: number,
+    sentRevision: number,
+    cause: 'expiry' | 'unauthorized',
+  ): Promise<void> {
     assertSessionEpoch(epochPort, expectedEpoch);
     if (sentRevision !== revision && credentials) return Promise.resolve();
-    if (refreshing) return refreshing;
+    if (refreshing) {
+      // A later protected 401 upgrades an expiry-started flight as well.
+      refreshUnauthorized ||= cause === 'unauthorized';
+      return refreshing;
+    }
+    refreshUnauthorized = cause === 'unauthorized';
     const refreshToken = credentials?.refreshToken;
     if (!refreshToken) return Promise.reject(safeSessionError());
     const signal = abort.signal;
@@ -139,7 +155,7 @@ export function createSession(options: SessionOptions = {}): SessionService {
           error.status === null;
         transition(
           definitive ? 'unauthenticated' : 'unable-to-verify',
-          definitive || malformed,
+          definitive || malformed || refreshUnauthorized,
         );
         throw safeSessionError(error);
       }
@@ -196,6 +212,7 @@ export function createSession(options: SessionOptions = {}): SessionService {
         listeners.delete(owned);
       };
     },
+    releasePrivateState,
     registerCleanup(cleanup) {
       const owned = () => cleanup();
       cleanups.add(owned);

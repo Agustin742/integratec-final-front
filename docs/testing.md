@@ -35,14 +35,27 @@ for T3's React/service boundary: synthetic controlled fetch and injected memory
 storage, real QueryClient cancellation/cache clearing, private release callbacks,
 StrictMode and unmount ownership, unresolved/protected rendering and malicious
 redirect inputs. Core coverage remains in `src/session/controller.test.ts` and
-`src/session/middleware.test.ts`; see [session evidence and limits](session-lifecycle.md#verification-and-remaining-work).
+`src/session/middleware.test.ts`. `src/session/storage.test.ts` models distinct tab
+owners with copied storage, same-owner reload, missing/unavailable ownership and
+ordinary opener name mismatch. Recovery regressions distinguish expiry-only
+uncertainty from an observed protected `401`, including one joining an expiry-started
+refresh. Authenticated A-to-B provider replacement tests inspect what B renders,
+populated Query/Mutation caches, a real query cancellation signal and late-result
+fencing; see [session evidence and limits](session-lifecycle.md#verification-and-remaining-work).
 
 These checks do not prove live backend authorization, server logout integration,
 CSP enforcement or manual tab-close/reopen/new-tab behavior. `sessionStorage`
 survives reload and may be restored by browser session recovery; an opener can
-seed a new tab with a copy. Do not assume all new tabs start empty. Browser proof,
-full-suite/build and independent verification remain parent/T4 work. No new screen
-or focus/layout interaction is introduced by the renderless integration.
+seed a new tab with a copy. The browser discriminator pairs a nonsecret `window.name`
+nonce with storage metadata and rejects ordinary opener copies before protected
+requests. Restoring or duplicating both values may be indistinguishable from reload:
+S11 remains open for product/browser-policy resolution, not silently weakened.
+The parent's original Chromium 156/mock-API result (5/6, opener failed) is preserved;
+corrected real-browser reproduction remains unverified here. Full-suite/build and
+independent verification remain parent/T4 work. MutationCache clearing is not
+cancellation of already-running async callbacks: consumers must fence completion
+writes against session ownership after awaits. No hypothetical mutation framework,
+new screen or focus/layout interaction is introduced by this correction.
 
 ## Browser smoke and optional deployed target
 

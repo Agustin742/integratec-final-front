@@ -3,6 +3,8 @@ import {
   createContext,
   useContext,
   useEffect,
+  useLayoutEffect,
+  useState,
   useSyncExternalStore,
   type ReactNode,
 } from 'react';
@@ -15,18 +17,28 @@ export interface SessionProviderProps {
   readonly children: ReactNode;
 }
 
-/** The application owns service identity; this effect owns Query cleanup. */
+/** Gate replacement children until the previous private owners have been released. */
 export function SessionProvider({ service, children }: SessionProviderProps) {
   const queryClient = useQueryClient();
-  useEffect(() => {
+  const [ready, setReady] = useState({ service, queryClient });
+  useLayoutEffect(() => {
     const unregister = service.controller.registerCleanup(() => {
       // Cancellation takes effect synchronously; never wait before removing data.
       void queryClient.cancelQueries();
       queryClient.clear();
     });
+    // This commit-time gate must acknowledge external cache teardown before B can render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional pre-paint ownership handoff
+    setReady({ service, queryClient });
     void service.controller.initialize();
-    return unregister;
+    return () => {
+      // Layout cleanup precedes passive owner unregistration and new child exposure.
+      service.controller.releasePrivateState();
+      unregister();
+    };
   }, [service, queryClient]);
+  if (ready.service !== service || ready.queryClient !== queryClient)
+    return null;
   return (
     <SessionContext.Provider value={service}>
       {children}

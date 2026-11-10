@@ -78,7 +78,7 @@ describe('session middleware bounded recovery', () => {
   );
 
   test.each(['offline', '503'])(
-    'uncertain refresh %s hides identity but retains credentials',
+    'observed 401 then uncertain refresh %s clears credentials but preserves uncertainty',
     async (failure) => {
       const h = harness((r) => {
         if (isRefresh(r)) {
@@ -87,14 +87,61 @@ describe('session middleware bounded recovery', () => {
         }
         return json({}, 401);
       }, saved());
+      const { controller } = createSession(h);
+      const release = vi.fn();
+      controller.registerCleanup(release);
+      await controller.initialize();
+      expect(controller.getSnapshot()).toEqual({ status: 'unable-to-verify' });
+      expect(h.storage.getItem(storageKey)).toBeNull();
+      expect(release).toHaveBeenCalledTimes(1);
+      expect(h.requests).toHaveLength(2);
+    },
+  );
+
+  test.each(['offline', '503'])(
+    'expiry-only uncertain refresh %s retains credentials',
+    async (failure) => {
+      const h = harness(() => {
+        if (failure === 'offline') throw new TypeError('synthetic offline');
+        return json({}, 503);
+      }, saved(0));
       const before = h.storage.getItem(storageKey);
       const { controller } = createSession(h);
       await controller.initialize();
       expect(controller.getSnapshot()).toEqual({ status: 'unable-to-verify' });
       expect(h.storage.getItem(storageKey)).toBe(before);
-      expect(h.requests).toHaveLength(2);
+      expect(h.requests).toHaveLength(1);
     },
   );
+
+  test('a 401 joining an expiry-started refresh upgrades its credential-discard cause', async () => {
+    const old = deferred<Response>();
+    const refresh = deferred<Response>();
+    const h = harness(
+      (r) => (isRefresh(r) ? refresh.promise : old.promise),
+      saved(100),
+    );
+    let now = 0;
+    const { client, controller } = createSession({ ...h, now: () => now });
+    const read = client.GET('/users/me');
+    await vi.waitFor(() => expect(h.requests).toHaveLength(1));
+    now = 200;
+    const expired = client.GET('/users/me');
+    const failures = Promise.allSettled([read, expired]);
+    await vi.waitFor(() =>
+      expect(h.requests.filter(isRefresh)).toHaveLength(1),
+    );
+    old.resolve(json({}, 401));
+    // Let the old response join the still-pending refresh.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    refresh.resolve(json({}, 503));
+    expect(
+      (await failures).every((result) => result.status === 'rejected'),
+    ).toBe(true);
+    expect(h.storage.getItem(storageKey)).toBeNull();
+    expect(controller.getSnapshot()).toEqual({ status: 'unable-to-verify' });
+    expect(h.requests).toHaveLength(2);
+  });
 
   test('remaining 401 after renewal clears both credentials without looping', async () => {
     const h = harness(
