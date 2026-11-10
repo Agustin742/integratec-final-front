@@ -6,8 +6,9 @@
 - **Area / files:** `src/api/`, new session integration, session tests and documentation; branch `feat/18-session-lifecycle`.
 - **Change:** Reviewing current backend `develop` contracts and implementing [front #18](https://github.com/Agustin742/integratec-final-front/issues/18). Backend dependencies #18/#20 are closed; refresh rotation includes a 30-second reuse grace window. No login screens, route guards or realtime rejoin included.
 - **Reason:** Provide safe session restoration, bounded refresh and account-isolated cleanup against the published backend contract.
-- **Checks:** Pending. Initial shell is Node 24.15.0/pnpm 10.34.9; project declares Node 22.23.4. Native CLI is not on PATH; no review outcome claimed.
-- **Next step:** Sync generated contracts, implement and test lifecycle, then independent security/concurrency verification. No publishing authorized.
+- **Checks:** T1: frozen install, pinned sync, typecheck and 30/30 existing API/contract-sync tests passed using local Node 22.23.4/pnpm 10.34.9 under ignored `odd/tools/`. Initial sync and a separate typecheck attempt were blocked before checks by shell Node24; no global runtime or project engine configuration changed. New Colyseus runtime schema is preserved only under ignored `odd/contracts/` to avoid introducing realtime dependencies into this session-only slice. T1 commit `46da407`; native committed-range assessment reports medium, reviewDue false (under_budget), no native review started.
+- **T2:** Session core implemented by a bounded writer (context-backstop routing); 38/38 controlled-fetch lifecycle/race tests, typecheck, scoped ESLint and Prettier passed on Node22. Assertion-level RED observed before GREEN; initial collection/type errors and later logout/cleanup corrections are recorded in the local task evidence. No live backend requests. Alejo explicitly selected keeping the ~1,300-line core with a size exception, with integration separate and independent verification still required.
+- **Next step:** Commit the coherent T2 core locally, implement React/cleanup integration, then independent security/concurrency verification and applicable native review. No publishing authorized.
 
 ## 2026-11-05 — Address PR #68 review findings (#14)
 
