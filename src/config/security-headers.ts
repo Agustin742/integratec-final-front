@@ -107,8 +107,11 @@ export function buildSecurityHeaders(config: PublicConfig): SecurityHeaders {
   });
 }
 
-function escapeYamlDoubleQuoted(value: string): string {
-  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
+function formatYamlString(value: string): string {
+  if (value.includes("'")) {
+    return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
+  }
+  return `'${value}'`;
 }
 
 /**
@@ -118,7 +121,7 @@ export function renderCustomHttpYaml(config: PublicConfig): string {
   const headers = buildSecurityHeaders(config);
   const headerLines = SECURITY_HEADER_NAMES.flatMap((key) => [
     `      - key: ${key}`,
-    `        value: ${escapeYamlDoubleQuoted(headers[key])}`,
+    `        value: ${formatYamlString(headers[key])}`,
   ]);
 
   return [
@@ -329,7 +332,7 @@ function validateCustomHttpYaml(
     }
     const expectedBlock = [
       `      - key: ${key}`,
-      `        value: ${escapeYamlDoubleQuoted(expectedValue)}`,
+      `        value: ${formatYamlString(expectedValue)}`,
     ].join('\n');
 
     if (!customHttpYaml.includes(expectedBlock)) {

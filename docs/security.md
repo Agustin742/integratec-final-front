@@ -70,9 +70,10 @@ AWS Amplify Hosting ([issue #22](https://github.com/Agustin742/integratec-final-
 | `pnpm preview` (`vite preview`)  | Serves `dist/index.html`.                                                                                                                | Full strict `Content-Security-Policy` and companion headers injected via `configurePreviewServer` middleware in [`vite.config.ts`](../vite.config.ts). | Allows local inspection and `pnpm e2e` (Playwright) to verify zero CSP violations against the production bundle.                                                             |
 | `pnpm dev` (`vite dev`)          | Vite's dev server injects `/@vite/client` and an inline `<script type="module">` preamble for `@vitejs/plugin-react` Fast Refresh (HMR). | Strict no-inline-script CSP is not applied to the dev server's HMR transform.                                                                          | Fast Refresh requires an inline module preamble during development only; `pnpm build`, `pnpm security:check`, and `pnpm e2e` enforce the production no-inline-script policy. |
 
-## DOM XSS prevention (`dangerouslySetInnerHTML`)
+## DOM XSS and `unsafe-eval` prevention (`dangerouslySetInnerHTML` and Zod `jitless`)
 
-Per [FD1](technical-justification.md#fd1-token-storage) and [Security](../rules/security.md#input-transport-and-failures), rendering unsanitized HTML is forbidden:
+Per [FD1](technical-justification.md#fd1-token-storage) and [Security](../rules/security.md#input-transport-and-failures), rendering unsanitized HTML and evaluating strings as code are forbidden:
 
 - [`eslint.config.js`](../eslint.config.js) enforces a `no-restricted-syntax` error on `JSXAttribute[name.name='dangerouslySetInnerHTML']` across all source files (`src/**/*.{ts,tsx}`).
 - [`src/config/eslint-security.test.ts`](../src/config/eslint-security.test.ts) verifies that ESLint rejects any component using `dangerouslySetInnerHTML`.
+- [`src/config/public-config.ts`](../src/config/public-config.ts) and [`src/components/forms/form-primitives.tsx`](../src/components/forms/form-primitives.tsx) enable `z.config({ jitless: true })` so Zod v4 never probes `new Function("")` at runtime under `script-src 'self' 'wasm-unsafe-eval'`.

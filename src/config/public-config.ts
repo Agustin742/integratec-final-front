@@ -1,6 +1,10 @@
 /// <reference types="vite/client" />
 import { z } from 'zod';
 
+// Disable Zod v4's `new Function()` JIT compiler so schema validation never
+// triggers a `script-src` (`unsafe-eval`) Content-Security-Policy violation (FD1).
+z.config({ jitless: true });
+
 export const PUBLIC_CONFIG_VARIABLES = [
   'VITE_APP_ENV',
   'VITE_API_BASE_URL',

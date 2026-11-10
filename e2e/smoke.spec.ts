@@ -13,7 +13,7 @@ test('serves the semantic placeholder without horizontal overflow', async ({
         __recordCspViolation__?: (directive: string) => void;
       };
       report.__recordCspViolation__?.(
-        `${event.violatedDirective}:${event.blockedURI}`,
+        `${event.violatedDirective}:${event.blockedURI}:${event.sourceFile}:${event.lineNumber}:${event.columnNumber}`,
       );
     });
   });
