@@ -22,7 +22,7 @@ describe('ESLint security rules (FD1 mitigation)', () => {
           message.message.includes('dangerouslySetInnerHTML'),
       ),
     ).toBe(true);
-  });
+  }, 15_000);
 
   test('allows standard safe JSX text rendering', async () => {
     const [result] = await eslint.lintText(

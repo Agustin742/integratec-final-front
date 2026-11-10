@@ -18,19 +18,20 @@ pnpm dev
 
 On nvm-windows, use `nvm install 22.23.4` and `nvm use 22.23.4` instead. Copy `.env.example` to `.env` before starting `pnpm dev` or running `pnpm build`. Open the local URL printed by Vite. See [development setup](docs/development.md) for commands, layout, configuration, and verification boundaries.
 
-| Command               | Purpose                                                                   |
-| --------------------- | ------------------------------------------------------------------------- |
-| `pnpm api:sync`       | Pull committed REST and realtime contracts from the backend repository    |
-| `pnpm dev`            | Start the local development server                                        |
-| `pnpm test`           | Run Vitest component checks once (no watch mode)                          |
-| `pnpm build:e2e`      | Build the showcase bundle the browser suite runs against                  |
-| `pnpm e2e`            | Build the showcase bundle, then run Playwright smoke against preview      |
-| `pnpm lint`           | Check TypeScript, React hooks, and JSX accessibility rules                |
-| `pnpm format:check`   | Check formatting of the application, its configuration, and documentation |
-| `pnpm typecheck`      | Check types with TypeScript strict mode                                   |
-| `pnpm build`          | Check types, generate static output in `dist/`, and emit `customHttp.yml` |
-| `pnpm security:check` | Verify built `dist/index.html` and `customHttp.yml` against FD1 CSP rules |
-| `pnpm preview`        | Serve the production build locally with strict CSP and security headers   |
+| Command               | Purpose                                                                     |
+| --------------------- | --------------------------------------------------------------------------- |
+| `pnpm api:sync`       | Pull committed REST and realtime contracts from the backend repository      |
+| `pnpm dev`            | Start the local development server                                          |
+| `pnpm test`           | Run Vitest component checks once (no watch mode)                            |
+| `pnpm build:e2e`      | Build the showcase bundle the browser suite runs against                    |
+| `pnpm e2e`            | Build the showcase bundle, then run Playwright smoke against preview        |
+| `pnpm lint`           | Check TypeScript, React hooks, and JSX accessibility rules                  |
+| `pnpm format:check`   | Check formatting of the application, its configuration, and documentation   |
+| `pnpm typecheck`      | Check types with TypeScript strict mode                                     |
+| `pnpm build`          | Check types, generate static output in `dist/`, and emit `customHttp.yml`   |
+| `pnpm security:sync`  | Sync repository-root `customHttp.yml` with active `VITE_` origins (Amplify) |
+| `pnpm security:check` | Verify built `dist/index.html` and `customHttp.yml` against FD1 CSP rules   |
+| `pnpm preview`        | Serve the production build locally with strict CSP and security headers     |
 
 ## Public configuration
 

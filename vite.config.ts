@@ -86,6 +86,7 @@ function validatePublicConfigPlugin(): Plugin {
         indexHtml,
         headers,
         customHttpYaml,
+        expectedConfig: publicConfig,
       });
     },
   };

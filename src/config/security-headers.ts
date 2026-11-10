@@ -18,6 +18,23 @@ export const PERMISSIONS_POLICY_VALUE =
 export const STRICT_TRANSPORT_SECURITY_VALUE =
   'max-age=63072000; includeSubDomains';
 
+export const ALLOWED_CSP_DIRECTIVE_NAMES = [
+  'default-src',
+  'script-src',
+  'style-src',
+  'img-src',
+  'font-src',
+  'connect-src',
+  'worker-src',
+  'manifest-src',
+  'form-action',
+  'frame-ancestors',
+  'base-uri',
+  'object-src',
+] as const;
+
+const ALLOWED_CSP_DIRECTIVE_SET = new Set<string>(ALLOWED_CSP_DIRECTIVE_NAMES);
+
 export class SecurityPolicyViolationError extends Error {
   readonly violations: readonly string[];
 
@@ -39,6 +56,19 @@ function toOrigin(endpointUrl: string): string {
 }
 
 /**
+ * Returns the expected `connect-src` token list (`'self'` plus deduplicated API and realtime origins)
+ * for a validated `PublicConfig`.
+ */
+export function getExpectedConnectSrcTokens(
+  config: PublicConfig,
+): readonly string[] {
+  const connectOrigins = new Set<string>(["'self'"]);
+  connectOrigins.add(toOrigin(config.apiBaseUrl));
+  connectOrigins.add(toOrigin(config.realtimeUrl));
+  return Object.freeze(Array.from(connectOrigins));
+}
+
+/**
  * Builds the strict Content-Security-Policy header value required by FD1.
  *
  * - Forbids inline scripts (`'unsafe-inline'` is absent from `script-src`) and JavaScript `'unsafe-eval'`.
@@ -47,9 +77,7 @@ function toOrigin(endpointUrl: string): string {
  * - Restricts `connect-src` to `'self'` plus the validated API and realtime origins from `PublicConfig`.
  */
 export function buildContentSecurityPolicy(config: PublicConfig): string {
-  const connectOrigins = new Set<string>(["'self'"]);
-  connectOrigins.add(toOrigin(config.apiBaseUrl));
-  connectOrigins.add(toOrigin(config.realtimeUrl));
+  const connectTokens = getExpectedConnectSrcTokens(config);
 
   const directives: readonly string[] = [
     "default-src 'none'",
@@ -57,7 +85,7 @@ export function buildContentSecurityPolicy(config: PublicConfig): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self'",
-    `connect-src ${Array.from(connectOrigins).join(' ')}`,
+    `connect-src ${connectTokens.join(' ')}`,
     "worker-src 'self' blob:",
     "manifest-src 'self'",
     "form-action 'self'",
@@ -135,10 +163,211 @@ export function renderCustomHttpYaml(config: PublicConfig): string {
   ].join('\n');
 }
 
+export interface CustomHttpHeaderEntry {
+  readonly key: string;
+  readonly value: string;
+}
+
+export interface CustomHttpRule {
+  readonly pattern: string;
+  readonly headers: readonly CustomHttpHeaderEntry[];
+}
+
+export interface CustomHttpConfig {
+  readonly customHeaders: readonly CustomHttpRule[];
+}
+
+function parseYamlScalar(raw: string, lineNumber: number): string {
+  const trimmed = raw.trim();
+  if (trimmed === '') {
+    throw new Error(`customHttp.yml line ${lineNumber}: empty scalar value.`);
+  }
+  if (trimmed.startsWith('"')) {
+    if (!trimmed.endsWith('"') || trimmed.length < 2) {
+      throw new Error(
+        `customHttp.yml line ${lineNumber}: unterminated double-quoted string.`,
+      );
+    }
+    const inner = trimmed.slice(1, -1);
+    let result = '';
+    for (let index = 0; index < inner.length; index += 1) {
+      const char = inner[index];
+      if (char === '\\') {
+        const next = inner[index + 1];
+        if (next === '"' || next === '\\') {
+          result += next;
+          index += 1;
+          continue;
+        }
+        throw new Error(
+          `customHttp.yml line ${lineNumber}: unsupported escape sequence "\\${next ?? ''}".`,
+        );
+      }
+      if (char === '"') {
+        throw new Error(
+          `customHttp.yml line ${lineNumber}: unescaped double quote inside string.`,
+        );
+      }
+      result += char;
+    }
+    return result;
+  }
+
+  if (trimmed.startsWith("'")) {
+    if (!trimmed.endsWith("'") || trimmed.length < 2) {
+      throw new Error(
+        `customHttp.yml line ${lineNumber}: unterminated single-quoted string.`,
+      );
+    }
+    const inner = trimmed.slice(1, -1);
+    let result = '';
+    for (let index = 0; index < inner.length; index += 1) {
+      const char = inner[index];
+      if (char === "'") {
+        if (inner[index + 1] === "'") {
+          result += "'";
+          index += 1;
+          continue;
+        }
+        throw new Error(
+          `customHttp.yml line ${lineNumber}: unescaped single quote inside string.`,
+        );
+      }
+      result += char;
+    }
+    return result;
+  }
+
+  if (/[:[\]{}#&*!|>'"%@`]/.test(trimmed)) {
+    throw new Error(
+      `customHttp.yml line ${lineNumber}: unquoted scalar "${trimmed}" contains reserved YAML syntax characters.`,
+    );
+  }
+  return trimmed;
+}
+
+/**
+ * Strictly parses the AWS Amplify Hosting `customHttp.yml` grammar.
+ * Rejects any unknown keys, invalid indentation, unclosed quotes, or trailing syntax errors.
+ */
+export function parseCustomHttpYaml(yamlText: string): CustomHttpConfig {
+  const normalized = yamlText.replaceAll('\r\n', '\n');
+  const lines = normalized.split('\n');
+
+  let state:
+    | 'before_root'
+    | 'after_custom_headers'
+    | 'after_pattern'
+    | 'in_headers'
+    | 'expect_value' = 'before_root';
+
+  const rules: { pattern: string; headers: CustomHttpHeaderEntry[] }[] = [];
+  let currentRule: {
+    pattern: string;
+    headers: CustomHttpHeaderEntry[];
+  } | null = null;
+  let pendingHeaderKey: string | null = null;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const lineNumber = index + 1;
+    const line = lines[index] ?? '';
+    const trimmed = line.trim();
+
+    if (trimmed === '' || trimmed.startsWith('#')) {
+      continue;
+    }
+
+    if (state === 'before_root') {
+      if (line !== 'customHeaders:') {
+        throw new Error(
+          `customHttp.yml line ${lineNumber}: expected top-level "customHeaders:", got "${line}".`,
+        );
+      }
+      state = 'after_custom_headers';
+      continue;
+    }
+
+    if (state === 'expect_value') {
+      const valueMatch = /^ {8}value:\s*(.+)$/.exec(line);
+      if (!valueMatch || pendingHeaderKey === null || currentRule === null) {
+        throw new Error(
+          `customHttp.yml line ${lineNumber}: expected "        value: <string>" for header "${pendingHeaderKey ?? ''}", got "${line}".`,
+        );
+      }
+      const parsedValue = parseYamlScalar(valueMatch[1] ?? '', lineNumber);
+      currentRule.headers.push({
+        key: pendingHeaderKey,
+        value: parsedValue,
+      });
+      pendingHeaderKey = null;
+      state = 'in_headers';
+      continue;
+    }
+
+    if (state === 'after_custom_headers' || state === 'in_headers') {
+      const patternMatch = /^ {2}- pattern:\s*(.+)$/.exec(line);
+      if (patternMatch) {
+        const patternValue = parseYamlScalar(patternMatch[1] ?? '', lineNumber);
+        currentRule = { pattern: patternValue, headers: [] };
+        rules.push(currentRule);
+        state = 'after_pattern';
+        continue;
+      }
+    }
+
+    if (state === 'after_pattern') {
+      if (line !== '    headers:') {
+        throw new Error(
+          `customHttp.yml line ${lineNumber}: expected "    headers:" after pattern, got "${line}".`,
+        );
+      }
+      state = 'in_headers';
+      continue;
+    }
+
+    if (state === 'in_headers') {
+      const keyMatch = /^ {6}- key:\s*(.+)$/.exec(line);
+      if (keyMatch) {
+        pendingHeaderKey = parseYamlScalar(keyMatch[1] ?? '', lineNumber);
+        state = 'expect_value';
+        continue;
+      }
+    }
+
+    throw new Error(
+      `customHttp.yml line ${lineNumber}: unexpected or malformed YAML line "${line}".`,
+    );
+  }
+
+  if (state === 'before_root' || rules.length === 0) {
+    throw new Error(
+      'customHttp.yml must define at least one customHeaders rule.',
+    );
+  }
+
+  if (state === 'expect_value' || state === 'after_pattern') {
+    throw new Error(
+      'customHttp.yml ended unexpectedly with an incomplete header entry.',
+    );
+  }
+
+  return Object.freeze({
+    customHeaders: Object.freeze(
+      rules.map((rule) =>
+        Object.freeze({
+          pattern: rule.pattern,
+          headers: Object.freeze([...rule.headers]),
+        }),
+      ),
+    ),
+  });
+}
+
 export interface ValidateBuiltHtmlAndHeadersOptions {
   readonly indexHtml: string;
   readonly headers: Readonly<Record<string, string | undefined>>;
   readonly customHttpYaml?: string;
+  readonly expectedConfig?: PublicConfig;
 }
 
 const SCRIPT_TAG_REGEX = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
@@ -147,6 +376,25 @@ const INLINE_EVENT_HANDLER_REGEX =
   /<[a-zA-Z][^>]*\bon[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>"']+)/i;
 const JAVASCRIPT_URL_REGEX =
   /\b(?:href|src|action|formaction)\s*=\s*(?:"\s*javascript:|'\s*javascript:|javascript:)/i;
+
+function isValidConnectOriginToken(token: string): boolean {
+  if (token === "'self'") {
+    return true;
+  }
+  try {
+    const parsed = new URL(token);
+    return (
+      ['http:', 'https:', 'ws:', 'wss:'].includes(parsed.protocol) &&
+      parsed.hostname !== '' &&
+      parsed.origin === token &&
+      parsed.pathname === '/' &&
+      parsed.search === '' &&
+      parsed.hash === ''
+    );
+  } catch {
+    return false;
+  }
+}
 
 function validateIndexHtml(indexHtml: string, violations: string[]): void {
   if (indexHtml.trim() === '') {
@@ -209,12 +457,34 @@ function validateIndexHtml(indexHtml: string, violations: string[]): void {
 
 function validateHeaders(
   headers: Readonly<Record<string, string | undefined>>,
+  expectedConfig: PublicConfig | undefined,
   violations: string[],
 ): void {
   const csp = headers['Content-Security-Policy'];
   if (!csp || csp.trim() === '') {
     violations.push('Missing Content-Security-Policy header.');
   } else {
+    const rawDirectives = csp
+      .split(';')
+      .map((part) => part.trim())
+      .filter((part) => part !== '');
+    const seenDirectives = new Set<string>();
+
+    for (const rawDirective of rawDirectives) {
+      const name = rawDirective.split(/\s+/)[0]?.toLowerCase() ?? '';
+      if (seenDirectives.has(name)) {
+        violations.push(
+          `Content-Security-Policy contains duplicate directive "${name}".`,
+        );
+      }
+      seenDirectives.add(name);
+      if (!ALLOWED_CSP_DIRECTIVE_SET.has(name)) {
+        violations.push(
+          `Content-Security-Policy contains disallowed or override directive "${name}" (only ${ALLOWED_CSP_DIRECTIVE_NAMES.join(', ')} are permitted).`,
+        );
+      }
+    }
+
     const directives = parseContentSecurityPolicy(csp);
 
     for (const [name, tokens] of directives.entries()) {
@@ -225,44 +495,17 @@ function validateHeaders(
       }
     }
 
-    const defaultSrc = directives.get('default-src');
-    if (!defaultSrc || !defaultSrc.includes("'none'")) {
-      violations.push(
-        "Content-Security-Policy must set default-src to 'none'.",
-      );
-    }
-
-    const scriptSrc = directives.get('script-src');
-    if (!scriptSrc || !scriptSrc.includes("'self'")) {
-      violations.push(
-        "Content-Security-Policy script-src must include 'self'.",
-      );
-    }
-    if (scriptSrc?.includes("'unsafe-inline'")) {
-      violations.push(
-        "Content-Security-Policy script-src must not allow 'unsafe-inline'.",
-      );
-    }
-
-    const connectSrc = directives.get('connect-src');
-    if (!connectSrc || !connectSrc.includes("'self'")) {
-      violations.push(
-        "Content-Security-Policy connect-src must include 'self'.",
-      );
-    }
-    if (connectSrc?.includes('*')) {
-      violations.push(
-        'Content-Security-Policy connect-src must not use wildcard (*) origins.',
-      );
-    }
-
     const requiredExactDirectives: ReadonlyArray<
       readonly [string, readonly string[]]
     > = [
-      ['font-src', ["'self'"]],
-      ['img-src', ["'self'", 'data:', 'blob:']],
+      ['default-src', ["'none'"]],
+      ['script-src', ["'self'", "'wasm-unsafe-eval'"]],
       ['style-src', ["'self'", "'unsafe-inline'"]],
+      ['img-src', ["'self'", 'data:', 'blob:']],
+      ['font-src', ["'self'"]],
       ['worker-src', ["'self'", 'blob:']],
+      ['manifest-src', ["'self'"]],
+      ['form-action', ["'self'"]],
       ['frame-ancestors', ["'none'"]],
       ['base-uri', ["'self'"]],
       ['object-src', ["'none'"]],
@@ -275,9 +518,43 @@ function validateHeaders(
         actual.length !== expectedTokens.length ||
         expectedTokens.some((token, index) => actual[index] !== token)
       ) {
+        if (
+          directiveName === 'script-src' &&
+          actual?.includes("'unsafe-inline'")
+        ) {
+          violations.push(
+            "Content-Security-Policy script-src must not allow 'unsafe-inline'.",
+          );
+        }
         violations.push(
           `Content-Security-Policy directive "${directiveName}" must be "${expectedTokens.join(' ')}".`,
         );
+      }
+    }
+
+    const connectSrc = directives.get('connect-src');
+    if (!connectSrc || !connectSrc.includes("'self'")) {
+      violations.push(
+        "Content-Security-Policy connect-src must include 'self'.",
+      );
+    } else {
+      for (const token of connectSrc) {
+        if (!isValidConnectOriginToken(token)) {
+          violations.push(
+            `Content-Security-Policy connect-src contains invalid or overly broad source "${token}"; only "'self'" and explicit http(s)/ws(s) origins are allowed.`,
+          );
+        }
+      }
+      if (expectedConfig !== undefined) {
+        const expectedConnect = getExpectedConnectSrcTokens(expectedConfig);
+        if (
+          connectSrc.length !== expectedConnect.length ||
+          expectedConnect.some((token, index) => connectSrc[index] !== token)
+        ) {
+          violations.push(
+            `Content-Security-Policy connect-src ("${connectSrc.join(' ')}") does not match expected configured origins ("${expectedConnect.join(' ')}").`,
+          );
+        }
       }
     }
   }
@@ -316,30 +593,55 @@ function validateCustomHttpYaml(
   headers: Readonly<Record<string, string | undefined>>,
   violations: string[],
 ): void {
-  if (!customHttpYaml.includes('customHeaders:')) {
-    violations.push(
-      'customHttp.yml is missing the top-level "customHeaders:" key.',
-    );
+  let parsed: CustomHttpConfig;
+  try {
+    parsed = parseCustomHttpYaml(customHttpYaml);
+  } catch (error) {
+    violations.push(error instanceof Error ? error.message : String(error));
+    return;
   }
-  if (!customHttpYaml.includes("- pattern: '**/*'")) {
-    violations.push('customHttp.yml must declare pattern "**/*".');
+
+  if (parsed.customHeaders.length !== 1) {
+    violations.push(
+      `customHttp.yml must contain exactly 1 customHeaders rule (got ${parsed.customHeaders.length}).`,
+    );
+    return;
+  }
+
+  const rule = parsed.customHeaders[0];
+  if (!rule || rule.pattern !== '**/*') {
+    violations.push('customHttp.yml rule must declare pattern "**/*".');
+    return;
+  }
+
+  const seenKeys = new Set<string>();
+  for (const entry of rule.headers) {
+    if (seenKeys.has(entry.key)) {
+      violations.push(
+        `customHttp.yml contains duplicate header key "${entry.key}".`,
+      );
+    }
+    seenKeys.add(entry.key);
   }
 
   for (const key of SECURITY_HEADER_NAMES) {
     const expectedValue = headers[key];
-    if (!expectedValue) {
+    const matchingEntry = rule.headers.find((entry) => entry.key === key);
+    if (!matchingEntry) {
+      violations.push(`customHttp.yml is missing required header "${key}".`);
       continue;
     }
-    const expectedBlock = [
-      `      - key: ${key}`,
-      `        value: ${formatYamlString(expectedValue)}`,
-    ].join('\n');
-
-    if (!customHttpYaml.includes(expectedBlock)) {
+    if (expectedValue !== undefined && matchingEntry.value !== expectedValue) {
       violations.push(
-        `customHttp.yml is missing or out of sync for header "${key}".`,
+        `customHttp.yml value for header "${key}" does not match the active security policy.`,
       );
     }
+  }
+
+  if (rule.headers.length !== SECURITY_HEADER_NAMES.length) {
+    violations.push(
+      `customHttp.yml contains unexpected headers (expected ${SECURITY_HEADER_NAMES.length}, got ${rule.headers.length}).`,
+    );
   }
 }
 
@@ -353,7 +655,7 @@ export function validateBuiltHtmlAndHeaders(
   const violations: string[] = [];
 
   validateIndexHtml(options.indexHtml, violations);
-  validateHeaders(options.headers, violations);
+  validateHeaders(options.headers, options.expectedConfig, violations);
 
   if (options.customHttpYaml !== undefined) {
     validateCustomHttpYaml(options.customHttpYaml, options.headers, violations);

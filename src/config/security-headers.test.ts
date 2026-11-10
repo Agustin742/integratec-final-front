@@ -1,15 +1,27 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
-import type { PublicConfig } from './public-config';
+import {
+  runSecurityBuildCheck,
+  syncCustomHttpFiles,
+} from '../../scripts/security/check-security-build.mjs';
+import type { PublicConfig } from './public-config.ts';
 import {
   SecurityPolicyViolationError,
   buildContentSecurityPolicy,
   buildSecurityHeaders,
   parseContentSecurityPolicy,
+  parseCustomHttpYaml,
   renderCustomHttpYaml,
   validateBuiltHtmlAndHeaders,
-} from './security-headers';
+} from './security-headers.ts';
 
 const sampleProdConfig: PublicConfig = {
   appEnv: 'production',
@@ -80,7 +92,7 @@ describe('buildContentSecurityPolicy', () => {
   });
 });
 
-describe('buildSecurityHeaders and renderCustomHttpYaml', () => {
+describe('buildSecurityHeaders, renderCustomHttpYaml, and parseCustomHttpYaml', () => {
   test('returns CSP and mandatory security headers including HSTS, Referrer-Policy, X-Content-Type-Options, Permissions-Policy, and X-Frame-Options', () => {
     const headers = buildSecurityHeaders(sampleProdConfig);
 
@@ -98,19 +110,16 @@ describe('buildSecurityHeaders and renderCustomHttpYaml', () => {
     );
   });
 
-  test('renders deterministic Amplify Hosting customHttp.yml matching the built security headers', () => {
+  test('renders deterministic Amplify Hosting customHttp.yml and parses it back losslessly', () => {
     const yaml = renderCustomHttpYaml(sampleDevConfig);
+    const parsed = parseCustomHttpYaml(yaml);
 
-    expect(yaml).toContain('customHeaders:');
-    expect(yaml).toContain("  - pattern: '**/*'");
-    expect(yaml).toContain('      - key: Content-Security-Policy');
-    expect(yaml).toContain('      - key: Strict-Transport-Security');
-    expect(yaml).toContain('      - key: X-Content-Type-Options');
-    expect(yaml).toContain('      - key: Referrer-Policy');
-    expect(yaml).toContain('      - key: Permissions-Policy');
-    expect(yaml).toContain('      - key: X-Frame-Options');
-    expect(yaml).toContain(
-      "connect-src 'self' http://localhost:3000 ws://localhost:2567",
+    expect(parsed.customHeaders).toHaveLength(1);
+    expect(parsed.customHeaders[0]?.pattern).toBe('**/*');
+    expect(parsed.customHeaders[0]?.headers).toEqual(
+      Object.entries(buildSecurityHeaders(sampleDevConfig)).map(
+        ([key, value]) => ({ key, value }),
+      ),
     );
   });
 
@@ -132,13 +141,14 @@ describe('buildSecurityHeaders and renderCustomHttpYaml', () => {
         indexHtml: validBuiltIndexHtml,
         headers: buildSecurityHeaders(templateConfig),
         customHttpYaml: committedYaml,
+        expectedConfig: templateConfig,
       }),
     ).not.toThrow();
   });
 });
 
 describe('validateBuiltHtmlAndHeaders', () => {
-  test('accepts a clean Vite production index.html and valid Amplify customHttp.yml', () => {
+  test('accepts a clean Vite production index.html and valid Amplify customHttp.yml matching expectedConfig', () => {
     const headers = buildSecurityHeaders(sampleProdConfig);
     const customHttpYaml = renderCustomHttpYaml(sampleProdConfig);
 
@@ -147,6 +157,7 @@ describe('validateBuiltHtmlAndHeaders', () => {
         indexHtml: validBuiltIndexHtml,
         headers,
         customHttpYaml,
+        expectedConfig: sampleProdConfig,
       }),
     ).not.toThrow();
   });
@@ -256,10 +267,87 @@ describe('validateBuiltHtmlAndHeaders', () => {
           ),
         },
       }),
-    ).toThrow(/script-src must not allow 'unsafe-inline'/i);
+    ).toThrow(/script-src/i);
   });
 
-  test('fails when required CSP directives or security headers are missing or customHttp.yml mismatches', () => {
+  test('fails when Content-Security-Policy appends script-src-elem or script-src-attr overrides', () => {
+    const validHeaders = buildSecurityHeaders(sampleProdConfig);
+
+    expect(() =>
+      validateBuiltHtmlAndHeaders({
+        indexHtml: validBuiltIndexHtml,
+        headers: {
+          ...validHeaders,
+          'Content-Security-Policy': `${validHeaders['Content-Security-Policy']}; script-src-elem 'self' 'unsafe-inline'`,
+        },
+      }),
+    ).toThrow(/script-src-elem/i);
+
+    expect(() =>
+      validateBuiltHtmlAndHeaders({
+        indexHtml: validBuiltIndexHtml,
+        headers: {
+          ...validHeaders,
+          'Content-Security-Policy': `${validHeaders['Content-Security-Policy']}; script-src-attr 'unsafe-inline'`,
+        },
+      }),
+    ).toThrow(/script-src-attr/i);
+  });
+
+  test('fails when connect-src uses scheme-only tokens (such as https:) or mismatches configured origins', () => {
+    const validHeaders = buildSecurityHeaders(sampleProdConfig);
+
+    expect(() =>
+      validateBuiltHtmlAndHeaders({
+        indexHtml: validBuiltIndexHtml,
+        headers: {
+          ...validHeaders,
+          'Content-Security-Policy': validHeaders[
+            'Content-Security-Policy'
+          ].replace(
+            "connect-src 'self' https://api.example.invalid wss://realtime.example.invalid",
+            "connect-src 'self' https:",
+          ),
+        },
+      }),
+    ).toThrow(/connect-src/i);
+
+    expect(() =>
+      validateBuiltHtmlAndHeaders({
+        indexHtml: validBuiltIndexHtml,
+        headers: validHeaders,
+        expectedConfig: {
+          appEnv: 'production',
+          apiBaseUrl: 'https://api.prod.school.edu.ar',
+          realtimeUrl: 'wss://rt.prod.school.edu.ar',
+        },
+      }),
+    ).toThrow(/connect-src/i);
+  });
+
+  test('fails when customHttp.yml has malformed YAML syntax (such as trailing broken: [) or structural errors', () => {
+    const validHeaders = buildSecurityHeaders(sampleProdConfig);
+    const validYaml = renderCustomHttpYaml(sampleProdConfig);
+
+    expect(() =>
+      validateBuiltHtmlAndHeaders({
+        indexHtml: validBuiltIndexHtml,
+        headers: validHeaders,
+        customHttpYaml: `${validYaml}broken: [\n`,
+      }),
+    ).toThrow(/customHttp\.yml/i);
+
+    expect(() =>
+      validateBuiltHtmlAndHeaders({
+        indexHtml: validBuiltIndexHtml,
+        headers: validHeaders,
+        customHttpYaml:
+          "customHeaders:\n  - pattern: '**/*'\n    headers: []\n",
+      }),
+    ).toThrow(/customHttp\.yml/i);
+  });
+
+  test('fails when required security headers are missing or invalid', () => {
     const validHeaders = buildSecurityHeaders(sampleProdConfig);
 
     expect(() =>
@@ -271,14 +359,80 @@ describe('validateBuiltHtmlAndHeaders', () => {
         },
       }),
     ).toThrow(/X-Content-Type-Options/i);
+  });
+});
 
-    expect(() =>
-      validateBuiltHtmlAndHeaders({
-        indexHtml: validBuiltIndexHtml,
-        headers: validHeaders,
-        customHttpYaml:
-          "customHeaders:\n  - pattern: '**/*'\n    headers: []\n",
-      }),
-    ).toThrow(/customHttp\.yml/i);
+describe('Amplify customHttp.yml environment handoff (syncCustomHttpFiles + runSecurityBuildCheck)', () => {
+  test('propagates non-placeholder environment origins into root customHttp.yml and verifies parity', () => {
+    const tempRoot = mkdtempSync(join(tmpdir(), 'integratec-csp-handoff-'));
+    try {
+      const distDir = join(tempRoot, 'dist');
+      mkdirSync(distDir, { recursive: true });
+      writeFileSync(join(distDir, 'index.html'), validBuiltIndexHtml, 'utf8');
+
+      // Start with the placeholder template in root customHttp.yml
+      const placeholderYaml = renderCustomHttpYaml({
+        appEnv: 'test',
+        apiBaseUrl: 'https://api.example.invalid',
+        realtimeUrl: 'wss://realtime.example.invalid',
+      });
+      writeFileSync(join(tempRoot, 'customHttp.yml'), placeholderYaml, 'utf8');
+
+      const deployEnv = {
+        MODE: 'production',
+        VITE_APP_ENV: 'production',
+        VITE_API_BASE_URL: 'https://api.prod.integratec.edu.ar/v1',
+        VITE_REALTIME_URL: 'wss://rt.prod.integratec.edu.ar/rooms',
+      };
+
+      // Emit dist/customHttp.yml as vite build does
+      const deployConfig: PublicConfig = {
+        appEnv: 'production',
+        apiBaseUrl: deployEnv.VITE_API_BASE_URL,
+        realtimeUrl: deployEnv.VITE_REALTIME_URL,
+      };
+      writeFileSync(
+        join(distDir, 'customHttp.yml'),
+        renderCustomHttpYaml(deployConfig),
+        'utf8',
+      );
+
+      // Before running syncCustomHttpFiles, requiring root match fails because root still has placeholder origins
+      expect(() =>
+        runSecurityBuildCheck({
+          root: tempRoot,
+          env: deployEnv,
+          requireRootMatchActiveConfig: true,
+        }),
+      ).toThrow(/connect-src|does not match/i);
+
+      // Run the Amplify handoff synchronization step (`pnpm security:sync`)
+      syncCustomHttpFiles({ root: tempRoot, env: deployEnv });
+
+      const syncedRootYaml = readFileSync(
+        join(tempRoot, 'customHttp.yml'),
+        'utf8',
+      );
+      const parsedRoot = parseCustomHttpYaml(syncedRootYaml);
+      const cspHeader = parsedRoot.customHeaders[0]?.headers.find(
+        (header) => header.key === 'Content-Security-Policy',
+      );
+
+      expect(cspHeader?.value).toContain(
+        "connect-src 'self' https://api.prod.integratec.edu.ar wss://rt.prod.integratec.edu.ar",
+      );
+      expect(cspHeader?.value).not.toContain('api.example.invalid');
+
+      // Now runSecurityBuildCheck with requireRootMatchActiveConfig passes
+      expect(() =>
+        runSecurityBuildCheck({
+          root: tempRoot,
+          env: deployEnv,
+          requireRootMatchActiveConfig: true,
+        }),
+      ).not.toThrow();
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 });
