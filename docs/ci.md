@@ -33,7 +33,7 @@ After a successful install, five separate steps invoke [the check helper](../scr
 | `test`         | `pnpm test`         | Non-watch component checks                            |
 | `build`        | `pnpm build`        | Typecheck, then production bundle                     |
 
-The `Build frontend` step supplies explicit, non-secret test placeholders (`VITE_APP_ENV=test`, `VITE_API_BASE_URL=https://api.example.invalid`, `VITE_REALTIME_URL=wss://realtime.example.invalid`) to satisfy the build-time public configuration boundary ([issue #15](https://github.com/Agustin742/integratec-final-front/issues/15)).
+The `Build frontend` step supplies explicit, non-secret test placeholders (`VITE_APP_ENV=test`, `VITE_API_BASE_URL=https://api.example.invalid`, `VITE_REALTIME_URL=wss://realtime.example.invalid`) to satisfy the build-time public configuration boundary ([issue #15](https://github.com/Agustin742/integratec-final-front/issues/15)), and immediately runs `pnpm security:check` ([issue #21](https://github.com/Agustin742/integratec-final-front/issues/21), [security guide](security.md)) to verify that `dist/index.html` contains no inline scripts and that `dist/customHttp.yml` and root `customHttp.yml` enforce the strict FD1 Content-Security-Policy.
 
 The helper checks each script's presence before running it. A missing script emits a GitHub notice and records `Skipped (script absent)`, not a passing check. A missing `test` script also adds a **Tests not configured** summary with an explicit no-tests-run message.
 

@@ -24,17 +24,30 @@ export default tseslint.config(
           message:
             'Do not read import.meta.env directly in feature code. Use getPublicConfig() from src/config/public-config.ts.',
         },
+        {
+          selector: "JSXAttribute[name.name='dangerouslySetInnerHTML']",
+          message:
+            'Do not use dangerouslySetInnerHTML (FD1 XSS mitigation, rules/security.md). Render safe React elements instead.',
+        },
       ],
     },
   },
   {
     files: ['src/config/**/*.ts'],
     rules: {
-      'no-restricted-syntax': 'off',
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "JSXAttribute[name.name='dangerouslySetInnerHTML']",
+          message:
+            'Do not use dangerouslySetInnerHTML (FD1 XSS mitigation, rules/security.md). Render safe React elements instead.',
+        },
+      ],
     },
   },
   {
-    files: ['*.config.{ts,js}'],
+    files: ['*.config.{ts,js}', 'scripts/**/*.mjs'],
+    extends: [js.configs.recommended, ...tseslint.configs.recommended],
     languageOptions: { globals: globals.node },
   },
 );
