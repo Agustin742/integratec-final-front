@@ -1,5 +1,14 @@
 # Tracker — Alejo
 
+## 2026-11-10 — Implement session lifecycle (#18)
+
+- **Status:** in-progress.
+- **Area / files:** `src/api/`, new session integration, session tests and documentation; branch `feat/18-session-lifecycle`.
+- **Change:** Reviewing current backend `develop` contracts and implementing [front #18](https://github.com/Agustin742/integratec-final-front/issues/18). Backend dependencies #18/#20 are closed; refresh rotation includes a 30-second reuse grace window. No login screens, route guards or realtime rejoin included.
+- **Reason:** Provide safe session restoration, bounded refresh and account-isolated cleanup against the published backend contract.
+- **Checks:** Pending. Initial shell is Node 24.15.0/pnpm 10.34.9; project declares Node 22.23.4. Native CLI is not on PATH; no review outcome claimed.
+- **Next step:** Sync generated contracts, implement and test lifecycle, then independent security/concurrency verification. No publishing authorized.
+
 ## 2026-11-05 — Address PR #68 review findings (#14)
 
 - **Status:** completed (code, tests and documentation pushed; screenshots and size-exception approval pending in the pull request).
