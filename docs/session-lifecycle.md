@@ -23,8 +23,8 @@ Refresh rotates both credentials. The session retains its original expiry. The p
 
 ## T2 service integration
 
-T2 adds no React integration, routes, login screen, Query cache owner, Zustand store
-or realtime connection. T3 owns React/cleanup integration and safe redirects;
+T2 supplies the framework-independent core; T3 adds React/Query cleanup integration
+and safe redirects below. No Zustand store or realtime connection exists yet;
 screens, guards and realtime rejoin remain outside this feature. See
 [session rules](../rules/authentication-and-session.md),
 [state ownership](../rules/state-management.md),
@@ -48,7 +48,7 @@ const unsubscribe = controller.subscribe(() => {
   void snapshot;
 });
 const unregisterCleanup = controller.registerCleanup(() => {
-  // T3 owner: synchronously clear private Query/Zustand state and release realtime.
+  // Consumer owner: synchronously clear private state and release subscriptions.
 });
 await controller.initialize();
 // After authentication, a typed protected request:
@@ -59,7 +59,7 @@ unsubscribe();
 unregisterCleanup();
 ```
 
-`getSnapshot` and `subscribe` are stable methods suitable for T3's
+`getSnapshot` and `subscribe` are stable methods used by the React
 `useSyncExternalStore` integration. `login(LoginRequestDto)` returns
 `{ ok, cleanupFailed }`; `logout()` returns `{ serverConfirmed, cleanupFailed }`.
 The application must distinguish failed login from an uncertain session via the
@@ -69,6 +69,36 @@ failure flag, including automatic invalidation. It never exposes caught errors.
 Each registration returns its own unregister function, even when callbacks are
 identical. Cleanup callbacks must be synchronous; their owners release any async
 resources without delaying local removal. One throwing owner does not skip others.
+
+## React ownership and safe redirects (T3)
+
+`src/main.tsx` constructs one `SessionService` outside rendering and passes it to
+`SessionProvider` inside the existing `ApiQueryProvider`. The public App/showcase
+is not gated. Provider effects register cleanup, invoke core single-flight
+`initialize()`, and unregister on teardown; StrictMode does not duplicate the
+pending identity request. Unmount detaches integration, not an implicit logout.
+
+- `useSessionService()` exposes the existing controller and typed client;
+  `useSessionSnapshot()` subscribes without starting network work.
+- `AuthenticatedContent` is opt-in: only `authenticated` renders children. Callers
+  supply accessible `fallback` content for initializing, unauthenticated and
+  unable-to-verify states, including appropriate status/recovery semantics. It
+  adds no strings, styling, route navigation or authorization guarantee.
+- The provider uses the actual context QueryClient: transitions synchronously
+  cancel queries and clear both Query and Mutation caches, without awaiting
+  cancellation. Non-abortable server mutations cannot be undone by clearing a
+  browser cache; future mutation owners must not write stale completion data.
+- `useSessionCleanup(release)` registers a synchronous private-state/subscription
+  release callback in an effect. Keep its identity stable where practical. Future
+  Zustand, realtime and scene owners register their own callbacks and unregister
+  on teardown; non-React owners use `controller.registerCleanup` directly. No
+  hypothetical consumer is installed. Core catches exceptions and reports them
+  through `getCleanupFailure()` and operation results; consumers must handle that
+  safe flag, not assume cleanup succeeded.
+- `safeSessionRedirect(unknown)` accepts exactly `/`; everything else falls back
+  to `/`. There is no caller-controlled fallback or URL normalization. External,
+  protocol-relative, backslash/encoded, query/hash and unapproved paths are not
+  accepted. Expanding the allowlist belongs to a future approved route story.
 
 ## Credentials and recovery
 
@@ -118,8 +148,13 @@ pnpm exec eslint src/session
 pnpm exec prettier --check src/session docs/session-lifecycle.md
 ```
 
-T3/T4 still own React/query integration, safe redirects, full-suite/build checks,
-browser/manual checks and independent verification. Tab-close/new-tab behavior has
+T3 controlled React/service tests cover S6/S9: StrictMode pending initialization,
+subscription ownership, unresolved-content withholding, synchronous query abort and
+Query/Mutation removal, late-result isolation, account replacement, cleanup release
+and failures, service replacement/unmount, and exact redirect matching. S14 remains
+excluded. T4/parent still own full-suite/build checks, independent verification and
+applicable browser/manual checks for S13. No screen, controls or layout were added;
+caller-provided fallback accessibility remains the caller's responsibility. Tab-close/new-tab behavior has
 not been manually verified here. Browser session restoration and opener-cloned
 `sessionStorage` need explicit browser verification; do not claim every new tab
 starts empty solely because storage is tab-scoped. No live backend was contacted.
