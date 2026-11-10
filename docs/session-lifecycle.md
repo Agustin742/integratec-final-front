@@ -175,14 +175,44 @@ T3 controlled React/service tests cover S6/S9: StrictMode pending initialization
 subscription ownership, unresolved-content withholding, synchronous query abort and
 Query/Mutation removal, late-result isolation, account replacement, cleanup release
 and failures, service replacement/unmount, and exact redirect matching. S14 remains
-excluded. T4/parent still own full-suite/build checks, independent verification and
-applicable browser/manual checks for S13. No screen, controls or layout were added;
-caller-provided fallback accessibility remains the caller's responsibility.
+excluded. No screen, controls or layout were added; caller-provided fallback
+accessibility remains the caller's responsibility.
 
-The original parent Chromium 156/mock-API probe passed 5/6 scenarios and failed
-opener cloning; its ignored report/script remain unchanged. Correction tests model
-opener-copy rejection, same-owner reload, unavailable ownership and cache isolation;
-the corrected real-browser reproduction is still parent-owned and unverified here.
+### Corrected candidate checks
+
+Parent checks against correction `e63a7aa` used Node 22.23.4/pnpm 10.34.9 and
+reserved example API/realtime URLs, never production credentials:
+
+| Check                                                    | Observed result                         |
+| -------------------------------------------------------- | --------------------------------------- |
+| Full unit/component suite                                | 228/228 passed, 24 files                |
+| Lint, typecheck, production build, configured formatting | Passed, exit 0 each                     |
+| Existing desktop/mobile Playwright suite                 | 16/16 passed after correction           |
+| Targeted Chromium 156 session scenarios                  | 6/6 passed after correction             |
+| Independent blocker-only recheck                         | 8/8 passed, exit 0; bounded scope below |
+
+The one independent recheck verified six B1 cases (observed `401` plus offline/503,
+expiry-only uncertainty and a `401` joining an expiry-started refresh), one B2
+StrictMode case (cache removal/abort before the first new-account child render,
+old/new owner isolation and unmount), and one B3 ordinary-opener/default-storage
+case with same-owner reload. This closes the confirmed-blocker correction cycle,
+not universal S11 or the full issue. Native committed-unit assessments reported
+`reviewDue: false`; no native review approval is claimed.
+
+The Chromium scenarios cover a fresh tab, storage-only login, reload with server
+identity reconstruction, an ordinary opener-created tab, confirmed logout and
+ordinary tab close/new-tab reopen. The API is mocked: these are real browser
+storage checks, not live backend integration or human manual verification.
+
+The original Chromium probe failed 1/6 on opener cloning; its report remains at
+ignored `odd/artifacts/session-checks/browser-session-proof.json`. The corrected
+6/6 report is separate under `odd/artifacts/session-checks/after-correction/`.
+Earlier failed unit/independent
+probes remain part of the work history; the isolated verifier's old scratch files
+were removed by runtime cleanup, so their existence is not claimed. Initial global
+formatting failed on 76 untouched CRLF checkout files; each was verified to normalize
+exactly to its HEAD blob before local-only normalization. No Git configuration or
+authored content changed, and the configured formatting check then passed.
 
 **S11 limitation requiring a product/browser-policy decision:** browsers may restore
 both `sessionStorage` and `window.name` on tab recovery or duplication. A copied

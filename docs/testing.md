@@ -50,9 +50,13 @@ seed a new tab with a copy. The browser discriminator pairs a nonsecret `window.
 nonce with storage metadata and rejects ordinary opener copies before protected
 requests. Restoring or duplicating both values may be indistinguishable from reload:
 S11 remains open for product/browser-policy resolution, not silently weakened.
-The parent's original Chromium 156/mock-API result (5/6, opener failed) is preserved;
-corrected real-browser reproduction remains unverified here. Full-suite/build and
-independent verification remain parent/T4 work. MutationCache clearing is not
+The parent's original Chromium 156/mock-API failure (5/6, opener failed) is preserved
+separately from the corrected 6/6 result. Against correction `e63a7aa`, the full
+suite passed 228/228, existing desktop/mobile Playwright passed 16/16, and lint,
+typecheck, production build and configured formatting passed. The one independent
+blocker-only recheck passed 8/8; see the linked session evidence for its scope.
+Alejo explicitly deferred universal recovery/duplication to a future PR question;
+S11 is not waived or complete. MutationCache clearing is not
 cancellation of already-running async callbacks: consumers must fence completion
 writes against session ownership after awaits. No hypothetical mutation framework,
 new screen or focus/layout interaction is introduced by this correction.
