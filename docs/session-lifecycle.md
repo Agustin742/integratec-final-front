@@ -187,6 +187,39 @@ and failures, service replacement/unmount, and exact redirect matching. No scree
 controls or layout were added; caller-provided fallback accessibility remains the
 caller's responsibility.
 
+### PR review correction verification
+
+The correction in `6fca493` was checked with Node 22.23.4/pnpm 10.34.9:
+
+| Check                                                             | Observed result                    |
+| ----------------------------------------------------------------- | ---------------------------------- |
+| Local full unit/component suite                                   | 236/236 passed, 24 files           |
+| Local lint, typecheck, configured formatting and production build | Passed, exit 0 each                |
+| Local documentation links                                         | Passed, 59 files                   |
+| Independent isolated focused regression suite                     | 86/86 passed, 7 files              |
+| Independent additional cancellation/storage/recovery probes       | 20/20 passed, 2 scratch-only files |
+| Independent candidate typecheck                                   | Passed, exit 0                     |
+
+Independent checks covered exact Error/DOMException cancellation identity through
+both request wrappers, initial requests and read replay, caller cancellation,
+logout/account ownership fences, retry exclusion, unchanged network failures,
+standalone storage validation without dynamic code, and initialization after a
+rotated token pair followed by a profile `503`. They asserted request counts,
+credentials, cleanup and resulting session state. The installed
+`openapi-fetch@0.17.0` error middleware contract was also inspected.
+
+The first local full-suite run had one existing App test timeout; the unchanged
+test then passed in isolation and the full suite passed without increasing any
+timeouts. Its original timing cause was not established. Two earlier independent
+attempts stopped during preparation and executed zero tests: an unsupported CLI
+flag, then an incorrectly nested dependency store. Both remain failed attempts,
+not test passes. After explicit authorization and preparation repair, the final
+isolated attempt installed all 511 locked packages offline and ran the checks above.
+
+These results do not claim new browser/manual, live-backend, deployed-CSP or
+production authorization evidence. The historical browser results below apply to
+their original revision.
+
 ### Historical checks
 
 Checks against correction `e63a7aa` used Node 22.23.4/pnpm 10.34.9 and
