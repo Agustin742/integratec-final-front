@@ -17,13 +17,13 @@ Backend dependencies [#18](https://github.com/Agustin742/integratec-final-back/i
 pnpm api:sync --branch 419240443c6de648ca31f1eb892cff6fb84a3205
 ```
 
-The sync also downloads the Colyseus runtime room-state class. This session-only change commits REST types and shared payload contracts, not that runtime class: it requires the `@colyseus/schema` dependency planned with the Colyseus client. The downloaded room-state artifact is kept locally under ignored `odd/contracts/`; no generated content was hand-edited.
+The sync also downloads the Colyseus runtime room-state class. This session-only change commits REST types and shared payload contracts, not that runtime class: it requires the `@colyseus/schema` dependency planned with the Colyseus client. The downloaded room-state class is not part of the delivered session runtime; no generated content was hand-edited.
 
 Refresh rotates both credentials. The session retains its original expiry. The published contract allows recently rotated refresh credentials within `REFRESH_REUSE_GRACE` (default 30 seconds); reuse beyond this window revokes the session. Invalid refresh credentials return the same generic `401`, with no distinct reuse error. Frontend renewal must still be single-flight.
 
-## T2 service integration
+## Service integration
 
-T2 supplies the framework-independent core; T3 adds React/Query cleanup integration
+The framework-independent core supports React/Query cleanup integration
 and safe redirects below. No Zustand store or realtime connection exists yet;
 screens, guards and realtime rejoin remain outside this feature. See
 [session rules](../rules/authentication-and-session.md),
@@ -70,7 +70,7 @@ Each registration returns its own unregister function, even when callbacks are
 identical. Cleanup callbacks must be synchronous; their owners release any async
 resources without delaying local removal. One throwing owner does not skip others.
 
-## React ownership and safe redirects (T3)
+## React ownership and safe redirects
 
 `src/main.tsx` constructs one `SessionService` outside rendering and passes it to
 `SessionProvider` inside the existing `ApiQueryProvider`. The public App/showcase
@@ -154,88 +154,99 @@ remains application-owned; its pending identity initialization is shared on remo
 - Epochs and abort signals isolate account changes, login, refresh, logout and
   protected responses. Middleware buffers response bodies before its final epoch
   check so a slow body from the previous account cannot escape as parsed data.
-  This client is for bounded REST payloads, not streaming endpoints.
+  This client is for bounded REST payloads, not streaming endpoints. Expected
+  `AbortError` cancellations are rethrown unchanged by request wrappers and
+  middleware (including read replay), not mapped to retryable network errors.
+- Storage configures Zod's jitless validation on standalone import, so it never
+  needs a dynamic `Function` probe regardless of application import order.
+- If renewal succeeds but `/users/me` returns a transient failure, a later explicit
+  `initialize()` reuses the rotated credentials and verifies identity again.
 
 ## Verification and remaining work
 
-Synthetic controlled-fetch tests cover S2–S5, S7–S8, S10 and S12 through the public
-factory/controller/client boundary, including concurrent/delayed `401`, expiry,
-unsafe writes, malformed storage/DTOs, uncertain failures, cleanup exceptions and
-late account responses. They do not establish live backend authorization or CSP.
-Node 22.23.4 is required; run the focused checks from the repository root:
+Synthetic controlled-fetch tests exercise the public factory/controller/client:
+concurrent/delayed `401`, expiry, unsafe writes, malformed storage/DTOs, uncertain
+failures, cleanup exceptions and late account responses. Focused regressions cover
+caller/logout cancellation without retry classification, exact cancellation error
+preservation, genuine network failures, standalone CSP-safe storage validation and
+explicit initialization recovery using rotated credentials.
+
+Use Node 22.23.4/pnpm 10.34.9 from the repository root:
 
 ```sh
-pnpm exec vitest run src/session
+pnpm exec vitest run src/api/client.test.ts src/api/query-client.test.tsx src/session
 pnpm typecheck
-pnpm exec eslint src/session
-pnpm exec prettier --check src/session docs/session-lifecycle.md
+pnpm lint
+pnpm format:check
 ```
 
-T3 controlled React/service tests cover S6/S9: StrictMode pending initialization,
+Controlled React/service tests cover StrictMode pending initialization,
 subscription ownership, unresolved-content withholding, synchronous query abort and
 Query/Mutation removal, late-result isolation, account replacement, cleanup release
-and failures, service replacement/unmount, and exact redirect matching. S14 remains
-excluded. No screen, controls or layout were added; caller-provided fallback
-accessibility remains the caller's responsibility.
+and failures, service replacement/unmount, and exact redirect matching. No screen,
+controls or layout were added; caller-provided fallback accessibility remains the
+caller's responsibility.
 
-### Corrected candidate checks
+### Historical checks
 
-Parent checks against correction `e63a7aa` used Node 22.23.4/pnpm 10.34.9 and
-reserved example API/realtime URLs, never production credentials:
+Checks against correction `e63a7aa` used Node 22.23.4/pnpm 10.34.9 and
+reserved example API/realtime URLs, never production credentials. These results
+apply to that revision, not subsequent changes:
 
-| Check                                                    | Observed result                         |
-| -------------------------------------------------------- | --------------------------------------- |
-| Full unit/component suite                                | 228/228 passed, 24 files                |
-| Lint, typecheck, production build, configured formatting | Passed, exit 0 each                     |
-| Existing desktop/mobile Playwright suite                 | 16/16 passed after correction           |
-| Targeted Chromium 156 session scenarios                  | 6/6 passed after correction             |
-| Independent blocker-only recheck                         | 8/8 passed, exit 0; bounded scope below |
+| Check                                                    | Observed result               |
+| -------------------------------------------------------- | ----------------------------- |
+| Full unit/component suite                                | 228/228 passed, 24 files      |
+| Lint, typecheck, production build, configured formatting | Passed, exit 0 each           |
+| Existing desktop/mobile Playwright suite                 | 16/16 passed after correction |
+| Targeted Chromium 156 session scenarios                  | 6/6 passed after correction   |
+| Independent bounded recheck                              | 8/8 passed, exit 0            |
 
-The one independent recheck verified six B1 cases (observed `401` plus offline/503,
-expiry-only uncertainty and a `401` joining an expiry-started refresh), one B2
-StrictMode case (cache removal/abort before the first new-account child render,
-old/new owner isolation and unmount), and one B3 ordinary-opener/default-storage
-case with same-owner reload. This closes the confirmed-blocker correction cycle,
-not universal S11 or the full issue. Native committed-unit assessments reported
-`reviewDue: false`; no native review approval is claimed.
+The independent recheck verified six renewal cases (observed `401` plus
+offline/503, expiry-only uncertainty and a `401` joining an expiry-started refresh),
+one StrictMode ownership case (cache removal/abort before the first new-account
+child render, old/new owner isolation and unmount), and one ordinary-opener case
+with default storage and same-owner reload. This was bounded verification, not
+proof of the full issue or native review approval.
 
 The Chromium scenarios cover a fresh tab, storage-only login, reload with server
 identity reconstruction, an ordinary opener-created tab, confirmed logout and
 ordinary tab close/new-tab reopen. The API is mocked: these are real browser
 storage checks, not live backend integration or human manual verification.
 
-The original Chromium probe failed 1/6 on opener cloning; its report remains at
-ignored `odd/artifacts/session-checks/browser-session-proof.json`. The corrected
-6/6 report is separate under `odd/artifacts/session-checks/after-correction/`.
-Earlier failed unit/independent
-probes remain part of the work history; the isolated verifier's old scratch files
-were removed by runtime cleanup, so their existence is not claimed. Initial global
-formatting failed on 76 untouched CRLF checkout files; each was verified to normalize
-exactly to its HEAD blob before local-only normalization. No Git configuration or
-authored content changed, and the configured formatting check then passed.
+The original Chromium probe passed 5/6 and failed on opener cloning; the corrected
+run passed 6/6. Earlier failed unit/independent probes remain historical failures,
+not passes; old isolated scratch files were removed by runtime cleanup and are not
+delivered evidence. Initial global formatting failed on 76 untouched CRLF checkout
+files; each was verified to normalize exactly to its HEAD blob before local-only
+normalization. No Git configuration or authored content changed, and the configured
+formatting check then passed.
 
-**S11 limitation requiring a product/browser-policy decision:** browsers may restore
-both `sessionStorage` and `window.name` on tab recovery or duplication. A copied
-storage/name pair is indistinguishable from a reload to this mechanism. Therefore
-this correction addresses ordinary opener cloning but does not establish the
-mandatory login-on-every-new/recovered-tab rule. That rule remains open, not waived.
-Do not claim all duplicate/restore behavior is solved; no broadcast infrastructure
-or implicit requirement exception was added. Manual-human checks, live role/foreign
-resource authorization, deployment CSP and browser restore behavior remain
-unverified. No live backend was contacted.
+Human-manual checks, live role/foreign-resource authorization, deployed CSP and
+browser Duplicate Tab/explicit restore behavior remain unverified. No live backend
+was contacted. The accepted policy below is not new browser verification.
 
-## Open question for the future pull request
+## Accepted browser continuity boundary
 
-Alejo explicitly deferred the unresolved recovery/duplication policy while asking
-that the remaining implementation and verification be finished. S11 remains open;
-this is neither an approved exception nor a claim that issue #18 is complete.
-
-Ask the team when preparing the separately authorized pull request:
-
-> Should recovering a closed tab or using the browser's Duplicate Tab action keep
-> the session, or must both require a new login? The implementation rejects
-> ordinary fresh/opener tabs and preserves same-tab reloads, but cannot distinguish
-> a reload from recovery that restores both storage and continuity metadata.
-
-Until the team resolves this question, retain the existing requirement and disclose
-this limitation in the PR. This local note does not authorize publishing or a merge.
+- **Question:** Must browser Duplicate Tab and explicit closed-tab restoration
+  always require a new login, even when both continuity values are cloned?
+- **Decision:** Fresh tabs and ordinary opener-created tabs require login;
+  same-tab F5/reload preserves continuity and rebuilds identity from `/users/me`.
+  Browser Duplicate Tab or explicit closed-tab restore that clones both
+  `sessionStorage` and `window.name` is an accepted user-agent boundary. Ordinary
+  close/new-tab reopen requires login; universal no-recovery is not guaranteed.
+- **Rationale:** A copied storage/name pair is indistinguishable from reload to
+  this mechanism. The nonsecret discriminator rejects ordinary opener copies
+  without changing token storage or adding cross-tab infrastructure.
+- **Alternatives:** Requiring login on all duplication/restoration would need a
+  stronger lifecycle mechanism; invalidating every reload would sacrifice the
+  agreed same-tab refresh behavior. Neither was selected.
+- **Approval:** TheKade accepted this boundary in the
+  [PR #72 review](https://github.com/Agustin742/integratec-final-front/pull/72#issuecomment-6776443564);
+  Alejo explicitly adopted it ("dale, hagamos todo eso"). The same review accepted
+  the original core's size exception; later changes remain separate reviewable
+  work units, not a renewed blanket exception.
+- **Scope and review condition:** Only browser-level cloning of both continuity
+  values is accepted. This does not relax token clearing, account isolation,
+  backend authorization or CSP. Revisit if browser behavior defeats ordinary
+  fresh/opener rejection or the team requires stronger restore isolation. See
+  [the authoritative session rule](../rules/authentication-and-session.md#token-storage-and-transport).

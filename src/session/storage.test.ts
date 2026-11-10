@@ -4,6 +4,39 @@ import { harness, login, memoryStorage, storageKey } from './test-fixtures';
 
 afterEach(() => vi.unstubAllGlobals());
 
+test('standalone storage validates invalid and valid credentials without a dynamic Function probe', async () => {
+  vi.resetModules();
+  const { z } = await import('zod');
+  const previous = z.config().jitless;
+  z.config({ jitless: false });
+  const dynamicFunction = vi.fn(function () {
+    throw new EvalError('CSP blocks dynamic code');
+  });
+  vi.stubGlobal('Function', dynamicFunction);
+  try {
+    const { createSessionStorage, SESSION_STORAGE_KEY } =
+      await import('./storage');
+    const storage = memoryStorage(JSON.stringify({ accessToken: '' }));
+    const session = createSessionStorage(storage);
+    expect(session.read()).toEqual({ unavailable: false });
+    expect(storage.getItem(SESSION_STORAGE_KEY)).toBeNull();
+    const credentials = {
+      accessToken: 'synthetic-access',
+      refreshToken: 'synthetic-refresh',
+      tokenType: 'Bearer' as const,
+      expiresIn: 900,
+      expiresAt: 900_000,
+    };
+    expect(session.write(credentials)).toBe(true);
+    expect(session.read()).toEqual({ credentials, unavailable: false });
+    expect(dynamicFunction).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllGlobals();
+    z.config({ jitless: previous });
+    vi.resetModules();
+  }
+});
+
 test('copied credentials require the same tab owner before any protected request', async () => {
   const h = harness();
   const original = createSession({ ...h, tabOwner: () => 'tab-A' });

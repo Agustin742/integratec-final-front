@@ -6,6 +6,7 @@ import {
   json,
   login,
   profile,
+  rotated,
   saved,
   storageKey,
   tokens,
@@ -121,6 +122,40 @@ describe('session lifecycle public boundary', () => {
     await controller.initialize();
     expect(controller.getSnapshot()).toEqual({ status: 'unable-to-verify' });
     expect(h.storage.getItem(storageKey)).toBe(before);
+  });
+
+  test('initialization recovers after refresh succeeds but profile verification returns 503', async () => {
+    let recovered = false;
+    const h = harness((request) => {
+      if (request.url.endsWith('/auth/refresh')) return json(rotated);
+      return recovered ? json(profile) : json({}, 503);
+    }, saved(0));
+    const { controller } = createSession(h);
+    await controller.initialize();
+    expect(controller.getSnapshot()).toEqual({ status: 'unable-to-verify' });
+    const stored = h.storage.getItem(storageKey);
+    expect(JSON.parse(stored!)).toMatchObject(rotated);
+    expect(h.requests).toHaveLength(2);
+    expect(await h.requests[0].json()).toEqual({
+      refreshToken: tokens.refreshToken,
+    });
+    recovered = true;
+    await controller.initialize();
+    expect(controller.getSnapshot()).toEqual({
+      status: 'authenticated',
+      user: profile,
+    });
+    expect(h.requests).toHaveLength(3);
+    expect(
+      h.requests
+        .slice(1)
+        .every(
+          (request) =>
+            request.headers.get('Authorization') ===
+            `Bearer ${rotated.accessToken}`,
+        ),
+    ).toBe(true);
+    expect(h.storage.getItem(storageKey)).toBe(stored);
   });
 
   test('credentials never reach localStorage, logs, URLs, snapshots or transport errors', async () => {

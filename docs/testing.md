@@ -31,7 +31,7 @@ Use real timers by default, and always for axe. For timer-dependent behavior, op
 ## Session lifecycle checks
 
 Run `pnpm exec vitest run src/session/provider.test.tsx src/session/redirect.test.ts`
-for T3's React/service boundary: synthetic controlled fetch and injected memory
+for the React/service boundary: synthetic controlled fetch and injected memory
 storage, real QueryClient cancellation/cache clearing, private release callbacks,
 StrictMode and unmount ownership, unresolved/protected rendering and malicious
 redirect inputs. Core coverage remains in `src/session/controller.test.ts` and
@@ -49,14 +49,23 @@ survives reload and may be restored by browser session recovery; an opener can
 seed a new tab with a copy. The browser discriminator pairs a nonsecret `window.name`
 nonce with storage metadata and rejects ordinary opener copies before protected
 requests. Restoring or duplicating both values may be indistinguishable from reload:
-S11 remains open for product/browser-policy resolution, not silently weakened.
-The parent's original Chromium 156/mock-API failure (5/6, opener failed) is preserved
+this is an accepted browser boundary, not a universal no-recovery guarantee. See
+[the approved decision](session-lifecycle.md#accepted-browser-continuity-boundary).
+Fresh/opener tabs require login; same-tab F5/reload preserves continuity.
+The original Chromium 156/mock-API failure (5/6, opener failed) is recorded
 separately from the corrected 6/6 result. Against correction `e63a7aa`, the full
 suite passed 228/228, existing desktop/mobile Playwright passed 16/16, and lint,
 typecheck, production build and configured formatting passed. The one independent
 blocker-only recheck passed 8/8; see the linked session evidence for its scope.
-Alejo explicitly deferred universal recovery/duplication to a future PR question;
-S11 is not waived or complete. MutationCache clearing is not
+These historical results are not checks of subsequent review corrections.
+Focused regressions exercise public request cancellation across logout and caller
+abort (including read replay), exact `AbortError` preservation, non-retry
+classification and genuine network failures. Standalone storage tests block the
+global `Function` constructor, validate invalid/valid stored values and restore
+global changes; initialization recovery verifies rotated credentials after a
+transient profile `503`. Run them together with
+`pnpm exec vitest run src/api/client.test.ts src/api/query-client.test.tsx src/session`.
+No new browser/manual verification is claimed. MutationCache clearing is not
 cancellation of already-running async callbacks: consumers must fence completion
 writes against session ownership after awaits. No hypothetical mutation framework,
 new screen or focus/layout interaction is introduced by this correction.

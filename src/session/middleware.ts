@@ -80,8 +80,13 @@ export function createSessionMiddleware(
             replay.headers.set('Authorization', `Bearer ${port.access()}`);
             try {
               result = await options.fetch(replay);
-            } catch {
+            } catch (error) {
               assertSessionEpoch(port, context.epoch);
+              if (
+                (error instanceof Error || error instanceof DOMException) &&
+                error.name === 'AbortError'
+              )
+                throw error;
               throw mapNetworkError(undefined);
             }
           }
@@ -97,9 +102,14 @@ export function createSessionMiddleware(
         headers: result.headers,
       });
     },
-    onError({ request }) {
+    onError({ request, error }) {
       const context = contexts.get(request);
       if (context) assertSessionEpoch(port, context.epoch);
+      if (
+        (error instanceof Error || error instanceof DOMException) &&
+        error.name === 'AbortError'
+      )
+        throw error;
       return mapNetworkError(undefined);
     },
   };

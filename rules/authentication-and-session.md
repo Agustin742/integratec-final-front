@@ -14,7 +14,7 @@ The frontend must represent session state consistently without acting as the sec
 
 - Both the access token and the refresh token **MUST** be stored in `sessionStorage` (FD1). They **MUST NOT** be stored in `localStorage`, cookies, or any other persistent storage.
 - The access token **MUST** be sent as an `Authorization: Bearer` header; the refresh token **MUST** be sent only to the refresh endpoint. Because no cookies carry credentials, API calls need no CSRF token.
-- Each new tab or window requires login and the session ends when the tab closes; the interface **MUST NOT** assume a session survives either.
+- Fresh tabs/windows and ordinary opener-created tabs **MUST** require login; same-tab reload **MAY** preserve session continuity. The interface **MUST NOT** assume continuity after tab closure. Browser Duplicate Tab or explicit closed-tab restoration cloning both `sessionStorage` and `window.name` is an accepted user-agent boundary, not a universal no-recovery guarantee. Scope, rationale, alternatives, approval and review condition are recorded in the [browser continuity decision](../docs/session-lifecycle.md#accepted-browser-continuity-boundary).
 - Tokens are readable by any script running in the page, so these mitigations are mandatory:
   - The application **MUST** be served with a strict Content-Security-Policy: no inline scripts, no `unsafe-eval`, and allowlisted sources only.
   - The application **MUST NOT** render unsanitized HTML, and **MUST NOT** use `dangerouslySetInnerHTML` with user content ([Security](./security.md#input-transport-and-failures)).

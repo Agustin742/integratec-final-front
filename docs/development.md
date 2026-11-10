@@ -47,7 +47,7 @@ The [README command table](../README.md#local-development) matches `package.json
 
 ## Session integration
 
-[Session lifecycle](session-lifecycle.md#react-ownership-and-safe-redirects-t3)
+[Session lifecycle](session-lifecycle.md#react-ownership-and-safe-redirects)
 documents the renderless provider, read-only snapshot hook, opt-in authenticated
 content, cleanup registration and root-only redirect helper. The public bootstrap
 and showcase remain ungated. No router, login screen or realtime rejoin is added.

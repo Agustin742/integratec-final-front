@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import type { components } from '../api/schema.generated';
 
+// Storage can be imported without application configuration; remain CSP-safe.
+z.config({ jitless: true });
+
 export type TokenPair = components['schemas']['TokenPairResponseDto'];
 export type SessionStorage = Pick<
   Storage,

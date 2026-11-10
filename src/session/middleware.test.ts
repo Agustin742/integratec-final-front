@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
-import { createApiClient } from '../api/client';
+import { createApiClient, requestApi } from '../api/client';
+import { shouldRetryMutation, shouldRetryQuery } from '../api/query-client';
 import { createSession } from './controller';
 import {
   baseUrl,
@@ -212,6 +213,81 @@ describe('session middleware bounded recovery', () => {
     expect(h.fetch).not.toHaveBeenCalled();
   });
 
+  test.each(['caller', 'logout', 'replay'] as const)(
+    'public request cancellation during %s is never classified for retry',
+    async (mode) => {
+      const started = deferred<AbortSignal>();
+      let pending = false;
+      const h = harness((request) => {
+        if (request.url.endsWith('/auth/logout'))
+          return new Response(null, { status: 204 });
+        if (isRefresh(request)) return json(rotated);
+        if (!pending) return json(profile);
+        if (
+          mode === 'replay' &&
+          request.headers.get('Authorization') ===
+            `Bearer ${tokens.accessToken}`
+        )
+          return json({}, 401);
+        return new Promise<Response>((_, reject) => {
+          request.signal.addEventListener('abort', () =>
+            reject(request.signal.reason),
+          );
+          started.resolve(request.signal);
+        });
+      }, saved());
+      const { controller, client } = createSession(h);
+      await controller.initialize();
+      const before = h.storage.getItem(storageKey);
+      const caller = new AbortController();
+      pending = true;
+      const result = requestApi(() =>
+        client.GET('/users/me', { signal: caller.signal }),
+      ).catch((error: unknown) => error);
+      const signal = await started.promise;
+      const cancellation = new DOMException('Caller cancelled', 'AbortError');
+      if (mode === 'logout') await controller.logout();
+      else caller.abort(cancellation);
+      const error = await result;
+      expect(signal.aborted).toBe(true);
+      expect(error).toBeInstanceOf(DOMException);
+      expect(error).toMatchObject({ name: 'AbortError' });
+      if (mode !== 'logout') expect(error).toBe(cancellation);
+      expect(shouldRetryQuery(0, error)).toBe(false);
+      expect(shouldRetryMutation(0, error, { idempotent: true })).toBe(false);
+      expect(h.requests).toHaveLength(
+        mode === 'replay' ? 4 : mode === 'logout' ? 3 : 2,
+      );
+      expect(controller.getSnapshot().status).toBe(
+        mode === 'logout' ? 'unauthenticated' : 'authenticated',
+      );
+      if (mode === 'replay')
+        expect(JSON.parse(h.storage.getItem(storageKey)!)).toMatchObject(
+          rotated,
+        );
+      else
+        expect(h.storage.getItem(storageKey)).toBe(
+          mode === 'logout' ? null : before,
+        );
+    },
+  );
+
+  test('a genuine protected network failure remains retryable without changing session storage', async () => {
+    const h = harness(() => {
+      throw new TypeError('synthetic offline');
+    }, saved());
+    const before = h.storage.getItem(storageKey);
+    const { controller, client } = createSession(h);
+    const error: unknown = await requestApi(() =>
+      client.GET('/users/me'),
+    ).catch((error: unknown) => error);
+    expect(error).toMatchObject({ kind: 'network', status: null });
+    expect(shouldRetryQuery(0, error)).toBe(true);
+    expect(h.requests).toHaveLength(1);
+    expect(h.storage.getItem(storageKey)).toBe(before);
+    expect(controller.getSnapshot().status).toBe('initializing');
+  });
+
   test('late protected response is aborted after logout even when fetch ignores abort', async () => {
     const old = deferred<Response>();
     const h = harness(
@@ -222,7 +298,7 @@ describe('session middleware bounded recovery', () => {
       saved(),
     );
     const { controller, client } = createSession(h);
-    const read = client.GET('/users/me');
+    const read = requestApi(() => client.GET('/users/me'));
     const rejection = expect(read).rejects.toMatchObject({
       name: 'AbortError',
     });
