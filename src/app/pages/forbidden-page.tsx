@@ -1,12 +1,15 @@
+import { ForbiddenScene } from '@/components/illustrations/scenes';
 import { GoHomeLink } from '../router/go-home-link';
 import { messages } from '../messages';
-import { PlaceholderPage } from './placeholder-page';
+import { StatusView } from './status-view';
 
 /** Insufficient role inside a resource the user can reach (not a login problem). */
 export function ForbiddenPage() {
   return (
-    <PlaceholderPage {...messages.pages.forbidden}>
-      <GoHomeLink />
-    </PlaceholderPage>
+    <StatusView
+      {...messages.pages.forbidden}
+      scene={<ForbiddenScene className="h-auto w-full" />}
+      actions={<GoHomeLink />}
+    />
   );
 }

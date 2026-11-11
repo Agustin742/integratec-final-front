@@ -16,7 +16,14 @@ React Router (FD4) runs in data mode: `createBrowserRouter` with `RouterProvider
 
 Every page is a lazy route module (`lazy: { Component }`), so its chunk loads when it is first matched. The `/dev/ui` route exists only when `__UI_SHOWCASE__` is true (dev server and the `showcase` build used by the browser suite); a production build drops it and its chunk.
 
-All routes live under one layout route, `AppShell`: `BaseLayout` (skip link, banner with the only `h1`, `main`), `<Outlet />` and the single toast host. Pages use `h2` for their title.
+## Layouts
+
+Two pathless layout routes sit under the root route. Both mount the single toast host and a `main` landmark with the same id, and focus after navigation is handled once above them (`RouterRoot`), so moving between layouts (for example login to home) is still announced.
+
+- `AuthLayout` (`/login`, `/register`, `/password-reset`, `/invitations/accept`): a split screen with no sidebar. The brand panel (the only `h1`, the product name, a one-line value statement and a decorative classroom scene) comes first in the DOM, so on phones it stacks above the content and on wide screens it sits on the right. The form column is `[data-auth-slot]`: feature screens render their form inside it and inherit its width and surface.
+- `AppShell` (everything else, including the `*` catch-all): `BaseLayout` (skip link, banner with the only `h1`, `main`) and `<Outlet />`. It has no sidebar: navigation arrives with the features that need it, and an empty aside is not rendered. The showcase at `/dev/ui` is reached by URL only; nothing links to it. If the shell later gets signed-in-only chrome, move `*` to a neutral layout so a signed-out 404 does not show it.
+
+Pages use `h2` for their title. The not found, forbidden and error views share `StatusView` (a decorative scene from `src/components/illustrations/scenes.tsx`, title, explanation, actions) and take the width of whichever layout hosts them.
 
 The table leaves room for the parent area (extended scope): it mounts as its own branch next to the protected one, with its own guard. It is not implemented.
 
@@ -32,8 +39,8 @@ A 403 or 404 from a resource never reaches the guards, so it cannot cause a logi
 
 ## Errors, not found and forbidden
 
-- `RootErrorBoundary` sits above the shell. It is plain markup on purpose (no shared component) so it still renders if a shared primitive is what broke. It has no skip link because it has no shell.
-- `RouteErrorBoundary` sits inside the shell, so a page error replaces only the page area and the banner, navigation and toasts stay.
+- `RootErrorBoundary` sits above the layouts. It is plain markup on purpose (no shared component, no scene) so it still renders if a shared primitive is what broke; it is styled with token utility classes only. It has no skip link because it has no layout.
+- `RouteErrorBoundary` sits inside each layout, so a page error replaces only the page area and the banner and toasts stay.
 - `classifyRouteError` maps what was thrown to one of: not found (404), forbidden (403), stale chunk (a failed lazy import, offers a full reload) or unexpected (generic error with "Reintentar"). A 401 is never handled here; the session layer owns it.
 - Throw `notFound()` or `forbidden()` (from `route-errors.ts`) in a page, hook or loader to show those views. Error text, stack and server data are never rendered.
 

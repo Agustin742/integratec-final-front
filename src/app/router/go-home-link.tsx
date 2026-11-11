@@ -2,14 +2,39 @@ import { Link } from 'react-router';
 import { cn } from '@/lib/utils';
 import { messages } from '../messages';
 
-/** Shared with the root fallback, which renders a plain anchor instead of a router link. */
-export const homeLinkClass =
-  'inline-flex min-h-11 items-center rounded-xl bg-secondary px-5 py-2 font-display text-base font-semibold text-secondary-foreground focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring';
+const base =
+  'inline-flex min-h-11 items-center justify-center rounded-xl px-5 py-2 font-display text-base font-semibold focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring';
 
-/** Router link back to the start page, styled like the secondary button. */
-export function GoHomeLink({ className }: { className?: string }) {
+/** Secondary look; shared with the root fallback, which renders a plain anchor. */
+export const homeLinkClass = cn(
+  base,
+  'bg-secondary text-secondary-foreground [--key:var(--key-secondary)] key-bevel motion-press',
+);
+
+const primaryClass = cn(
+  base,
+  'bg-primary text-primary-foreground [--key:var(--key-primary)] key-bevel motion-press',
+);
+
+export type GoHomeLinkProps = {
+  className?: string;
+  /** `primary` when going home is the main way out, `secondary` next to another main action. */
+  variant?: 'primary' | 'secondary';
+};
+
+/** Router link back to the start page, styled like a resin-key button. */
+export function GoHomeLink({
+  className,
+  variant = 'primary',
+}: GoHomeLinkProps) {
   return (
-    <Link to="/" className={cn(homeLinkClass, className)}>
+    <Link
+      to="/"
+      className={cn(
+        variant === 'primary' ? primaryClass : homeLinkClass,
+        className,
+      )}
+    >
       {messages.errors.goHome}
     </Link>
   );

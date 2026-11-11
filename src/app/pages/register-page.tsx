@@ -1,6 +1,6 @@
 import { messages } from '../messages';
-import { PlaceholderPage } from './placeholder-page';
+import { AuthPlaceholderPage } from './auth-placeholder-page';
 
 export function RegisterPage() {
-  return <PlaceholderPage {...messages.pages.register} />;
+  return <AuthPlaceholderPage {...messages.pages.register} />;
 }

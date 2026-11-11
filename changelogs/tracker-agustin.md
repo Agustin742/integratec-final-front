@@ -1,5 +1,13 @@
 # Tracker — Agustin
 
+## 2026-11-11 — Visual pass: split auth layout and illustrated error views (#20, task 6)
+
+- **Status:** in-progress (feature complete, pending pull request)
+- **Area / files:** `PRODUCT.md`, `src/app/router/auth-layout.tsx`, `src/app/router/focus-on-navigation.tsx`, `src/app/router/app-shell.tsx`, `src/app/router/routes.tsx`, `src/app/router/error-boundaries.tsx`, `src/app/router/go-home-link.tsx`, `src/app/pages/`, `src/components/illustrations/scenes.tsx`, `src/components/layout/skip-link.tsx`, `src/app/messages.ts`, router tests, `e2e/ui-foundations.spec.ts`, `docs/routing.md`
+- **Change:** Login, register, password reset and invitation acceptance now use their own split-screen layout without a sidebar (a brand panel with a classroom scene drawn in inline SVG from the design tokens, and a form column ready for the feature forms). The 404, forbidden, unexpected-error and stale-version views are illustrated with the same scene style and have clear actions; the root fallback stays plain markup but is styled. The shell no longer shows the component showcase link (the `/dev/ui` route is unchanged and still dropped from production builds) and renders no empty sidebar. The skip link and focus-on-navigation moved into shared pieces so both layouts use them. Added `PRODUCT.md` with the confirmed product context.
+- **Reason:** The first pass had no design: placeholders lived inside the app shell, a dev-only link showed on every page and the error views were bare text.
+- **Next step:** Open the pull request to `develop`.
+
 ## 2026-11-11 — Skip link, focus, document title and router review gaps (#20, task 5)
 
 - **Status:** in-progress (feature complete, pending pull request)

@@ -11,8 +11,8 @@ component demonstration, not a classroom flow or a completed business action.
 
 ## Inspect the examples
 
-1. Follow the sidebar anchor to the component section or use the first keyboard
-   skip link to focus main.
+1. Open `/dev/ui` by URL (nothing links to it) and use the first keyboard skip
+   link to focus main.
 2. Inspect the loading, empty, success, validation and error examples.
 3. Switch tabs using arrows; open a Dialog or Sheet, then close with Escape.
 4. Trigger the local notification; it explicitly says no data was saved.
@@ -45,9 +45,9 @@ Component contracts: [controls](ui-controls.md), [feedback and tables](ui-displa
 ## Verification and remaining proof
 
 - `src/app/router/routes.test.tsx` renders the shared route table in a memory router
-  and protects the banner heading, page headings inside the shell, one notification
-  region, axe, the skip link and the document title on every page, the `/dev/ui`
-  showcase route (including a sidebar click that navigates client-side) and its
+  and protects the banner heading, page headings inside each layout, one notification
+  region, axe, the skip link and the document title on every page, the absence of a
+  sidebar and of any showcase link, the `/dev/ui` showcase route and its
   absence when the gate is off. Focus after navigation is covered in
   `app-shell.test.tsx`; see [routing](routing.md).
 - `ui-foundations.test.tsx` checks the five labeled states, validation associations

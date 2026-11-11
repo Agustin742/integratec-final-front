@@ -1,6 +1,6 @@
 import { messages } from '../messages';
-import { PlaceholderPage } from './placeholder-page';
+import { AuthPlaceholderPage } from './auth-placeholder-page';
 
 export function InvitationAcceptPage() {
-  return <PlaceholderPage {...messages.pages.invitationAccept} />;
+  return <AuthPlaceholderPage {...messages.pages.invitationAccept} />;
 }

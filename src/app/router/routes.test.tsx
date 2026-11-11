@@ -33,16 +33,22 @@ function renderAt(
   };
 }
 
-const pages = [
+const authPages = [
   ['/login', messages.pages.login.title],
   ['/register', messages.pages.register.title],
   ['/password-reset', messages.pages.passwordReset.title],
   ['/invitations/accept', messages.pages.invitationAccept.title],
-  ['/', messages.pages.home.title],
 ] as const;
 
+const pages = [...authPages, ['/', messages.pages.home.title]] as const;
+
+const noShowcaseLink = () =>
+  expect(
+    screen.queryByRole('link', { name: messages.showcase.title }),
+  ).not.toBeInTheDocument();
+
 test.each(pages)(
-  'renders %s lazily inside the application shell',
+  'renders %s lazily with one h1, one main and one toast host',
   async (path, title) => {
     const { container } = renderAt(path, { authenticated: path === '/' });
 
@@ -51,7 +57,7 @@ test.each(pages)(
     ).toBeVisible();
     const main = screen.getByRole('main');
     expect(within(main).getByRole('heading', { name: title })).toBeVisible();
-    // The shell header owns the only h1; pages must not add another.
+    // The layout header owns the only h1; pages must not add another.
     expect(
       within(main).queryByRole('heading', { level: 1 }),
     ).not.toBeInTheDocument();
@@ -61,10 +67,45 @@ test.each(pages)(
         name: messages.title,
       }),
     ).toBeVisible();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(
       screen.getAllByRole('region', { name: /Notificaciones/ }),
     ).toHaveLength(1);
     await expectAccessible(container);
+  },
+);
+
+test.each(pages)(
+  'never shows a sidebar or the showcase link on %s, even when the showcase is enabled',
+  async (path, title) => {
+    renderAt(path, { authenticated: path === '/', showcase: true });
+    await screen.findByRole('heading', { level: 2, name: title });
+
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+    noShowcaseLink();
+  },
+);
+
+test.each(authPages)(
+  'the auth layout on %s puts the brand panel above the form column and reserves a form slot',
+  async (path, title) => {
+    renderAt(path);
+    await screen.findByRole('heading', { level: 2, name: title });
+
+    const banner = screen.getByRole('banner');
+    const main = screen.getByRole('main');
+    // DOM order is the mobile stacking order: the panel comes first.
+    expect(
+      banner.compareDocumentPosition(main) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(banner).toHaveTextContent(messages.auth.tagline);
+    // The scene is decorative.
+    expect(banner.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    // Future forms drop into this slot.
+    expect(main.querySelector('[data-auth-slot]')).toContainElement(
+      within(main).getByRole('heading', { name: title }),
+    );
   },
 );
 
@@ -110,6 +151,24 @@ test('renders the not found page for an unknown path', async () => {
   await expectAccessible(container);
 });
 
+test('the catch-all 404 for a signed-out visitor shows no app-only chrome', async () => {
+  renderAt('/no-such-page', { showcase: true });
+
+  await screen.findByRole('heading', {
+    level: 2,
+    name: messages.pages.notFound.title,
+  });
+  expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+  expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+  noShowcaseLink();
+  expect(
+    screen.getByRole('link', { name: messages.errors.goHome }),
+  ).toHaveAttribute('href', '/');
+  expect(
+    screen.getByRole('main').querySelector('svg[aria-hidden="true"]'),
+  ).not.toBeNull();
+});
+
 test('serves the component showcase at /dev/ui when it is enabled', async () => {
   renderAt('/dev/ui', { showcase: true });
 
@@ -120,32 +179,10 @@ test('serves the component showcase at /dev/ui when it is enabled', async () => 
       { timeout: 5000 },
     ),
   ).toBeVisible();
-  expect(
-    screen.getByRole('link', { name: messages.showcase.title }),
-  ).toHaveAttribute('href', '/dev/ui');
   expect(document.title).toBe(`${messages.showcase.title} · ${messages.title}`);
+  // Reachable by URL only: no page links to it.
+  noShowcaseLink();
 });
-
-test('the showcase sidebar link navigates client-side and marks the current page', async () => {
-  const { router } = renderAt('/login', { showcase: true });
-  await screen.findByRole('heading', { name: messages.pages.login.title });
-  const link = screen.getByRole('link', { name: messages.showcase.title });
-  expect(link).not.toHaveAttribute('aria-current');
-
-  fireEvent.click(link);
-
-  expect(
-    await screen.findByRole(
-      'heading',
-      { level: 2, name: messages.showcase.title },
-      { timeout: 10_000 },
-    ),
-  ).toBeVisible();
-  expect(router.state.location.pathname).toBe('/dev/ui');
-  expect(
-    screen.getByRole('link', { name: messages.showcase.title }),
-  ).toHaveAttribute('aria-current', 'page');
-}, 15_000);
 
 test('does not register the showcase route when it is disabled', async () => {
   renderAt('/dev/ui', { showcase: false });

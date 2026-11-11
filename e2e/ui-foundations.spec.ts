@@ -9,9 +9,6 @@ for (const width of [360, 1280]) {
     await page.goto('./dev/ui');
     await expect(page.getByRole('banner')).toBeVisible();
     await expect(
-      page.getByRole('complementary', { name: messages.showcase.navigation }),
-    ).toBeVisible();
-    await expect(
       page.getByRole('heading', { name: messages.title, exact: true }),
     ).toBeVisible();
     await expect(

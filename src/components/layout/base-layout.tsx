@@ -1,6 +1,7 @@
 import { useId, useRef, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { layoutMessages } from './messages';
+import { SkipLink } from './skip-link';
 
 export type BaseLayoutProps = {
   header: ReactNode;
@@ -31,13 +32,10 @@ export function BaseLayout({
         className,
       )}
     >
-      <a
-        href={`#${contentId}`}
-        onClick={() => mainRef.current?.focus()}
-        className="sr-only z-50 rounded-xl bg-primary px-4 py-2 font-display text-primary-foreground focus:not-sr-only focus:fixed focus:top-4 focus:left-4"
-      >
-        {layoutMessages.skipToContent}
-      </a>
+      <SkipLink
+        targetId={contentId}
+        onActivate={() => mainRef.current?.focus()}
+      />
       <header className="border-b border-edge bg-card text-card-foreground shadow-panel">
         <div className="mx-auto w-full max-w-6xl min-w-0 px-4 py-4 sm:px-6">
           {header}

@@ -240,3 +240,63 @@ test('the forbidden view sets its own document title', async () => {
     `${messages.pages.forbidden.title} · ${messages.title}`,
   );
 });
+
+const expectIllustrated = () => {
+  const main = screen.getByRole('main');
+  const scene = main.querySelector('svg');
+  expect(scene).not.toBeNull();
+  expect(scene).toHaveAttribute('aria-hidden', 'true');
+  expect(
+    screen.queryByRole('link', { name: messages.showcase.title }),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+};
+
+test('the unexpected error view is illustrated and offers retry and a way home', async () => {
+  renderAt('/boom', [{ path: 'boom', Component: thrower(new Error(SECRET)) }]);
+
+  await screen.findByRole('alert');
+  expectIllustrated();
+  expect(screen.getByRole('button', { name: 'Reintentar' })).toBeVisible();
+  expect(
+    screen.getByRole('link', { name: messages.errors.goHome }),
+  ).toHaveAttribute('href', '/');
+});
+
+test('the stale chunk view is illustrated and offers a reload and a way home', async () => {
+  renderAt('/stale', [
+    {
+      path: 'stale',
+      lazy: {
+        Component: () =>
+          Promise.reject(
+            new TypeError('Failed to fetch dynamically imported module'),
+          ),
+      },
+    },
+  ]);
+
+  await screen.findByRole('alert');
+  expectIllustrated();
+  expect(
+    screen.getByRole('button', { name: messages.errors.reload }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole('link', { name: messages.errors.goHome }),
+  ).toHaveAttribute('href', '/');
+});
+
+test('the forbidden and not found views are illustrated with a way home', async () => {
+  renderAt('/secret', [{ path: 'secret', Component: thrower(forbidden()) }]);
+  await screen.findByRole('heading', { name: messages.pages.forbidden.title });
+  expectIllustrated();
+  expect(
+    screen.getByRole('link', { name: messages.errors.goHome }),
+  ).toHaveAttribute('href', '/');
+});
+
+test('the not found view is illustrated', async () => {
+  renderAt('/nowhere', []);
+  await screen.findByRole('heading', { name: messages.pages.notFound.title });
+  expectIllustrated();
+});

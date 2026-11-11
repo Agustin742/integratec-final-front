@@ -1,5 +1,9 @@
 export const messages = {
   title: 'IntegrarTec',
+  auth: {
+    tagline:
+      'Un aula virtual con presencia: clases, material, actividades y seguimiento en un solo lugar.',
+  },
   pages: {
     login: {
       title: 'Iniciar sesión',

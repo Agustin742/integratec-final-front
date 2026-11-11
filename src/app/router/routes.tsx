@@ -3,6 +3,8 @@ import { PublicOnly, RequireAuth } from './guards';
 import { NotFoundPage } from '../pages/not-found-page';
 import { RootErrorBoundary, RouteErrorBoundary } from './error-boundaries';
 import { AppHydrateFallback, AppShell, SHOWCASE_PATH } from './app-shell';
+import { AuthLayout } from './auth-layout';
+import { RouterRoot } from './focus-on-navigation';
 
 /**
  * The component showcase is a development aid. It is registered by the dev
@@ -43,19 +45,20 @@ export function createAppRoutes({
   const showcaseRoute = showcase ? createShowcaseRoute() : null;
   return [
     {
-      // Root route: no layout of its own, so it still renders if the shell throws.
+      // Root route: no chrome of its own, so it still renders if a layout throws.
+      // It only manages focus after navigation, for every layout.
       id: 'root',
+      Component: RouterRoot,
       ErrorBoundary: RootErrorBoundary,
       children: [
         {
-          // Layout route without a path: the shell wraps every child.
-          Component: () => <AppShell showcase={showcase} />,
+          // Public layout route: split screen with no navigation, for every
+          // signed-out screen. Its own error boundary keeps the layout mounted.
+          Component: AuthLayout,
           HydrateFallback: AppHydrateFallback,
           children: [
             {
-              // Pathless wrapper: a page error replaces only the page area, so the
-              // shell (banner, navigation, toast host) stays mounted.
-              id: 'page',
+              id: 'auth-page',
               ErrorBoundary: RouteErrorBoundary,
               children: [
                 // Signed-out pages: a signed-in user is redirected away from them.
@@ -95,6 +98,21 @@ export function createAppRoutes({
                         .InvitationAcceptPage,
                   },
                 },
+              ],
+            },
+          ],
+        },
+        {
+          // Application layout route without a path: the shell wraps every child.
+          Component: AppShell,
+          HydrateFallback: AppHydrateFallback,
+          children: [
+            {
+              // Pathless wrapper: a page error replaces only the page area, so the
+              // shell (banner, navigation, toast host) stays mounted.
+              id: 'page',
+              ErrorBoundary: RouteErrorBoundary,
+              children: [
                 // Protected area. This pathless branch is behind the session guard;
                 // everything that requires a signed-in user nests here.
                 {
