@@ -1,6 +1,5 @@
 import { useRef } from 'react';
 import { Outlet } from 'react-router';
-import { ClassroomScene } from '@/components/illustrations/scenes';
 import { SkipLink } from '@/components/layout/skip-link';
 import { Toast } from '@/components/ui/toast';
 import { messages } from '../messages';
@@ -12,7 +11,7 @@ import { MAIN_CONTENT_ID } from './focus-on-navigation';
  *
  * The brand panel comes first in the DOM, so on a phone it stacks above the
  * content and on a wide screen it sits on the right. It only holds a heading
- * and a decorative scene, so nothing in it needs a tab stop and the skip link
+ * and a placeholder for the 3D classroom model, so nothing in it needs a tab stop and the skip link
  * jumps straight to `main`. The `h1` is the product name, as in the shell;
  * pages keep `h2` for their own title.
  *
@@ -38,7 +37,13 @@ export function AuthLayout() {
               {messages.auth.tagline}
             </p>
           </div>
-          <ClassroomScene className="h-40 w-auto sm:h-52 lg:h-auto lg:w-full lg:max-w-2xl" />
+          {/* Placeholder until the 3D classroom model is available. */}
+          <p
+            data-classroom-placeholder
+            className="flex aspect-[16/9] w-full max-w-2xl items-center justify-center rounded-3xl border-2 border-dashed border-primary-foreground/40 px-6 text-center text-base font-medium text-primary-foreground/80"
+          >
+            {messages.auth.classroomPlaceholder}
+          </p>
         </header>
         <main
           id={MAIN_CONTENT_ID}

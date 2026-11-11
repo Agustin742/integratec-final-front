@@ -100,8 +100,9 @@ test.each(authPages)(
       banner.compareDocumentPosition(main) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(banner).toHaveTextContent(messages.auth.tagline);
-    // The scene is decorative.
-    expect(banner.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    // The 3D classroom model is not built yet: the panel shows a text placeholder.
+    expect(banner.querySelector('svg')).toBeNull();
+    expect(banner).toHaveTextContent(messages.auth.classroomPlaceholder);
     // Future forms drop into this slot.
     expect(main.querySelector('[data-auth-slot]')).toContainElement(
       within(main).getByRole('heading', { name: title }),

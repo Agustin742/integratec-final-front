@@ -3,6 +3,7 @@ export const messages = {
   auth: {
     tagline:
       'Un aula virtual con presencia: clases, material, actividades y seguimiento en un solo lugar.',
+    classroomPlaceholder: 'Acá va el modelo 3D del aula.',
   },
   pages: {
     login: {
