@@ -46,7 +46,10 @@ Component contracts: [controls](ui-controls.md), [feedback and tables](ui-displa
 
 - `src/app/router/routes.test.tsx` renders the shared route table in a memory router
   and protects the banner heading, page headings inside the shell, one notification
-  region, the `/dev/ui` showcase route and its absence when the gate is off.
+  region, axe, the skip link and the document title on every page, the `/dev/ui`
+  showcase route (including a sidebar click that navigates client-side) and its
+  absence when the gate is off. Focus after navigation is covered in
+  `app-shell.test.tsx`; see [routing](routing.md).
 - `ui-foundations.test.tsx` checks the five labeled states, validation associations
   and editable text, table semantics, keyboard tab selection, modal descriptions,
   background removal from accessible queries and focus restoration.

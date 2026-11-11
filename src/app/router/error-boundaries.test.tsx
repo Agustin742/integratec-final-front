@@ -200,3 +200,43 @@ test('the catch-all still renders the not found page with a way home', async () 
     screen.getByRole('link', { name: messages.errors.goHome }),
   ).toHaveAttribute('href', '/');
 });
+
+test('a loader error shows the generic error and Reintentar loads the page', async () => {
+  let attempts = 0;
+  const { router } = renderAt('/flaky', [
+    {
+      path: 'flaky',
+      loader: () => {
+        attempts += 1;
+        if (attempts === 1) throw new Error(SECRET);
+        return null;
+      },
+      Component: () => <h2>Loaded after retry</h2>,
+    },
+  ]);
+
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent(messages.errors.unexpected.title);
+  expect(document.body).not.toHaveTextContent(SECRET);
+  expect(document.title).toBe(
+    `${messages.errors.unexpected.title} · ${messages.title}`,
+  );
+  expectShellIntact();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+
+  expect(
+    await screen.findByRole('heading', { name: 'Loaded after retry' }),
+  ).toBeVisible();
+  expect(attempts).toBe(2);
+  expect(router.state.location.pathname).toBe('/flaky');
+});
+
+test('the forbidden view sets its own document title', async () => {
+  renderAt('/secret', [{ path: 'secret', Component: thrower(forbidden()) }]);
+
+  await screen.findByRole('heading', { name: messages.pages.forbidden.title });
+  expect(document.title).toBe(
+    `${messages.pages.forbidden.title} · ${messages.title}`,
+  );
+});

@@ -36,3 +36,30 @@ test('ignores repeated next parameters instead of picking an attacker value', ()
   const params = new URLSearchParams('next=%2F&next=%2F%2Fevil.example');
   expect(readReturnTarget(params)).toBe('/');
 });
+
+// Production approves only "/" today; the policy accepts an allowlist so the
+// forwarding path can be proven with a destination a later story will add.
+const withClassrooms: ReadonlySet<string> = new Set(['/', '/classrooms']);
+
+test('forwards an approved non-default destination through the login round trip', () => {
+  const url = buildLoginRedirect(
+    { pathname: '/classrooms', search: '', hash: '' },
+    withClassrooms,
+  );
+  expect(url).toBe('/login?next=%2Fclassrooms');
+
+  const params = new URL(url, 'https://app.example').searchParams;
+  expect(readReturnTarget(params, withClassrooms)).toBe('/classrooms');
+});
+
+test('the production allowlist still degrades a non-default destination to "/"', () => {
+  expect(
+    buildLoginRedirect({ pathname: '/classrooms', search: '', hash: '' }),
+  ).toBe('/login?next=%2F');
+  expect(readReturnTarget(new URLSearchParams('next=%2Fclassrooms'))).toBe('/');
+});
+
+test('repeated next parameters are absent even when each value is approved', () => {
+  const params = new URLSearchParams('next=%2Fclassrooms&next=%2Fclassrooms');
+  expect(readReturnTarget(params, withClassrooms)).toBe('/');
+});

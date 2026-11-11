@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
@@ -21,6 +21,21 @@ vi.mock('@/components/ui/toast', () => ({
   },
 }));
 
+// The root fallback is the last resort, so it must not depend on shared
+// primitives: if one of them is what broke, rendering it would throw again.
+vi.mock('@/components/feedback/states', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/components/feedback/states')>()),
+  ErrorState: () => {
+    throw new Error('shared-primitive-broken');
+  },
+}));
+vi.mock('@/components/ui/button', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/components/ui/button')>()),
+  Button: () => {
+    throw new Error('shared-primitive-broken');
+  },
+}));
+
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -29,7 +44,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-test('renders a minimal fallback with no shell when the shell itself throws', async () => {
+test('renders a minimal fallback with no shell, even when shared primitives throw', async () => {
   const session = fakeSession({ status: 'authenticated', user: profile });
   const router = createMemoryRouter(createAppRoutes(), {
     initialEntries: ['/'],
@@ -44,6 +59,11 @@ test('renders a minimal fallback with no shell when the shell itself throws', as
     messages.errors.root.title,
   );
   expect(screen.getByRole('main')).toBeVisible();
+  await waitFor(() =>
+    expect(document.title).toBe(
+      `${messages.errors.root.title} · ${messages.title}`,
+    ),
+  );
   expect(screen.queryByRole('banner')).not.toBeInTheDocument();
   expect(document.body).not.toHaveTextContent(SECRET);
   expect(

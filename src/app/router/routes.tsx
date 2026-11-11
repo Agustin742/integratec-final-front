@@ -12,16 +12,19 @@ import { AppHydrateFallback, AppShell, SHOWCASE_PATH } from './app-shell';
 export const showcaseEnabled = __UI_SHOWCASE__;
 
 // Gated on the build-time constant itself (not on a runtime option) so the
-// bundler can prove the dynamic import unreachable and drop the chunk.
-const showcaseRoute: RouteObject | null = __UI_SHOWCASE__
-  ? {
-      path: SHOWCASE_PATH.slice(1),
-      lazy: {
-        Component: async () =>
-          (await import('../ui-foundations')).UiFoundations,
-      },
-    }
-  : null;
+// bundler can prove the dynamic import unreachable and drop the chunk. Built
+// per router: react-router mutates route objects as it resolves `lazy`, so one
+// object must never be shared between routers.
+const createShowcaseRoute = (): RouteObject | null =>
+  __UI_SHOWCASE__
+    ? {
+        path: SHOWCASE_PATH.slice(1),
+        lazy: {
+          Component: async () =>
+            (await import('../ui-foundations')).UiFoundations,
+        },
+      }
+    : null;
 
 export type AppRoutesOptions = {
   showcase?: boolean;
@@ -37,6 +40,7 @@ export function createAppRoutes({
   showcase = showcaseEnabled,
   protectedRoutes = [],
 }: AppRoutesOptions = {}): RouteObject[] {
+  const showcaseRoute = showcase ? createShowcaseRoute() : null;
   return [
     {
       // Root route: no layout of its own, so it still renders if the shell throws.
@@ -109,7 +113,7 @@ export function createAppRoutes({
                 },
                 // Reserved: a separate minimal area for parent users (extended scope)
                 // mounts as its own branch here, with its own guard.
-                ...(showcase && showcaseRoute ? [showcaseRoute] : []),
+                ...(showcaseRoute ? [showcaseRoute] : []),
                 {
                   path: '*',
                   // Static: the boundary already bundles this tiny view.

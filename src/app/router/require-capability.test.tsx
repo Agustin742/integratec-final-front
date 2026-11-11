@@ -12,7 +12,7 @@ import {
   vi,
 } from 'vitest';
 import { createApiClient } from '@/api/client';
-import type { SessionSnapshot } from '@/session/controller';
+import type { SessionService, SessionSnapshot } from '@/session/controller';
 import { SessionProvider } from '@/session/provider';
 import { profile } from '@/session/test-fixtures';
 import { expectAccessible } from '@/test/accessibility';
@@ -75,13 +75,41 @@ const gatedRoutes = [
     ),
     children: [{ index: true, Component: () => <h2>Metrics page</h2> }],
   },
+  {
+    // No `:classroomId` param and no prop: nothing to check access against.
+    path: 'no-id',
+    Component: () => (
+      <RequireCapability capability="moderate_chat">
+        <h2>No id content</h2>
+      </RequireCapability>
+    ),
+  },
+  {
+    path: 'empty-id/:classroomId',
+    Component: () => (
+      <RequireCapability capability="moderate_chat" classroomId="">
+        <h2>Empty id content</h2>
+      </RequireCapability>
+    ),
+  },
+  {
+    // The explicit prop wins over the route param.
+    path: 'override/:classroomId',
+    Component: () => (
+      <RequireCapability capability="moderate_chat" classroomId={CLASSROOM_B}>
+        <h2>Override content</h2>
+      </RequireCapability>
+    ),
+  },
 ];
 
-function renderAt(path: string) {
-  const session = fakeSession(
-    authenticated,
-    createApiClient({ baseUrl: TEST_API_BASE_URL }),
-  );
+function renderAt(
+  path: string,
+  client: SessionService['client'] = createApiClient({
+    baseUrl: TEST_API_BASE_URL,
+  }),
+) {
+  const session = fakeSession(authenticated, client);
   const router = createMemoryRouter(
     createAppRoutes({ protectedRoutes: gatedRoutes }),
     { initialEntries: [path] },
@@ -264,4 +292,81 @@ test('an unexpected failure shows the generic error, never login', async () => {
     messages.errors.unexpected.title,
   );
   expect(router.state.location.pathname).toBe(`/classrooms/${CLASSROOM_A}`);
+});
+
+test.each([['/no-id'], [`/empty-id/${CLASSROOM_A}`]])(
+  'shows not found without any request when there is no classroom id (%s)',
+  async (path) => {
+    // `onUnhandledFrame: 'error'` fails the test if a request is attempted.
+    const { router } = renderAt(path);
+
+    expect(
+      await screen.findByRole('heading', {
+        name: messages.pages.notFound.title,
+      }),
+    ).toBeVisible();
+    expect(screen.queryByText(/content$/)).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(path);
+  },
+);
+
+test('an explicit classroomId prop overrides the route param', async () => {
+  // Only classroom B has a handler: a request for the param (A) would fail.
+  mswServer.use(
+    createClassroomDetailHandler(CLASSROOM_B, {
+      myRole: 'TEACHER',
+      capabilities: ['moderate_chat'],
+    }),
+  );
+  renderAt(`/override/${CLASSROOM_A}`);
+
+  expect(
+    await screen.findByRole('heading', { name: 'Override content' }),
+  ).toBeVisible();
+});
+
+test('a failure that is not an ApiError shows the generic error, never the content', async () => {
+  // `requestApi` only rethrows an abort untouched, so this reaches the hook as
+  // a plain DOMException instead of an ApiError.
+  const failing = {
+    GET: () => Promise.reject(new DOMException('aborted', 'AbortError')),
+  } as unknown as SessionService['client'];
+  const { router } = renderAt(`/classrooms/${CLASSROOM_A}`, failing);
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    messages.errors.unexpected.title,
+  );
+  expect(screen.queryByText('Moderation tools')).not.toBeInTheDocument();
+  expect(router.state.location.pathname).toBe(`/classrooms/${CLASSROOM_A}`);
+});
+
+test('a signed-out session never shows protected content or sends a request', async () => {
+  const session = fakeSession(
+    { status: 'unauthenticated' },
+    createApiClient({ baseUrl: TEST_API_BASE_URL }),
+  );
+  const router = createMemoryRouter(
+    [
+      {
+        path: 'classrooms/:classroomId',
+        Component: () => (
+          <RequireCapability capability="moderate_chat">
+            <h2>Moderation tools</h2>
+          </RequireCapability>
+        ),
+      },
+    ],
+    { initialEntries: [`/classrooms/${CLASSROOM_A}`] },
+  );
+  render(
+    <SessionProvider service={session.service}>
+      <RouterProvider router={router} />
+    </SessionProvider>,
+  );
+
+  // The query is disabled without a user, so the gate stays in loading.
+  expect(await screen.findByText(messages.access.checking)).toBeInTheDocument();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(screen.getByText(messages.access.checking)).toBeInTheDocument();
+  expect(screen.queryByText('Moderation tools')).not.toBeInTheDocument();
 });

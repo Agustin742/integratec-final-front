@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { RouterProvider } from 'react-router/dom';
 import { createMemoryRouter } from 'react-router';
 import { expect, test } from 'vitest';
@@ -44,14 +44,17 @@ const pages = [
 test.each(pages)(
   'renders %s lazily inside the application shell',
   async (path, title) => {
-    renderAt(path, { authenticated: path === '/' });
+    const { container } = renderAt(path, { authenticated: path === '/' });
 
     expect(
       await screen.findByRole('heading', { level: 2, name: title }),
     ).toBeVisible();
+    const main = screen.getByRole('main');
+    expect(within(main).getByRole('heading', { name: title })).toBeVisible();
+    // The shell header owns the only h1; pages must not add another.
     expect(
-      within(screen.getByRole('main')).getByRole('heading', { name: title }),
-    ).toBeVisible();
+      within(main).queryByRole('heading', { level: 1 }),
+    ).not.toBeInTheDocument();
     expect(
       within(screen.getByRole('banner')).getByRole('heading', {
         level: 1,
@@ -59,13 +62,37 @@ test.each(pages)(
       }),
     ).toBeVisible();
     expect(
-      screen.getByRole('link', { name: /Saltar al contenido/ }),
-    ).toBeInTheDocument();
-    expect(
       screen.getAllByRole('region', { name: /Notificaciones/ }),
     ).toHaveLength(1);
+    await expectAccessible(container);
   },
 );
+
+test.each(pages)(
+  'the skip link on %s reaches the focusable main landmark',
+  async (path, title) => {
+    renderAt(path, { authenticated: path === '/' });
+    await screen.findByRole('heading', { level: 2, name: title });
+
+    const skipLink = screen.getByRole('link', { name: /Saltar al contenido/ });
+    const main = screen.getByRole('main');
+    expect(skipLink).toHaveAttribute('href', `#${main.id}`);
+    expect(main).toHaveAttribute('tabindex', '-1');
+
+    fireEvent.click(skipLink);
+    expect(main).toHaveFocus();
+  },
+);
+
+test.each(pages)('sets the document title on %s', async (path, title) => {
+  renderAt(path, { authenticated: path === '/' });
+  await screen.findByRole('heading', { level: 2, name: title });
+
+  // The title is written in an effect, which can land just after the heading.
+  await waitFor(() =>
+    expect(document.title).toBe(`${title} · ${messages.title}`),
+  );
+});
 
 test('renders the not found page for an unknown path', async () => {
   const { container } = renderAt('/no-such-page');
@@ -77,6 +104,9 @@ test('renders the not found page for an unknown path', async () => {
     }),
   ).toBeVisible();
   expect(screen.getByRole('banner')).toBeVisible();
+  expect(document.title).toBe(
+    `${messages.pages.notFound.title} · ${messages.title}`,
+  );
   await expectAccessible(container);
 });
 
@@ -93,7 +123,29 @@ test('serves the component showcase at /dev/ui when it is enabled', async () => 
   expect(
     screen.getByRole('link', { name: messages.showcase.title }),
   ).toHaveAttribute('href', '/dev/ui');
+  expect(document.title).toBe(`${messages.showcase.title} · ${messages.title}`);
 });
+
+test('the showcase sidebar link navigates client-side and marks the current page', async () => {
+  const { router } = renderAt('/login', { showcase: true });
+  await screen.findByRole('heading', { name: messages.pages.login.title });
+  const link = screen.getByRole('link', { name: messages.showcase.title });
+  expect(link).not.toHaveAttribute('aria-current');
+
+  fireEvent.click(link);
+
+  expect(
+    await screen.findByRole(
+      'heading',
+      { level: 2, name: messages.showcase.title },
+      { timeout: 10_000 },
+    ),
+  ).toBeVisible();
+  expect(router.state.location.pathname).toBe('/dev/ui');
+  expect(
+    screen.getByRole('link', { name: messages.showcase.title }),
+  ).toHaveAttribute('aria-current', 'page');
+}, 15_000);
 
 test('does not register the showcase route when it is disabled', async () => {
   renderAt('/dev/ui', { showcase: false });

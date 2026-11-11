@@ -188,6 +188,10 @@ test('supports keyboard skip, modal focus containment and trigger restoration', 
 }) => {
   await page.goto('./dev/ui');
   const copy = messages.showcase;
+  // The page loads lazily: press Tab only once the shell and page are rendered.
+  await expect(
+    page.getByRole('heading', { name: copy.title, level: 2 }),
+  ).toBeVisible();
   await page.keyboard.press('Tab');
   const skip = page.getByRole('link', { name: layoutMessages.skipToContent });
   await expect(skip).toBeFocused();

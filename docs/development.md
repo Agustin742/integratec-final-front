@@ -13,34 +13,38 @@
 
 ## Source layout
 
-| Path                                        | Responsibility                                                                         |
-| ------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `src/main.tsx`                              | Validate public configuration and mount React with StrictMode and `ApiQueryProvider`   |
-| `src/config/public-config.ts`               | Typed, Zod-validated `VITE_` public configuration boundary                             |
-| `src/config/security-headers.ts`            | Strict CSP, HTTP security headers, Amplify `customHttp.yml` generator, and validator   |
-| `src/app/router/routes.tsx`                 | Route table (lazy pages, public and protected branches, 404) and `createAppRouter()`   |
-| `src/app/router/app-shell.tsx`              | Layout route: `BaseLayout`, `<Outlet />` and the single `Toast` host                   |
-| `src/app/pages/`                            | Lazy placeholder route modules, replaced by feature screens in later stories           |
-| `src/app/messages.ts`                       | Centralized Spanish (Argentina) placeholder strings                                    |
-| `src/api/schema.generated.ts`               | Generated REST OpenAPI TypeScript definitions (`pnpm api:sync`)                        |
-| `src/api/client.ts`                         | Typed `openapi-fetch` client and `requestApi` / `requestApiVoid` helpers               |
-| `src/api/errors.ts`                         | Backend `ErrorEnvelope` and network error mapper (`ApiError`)                          |
-| `src/api/messages.ts`                       | Centralized `es-AR` user-facing API error messages                                     |
-| `src/api/idempotency.ts`                    | `Idempotency-Key` UUID helper for idempotent mutations                                 |
-| `src/api/query-keys.ts`                     | User-, classroom-, and child-scoped TanStack Query key factory                         |
-| `src/api/query-client.tsx`                  | TanStack Query client defaults (`MAX_QUERY_RETRIES = 2`) and `ApiQueryProvider`        |
-| `src/lib/dates.ts`                          | `es-AR` instant, school-timezone deadline (FD11), and date-only formatting helpers     |
-| `src/components/feedback/`                  | Shared loading, empty, error, stale-data notice, and live-region primitives            |
-| `src/components/pagination/`                | Offset pagination helpers (`Paginated<T>`) and accessible `PaginationControls`         |
-| `src/components/forms/`                     | React Hook Form + Zod helpers, `FormField`, server error mapper, and submit guards     |
-| `src/realtime/contracts.generated.ts`       | Generated shared realtime payload contracts (`pnpm api:sync`)                          |
-| `src/test/msw/`                             | Contract-faithful Mock Service Worker (MSW) handlers and server for tests (FD9)        |
-| `scripts/api-sync/sync-contracts.mjs`       | Contract synchronization resolver and generator (`pnpm api:sync`)                      |
-| `scripts/security/check-security-build.mjs` | Post-build HTML and Amplify `customHttp.yml` security verifier (`pnpm security:check`) |
-| `customHttp.yml`                            | AWS Amplify Hosting custom HTTP security headers specification (FD1)                   |
-| `vite.config.ts`                            | Build/dev configuration validation, security header emission, and React integration    |
+| Path                                        | Responsibility                                                                           |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `src/main.tsx`                              | Validate public configuration and mount React with StrictMode and `ApiQueryProvider`     |
+| `src/config/public-config.ts`               | Typed, Zod-validated `VITE_` public configuration boundary                               |
+| `src/config/security-headers.ts`            | Strict CSP, HTTP security headers, Amplify `customHttp.yml` generator, and validator     |
+| `src/app/router/routes.tsx`                 | Route table (lazy pages, public and protected branches, 404) and `createAppRouter()`     |
+| `src/app/router/app-shell.tsx`              | Layout route: `BaseLayout`, `<Outlet />` and the single `Toast` host                     |
+| `src/app/router/guards.tsx`                 | `RequireAuth` and `PublicOnly` session guards and the constrained `?next=` return target |
+| `src/app/router/error-boundaries.tsx`       | Root and per-page error boundaries, with 404, forbidden and stale-chunk views            |
+| `src/app/router/require-capability.tsx`     | Capability gate fed by `useClassroomCapabilities` (server-provided, never persisted)     |
+| `src/app/router/document-title.ts`          | `useDocumentTitle`, the single writer of `document.title` (`<page> · IntegrarTec`)       |
+| `src/app/pages/`                            | Lazy placeholder route modules, replaced by feature screens in later stories             |
+| `src/app/messages.ts`                       | Centralized Spanish (Argentina) placeholder strings                                      |
+| `src/api/schema.generated.ts`               | Generated REST OpenAPI TypeScript definitions (`pnpm api:sync`)                          |
+| `src/api/client.ts`                         | Typed `openapi-fetch` client and `requestApi` / `requestApiVoid` helpers                 |
+| `src/api/errors.ts`                         | Backend `ErrorEnvelope` and network error mapper (`ApiError`)                            |
+| `src/api/messages.ts`                       | Centralized `es-AR` user-facing API error messages                                       |
+| `src/api/idempotency.ts`                    | `Idempotency-Key` UUID helper for idempotent mutations                                   |
+| `src/api/query-keys.ts`                     | User-, classroom-, and child-scoped TanStack Query key factory                           |
+| `src/api/query-client.tsx`                  | TanStack Query client defaults (`MAX_QUERY_RETRIES = 2`) and `ApiQueryProvider`          |
+| `src/lib/dates.ts`                          | `es-AR` instant, school-timezone deadline (FD11), and date-only formatting helpers       |
+| `src/components/feedback/`                  | Shared loading, empty, error, stale-data notice, and live-region primitives              |
+| `src/components/pagination/`                | Offset pagination helpers (`Paginated<T>`) and accessible `PaginationControls`           |
+| `src/components/forms/`                     | React Hook Form + Zod helpers, `FormField`, server error mapper, and submit guards       |
+| `src/realtime/contracts.generated.ts`       | Generated shared realtime payload contracts (`pnpm api:sync`)                            |
+| `src/test/msw/`                             | Contract-faithful Mock Service Worker (MSW) handlers and server for tests (FD9)          |
+| `scripts/api-sync/sync-contracts.mjs`       | Contract synchronization resolver and generator (`pnpm api:sync`)                        |
+| `scripts/security/check-security-build.mjs` | Post-build HTML and Amplify `customHttp.yml` security verifier (`pnpm security:check`)   |
+| `customHttp.yml`                            | AWS Amplify Hosting custom HTTP security headers specification (FD1)                     |
+| `vite.config.ts`                            | Build/dev configuration validation, security header emission, and React integration      |
 
-Add feature UI, integration, and tests together when their issues start. Do not pre-create hypothetical feature scaffolding. Follow [frontend conventions](../rules/frontend-conventions.md) and [architecture boundaries](../rules/architecture.md).
+Add feature UI, integration, and tests together when their issues start. Do not pre-create hypothetical feature scaffolding. Routing, guards, error boundaries, the skip link, focus and title management, and the hosting rewrite deep links need are in [routing](routing.md). Follow [frontend conventions](../rules/frontend-conventions.md) and [architecture boundaries](../rules/architecture.md).
 
 ## Configuration and commands
 
@@ -55,7 +59,8 @@ The [README command table](../README.md#local-development) matches `package.json
 [Session lifecycle](session-lifecycle.md#react-ownership-and-safe-redirects)
 documents the renderless provider, read-only snapshot hook, opt-in authenticated
 content, cleanup registration and root-only redirect helper. The public bootstrap
-and showcase remain ungated. No router, login screen or realtime rejoin is added.
+and showcase remain ungated. The route guards that consume it are documented in
+[routing](routing.md). No login screen or realtime rejoin is added.
 Private consumers own their synchronous cleanup registrations; service construction
 belongs outside React rendering, with `SessionProvider` inside `ApiQueryProvider`.
 

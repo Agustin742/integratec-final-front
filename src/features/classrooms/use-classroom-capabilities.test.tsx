@@ -16,7 +16,7 @@ import { ApiError } from '@/api/errors';
 import { ApiQueryProvider, createAppQueryClient } from '@/api/query-client';
 import { classroomDetailQueryKey } from '@/api/query-keys';
 import { fakeSession } from '@/app/router/fake-session';
-import type { SessionSnapshot } from '@/session/controller';
+import type { SessionService, SessionSnapshot } from '@/session/controller';
 import { SessionProvider } from '@/session/provider';
 import { profile } from '@/session/test-fixtures';
 import {
@@ -52,11 +52,13 @@ afterAll(() => {
   mswServer.close();
 });
 
-function setup(initialId: string) {
-  const session = fakeSession(
-    authenticated,
-    createApiClient({ baseUrl: TEST_API_BASE_URL }),
-  );
+function setup(
+  initialId: string,
+  client: SessionService['client'] = createApiClient({
+    baseUrl: TEST_API_BASE_URL,
+  }),
+) {
+  const session = fakeSession(authenticated, client);
   const queryClient = createAppQueryClient();
   const view = renderHook(
     ({ id }: { id: string }) => useClassroomCapabilities(id),
@@ -211,5 +213,17 @@ describe('useClassroomCapabilities', () => {
       ),
     ).toBeUndefined();
     expect(setItem).not.toHaveBeenCalled();
+  });
+
+  test('wraps a failure that is not an ApiError instead of casting it', async () => {
+    const failing = {
+      GET: () => Promise.reject(new DOMException('aborted', 'AbortError')),
+    } as unknown as SessionService['client'];
+    const { result } = setup(CLASSROOM_A, failing);
+
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    if (result.current.status !== 'error') throw new Error('unreachable');
+    expect(result.current.error).toBeInstanceOf(ApiError);
+    expect(result.current.error.kind).toBe('unexpected');
   });
 });

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { requestApi } from '@/api/client';
-import type { ApiError } from '@/api/errors';
+import { ApiError } from '@/api/errors';
+import { apiErrorMessages } from '@/api/messages';
 import { classroomDetailQueryKey } from '@/api/query-keys';
 import type { components } from '@/api/schema.generated';
 import { useSessionService, useSessionSnapshot } from '@/session/provider';
@@ -27,6 +28,22 @@ export type ClassroomCapabilities =
       /** True only when the server granted `capability` in this classroom. */
       readonly can: (capability: Capability) => boolean;
     };
+
+/**
+ * `requestApi` maps every failure to an `ApiError` except an abort, which it
+ * rethrows untouched. Anything else that reaches the query is wrapped so
+ * callers can rely on `status: 'error'` always carrying an `ApiError`.
+ */
+function toApiError(error: unknown): ApiError {
+  if (error instanceof ApiError) return error;
+  return new ApiError({
+    kind: 'unexpected',
+    status: null,
+    code: null,
+    userMessage: apiErrorMessages.unexpected,
+    cause: error,
+  });
+}
 
 const PENDING: ClassroomCapabilities = Object.freeze({ status: 'pending' });
 
@@ -65,7 +82,7 @@ export function useClassroomCapabilities(
   });
 
   if (query.isError) {
-    return { status: 'error', error: query.error as ApiError };
+    return { status: 'error', error: toApiError(query.error) };
   }
   if (query.data === undefined) {
     return PENDING;

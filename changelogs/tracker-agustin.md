@@ -1,5 +1,13 @@
 # Tracker — Agustin
 
+## 2026-11-11 — Skip link, focus, document title and router review gaps (#20, task 5)
+
+- **Status:** in-progress (feature complete, pending pull request)
+- **Area / files:** `src/app/router/app-shell.tsx`, `src/app/router/document-title.ts`, `src/app/router/error-boundaries.tsx`, `src/app/router/routes.tsx`, `src/app/pages/placeholder-page.tsx`, `src/app/ui-foundations.tsx`, `src/features/classrooms/use-classroom-capabilities.ts`, `src/session/redirect.ts`, `src/app/router/return-target.ts`, router tests, `docs/routing.md`, `docs/development.md`, `docs/ui-showcase.md`, `package.json`
+- **Change:** The main landmark now has a stable id used by the skip link on every route; after a client-side navigation focus moves to the new page heading (never on first load or on the login redirect that resolves it); `document.title` is `<page> · IntegrarTec` through one hook, including not-found, forbidden and error views. The root error fallback is plain markup so it survives a broken shared component. The capability hook wraps any non-`ApiError` instead of casting it. `safeSessionRedirect` takes an optional allowlist (tests only; production stays `/`). The showcase route object is now created per router (react-router mutates route objects, and sharing one broke a second router). Added tests for axe on every page, the skip link, titles, the showcase link, the return-target round trip, loader error retry and the capability gate edge cases. Added `docs/routing.md` (route table, guards, errors, capability gate, adding a protected route, hosting rewrite for deep links).
+- **Reason:** Close the accessibility scope and the review gaps of tasks 1 to 4 so the router shell meets the issue acceptance criteria.
+- **Next step:** Open the pull request to `develop`; issue #22 owns the Amplify SPA rewrite that deep links need.
+
 ## 2026-11-11 — Server-derived capability gating (#20, task 4)
 
 - **Status:** in-progress
