@@ -19,10 +19,14 @@ import {
   type UseFormProps,
   type UseFormReturn,
 } from 'react-hook-form';
-import type { z } from 'zod';
+import { z } from 'zod';
 import { ApiError } from '@/api/errors';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Field, type FieldControlProps } from '@/components/ui/field';
+
+// Ensure Zod v4 runs in jitless mode so form schema validation never attempts
+// `new Function()` under our strict Content-Security-Policy (FD1).
+z.config({ jitless: true });
 
 export const formMessages = {
   rootErrorTitle: 'No pudimos procesar el formulario',

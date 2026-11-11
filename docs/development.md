@@ -13,27 +13,30 @@
 
 ## Source layout
 
-| Path                                  | Responsibility                                                                       |
-| ------------------------------------- | ------------------------------------------------------------------------------------ |
-| `src/main.tsx`                        | Validate public configuration and mount React with StrictMode and `ApiQueryProvider` |
-| `src/config/public-config.ts`         | Typed, Zod-validated `VITE_` public configuration boundary                           |
-| `src/app/App.tsx`                     | Minimal semantic placeholder, without routing or feature behavior                    |
-| `src/app/messages.ts`                 | Centralized Spanish (Argentina) placeholder strings                                  |
-| `src/api/schema.generated.ts`         | Generated REST OpenAPI TypeScript definitions (`pnpm api:sync`)                      |
-| `src/api/client.ts`                   | Typed `openapi-fetch` client and `requestApi` / `requestApiVoid` helpers             |
-| `src/api/errors.ts`                   | Backend `ErrorEnvelope` and network error mapper (`ApiError`)                        |
-| `src/api/messages.ts`                 | Centralized `es-AR` user-facing API error messages                                   |
-| `src/api/idempotency.ts`              | `Idempotency-Key` UUID helper for idempotent mutations                               |
-| `src/api/query-keys.ts`               | User-, classroom-, and child-scoped TanStack Query key factory                       |
-| `src/api/query-client.tsx`            | TanStack Query client defaults (`MAX_QUERY_RETRIES = 2`) and `ApiQueryProvider`      |
-| `src/lib/dates.ts`                    | `es-AR` instant, school-timezone deadline (FD11), and date-only formatting helpers   |
-| `src/components/feedback/`            | Shared loading, empty, error, stale-data notice, and live-region primitives          |
-| `src/components/pagination/`          | Offset pagination helpers (`Paginated<T>`) and accessible `PaginationControls`       |
-| `src/components/forms/`               | React Hook Form + Zod helpers, `FormField`, server error mapper, and submit guards   |
-| `src/realtime/contracts.generated.ts` | Generated shared realtime payload contracts (`pnpm api:sync`)                        |
-| `src/test/msw/`                       | Contract-faithful Mock Service Worker (MSW) handlers and server for tests (FD9)      |
-| `scripts/api-sync/sync-contracts.mjs` | Contract synchronization resolver and generator (`pnpm api:sync`)                    |
-| `vite.config.ts`                      | Build/dev configuration validation plugin and React integration                      |
+| Path                                        | Responsibility                                                                         |
+| ------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `src/main.tsx`                              | Validate public configuration and mount React with StrictMode and `ApiQueryProvider`   |
+| `src/config/public-config.ts`               | Typed, Zod-validated `VITE_` public configuration boundary                             |
+| `src/config/security-headers.ts`            | Strict CSP, HTTP security headers, Amplify `customHttp.yml` generator, and validator   |
+| `src/app/App.tsx`                           | Minimal semantic placeholder, without routing or feature behavior                      |
+| `src/app/messages.ts`                       | Centralized Spanish (Argentina) placeholder strings                                    |
+| `src/api/schema.generated.ts`               | Generated REST OpenAPI TypeScript definitions (`pnpm api:sync`)                        |
+| `src/api/client.ts`                         | Typed `openapi-fetch` client and `requestApi` / `requestApiVoid` helpers               |
+| `src/api/errors.ts`                         | Backend `ErrorEnvelope` and network error mapper (`ApiError`)                          |
+| `src/api/messages.ts`                       | Centralized `es-AR` user-facing API error messages                                     |
+| `src/api/idempotency.ts`                    | `Idempotency-Key` UUID helper for idempotent mutations                                 |
+| `src/api/query-keys.ts`                     | User-, classroom-, and child-scoped TanStack Query key factory                         |
+| `src/api/query-client.tsx`                  | TanStack Query client defaults (`MAX_QUERY_RETRIES = 2`) and `ApiQueryProvider`        |
+| `src/lib/dates.ts`                          | `es-AR` instant, school-timezone deadline (FD11), and date-only formatting helpers     |
+| `src/components/feedback/`                  | Shared loading, empty, error, stale-data notice, and live-region primitives            |
+| `src/components/pagination/`                | Offset pagination helpers (`Paginated<T>`) and accessible `PaginationControls`         |
+| `src/components/forms/`                     | React Hook Form + Zod helpers, `FormField`, server error mapper, and submit guards     |
+| `src/realtime/contracts.generated.ts`       | Generated shared realtime payload contracts (`pnpm api:sync`)                          |
+| `src/test/msw/`                             | Contract-faithful Mock Service Worker (MSW) handlers and server for tests (FD9)        |
+| `scripts/api-sync/sync-contracts.mjs`       | Contract synchronization resolver and generator (`pnpm api:sync`)                      |
+| `scripts/security/check-security-build.mjs` | Post-build HTML and Amplify `customHttp.yml` security verifier (`pnpm security:check`) |
+| `customHttp.yml`                            | AWS Amplify Hosting custom HTTP security headers specification (FD1)                   |
+| `vite.config.ts`                            | Build/dev configuration validation, security header emission, and React integration    |
 
 Add feature UI, integration, and tests together when their issues start. Do not pre-create hypothetical feature scaffolding. Follow [frontend conventions](../rules/frontend-conventions.md) and [architecture boundaries](../rules/architecture.md).
 
@@ -41,7 +44,7 @@ Add feature UI, integration, and tests together when their issues start. Do not 
 
 Public build-time configuration ([issue #15](https://github.com/Agustin742/integratec-final-front/issues/15)) is read exclusively through [`src/config/public-config.ts`](../src/config/public-config.ts) (`VITE_APP_ENV`, `VITE_API_BASE_URL`, `VITE_REALTIME_URL`). Copy [`.env.example`](../.env.example) to `.env` for local development; keep real `.env` files out of Git and never place secrets in `VITE_` variables. Missing or invalid values fail fast during `pnpm dev`, `pnpm build`, and application startup without silently falling back to a production service. ESLint forbids direct `import.meta.env` reads outside `src/config/`. See [README public configuration](../README.md#public-configuration) and [environment rules](../rules/configuration-and-environments.md).
 
-The [README command table](../README.md#local-development) matches `package.json`. Vite alone transpiles TypeScript without checking types, so `pnpm build` explicitly runs the same `tsc --noEmit` check as `pnpm typecheck` before bundling. A strict type error must stop the build before Vite emits output.
+The [README command table](../README.md#local-development) matches `package.json`. Vite alone transpiles TypeScript without checking types, so `pnpm build` explicitly runs the same `tsc --noEmit` check as `pnpm typecheck` before bundling. A strict type error must stop the build before Vite emits output. At the end of `vite build`, the security plugin in [`vite.config.ts`](../vite.config.ts) emits `dist/customHttp.yml` and verifies that `dist/index.html` contains no inline scripts (`pnpm security:check` runs the same verification standalone and in CI); see [Content Security Policy and security headers](security.md).
 
 `pnpm api:sync` ([issue #16](https://github.com/Agustin742/integratec-final-front/issues/16)) fetches the backend's committed `apps/api/openapi.json` and realtime contract artifacts from `Agustin742/integratec-final-back` (`develop` by default, or a local checkout via `--backend-dir <path>` / `BACKEND_CHECKOUT_DIR`) and regenerates committed TypeScript files in `src/api/schema.generated.ts` and `src/realtime/contracts.generated.ts` (plus `src/realtime/room-state.generated.ts` once backend Colyseus room-state codegen is published). Prettier and ESLint ignore `src/api/*.generated.ts` and `src/realtime/*.generated.ts` so generated contracts are never hand-edited or reformatted, while `pnpm typecheck` and `pnpm build` validate them offline without a running backend.
 

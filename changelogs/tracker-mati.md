@@ -1,10 +1,23 @@
 # Tracker — Mati
 
-## 2026-11-09 — Add shared feedback and form primitives (states, form fields, server errors, date formatting) (#19)
+## 2026-11-10 — Add strict Content-Security-Policy and security headers for Amplify (FD1 mitigation) (#21)
 
 - **Status:** in-progress
+- **Area / files:** `src/config/security-headers.ts`, `src/config/security-headers.test.ts`, `src/config/eslint-security.test.ts`, `src/config/public-config.ts`, `src/components/forms/form-primitives.tsx`, `scripts/security/check-security-build.mjs`, `scripts/security/check-security-build.d.mts`, `customHttp.yml`, `vite.config.ts`, `eslint.config.js`, `e2e/smoke.spec.ts`, `package.json`, `.github/workflows/ci.yml`, `README.md`, `docs/security.md`, `docs/development.md`, `docs/ci.md`, `docs/technical-justification.md`, `changelogs/tracker-mati.md`
+- **Change:** Implementing [issue #21](https://github.com/Agustin742/integratec-final-front/issues/21) on `feat/21-csp-security-headers` in three work units plus PR #73 review follow-up:
+  1. Strict Content-Security-Policy (`buildContentSecurityPolicy`), companion HTTP security headers (`buildSecurityHeaders`), Amplify Hosting `customHttp.yml` generator (`renderCustomHttpYaml`), strict YAML parser (`parseCustomHttpYaml`), and HTML/header validator (`validateBuiltHtmlAndHeaders`) derived from the validated `PublicConfig`, with 16 unit tests in `src/config/security-headers.test.ts`.
+  2. Vite build/preview security integration (`dist/customHttp.yml` emission + preview response headers), `pnpm security:sync` (`syncCustomHttpFiles` for AWS Amplify Hosting root `customHttp.yml` environment handoff) and `pnpm security:check` CLI (`scripts/security/check-security-build.mjs`) wired into CI, ESLint ban on `dangerouslySetInnerHTML` verified by `src/config/eslint-security.test.ts`, `z.config({ jitless: true })` so Zod v4 never probes `new Function()` under strict CSP, and Playwright smoke verification of active security headers and zero CSP console violations (`e2e/smoke.spec.ts`).
+  3. Documentation of every allowed origin, WebAssembly directive (`'wasm-unsafe-eval'` for F15 Draco/KTX2 decoders), Amplify `customHttp.yml` handoff (`pnpm security:sync` + `pnpm security:check --require-root-match` for F12), and `vite dev` vs production CSP differences in `docs/security.md`, `README.md`, `docs/development.md`, `docs/ci.md`, and `docs/technical-justification.md`.
+  4. PR #73 review follow-up: added explicit Amplify root `customHttp.yml` environment handoff (`pnpm security:sync` / `syncCustomHttpFiles` and `runSecurityBuildCheck({ requireRootMatchActiveConfig: true })`), strict closed-directive-set CSP validation rejecting `script-src-elem` / `script-src-attr` overrides and scheme-only `connect-src` sources (`https:`), exact `connect-src` parity against `expectedConfig`, and full line-by-line YAML syntax/structure parsing (`parseCustomHttpYaml`) rejecting trailing malformed YAML (`broken: [`).
+- **Reason:** Ship the mandatory XSS mitigations required by FD1 (`sessionStorage` token storage) in `rules/authentication-and-session.md`, `rules/security.md`, and `rules/deployment-and-operations.md`.
+- **Verification:** On Node `22.23.4` and pnpm `10.34.9`: `pnpm test` (21 files, 191 tests passed), `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm build`, `pnpm security:check`, and `pnpm e2e` (16/16 Playwright desktop and mobile scenarios with active CSP headers and zero CSP violations) passed; `git diff --check` passed. Local `python3` (`C:\Python314\python.exe` missing) and `actionlint` 1.7.7 are unavailable on this Windows workstation and run in the Ubuntu GitHub Actions `checks` job.
+- **Next step:** Publish the PR from `feat/21-csp-security-headers` into `develop`, verify GitHub Actions checks, and await teammate review and merge to complete #21.
+
+## 2026-11-09 — Add shared feedback and form primitives (states, form fields, server errors, date formatting) (#19)
+
+- **Status:** completed (merged into `develop` via [PR #69](https://github.com/Agustin742/integratec-final-front/pull/69), commit `c98c96d`)
 - **Area / files:** `package.json`, `pnpm-lock.yaml`, `src/lib/dates.ts`, `src/lib/dates.test.ts`, `src/components/feedback/`, `src/components/pagination/`, `src/components/forms/`, `src/app/`, `e2e/ui-foundations.spec.ts`, `README.md`, `docs/`, `changelogs/tracker-mati.md`
-- **Change:** Implementing [issue #19](https://github.com/Agustin742/integratec-final-front/issues/19) on `feat/19-feedback-form-primitives` in four work units:
+- **Change:** Implemented [issue #19](https://github.com/Agustin742/integratec-final-front/issues/19) on `feat/19-feedback-form-primitives` in four work units:
   1. `es-AR` date/time display helpers (`formatInstant`, `formatDeadline` in school time zone with zone label per FD11, and unshifted `formatDateOnly`).
   2. Presentational feedback state primitives (`LoadingState`, `EmptyState`, `ErrorState`, `StaleDataNotice`, and `LiveRegion`).
   3. Paginated list query/meta helpers and accessible `PaginationControls` aligned with the backend `Paginated<T>` contract.
@@ -12,7 +25,7 @@
   5. PR #69 review follow-up: nested dotted field path resolution in `applyServerErrorsToForm` (using `form.getValues()` and `options.knownFields` without walking `form.control._fields` DOM refs), out-of-range page visibility and `NaN` clamping in `PaginationControls` / `getPaginationMeta`, sibling `aria-busy="true"` placeholder container separate from the `role="status"` live announcement in `LoadingState`, rethrowing non-`ApiError` programming exceptions and stabilizing `handleSubmit` in `useProtectedSubmit`, `hourCycle: 'h23'` and compact/lowercase offset parsing in `formatInstant`, `.transform` schema compatibility in `FormField`, and `1280px` / `360px` showcase screenshots in `docs/assets/ui-foundations/`.
 - **Reason:** Provide shared, accessible feedback, pagination, date/time, and form primitives so feature screens do not reinvent them (`rules/forms-and-validation.md`, `rules/error-handling-and-feedback.md`, `rules/data-and-time.md`, `rules/ui-and-accessibility.md`).
 - **Verification:** On Node `22.23.4` and pnpm `10.34.9`: `pnpm test` (19 files, 172 tests passed), `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm build`, and `pnpm e2e` (16/16 Playwright desktop and mobile scenarios) passed; `git diff --check` passed. Local `python3` (`C:\Python314\python.exe` missing) and `actionlint` 1.7.7 are unavailable on this Windows workstation and run in the Ubuntu GitHub Actions `checks` job.
-- **Next step:** Publish the PR from `feat/19-feedback-form-primitives` into `develop`, verify GitHub Actions checks, and await teammate review and merge to complete #19.
+- **Next step:** Completed and merged in [PR #69](https://github.com/Agustin742/integratec-final-front/pull/69); unblocks feature stories.
 
 ## 2026-11-05 — Create the typed API client, TanStack Query setup and error envelope mapping (#17)
 

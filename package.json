@@ -13,10 +13,12 @@
     "test": "vitest run",
     "build:e2e": "tsc --noEmit && vite build --mode showcase",
     "e2e": "pnpm build:e2e && playwright test",
-    "lint": "eslint src e2e vite.config.ts vitest.config.ts playwright.config.ts eslint.config.js",
-    "format:check": "prettier --check package.json tsconfig.json vite.config.ts vitest.config.ts playwright.config.ts eslint.config.js .prettierrc.json index.html src e2e README.md docs/development.md docs/testing.md docs/session-lifecycle.md docs/ui-*.md",
+    "lint": "eslint src e2e vite.config.ts vitest.config.ts playwright.config.ts eslint.config.js scripts/security/check-security-build.mjs",
+    "format:check": "prettier --check package.json tsconfig.json vite.config.ts vitest.config.ts playwright.config.ts eslint.config.js .prettierrc.json customHttp.yml index.html src e2e scripts/security/check-security-build.mjs scripts/security/check-security-build.d.mts README.md docs/development.md docs/testing.md docs/security.md docs/session-lifecycle.md docs/ui-*.md",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
+    "security:sync": "node scripts/security/check-security-build.mjs --sync-root",
+    "security:check": "node scripts/security/check-security-build.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -4,19 +4,19 @@ Frontend-side justification for course requirement R6. Decisions come from the [
 
 ## Summary
 
-| Area | Decision | Role in this project |
-|---|---|---|
-| Application | React + TypeScript + Vite | Authenticated shell, navigation, and functional panels |
-| 3D world | Three.js + React Three Fiber | Isometric 3D scene, avatars, camera, object interactions |
-| Styling and components | Tailwind CSS + shadcn/ui | Panels and forms |
-| Client state | Zustand | UI state, interactions, local preferences |
-| Server data | TanStack Query | Queries, cache, invalidation of persistent data |
-| Forms | React Hook Form + Zod | Form handling and input validation |
-| Drag and drop (optional) | dnd-kit | Only if a future feature needs drag and drop; no current requirement does |
-| Testing | Vitest + Playwright | Unit/integration and end-to-end tests |
-| Router | React Router | Routes and protected navigation (FD4) |
-| API client | openapi-typescript + openapi-fetch | Types generated from the backend OpenAPI document (FD2, FD7) |
-| Hosting | AWS Amplify Hosting (`us-east-2`) | Static build served over HTTPS |
+| Area                     | Decision                           | Role in this project                                                      |
+| ------------------------ | ---------------------------------- | ------------------------------------------------------------------------- |
+| Application              | React + TypeScript + Vite          | Authenticated shell, navigation, and functional panels                    |
+| 3D world                 | Three.js + React Three Fiber       | Isometric 3D scene, avatars, camera, object interactions                  |
+| Styling and components   | Tailwind CSS + shadcn/ui           | Panels and forms                                                          |
+| Client state             | Zustand                            | UI state, interactions, local preferences                                 |
+| Server data              | TanStack Query                     | Queries, cache, invalidation of persistent data                           |
+| Forms                    | React Hook Form + Zod              | Form handling and input validation                                        |
+| Drag and drop (optional) | dnd-kit                            | Only if a future feature needs drag and drop; no current requirement does |
+| Testing                  | Vitest + Playwright                | Unit/integration and end-to-end tests                                     |
+| Router                   | React Router                       | Routes and protected navigation (FD4)                                     |
+| API client               | openapi-typescript + openapi-fetch | Types generated from the backend OpenAPI document (FD2, FD7)              |
+| Hosting                  | AWS Amplify Hosting (`us-east-2`)  | Static build served over HTTPS                                            |
 
 ## Decisions
 
@@ -82,20 +82,20 @@ Decided and approved by Agustin (decision owner) on 2026-11-02. This is not a cl
 
 The backend repository records decisions D1-D12 in its `docs/technical-justification.md` section 7 (a relative link to that repository is not possible, so it is cited here). They affect the frontend as follows.
 
-| ID | Backend decision | Frontend impact |
-|---|---|---|
-| D1 | Short-lived JWT access token plus a rotated, hashed opaque refresh token; the server checks a session identifier on every protected request and a revoked session yields `401` | The client holds both tokens (FD1), sends the access token as `Authorization: Bearer`, refreshes on expiry, and ends the session when refresh fails ([Authentication and session](../rules/authentication-and-session.md)) |
-| D2 | Colyseus `onAuth` calls an internal NestJS endpoint to verify the session and access before admitting a join | The client supplies the access token when joining, as the SDK `Authorization` header (FD3); admission is decided by the server |
-| D3 | Backend pnpm monorepo (`apps/api`, `apps/realtime`, `packages/contracts`) | None, except the contract types the frontend consumes (D4) |
-| D4 | NestJS generates an OpenAPI document served with the Scalar reference UI; the frontend generates its types from it | The frontend generates API types from that document (FD2); the backend also commits the document and the realtime type artifacts (backend D8), which the frontend syncs (FD7) |
-| D5 | AWS region `us-east-2` (changed from `sa-east-1` on 2026-11-04: the AWS account assigns the Region and denies others) | The frontend hosting is placed in the same region (FD5) |
-| D6 | No long-lived AWS access keys; GitHub Actions OIDC is the target, but the AWS account currently denies creating the OIDC provider (backend D6 update, 2026-11-04) | The frontend deploys through Amplify Hosting's GitHub App connection, with no AWS credentials in GitHub (FD5) |
-| D7 | Two ways to join: single-use email invitations (mandatory for teachers and parents) and a per-classroom join code that grants only the `Student` role | The interface supports entering a classroom code and the teacher's code management, and keeps email invitations for other roles ([Classrooms, roles, and permissions](../rules/classrooms-and-roles.md)) |
-| D8 | The backend commits `openapi.json` (CI fails if stale), generates Colyseus room state types with `schema-codegen`, exports realtime message payload types from `packages/contracts`, and commits them | The frontend pulls these artifacts with `pnpm api:sync` and commits the generated types (FD7) |
-| D9 | Contract-first: the backend publishes each endpoint's DTOs and OpenAPI entry (a `501` stub is allowed) before or with its implementation; the committed `openapi.json` carries it | The frontend builds MSW handlers from the contract and proceeds before the backend implementation lands (FD9) |
-| D10 | Timestamps stored in UTC and returned as ISO 8601 UTC; each School has a persisted IANA time zone (default `America/Argentina/Buenos_Aires`); the server decides lateness in UTC | The frontend displays deadlines in the school's time zone and indicates the zone (FD11) |
-| D11 | Auto-graded multiple choice in activities and exams is MVP Core; ungraded self-assessed practice quizzes stay MVP Extendido | The interface renders multiple choice as a quiz or exam and shows the server's result (FD12) |
-| D12 | `GET /classrooms/:id/members` returns id, display name, classroom role, and avatar summary to every classroom member; paginated, optional `q` prefix filter, `404` for non-members | Mention autocomplete consumes it (FD12) |
+| ID  | Backend decision                                                                                                                                                                                      | Frontend impact                                                                                                                                                                                                            |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | Short-lived JWT access token plus a rotated, hashed opaque refresh token; the server checks a session identifier on every protected request and a revoked session yields `401`                        | The client holds both tokens (FD1), sends the access token as `Authorization: Bearer`, refreshes on expiry, and ends the session when refresh fails ([Authentication and session](../rules/authentication-and-session.md)) |
+| D2  | Colyseus `onAuth` calls an internal NestJS endpoint to verify the session and access before admitting a join                                                                                          | The client supplies the access token when joining, as the SDK `Authorization` header (FD3); admission is decided by the server                                                                                             |
+| D3  | Backend pnpm monorepo (`apps/api`, `apps/realtime`, `packages/contracts`)                                                                                                                             | None, except the contract types the frontend consumes (D4)                                                                                                                                                                 |
+| D4  | NestJS generates an OpenAPI document served with the Scalar reference UI; the frontend generates its types from it                                                                                    | The frontend generates API types from that document (FD2); the backend also commits the document and the realtime type artifacts (backend D8), which the frontend syncs (FD7)                                              |
+| D5  | AWS region `us-east-2` (changed from `sa-east-1` on 2026-11-04: the AWS account assigns the Region and denies others)                                                                                 | The frontend hosting is placed in the same region (FD5)                                                                                                                                                                    |
+| D6  | No long-lived AWS access keys; GitHub Actions OIDC is the target, but the AWS account currently denies creating the OIDC provider (backend D6 update, 2026-11-04)                                     | The frontend deploys through Amplify Hosting's GitHub App connection, with no AWS credentials in GitHub (FD5)                                                                                                              |
+| D7  | Two ways to join: single-use email invitations (mandatory for teachers and parents) and a per-classroom join code that grants only the `Student` role                                                 | The interface supports entering a classroom code and the teacher's code management, and keeps email invitations for other roles ([Classrooms, roles, and permissions](../rules/classrooms-and-roles.md))                   |
+| D8  | The backend commits `openapi.json` (CI fails if stale), generates Colyseus room state types with `schema-codegen`, exports realtime message payload types from `packages/contracts`, and commits them | The frontend pulls these artifacts with `pnpm api:sync` and commits the generated types (FD7)                                                                                                                              |
+| D9  | Contract-first: the backend publishes each endpoint's DTOs and OpenAPI entry (a `501` stub is allowed) before or with its implementation; the committed `openapi.json` carries it                     | The frontend builds MSW handlers from the contract and proceeds before the backend implementation lands (FD9)                                                                                                              |
+| D10 | Timestamps stored in UTC and returned as ISO 8601 UTC; each School has a persisted IANA time zone (default `America/Argentina/Buenos_Aires`); the server decides lateness in UTC                      | The frontend displays deadlines in the school's time zone and indicates the zone (FD11)                                                                                                                                    |
+| D11 | Auto-graded multiple choice in activities and exams is MVP Core; ungraded self-assessed practice quizzes stay MVP Extendido                                                                           | The interface renders multiple choice as a quiz or exam and shows the server's result (FD12)                                                                                                                               |
+| D12 | `GET /classrooms/:id/members` returns id, display name, classroom role, and avatar summary to every classroom member; paginated, optional `q` prefix filter, `404` for non-members                    | Mention autocomplete consumes it (FD12)                                                                                                                                                                                    |
 
 ### FD1. Token storage
 
@@ -104,7 +104,7 @@ The backend repository records decisions D1-D12 in its `docs/technical-justifica
 - **Rationale:** Matches the backend agreement recorded in D1, needs no cookie or CSRF infrastructure, and limits token lifetime to the tab.
 - **Alternatives:** (A) access token in memory and refresh token in an HttpOnly cookie, rejected by the decision owner; (B) both tokens in `localStorage`, rejected because they persist across browser restarts and enlarge the XSS exposure window.
 - **Trade-offs:** Tokens are readable by any script running in the page (XSS). Fresh/opener tabs require login and same-tab reload preserves continuity. Browser Duplicate Tab or explicit closed-tab restoration cloning both `sessionStorage` and `window.name` is an accepted boundary, not a universal no-recovery guarantee; see the [approved browser continuity clarification](session-lifecycle.md#accepted-browser-continuity-boundary) for rationale, alternatives, approval and review condition.
-- **Mandatory mitigations:** strict Content-Security-Policy (no inline scripts, no `unsafe-eval`, allowlisted sources); never render unsanitized HTML (no `dangerouslySetInnerHTML` with user content); no third-party scripts beyond those approved; short access-token lifetime and refresh rotation per D1; clear both tokens on logout and on any `401` after a failed refresh. They are enforced by [Authentication and session](../rules/authentication-and-session.md) and [Security](../rules/security.md).
+- **Mandatory mitigations:** strict Content-Security-Policy (no inline scripts, no `unsafe-eval`, allowlisted sources; `script-src 'self' 'wasm-unsafe-eval'` and `worker-src 'self' blob:` permit same-origin WebAssembly Draco/KTX2 decoders for F15 without JavaScript `eval()`, served via Amplify `customHttp.yml`, see [Content Security Policy and security headers](./security.md)); never render unsanitized HTML (no `dangerouslySetInnerHTML` with user content, enforced by ESLint); no third-party scripts beyond those approved; short access-token lifetime and refresh rotation per D1; clear both tokens on logout and on any `401` after a failed refresh. They are enforced by [Authentication and session](../rules/authentication-and-session.md) and [Security](../rules/security.md).
 - **Approval:** Approved by Agustin (decision owner) on 2026-11-02.
 
 ### FD2. API types
