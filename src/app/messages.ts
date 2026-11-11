@@ -30,6 +30,12 @@ export const messages = {
       description: 'La dirección que buscás no existe o fue movida.',
     },
   },
+  session: {
+    verifying: 'Verificando tu sesión...',
+    unableTitle: 'No pudimos verificar tu sesión',
+    unableDescription:
+      'No pudimos comprobar si tu sesión sigue activa. Revisá tu conexión e intentá de nuevo.',
+  },
   showcase: {
     title: 'Componentes de interfaz',
     navigation: 'Ejemplos de interfaz',

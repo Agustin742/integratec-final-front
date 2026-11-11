@@ -1,5 +1,13 @@
 # Tracker — Agustin
 
+## 2026-11-11 — Session guards for the router (#20, task 2)
+
+- **Status:** in-progress
+- **Area / files:** `src/app/router/guards.tsx`, `src/app/router/return-target.ts`, `src/app/router/routes.tsx`, `src/app/messages.ts`
+- **Change:** Added `RequireAuth` (loading while the session initializes, redirect to `/login?next=` when signed out, retry state when it cannot be verified) on the protected branch, and `PublicOnly` on login, register and password reset. Invitation acceptance stays reachable signed in or out. The return target is built and read through `safeSessionRedirect`.
+- **Reason:** One guard decides session access so screens never flash protected content or loop through login.
+- **Next step:** Error boundaries and not-found/forbidden views, capability gating, skip link/focus/title (tasks 3-5).
+
 ## 2026-11-11 — React Router app shell (#20, task 1)
 
 - **Status:** in-progress

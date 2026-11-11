@@ -1,4 +1,5 @@
 import { createBrowserRouter, type RouteObject } from 'react-router';
+import { PublicOnly, RequireAuth } from './guards';
 import { AppHydrateFallback, AppShell, SHOWCASE_PATH } from './app-shell';
 
 /**
@@ -37,28 +38,35 @@ export function createAppRoutes({
       Component: () => <AppShell showcase={showcase} />,
       HydrateFallback: AppHydrateFallback,
       children: [
-        // Public routes.
+        // Signed-out pages: a signed-in user is redirected away from them.
         {
-          path: 'login',
-          lazy: {
-            Component: async () =>
-              (await import('../pages/login-page')).LoginPage,
-          },
+          Component: PublicOnly,
+          children: [
+            {
+              path: 'login',
+              lazy: {
+                Component: async () =>
+                  (await import('../pages/login-page')).LoginPage,
+              },
+            },
+            {
+              path: 'register',
+              lazy: {
+                Component: async () =>
+                  (await import('../pages/register-page')).RegisterPage,
+              },
+            },
+            {
+              path: 'password-reset',
+              lazy: {
+                Component: async () =>
+                  (await import('../pages/password-reset-page'))
+                    .PasswordResetPage,
+              },
+            },
+          ],
         },
-        {
-          path: 'register',
-          lazy: {
-            Component: async () =>
-              (await import('../pages/register-page')).RegisterPage,
-          },
-        },
-        {
-          path: 'password-reset',
-          lazy: {
-            Component: async () =>
-              (await import('../pages/password-reset-page')).PasswordResetPage,
-          },
-        },
+        // Reachable signed in or out: an invited user may already have an account.
         {
           path: 'invitations/accept',
           lazy: {
@@ -67,10 +75,11 @@ export function createAppRoutes({
                 .InvitationAcceptPage,
           },
         },
-        // Protected area. This pathless branch is where the session guard
-        // attaches (T2); everything that requires a signed-in user nests here.
+        // Protected area. This pathless branch is behind the session guard;
+        // everything that requires a signed-in user nests here.
         {
           id: 'protected',
+          Component: RequireAuth,
           children: [
             {
               index: true,

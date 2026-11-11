@@ -3,15 +3,34 @@ import { RouterProvider } from 'react-router/dom';
 import { createMemoryRouter } from 'react-router';
 import { expect, test } from 'vitest';
 import { expectAccessible } from '@/test/accessibility';
+import { SessionProvider } from '@/session/provider';
+import { profile } from '@/session/test-fixtures';
 import { render } from '@/test/render';
 import { messages } from '../messages';
+import { fakeSession } from './fake-session';
 import { createAppRoutes } from './routes';
 
-function renderAt(path: string, options?: { showcase?: boolean }) {
+/** Signed out by default; the protected home needs an authenticated session. */
+function renderAt(
+  path: string,
+  options?: { showcase?: boolean; authenticated?: boolean },
+) {
+  const { service } = fakeSession(
+    options?.authenticated
+      ? { status: 'authenticated', user: profile }
+      : { status: 'unauthenticated' },
+  );
   const router = createMemoryRouter(createAppRoutes(options), {
     initialEntries: [path],
   });
-  return { router, ...render(<RouterProvider router={router} />) };
+  return {
+    router,
+    ...render(
+      <SessionProvider service={service}>
+        <RouterProvider router={router} />
+      </SessionProvider>,
+    ),
+  };
 }
 
 const pages = [
@@ -25,7 +44,7 @@ const pages = [
 test.each(pages)(
   'renders %s lazily inside the application shell',
   async (path, title) => {
-    renderAt(path);
+    renderAt(path, { authenticated: path === '/' });
 
     expect(
       await screen.findByRole('heading', { level: 2, name: title }),
