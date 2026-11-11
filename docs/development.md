@@ -48,11 +48,22 @@ The [README command table](../README.md#local-development) matches `package.json
 
 `pnpm api:sync` ([issue #16](https://github.com/Agustin742/integratec-final-front/issues/16)) fetches the backend's committed `apps/api/openapi.json` and realtime contract artifacts from `Agustin742/integratec-final-back` (`develop` by default, or a local checkout via `--backend-dir <path>` / `BACKEND_CHECKOUT_DIR`) and regenerates committed TypeScript files in `src/api/schema.generated.ts` and `src/realtime/contracts.generated.ts` (plus `src/realtime/room-state.generated.ts` once backend Colyseus room-state codegen is published). Prettier and ESLint ignore `src/api/*.generated.ts` and `src/realtime/*.generated.ts` so generated contracts are never hand-edited or reformatted, while `pnpm typecheck` and `pnpm build` validate them offline without a running backend.
 
+## Session integration
+
+[Session lifecycle](session-lifecycle.md#react-ownership-and-safe-redirects)
+documents the renderless provider, read-only snapshot hook, opt-in authenticated
+content, cleanup registration and root-only redirect helper. The public bootstrap
+and showcase remain ungated. No router, login screen or realtime rejoin is added.
+Private consumers own their synchronous cleanup registrations; service construction
+belongs outside React rendering, with `SessionProvider` inside `ApiQueryProvider`.
+
 ## Verification boundaries
 
 Before delivery, run a frozen install and every listed quality command on Node 22. Start `pnpm dev` and inspect the placeholder at desktop and mobile widths, including zoom. After `pnpm build`, inspect `pnpm preview` as well. Verify that an intentionally invalid strict TypeScript fixture fails both typecheck and build in isolated state, not committed source.
 
-The placeholder has no controls, network requests, forms, or asynchronous states. Keyboard focus interactions, loading, validation, and error flows are therefore not introduced here; they must be checked when those behaviors are implemented. Check the document language and heading semantics now.
+The public placeholder has no controls, forms, or asynchronous UI states. The
+session provider may verify stored credentials with `/users/me` during bootstrap;
+without credentials it performs no request. Keyboard focus interactions, loading, validation, and error flows are therefore not introduced here; they must be checked when those behaviors are implemented. Check the document language and heading semantics now.
 
 [F02 testing infrastructure](testing.md) provides `pnpm test` (Vitest/Testing Library with jsdom) and `pnpm e2e` (Playwright against production preview). Follow that guide for the project-local Chromium install, helpers, optional remote URL, fake timers, and contract-mocking policy. Lint, strict typecheck, and formatting include both runner configs and browser tests. Existing Python CI-tooling tests remain applicable. [F03 frontend CI](ci.md) now runs separate lint, formatting, typecheck, non-watch test and build steps after a frozen install on Node 22, with explicit skip notices and a result summary. Playwright remains optional and local, not a CI gate.
 

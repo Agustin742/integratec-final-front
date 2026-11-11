@@ -28,6 +28,48 @@ The environment-assignment syntax above uses Bash (including Git Bash on Windows
 
 Use real timers by default, and always for axe. For timer-dependent behavior, opt into `vi.useFakeTimers()` in the smallest test scope, advance pending work inside React `act`, then flush pending timers and restore `vi.useRealTimers()` in teardown (including failure paths). Restore real timers before calling the accessibility helper; fake timers can stall axe. Do not add artificial loading/focus scenarios to the static placeholder.
 
+## Session lifecycle checks
+
+Run `pnpm exec vitest run src/session/provider.test.tsx src/session/redirect.test.ts`
+for the React/service boundary: synthetic controlled fetch and injected memory
+storage, real QueryClient cancellation/cache clearing, private release callbacks,
+StrictMode and unmount ownership, unresolved/protected rendering and malicious
+redirect inputs. Core coverage remains in `src/session/controller.test.ts` and
+`src/session/middleware.test.ts`. `src/session/storage.test.ts` models distinct tab
+owners with copied storage, same-owner reload, missing/unavailable ownership and
+ordinary opener name mismatch. Recovery regressions distinguish expiry-only
+uncertainty from an observed protected `401`, including one joining an expiry-started
+refresh. Authenticated A-to-B provider replacement tests inspect what B renders,
+populated Query/Mutation caches, a real query cancellation signal and late-result
+fencing; see [session evidence and limits](session-lifecycle.md#verification-and-remaining-work).
+
+These checks do not prove live backend authorization, server logout integration,
+CSP enforcement or manual tab-close/reopen/new-tab behavior. `sessionStorage`
+survives reload and may be restored by browser session recovery; an opener can
+seed a new tab with a copy. The browser discriminator pairs a nonsecret `window.name`
+nonce with storage metadata and rejects ordinary opener copies before protected
+requests. Restoring or duplicating both values may be indistinguishable from reload:
+this is an accepted browser boundary, not a universal no-recovery guarantee. See
+[the approved decision](session-lifecycle.md#accepted-browser-continuity-boundary).
+Fresh/opener tabs require login; same-tab F5/reload preserves continuity.
+The original Chromium 156/mock-API failure (5/6, opener failed) is recorded
+separately from the corrected 6/6 result. Against correction `e63a7aa`, the full
+suite passed 228/228, existing desktop/mobile Playwright passed 16/16, and lint,
+typecheck, production build and configured formatting passed. The one independent
+blocker-only recheck passed 8/8; see the linked session evidence for its scope.
+These historical results are not checks of subsequent review corrections.
+Focused regressions exercise public request cancellation across logout and caller
+abort (including read replay), exact `AbortError` preservation, non-retry
+classification and genuine network failures. Standalone storage tests block the
+global `Function` constructor, validate invalid/valid stored values and restore
+global changes; initialization recovery verifies rotated credentials after a
+transient profile `503`. Run them together with
+`pnpm exec vitest run src/api/client.test.ts src/api/query-client.test.tsx src/session`.
+No new browser/manual verification is claimed. MutationCache clearing is not
+cancellation of already-running async callbacks: consumers must fence completion
+writes against session ownership after awaits. No hypothetical mutation framework,
+new screen or focus/layout interaction is introduced by this correction.
+
 ## Browser smoke and optional deployed target
 
 `pnpm e2e` runs `pnpm build:e2e` — the `showcase` Vite build mode, which includes the component showcase — and then Playwright, which starts `pnpm preview` on `http://127.0.0.1:4173`, refuses to reuse another server, and stops its managed preview afterward. A plain `pnpm build` produces the production bundle: it resolves the showcase flag to `false` and emits no showcase chunk. Desktop Chrome and mobile-emulated Chromium projects check title, `es-AR`, banner and main roles, horizontal overflow, and the showcase interaction scenarios including reduced motion. Mobile emulation is not a physical-device test. Results are ignored under `e2e/test-results/`; no screenshots or WebGL pixel assertions are generated.

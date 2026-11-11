@@ -211,6 +211,31 @@ describe('createApiClient and requestApi', () => {
     }
   });
 
+  test.each(['data', 'void'] as const)(
+    '%s requests preserve exact cancellations and still map genuine network failures',
+    async (mode) => {
+      const fetch = vi.fn<typeof globalThis.fetch>();
+      const client = createApiClient({ fetch });
+      const request = () =>
+        mode === 'data'
+          ? requestApi(() => client.GET('/users/me'))
+          : requestApiVoid(() => client.POST('/auth/logout'));
+      for (const cancellation of [
+        new DOMException('Caller cancelled', 'AbortError'),
+        Object.assign(new Error('Caller cancelled'), { name: 'AbortError' }),
+      ]) {
+        fetch.mockRejectedValueOnce(cancellation);
+        await expect(request()).rejects.toBe(cancellation);
+      }
+      fetch.mockRejectedValueOnce(new TypeError('synthetic offline'));
+      await expect(request()).rejects.toMatchObject({
+        kind: 'network',
+        status: null,
+      });
+      expect(fetch).toHaveBeenCalledTimes(3);
+    },
+  );
+
   test('throws an unexpected ApiError when requestApi receives a 2xx response with undefined data', async () => {
     await expect(
       requestApi(async () => ({

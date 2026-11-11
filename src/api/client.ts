@@ -45,6 +45,11 @@ export async function requestApi<TData>(
   try {
     result = await execute();
   } catch (cause) {
+    if (
+      (cause instanceof Error || cause instanceof DOMException) &&
+      cause.name === 'AbortError'
+    )
+      throw cause;
     throw mapNetworkError(cause);
   }
 
@@ -70,6 +75,11 @@ export async function requestApiVoid(
   try {
     result = await execute();
   } catch (cause) {
+    if (
+      (cause instanceof Error || cause instanceof DOMException) &&
+      cause.name === 'AbortError'
+    )
+      throw cause;
     throw mapNetworkError(cause);
   }
 

@@ -23,6 +23,254 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register account and select organizational path
+         * @description Creates a user account, baseline avatar configuration, and the initial organizational structure atomically.
+         */
+        post: operations["AuthController_register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Log in with email and password
+         * @description Opens a session and returns a short-lived access token (JWT) plus an opaque refresh token. Send the access token in the Authorization header as a Bearer credential.
+         */
+        post: operations["AuthController_login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate the refresh token
+         * @description Exchanges a refresh token for a new access token and a new refresh token for the same session. The presented refresh token becomes invalid; presenting an already rotated token revokes the whole session, except within a short reuse window after its rotation (REFRESH_REUSE_GRACE, default 30s) where a new pair is issued for the same session. The session keeps its original expiry.
+         */
+        post: operations["AuthController_refresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Log out and revoke the current session
+         * @description Revokes the session of the Bearer access token. Afterwards that access token and the session's refresh tokens are rejected with 401.
+         */
+        post: operations["AuthController_logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/password-reset/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request a password reset email
+         * @description Always answers 202 with the same body, whether or not the email belongs to an account, so it cannot be used to discover registered emails. For a registered email a link (`<PASSWORD_RESET_URL_BASE>?token=<token>`) is emailed asynchronously; it is single-use and expires after PASSWORD_RESET_TTL (default 1h). Public endpoint.
+         */
+        post: operations["AuthController_requestPasswordReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/password-reset/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set a new password with a reset token
+         * @description Spends the token from the emailed link: sets the new password and revokes every session of the account, so previous access and refresh tokens stop working. The token works once. Public endpoint.
+         */
+        post: operations["AuthController_confirmPasswordReset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read own profile and base avatar
+         * @description The global SessionAuthGuard verifies the session once; identity comes from CurrentUser. Missing, empty or unsupported stored appearance returns base defaults without changing stored appearance.
+         */
+        get: operations["UsersController_getMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/me/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update own display name
+         * @description Uses the global SessionAuthGuard identity. Changes only displayName; unsupported stored appearance returns base defaults and a privacy-safe warning without repairing stored appearance.
+         */
+        patch: operations["UsersController_updateProfile"];
+        trace?: never;
+    };
+    "/users/me/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Replace own base avatar
+         * @description Uses the global SessionAuthGuard identity with one session verification. All five fields required, not a partial merge. Replaces stored base-only appearance, including unsupported legacy values. Body, hair and ordinary tops are free. Accessories and uniforms are not supported.
+         */
+        patch: operations["UsersController_updateAvatar"];
+        trace?: never;
+    };
+    "/classrooms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List accessible classrooms
+         * @description Returns a paginated list (page, pageSize, sort=createdAt|name, default -createdAt) of classrooms accessible to the authenticated user (as School Owner/Admin, Teacher, enrolled Student, or active linked Parent when adultMode is false).
+         */
+        get: operations["ClassroomsController_list"];
+        put?: never;
+        /**
+         * Create a virtual classroom
+         * @description Atomically creates a persistent classroom together with its default classroom pet, initial desk layout, and school teacher membership when applicable. Allowed for independent teachers and school staff (Owner, Admin, Teacher).
+         */
+        post: operations["ClassroomsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get classroom details and caller capabilities
+         * @description Returns the persistent state of a virtual classroom, its pet, desk count, and the server-derived role and capabilities for the authenticated caller.
+         */
+        get: operations["ClassroomsController_findOne"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update classroom configuration and control flags
+         * @description Updates classroom name, subject, adultMode, or live control flags (chatMuted, collaborationLocked, gamesDisabled). Restricted to staff of the classroom (School Owner/Admin or the classroom Teacher).
+         */
+        patch: operations["ClassroomsController_update"];
+        trace?: never;
+    };
+    "/me/classrooms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List classrooms accessible to the authenticated user
+         * @description Returns a paginated list of classrooms accessible to the authenticated user (as School Owner/Admin, Teacher, enrolled Student, or active linked Parent when adultMode is false) with derived role and capabilities.
+         */
+        get: operations["MeClassroomsController_listMyClassrooms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -40,6 +288,86 @@ export interface components {
              * @example 2026-01-01T00:00:00.000Z
              */
             timestamp: string;
+        };
+        RegisterRequestDto: {
+            /**
+             * @description User email address, normalized to lowercase and trimmed
+             * @example profesora.ana@example.com
+             */
+            email: string;
+            /**
+             * @description User password (between 8 characters and 72 UTF-8 bytes)
+             * @example passwordSegura123
+             */
+            password: string;
+            /**
+             * @description Display name for the user profile
+             * @example Prof. Ana García
+             */
+            displayName: string;
+            /**
+             * @description Organizational path chosen during registration
+             * @example INDEPENDENT_TEACHER
+             * @enum {string}
+             */
+            path: "INDEPENDENT_TEACHER" | "SCHOOL";
+            /**
+             * @description School name (required when path is SCHOOL)
+             * @example Colegio Belgrano Day
+             */
+            schoolName?: string;
+        };
+        SchoolSummaryDto: {
+            /**
+             * @description Unique school identifier (UUID)
+             * @example 3f6c2d9e-0000-4000-8000-000000000000
+             */
+            id: string;
+            /**
+             * @description Name of the created school
+             * @example Colegio Belgrano Day
+             */
+            name: string;
+            /**
+             * @description Unique slug generated for the school
+             * @example colegio-belgrano-day
+             */
+            slug: string;
+            /**
+             * @description IANA time zone for the school
+             * @example America/Argentina/Buenos_Aires
+             */
+            timeZone: string;
+        };
+        RegisterResponseDto: {
+            /**
+             * @description Unique user identifier (UUID)
+             * @example 3f6c2d9e-0000-4000-8000-000000000000
+             */
+            id: string;
+            /**
+             * @description Registered user email address
+             * @example profesora.ana@example.com
+             */
+            email: string;
+            /**
+             * @description User display name
+             * @example Prof. Ana García
+             */
+            displayName: string;
+            /**
+             * @description Organizational path chosen during registration
+             * @example INDEPENDENT_TEACHER
+             * @enum {string}
+             */
+            path: "INDEPENDENT_TEACHER" | "SCHOOL";
+            /** @description Created school details if path is SCHOOL */
+            school?: components["schemas"]["SchoolSummaryDto"];
+            /**
+             * @description Account creation instant in UTC (ISO 8601)
+             * @example 2026-11-05T20:00:00.000Z
+             */
+            createdAt: string;
         };
         /**
          * @description Stable machine-readable code. Clients branch on this, never on the message.
@@ -78,6 +406,366 @@ export interface components {
         ErrorEnvelope: {
             error: components["schemas"]["ErrorBody"];
         };
+        LoginRequestDto: {
+            /**
+             * @description Account email address, normalized to lowercase and trimmed
+             * @example profesora.ana@example.com
+             */
+            email: string;
+            /**
+             * @description Account password (at most 72 UTF-8 bytes, the bcrypt input limit)
+             * @example passwordSegura123
+             */
+            password: string;
+        };
+        TokenPairResponseDto: {
+            /**
+             * @description Short-lived JWT (HS256). Send it as `Authorization: Bearer <accessToken>`.
+             * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIuLi4ifQ.signature
+             */
+            accessToken: string;
+            /**
+             * @description Opaque refresh token. Stored server-side only as a SHA-256 digest; keep it secret.
+             * @example q3VZk0mH1xk4oQe2l7Yw5r8m9uJcT6bNf0aXsD1pLhE
+             */
+            refreshToken: string;
+            /**
+             * @description Authorization scheme.
+             * @example Bearer
+             * @enum {string}
+             */
+            tokenType: "Bearer";
+            /**
+             * @description Access token lifetime in seconds.
+             * @example 900
+             */
+            expiresIn: number;
+        };
+        RefreshRequestDto: {
+            /**
+             * @description The current opaque refresh token. It is single-use: the response carries its replacement.
+             * @example q3VZk0mH1xk4oQe2l7Yw5r8m9uJcT6bNf0aXsD1pLhE
+             */
+            refreshToken: string;
+        };
+        PasswordResetRequestDto: {
+            /**
+             * @description Email of the account to reset, normalized to lowercase and trimmed
+             * @example profesora.ana@example.com
+             */
+            email: string;
+        };
+        PasswordResetRequestedResponseDto: {
+            /**
+             * @description Constant message; it never reveals whether the email is registered.
+             * @example If the email belongs to an account, a reset link has been sent.
+             */
+            message: string;
+        };
+        PasswordResetConfirmRequestDto: {
+            /**
+             * @description The opaque token from the emailed link (`?token=`). It works once.
+             * @example q3VZk0mH1xk4oQe2l7Yw5r8m9uJcT6bNf0aXsD1pLhE
+             */
+            token: string;
+            /**
+             * @description The new password, under the same policy as registration
+             * @example passwordSegura123
+             */
+            newPassword: string;
+        };
+        AvatarDto: {
+            /**
+             * @example male
+             * @enum {string}
+             */
+            bodyId: "male" | "female";
+            /**
+             * @description male: afro/dreads; female: afro/original.
+             * @example afro
+             * @enum {string}
+             */
+            hairId: "afro" | "dreads" | "original";
+            /**
+             * @description male: hoodie/tank; female: hoodie/tank/tshirt. Uniforms excluded.
+             * @example hoodie
+             * @enum {string}
+             */
+            topId: "hoodie" | "tank" | "tshirt";
+            /**
+             * @description Case-insensitive; returned uppercase.
+             * @example #6C4D48
+             * @enum {string}
+             */
+            hairColor: "#6C4D48" | "#AF6D63" | "#E5AD58" | "#353849" | "#C77DAA";
+            /**
+             * @description Case-insensitive; returned uppercase.
+             * @example #5B4F96
+             * @enum {string}
+             */
+            clothingColor: "#5B4F96" | "#75B7DA" | "#F2C85C" | "#EFA5AE" | "#7EBA8B" | "#F4E6D2";
+        };
+        OwnProfileDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example teacher@example.test */
+            email: string;
+            /** @example Prof. Ana */
+            displayName: string;
+            avatar: components["schemas"]["AvatarDto"];
+        };
+        UpdateProfileDto: {
+            /**
+             * @description 1–100 characters after surrounding-space trimming. C0/C1 controls and Unicode line/paragraph separators are rejected before trimming; requires a character other than whitespace, default-ignorables, combining marks or braille blank. Unicode names, punctuation and joiners within visible names are preserved.
+             * @example Prof. Ana
+             */
+            displayName: string;
+        };
+        CreateClassroomDto: {
+            /**
+             * @description Display name of the virtual classroom
+             * @example 3° Año B - Matemática
+             */
+            name: string;
+            /**
+             * @description Optional subject or course description for the classroom
+             * @example Matemática y Geometría
+             */
+            subject?: string;
+            /**
+             * @description Whether the classroom runs in adult education mode (disables parent links and parent actions)
+             * @default false
+             * @example false
+             */
+            adultMode: boolean;
+            /**
+             * @description Optional target school UUID when the actor belongs to a school; omitted for independent teachers or resolved automatically from active school membership
+             * @example 3f6c2d9e-0000-4000-8000-000000000000
+             */
+            schoolId?: string;
+        };
+        ClassroomPetSummaryDto: {
+            /**
+             * @description Unique identifier of the classroom pet (UUID)
+             * @example 9a1b2c3d-0000-4000-8000-000000000001
+             */
+            id: string;
+            /**
+             * @description Display name of the classroom pet
+             * @example Michi
+             */
+            name: string;
+            /**
+             * @description Species identifier of the classroom pet
+             * @example cat
+             */
+            species: string;
+            /**
+             * @description Current level of the classroom pet
+             * @example 1
+             */
+            level: number;
+            /**
+             * @description Accumulated experience points of the classroom pet
+             * @example 0
+             */
+            experience: number;
+        };
+        ClassroomDetailResponseDto: {
+            /**
+             * @description Unique classroom identifier (UUID)
+             * @example 4e5f6a7b-0000-4000-8000-000000000002
+             */
+            id: string;
+            /**
+             * @description Display name of the virtual classroom
+             * @example 3° Año B - Matemática
+             */
+            name: string;
+            /**
+             * @description Optional subject or course description
+             * @example Matemática y Geometría
+             */
+            subject: string | null;
+            /**
+             * @description Owning school UUID when the classroom belongs to a school, or null
+             * @example 3f6c2d9e-0000-4000-8000-000000000000
+             */
+            schoolId: string | null;
+            /**
+             * @description Owning independent teacher user UUID when the classroom belongs to an independent teacher, or null
+             * @example null
+             */
+            independentTeacherId: string | null;
+            /**
+             * @description Whether the classroom runs in adult education mode
+             * @example false
+             */
+            adultMode: boolean;
+            /**
+             * @description Whether the classroom student chat is muted
+             * @example false
+             */
+            chatMuted: boolean;
+            /**
+             * @description Whether collaborative editing is locked
+             * @example false
+             */
+            collaborationLocked: boolean;
+            /**
+             * @description Whether interactive classroom games are disabled
+             * @example false
+             */
+            gamesDisabled: boolean;
+            /**
+             * @description Resolved role of the authenticated caller in this classroom
+             * @example TEACHER
+             * @enum {string}
+             */
+            myRole: "OWNER" | "ADMIN" | "TEACHER" | "STUDENT" | "PARENT";
+            /**
+             * @description Server-derived capabilities granted to the caller in this classroom
+             * @example [
+             *       "configure_classroom",
+             *       "invite_members",
+             *       "publish_content",
+             *       "moderate_chat",
+             *       "configure_bot",
+             *       "view_metrics",
+             *       "chat_classmates",
+             *       "list_directory",
+             *       "message_teacher"
+             *     ]
+             */
+            capabilities: ("manage_school" | "configure_classroom" | "invite_members" | "publish_content" | "moderate_chat" | "configure_bot" | "view_metrics" | "participate_activities" | "chat_classmates" | "list_directory" | "message_teacher")[];
+            /**
+             * @description Classroom creation timestamp in UTC (ISO 8601)
+             * @example 2026-11-07T20:00:00.000Z
+             */
+            createdAt: string;
+            /**
+             * @description Classroom last update timestamp in UTC (ISO 8601)
+             * @example 2026-11-07T20:00:00.000Z
+             */
+            updatedAt: string;
+            /**
+             * @description Total number of desks provisioned in the classroom
+             * @example 12
+             */
+            deskCount: number;
+            /** @description The classroom pet state */
+            pet: components["schemas"]["ClassroomPetSummaryDto"] | null;
+        };
+        ClassroomListItemDto: {
+            /**
+             * @description Unique classroom identifier (UUID)
+             * @example 4e5f6a7b-0000-4000-8000-000000000002
+             */
+            id: string;
+            /**
+             * @description Display name of the virtual classroom
+             * @example 3° Año B - Matemática
+             */
+            name: string;
+            /**
+             * @description Optional subject or course description
+             * @example Matemática y Geometría
+             */
+            subject: string | null;
+            /**
+             * @description Owning school UUID when the classroom belongs to a school, or null
+             * @example 3f6c2d9e-0000-4000-8000-000000000000
+             */
+            schoolId: string | null;
+            /**
+             * @description Owning independent teacher user UUID when the classroom belongs to an independent teacher, or null
+             * @example null
+             */
+            independentTeacherId: string | null;
+            /**
+             * @description Whether the classroom runs in adult education mode
+             * @example false
+             */
+            adultMode: boolean;
+            /**
+             * @description Whether the classroom student chat is muted
+             * @example false
+             */
+            chatMuted: boolean;
+            /**
+             * @description Whether collaborative editing is locked
+             * @example false
+             */
+            collaborationLocked: boolean;
+            /**
+             * @description Whether interactive classroom games are disabled
+             * @example false
+             */
+            gamesDisabled: boolean;
+            /**
+             * @description Resolved role of the authenticated caller in this classroom
+             * @example TEACHER
+             * @enum {string}
+             */
+            myRole: "OWNER" | "ADMIN" | "TEACHER" | "STUDENT" | "PARENT";
+            /**
+             * @description Server-derived capabilities granted to the caller in this classroom
+             * @example [
+             *       "configure_classroom",
+             *       "invite_members",
+             *       "publish_content",
+             *       "moderate_chat",
+             *       "configure_bot",
+             *       "view_metrics",
+             *       "chat_classmates",
+             *       "list_directory",
+             *       "message_teacher"
+             *     ]
+             */
+            capabilities: ("manage_school" | "configure_classroom" | "invite_members" | "publish_content" | "moderate_chat" | "configure_bot" | "view_metrics" | "participate_activities" | "chat_classmates" | "list_directory" | "message_teacher")[];
+            /**
+             * @description Classroom creation timestamp in UTC (ISO 8601)
+             * @example 2026-11-07T20:00:00.000Z
+             */
+            createdAt: string;
+            /**
+             * @description Classroom last update timestamp in UTC (ISO 8601)
+             * @example 2026-11-07T20:00:00.000Z
+             */
+            updatedAt: string;
+        };
+        UpdateClassroomDto: {
+            /**
+             * @description Updated display name of the virtual classroom
+             * @example 3° Año B - Matemática Avanzada
+             */
+            name?: string;
+            /**
+             * @description Updated subject or course description for the classroom
+             * @example Álgebra y Análisis
+             */
+            subject?: Record<string, never> | null;
+            /**
+             * @description Whether the classroom runs in adult education mode (preserves existing parent links in DB while disabling parent access)
+             * @example false
+             */
+            adultMode?: boolean;
+            /**
+             * @description Whether the classroom student chat channel is muted
+             * @example false
+             */
+            chatMuted?: boolean;
+            /**
+             * @description Whether collaborative editing in the classroom is locked
+             * @example false
+             */
+            collaborationLocked?: boolean;
+            /**
+             * @description Whether interactive classroom games are disabled
+             * @example false
+             */
+            gamesDisabled?: boolean;
+        };
     };
     responses: never;
     parameters: never;
@@ -103,6 +791,618 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthStatus"];
+                };
+            };
+        };
+    };
+    AuthController_register: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterRequestDto"];
+            };
+        };
+        responses: {
+            /** @description Account and organizational structure created successfully. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterResponseDto"];
+                };
+            };
+            /** @description Validation failed or missing required fields (e.g. invalid email, short password). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description A user with this normalized email address already exists. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    AuthController_login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequestDto"];
+            };
+        };
+        responses: {
+            /** @description Session opened. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenPairResponseDto"];
+                };
+            };
+            /** @description Validation failed (malformed email or missing password). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid credentials. The response is identical for an unknown email and a wrong password. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    AuthController_refresh: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshRequestDto"];
+            };
+        };
+        responses: {
+            /** @description New token pair issued. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenPairResponseDto"];
+                };
+            };
+            /** @description Validation failed (missing or malformed refreshToken). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Unknown, already rotated, or expired refresh token, or a revoked or expired session. The response is the same generic error in every case. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    AuthController_logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Session revoked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    AuthController_requestPasswordReset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordResetRequestDto"];
+            };
+        };
+        responses: {
+            /** @description Request accepted. Identical for registered and unregistered emails. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordResetRequestedResponseDto"];
+                };
+            };
+            /** @description Validation failed (missing or malformed email). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    AuthController_confirmPasswordReset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordResetConfirmRequestDto"];
+            };
+        };
+        responses: {
+            /** @description Password changed and previous sessions revoked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation failed (missing token, password outside the policy), or the token is unknown, already used or expired (BAD_REQUEST, the same generic error in every case). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    UsersController_getMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnProfileDto"];
+                };
+            };
+            /** @description Missing, malformed, expired or revoked session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    UsersController_updateProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProfileDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnProfileDto"];
+                };
+            };
+            /** @description VALIDATION_FAILED with per-field details; unknown fields rejected. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing, malformed, expired or revoked session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    UsersController_updateAvatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AvatarDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvatarDto"];
+                };
+            };
+            /** @description VALIDATION_FAILED with per-field details; unknown fields, incompatible choices and non-palette colors rejected. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing, malformed, expired or revoked session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Avatar access adapter denied use. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ClassroomsController_list: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+                /** @description Field to order by; prefix with "-" for descending. Allowed fields and the default order are listed per endpoint. */
+                sort?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of accessible classrooms. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ClassroomListItemDto"][];
+                        /** @example 1 */
+                        page: number;
+                        /** @example 20 */
+                        pageSize: number;
+                        /**
+                         * @description Item count across all pages.
+                         * @example 42
+                         */
+                        total: number;
+                    };
+                };
+            };
+            /** @description Invalid pagination or sort parameters (page, pageSize, sort). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ClassroomsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateClassroomDto"];
+            };
+        };
+        responses: {
+            /** @description Classroom, pet, and initial desks created atomically. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassroomDetailResponseDto"];
+                };
+            };
+            /** @description Validation failed (missing or invalid fields), or schoolId is missing for a caller who belongs to several schools. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Caller is a student or parent related to the target school and is not allowed to create classrooms. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Specified school does not exist or the caller has no relation to it (indistinguishable by design). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ClassroomsController_findOne: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Classroom details and caller capabilities. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassroomDetailResponseDto"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Classroom does not exist or caller has no relationship with it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ClassroomsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateClassroomDto"];
+            };
+        };
+        responses: {
+            /** @description Updated classroom details. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassroomDetailResponseDto"];
+                };
+            };
+            /** @description Validation failed: invalid or unknown fields, invisible or control characters in name or subject, or an empty body (at least one field is required). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Caller is a member (student or parent) with insufficient role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Classroom does not exist or caller has no relationship with it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    MeClassroomsController_listMyClassrooms: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+                /** @description Field to order by; prefix with "-" for descending. Allowed fields and the default order are listed per endpoint. */
+                sort?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of accessible classrooms. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ClassroomListItemDto"][];
+                        /** @example 1 */
+                        page: number;
+                        /** @example 20 */
+                        pageSize: number;
+                        /**
+                         * @description Item count across all pages.
+                         * @example 42
+                         */
+                        total: number;
+                    };
+                };
+            };
+            /** @description Invalid pagination or sort parameters (page, pageSize, sort). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
         };
