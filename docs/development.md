@@ -18,7 +18,9 @@
 | `src/main.tsx`                              | Validate public configuration and mount React with StrictMode and `ApiQueryProvider`   |
 | `src/config/public-config.ts`               | Typed, Zod-validated `VITE_` public configuration boundary                             |
 | `src/config/security-headers.ts`            | Strict CSP, HTTP security headers, Amplify `customHttp.yml` generator, and validator   |
-| `src/app/App.tsx`                           | Minimal semantic placeholder, without routing or feature behavior                      |
+| `src/app/router/routes.tsx`                 | Route table (lazy pages, public and protected branches, 404) and `createAppRouter()`   |
+| `src/app/router/app-shell.tsx`              | Layout route: `BaseLayout`, `<Outlet />` and the single `Toast` host                   |
+| `src/app/pages/`                            | Lazy placeholder route modules, replaced by feature screens in later stories           |
 | `src/app/messages.ts`                       | Centralized Spanish (Argentina) placeholder strings                                    |
 | `src/api/schema.generated.ts`               | Generated REST OpenAPI TypeScript definitions (`pnpm api:sync`)                        |
 | `src/api/client.ts`                         | Typed `openapi-fetch` client and `requestApi` / `requestApiVoid` helpers               |

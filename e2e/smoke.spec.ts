@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { messages } from '../src/app/messages';
 
 test('serves the semantic placeholder without horizontal overflow', async ({
   page,
@@ -37,6 +38,9 @@ test('serves the semantic placeholder without horizontal overflow', async ({
   await expect(page.locator('html')).toHaveAttribute('lang', 'es-AR');
   const main = page.getByRole('main');
   await expect(main).toBeVisible();
+  await expect(
+    main.getByRole('heading', { level: 2, name: messages.pages.home.title }),
+  ).toBeVisible();
   await expect(
     page
       .getByRole('banner')

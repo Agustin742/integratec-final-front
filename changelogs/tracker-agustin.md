@@ -1,5 +1,13 @@
 # Tracker — Agustin
 
+## 2026-11-11 — React Router app shell (#20, task 1)
+
+- **Status:** in-progress
+- **Area / files:** `src/app/router/`, `src/app/pages/`, `src/app/messages.ts`, `src/main.tsx`, `e2e/`, `docs/development.md`, `docs/ui-showcase.md`, `package.json`
+- **Change:** Added `react-router` 8.5.1 (exact pin) in data mode: a shared route table with lazy placeholder pages (login, register, password reset, invitation landing, protected home), a layout route on `BaseLayout` with `<Outlet />` and the toast host, a 404 catch-all, and the dev showcase moved to `/dev/ui`, registered only when `__UI_SHOWCASE__` is true. `main.tsx` renders `RouterProvider`; `App` was replaced by the route tests.
+- **Reason:** Navigation foundation for every upcoming screen (FD4).
+- **Next step:** Session guards, error boundaries, capability gating, skip link/focus/title (tasks 2-5).
+
 ## 2026-11-09 — Native Colyseus join credential (FD3) and realtime contract sync path
 
 - **Status:** completed

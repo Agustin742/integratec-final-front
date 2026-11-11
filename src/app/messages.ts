@@ -1,6 +1,35 @@
 export const messages = {
   title: 'IntegrarTec',
-  bootstrapReady: 'La base de la aplicación está lista para comenzar.',
+  pages: {
+    login: {
+      title: 'Iniciar sesión',
+      description:
+        'Acá vas a poder ingresar con tu cuenta. Pantalla en construcción.',
+    },
+    register: {
+      title: 'Crear cuenta',
+      description: 'Acá vas a poder registrarte. Pantalla en construcción.',
+    },
+    passwordReset: {
+      title: 'Restablecer contraseña',
+      description:
+        'Acá vas a poder recuperar el acceso a tu cuenta. Pantalla en construcción.',
+    },
+    invitationAccept: {
+      title: 'Aceptar invitación',
+      description:
+        'Acá vas a poder aceptar una invitación a un aula. Pantalla en construcción.',
+    },
+    home: {
+      title: 'Inicio',
+      description:
+        'Acá vas a ver tus aulas y tu actividad. Pantalla en construcción.',
+    },
+    notFound: {
+      title: 'Página no encontrada',
+      description: 'La dirección que buscás no existe o fue movida.',
+    },
+  },
   showcase: {
     title: 'Componentes de interfaz',
     navigation: 'Ejemplos de interfaz',
