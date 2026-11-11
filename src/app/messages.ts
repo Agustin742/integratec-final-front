@@ -54,6 +54,9 @@ export const messages = {
         'Ocurrió un problema inesperado. Recargá la página o volvé al inicio.',
     },
   },
+  access: {
+    checking: 'Verificando tus permisos...',
+  },
   session: {
     verifying: 'Verificando tu sesión...',
     unableTitle: 'No pudimos verificar tu sesión',

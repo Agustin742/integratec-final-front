@@ -1,5 +1,13 @@
 # Tracker — Agustin
 
+## 2026-11-11 — Server-derived capability gating (#20, task 4)
+
+- **Status:** in-progress
+- **Area / files:** `src/features/classrooms/use-classroom-capabilities.ts`, `src/app/router/require-capability.tsx`, `src/api/query-keys.ts`, `src/app/messages.ts`, `src/test/msw/handlers.ts`, `src/app/router/fake-session.ts`
+- **Change:** Added `useClassroomCapabilities(classroomId)`, a TanStack Query read of `GET /classrooms/{id}` through the session client that returns the role and capabilities the server granted (typed from the generated schema, keyed by user and classroom, nothing persisted), and the `RequireCapability` gate. The gate shows loading while pending, forbidden when the capability is missing or on 403, not found on 404 (so a foreign classroom looks like a missing one) and the generic error view for anything else; it never redirects to login.
+- **Reason:** Role-based screens must follow what the server allows in the current classroom, never a role name or stored value in the client.
+- **Next step:** Skip link, focus on navigation and document title per route (task 5).
+
 ## 2026-11-11 — Error boundaries and not-found/forbidden views (#20, task 3)
 
 - **Status:** in-progress

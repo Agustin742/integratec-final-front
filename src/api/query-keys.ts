@@ -99,3 +99,15 @@ export function createUserScopePredicate(
     return candidate?.userId === normalizedUserId;
   };
 }
+
+/**
+ * Key of `GET /classrooms/{id}`: the caller's role and capabilities in one
+ * classroom. Scoped by user and classroom, so switching either one reads an
+ * isolated cache entry and `createUserScopePredicate` evicts it on logout.
+ */
+export function classroomDetailQueryKey(
+  userId: string,
+  classroomId: string,
+): ScopedQueryKey {
+  return createScopedQueryKey({ userId, classroomId }, 'classrooms', 'detail');
+}
