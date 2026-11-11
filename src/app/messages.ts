@@ -29,6 +29,30 @@ export const messages = {
       title: 'Página no encontrada',
       description: 'La dirección que buscás no existe o fue movida.',
     },
+    forbidden: {
+      title: 'No tenés acceso a esta página',
+      description:
+        'Tu rol actual no permite ver este contenido. Si creés que es un error, consultá con quien administra el aula.',
+    },
+  },
+  errors: {
+    goHome: 'Ir al inicio',
+    reload: 'Recargar la página',
+    unexpected: {
+      title: 'Algo salió mal',
+      description:
+        'No pudimos mostrar esta página. Podés intentar de nuevo o volver al inicio.',
+    },
+    staleChunk: {
+      title: 'Hay una versión nueva de la aplicación',
+      description:
+        'No pudimos cargar esta pantalla porque la aplicación se actualizó o se cortó la conexión. Recargá la página para continuar.',
+    },
+    root: {
+      title: 'La aplicación no pudo mostrarse',
+      description:
+        'Ocurrió un problema inesperado. Recargá la página o volvé al inicio.',
+    },
   },
   session: {
     verifying: 'Verificando tu sesión...',

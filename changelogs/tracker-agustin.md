@@ -1,5 +1,13 @@
 # Tracker — Agustin
 
+## 2026-11-11 — Error boundaries and not-found/forbidden views (#20, task 3)
+
+- **Status:** in-progress
+- **Area / files:** `src/app/router/error-boundaries.tsx`, `src/app/router/route-errors.ts`, `src/app/router/routes.tsx`, `src/app/pages/not-found-page.tsx`, `src/app/pages/forbidden-page.tsx`, `src/app/messages.ts`
+- **Change:** Added a root error boundary above the shell (minimal fallback with reload and home) and a per-page boundary inside the shell, so a page error or a failed lazy chunk keeps the banner, navigation and toast host. Route errors are classified (404 to not found, 403 to forbidden, stale chunk to reload, anything else to a generic error with retry); 401 is never handled there. Added notFound()/forbidden() throw helpers and a forbidden view. Error text, stack and server data are never rendered.
+- **Reason:** One place decides how failures look, without login loops or leaked internals.
+- **Next step:** Capability gating, skip link/focus/title (tasks 4-5).
+
 ## 2026-11-11 — Session guards for the router (#20, task 2)
 
 - **Status:** in-progress
