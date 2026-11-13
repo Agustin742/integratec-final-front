@@ -61,7 +61,7 @@ It shows loading while pending, forbidden when the server did not grant the capa
 ## Accessibility
 
 - The skip link from `BaseLayout` targets `main` (`id="main-content"`, `tabIndex={-1}`) on every route inside the shell.
-- After a client-side navigation that changes the pathname, focus moves to the new page's heading, or to `main` when it has none (`useFocusOnNavigation` in `app-shell.tsx`). It does not run on the first render or on the redirect that resolves a first load, and search or hash changes keep focus. Moving focus to the heading is what makes screen readers announce the new page.
+- After a client-side navigation that changes the pathname, focus moves to the new page's heading, or to `main` when it has none (`useFocusOnNavigation` in `src/app/router/focus-on-navigation.tsx`, mounted by `RouterRoot` above both layouts). It does not run until the initial session and any guard redirect have resolved. Subsequent pathname changes move focus for both push and replace navigation, including signing in from the initial login page; search or hash changes keep focus. The `protected` and `public-only` route IDs identify the session guards for initial-load focus settlement; preserve them when extending the table. Moving focus to the heading is what makes screen readers announce the new page.
 - `document.title` is `<page> · IntegrarTec`, written only by `useDocumentTitle` (`document-title.ts`). Pages get it through `PlaceholderPage`; the error views call it directly. Because each view titles itself, a forbidden or error view never inherits the title of the route that failed.
 
 ## Add a protected route

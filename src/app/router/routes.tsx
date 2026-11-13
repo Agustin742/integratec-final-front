@@ -63,6 +63,7 @@ export function createAppRoutes({
               children: [
                 // Signed-out pages: a signed-in user is redirected away from them.
                 {
+                  id: 'public-only',
                   Component: PublicOnly,
                   children: [
                     {

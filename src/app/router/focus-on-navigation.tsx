@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { Outlet, useLocation, useNavigationType } from 'react-router';
+import { Outlet, useLocation, useMatches } from 'react-router';
+import { useSessionSnapshot } from '@/session/provider';
 
 /** Target of the skip link and of focus management after navigation. */
 export const MAIN_CONTENT_ID = 'main-content';
@@ -19,17 +20,28 @@ export const MAIN_CONTENT_ID = 'main-content';
  */
 function useFocusOnNavigation() {
   const { pathname } = useLocation();
-  const navigationType = useNavigationType();
+  const matches = useMatches();
+  const { status } = useSessionSnapshot();
   const previousPathname = useRef(pathname);
-  const navigatedByUser = useRef(false);
+  const initialLoadResolved = useRef(false);
+  const initialRedirectPending = matches.some(
+    ({ id }) =>
+      (id === 'protected' && status === 'unauthenticated') ||
+      (id === 'public-only' && status === 'authenticated'),
+  );
 
   useEffect(() => {
-    if (previousPathname.current === pathname) return;
+    const pathnameChanged = previousPathname.current !== pathname;
     previousPathname.current = pathname;
 
-    const isRedirect = navigationType === 'REPLACE';
-    if (!isRedirect) navigatedByUser.current = true;
-    if (isRedirect && !navigatedByUser.current) return;
+    // Settle only after the initial session and its guard redirect have landed.
+    // A later REPLACE (including sign-in) is ordinary application navigation.
+    if (!initialLoadResolved.current) {
+      initialLoadResolved.current =
+        status !== 'initializing' && !initialRedirectPending;
+      return;
+    }
+    if (!pathnameChanged) return;
 
     const main = document.getElementById(MAIN_CONTENT_ID);
     if (!main) return;
@@ -41,7 +53,7 @@ function useFocusOnNavigation() {
     } else {
       main.focus();
     }
-  }, [pathname, navigationType]);
+  }, [pathname, status, initialRedirectPending]);
 }
 
 /** Root route component: focus management shared by every layout, then the matched layout. */

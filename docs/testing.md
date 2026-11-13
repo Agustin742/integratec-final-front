@@ -20,7 +20,8 @@ The environment-assignment syntax above uses Bash (including Git Bash on Windows
 
 ## Component tests and helpers
 
-- Vitest merges the existing Vite configuration, retaining the React plugin. Its jsdom suite includes only `src/**/*.test.{ts,tsx}`; Playwright discovers tests separately in `e2e/`.
+- Vitest merges the existing Vite configuration, retaining the React plugin. Its suite includes only `src/**/*.test.{ts,tsx}` and defaults to jsdom; Playwright discovers tests separately in `e2e/`.
+- `src/config/eslint-security.test.ts` overrides the environment to Node for ESLint's filesystem/config-loading API. Both unsafe HTML rejection and safe JSX rendering exercise the real discovered `eslint.config.js`, without mocking security rules or increasing test timeouts. Run it with `pnpm exec vitest run src/config/eslint-security.test.ts`.
 - `src/test/setup.ts` imports jest-dom's Vitest matchers and registers RTL cleanup explicitly because Vitest globals are disabled. Import `test`, `expect`, and timer utilities from `vitest`.
 - `src/test/render.tsx` accepts RTL render options plus an optional `queryClient` and wraps the tree in StrictMode and `ApiQueryProvider` (`createAppQueryClient()` by default, preserving the provider across `rerender` calls). Add future providers incrementally (such as routing in F10), not hypothetical wrappers.
 - Prefer role/name queries and observable outcomes. `src/app/App.test.tsx` is the sample, not feature coverage.
