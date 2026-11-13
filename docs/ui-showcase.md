@@ -1,18 +1,18 @@
 # Local UI foundations showcase
 
-The current `App` composes [BaseLayout](ui-layout.md) with `UiFoundations` to make
-the accepted warm component set inspectable. The IntegrarTec name is now a single
-`h1` in the banner and the bootstrap text stays in main, so the app name is not
-duplicated and the existing smoke contract still reads a level-one heading. The
-showcase is gated behind `__UI_SHOWCASE__` (see
+The app shell composes [BaseLayout](ui-layout.md) and, in the `/dev/ui` route, renders
+`UiFoundations` to make the accepted warm component set inspectable. The IntegrarTec
+name is a single `h1` in the banner and page titles are `h2` in main, so the app name
+is not duplicated and the existing smoke contract still reads a level-one heading. The
+`/dev/ui` route is registered only when `__UI_SHOWCASE__` is true (see
 [the showcase gate](ui-foundations.md#showcase-gate)): the dev server and
 `pnpm build:e2e` include it, a production build does not. This is a local
 component demonstration, not a classroom flow or a completed business action.
 
 ## Inspect the examples
 
-1. Follow the sidebar anchor to the component section or use the first keyboard
-   skip link to focus main.
+1. Open `/dev/ui` by URL (nothing links to it) and use the first keyboard skip
+   link to focus main.
 2. Inspect the loading, empty, success, validation and error examples.
 3. Switch tabs using arrows; open a Dialog or Sheet, then close with Escape.
 4. Trigger the local notification; it explicitly says no data was saved.
@@ -44,9 +44,12 @@ Component contracts: [controls](ui-controls.md), [feedback and tables](ui-displa
 
 ## Verification and remaining proof
 
-- `App.test.tsx` protects the banner heading, bootstrap text and integrated
-  landmarks, and checks the showcase anchor, one notification region and axe
-  semantics (not contrast).
+- `src/app/router/routes.test.tsx` renders the shared route table in a memory router
+  and protects the banner heading, page headings inside each layout, one notification
+  region, axe, the skip link and the document title on every page, the absence of a
+  sidebar and of any showcase link, the `/dev/ui` showcase route and its
+  absence when the gate is off. Focus after navigation is covered in
+  `app-shell.test.tsx`; see [routing](routing.md).
 - `ui-foundations.test.tsx` checks the five labeled states, validation associations
   and editable text, table semantics, keyboard tab selection, modal descriptions,
   background removal from accessible queries and focus restoration.

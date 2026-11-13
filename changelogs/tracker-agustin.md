@@ -1,5 +1,53 @@
 # Tracker — Agustin
 
+## 2026-11-11 — Visual pass: split auth layout and illustrated error views (#20, task 6)
+
+- **Status:** in-progress (feature complete, pending pull request)
+- **Area / files:** `PRODUCT.md`, `src/app/router/auth-layout.tsx`, `src/app/router/focus-on-navigation.tsx`, `src/app/router/app-shell.tsx`, `src/app/router/routes.tsx`, `src/app/router/error-boundaries.tsx`, `src/app/router/go-home-link.tsx`, `src/app/pages/`, `src/components/illustrations/scenes.tsx`, `src/components/layout/skip-link.tsx`, `src/app/messages.ts`, router tests, `e2e/ui-foundations.spec.ts`, `docs/routing.md`
+- **Change:** Login, register, password reset and invitation acceptance now use their own split-screen layout without a sidebar (a brand panel with a classroom scene drawn in inline SVG from the design tokens, and a form column ready for the feature forms). The 404, forbidden, unexpected-error and stale-version views are illustrated with the same scene style and have clear actions; the root fallback stays plain markup but is styled. The shell no longer shows the component showcase link (the `/dev/ui` route is unchanged and still dropped from production builds) and renders no empty sidebar. The skip link and focus-on-navigation moved into shared pieces so both layouts use them. Added `PRODUCT.md` with the confirmed product context.
+- **Reason:** The first pass had no design: placeholders lived inside the app shell, a dev-only link showed on every page and the error views were bare text.
+- **Next step:** Open the pull request to `develop`.
+
+## 2026-11-11 — Skip link, focus, document title and router review gaps (#20, task 5)
+
+- **Status:** in-progress (feature complete, pending pull request)
+- **Area / files:** `src/app/router/app-shell.tsx`, `src/app/router/document-title.ts`, `src/app/router/error-boundaries.tsx`, `src/app/router/routes.tsx`, `src/app/pages/placeholder-page.tsx`, `src/app/ui-foundations.tsx`, `src/features/classrooms/use-classroom-capabilities.ts`, `src/session/redirect.ts`, `src/app/router/return-target.ts`, router tests, `docs/routing.md`, `docs/development.md`, `docs/ui-showcase.md`, `package.json`
+- **Change:** The main landmark now has a stable id used by the skip link on every route; after a client-side navigation focus moves to the new page heading (never on first load or on the login redirect that resolves it); `document.title` is `<page> · IntegrarTec` through one hook, including not-found, forbidden and error views. The root error fallback is plain markup so it survives a broken shared component. The capability hook wraps any non-`ApiError` instead of casting it. `safeSessionRedirect` takes an optional allowlist (tests only; production stays `/`). The showcase route object is now created per router (react-router mutates route objects, and sharing one broke a second router). Added tests for axe on every page, the skip link, titles, the showcase link, the return-target round trip, loader error retry and the capability gate edge cases. Added `docs/routing.md` (route table, guards, errors, capability gate, adding a protected route, hosting rewrite for deep links).
+- **Reason:** Close the accessibility scope and the review gaps of tasks 1 to 4 so the router shell meets the issue acceptance criteria.
+- **Next step:** Open the pull request to `develop`; issue #22 owns the Amplify SPA rewrite that deep links need.
+
+## 2026-11-11 — Server-derived capability gating (#20, task 4)
+
+- **Status:** in-progress
+- **Area / files:** `src/features/classrooms/use-classroom-capabilities.ts`, `src/app/router/require-capability.tsx`, `src/api/query-keys.ts`, `src/app/messages.ts`, `src/test/msw/handlers.ts`, `src/app/router/fake-session.ts`
+- **Change:** Added `useClassroomCapabilities(classroomId)`, a TanStack Query read of `GET /classrooms/{id}` through the session client that returns the role and capabilities the server granted (typed from the generated schema, keyed by user and classroom, nothing persisted), and the `RequireCapability` gate. The gate shows loading while pending, forbidden when the capability is missing or on 403, not found on 404 (so a foreign classroom looks like a missing one) and the generic error view for anything else; it never redirects to login.
+- **Reason:** Role-based screens must follow what the server allows in the current classroom, never a role name or stored value in the client.
+- **Next step:** Skip link, focus on navigation and document title per route (task 5).
+
+## 2026-11-11 — Error boundaries and not-found/forbidden views (#20, task 3)
+
+- **Status:** in-progress
+- **Area / files:** `src/app/router/error-boundaries.tsx`, `src/app/router/route-errors.ts`, `src/app/router/routes.tsx`, `src/app/pages/not-found-page.tsx`, `src/app/pages/forbidden-page.tsx`, `src/app/messages.ts`
+- **Change:** Added a root error boundary above the shell (minimal fallback with reload and home) and a per-page boundary inside the shell, so a page error or a failed lazy chunk keeps the banner, navigation and toast host. Route errors are classified (404 to not found, 403 to forbidden, stale chunk to reload, anything else to a generic error with retry); 401 is never handled there. Added notFound()/forbidden() throw helpers and a forbidden view. Error text, stack and server data are never rendered.
+- **Reason:** One place decides how failures look, without login loops or leaked internals.
+- **Next step:** Capability gating, skip link/focus/title (tasks 4-5).
+
+## 2026-11-11 — Session guards for the router (#20, task 2)
+
+- **Status:** in-progress
+- **Area / files:** `src/app/router/guards.tsx`, `src/app/router/return-target.ts`, `src/app/router/routes.tsx`, `src/app/messages.ts`
+- **Change:** Added `RequireAuth` (loading while the session initializes, redirect to `/login?next=` when signed out, retry state when it cannot be verified) on the protected branch, and `PublicOnly` on login, register and password reset. Invitation acceptance stays reachable signed in or out. The return target is built and read through `safeSessionRedirect`.
+- **Reason:** One guard decides session access so screens never flash protected content or loop through login.
+- **Next step:** Error boundaries and not-found/forbidden views, capability gating, skip link/focus/title (tasks 3-5).
+
+## 2026-11-11 — React Router app shell (#20, task 1)
+
+- **Status:** in-progress
+- **Area / files:** `src/app/router/`, `src/app/pages/`, `src/app/messages.ts`, `src/main.tsx`, `e2e/`, `docs/development.md`, `docs/ui-showcase.md`, `package.json`
+- **Change:** Added `react-router` 8.5.1 (exact pin) in data mode: a shared route table with lazy placeholder pages (login, register, password reset, invitation landing, protected home), a layout route on `BaseLayout` with `<Outlet />` and the toast host, a 404 catch-all, and the dev showcase moved to `/dev/ui`, registered only when `__UI_SHOWCASE__` is true. `main.tsx` renders `RouterProvider`; `App` was replaced by the route tests.
+- **Reason:** Navigation foundation for every upcoming screen (FD4).
+- **Next step:** Session guards, error boundaries, capability gating, skip link/focus/title (tasks 2-5).
+
 ## 2026-11-09 — Native Colyseus join credential (FD3) and realtime contract sync path
 
 - **Status:** completed

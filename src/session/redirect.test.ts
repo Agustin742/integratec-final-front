@@ -30,3 +30,10 @@ test('accepts only the approved root destination without normalization', () => {
     expect(safeSessionRedirect(destination), String(destination)).toBe('/');
   }
 });
+
+test('an explicit allowlist replaces the production one for that call only', () => {
+  const allowlist: ReadonlySet<string> = new Set(['/classrooms']);
+  expect(safeSessionRedirect('/classrooms', allowlist)).toBe('/classrooms');
+  expect(safeSessionRedirect('/', allowlist)).toBe('/');
+  expect(safeSessionRedirect('/classrooms')).toBe('/');
+});

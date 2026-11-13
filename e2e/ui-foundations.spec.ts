@@ -6,15 +6,14 @@ import { uiMessages } from '../src/components/ui/ui-messages';
 for (const width of [360, 1280]) {
   test(`fits the layout and long content at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 800 });
-    await page.goto('./');
+    await page.goto('./dev/ui');
     await expect(page.getByRole('banner')).toBeVisible();
-    await expect(
-      page.getByRole('complementary', { name: messages.showcase.navigation }),
-    ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: messages.title, exact: true }),
     ).toBeVisible();
-    await expect(page.getByText(messages.bootstrapReady)).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: messages.showcase.title }),
+    ).toBeVisible();
     const fits = () =>
       page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -38,7 +37,7 @@ test('keeps content and modal controls usable at 200% CSS zoom', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 1000 });
-  await page.goto('./');
+  await page.goto('./dev/ui');
   // CSS zoom exercises rendered magnification, not browser UI zoom.
   await page.locator('html').evaluate((element) => {
     element.style.zoom = '2';
@@ -67,7 +66,7 @@ test('blocks physical pointer activation of background actions behind modals', a
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.goto('./');
+  await page.goto('./dev/ui');
   const copy = messages.showcase;
   await page.getByRole('tab', { name: copy.overlays }).click();
   const notice = page.getByRole('button', { name: copy.showToast });
@@ -118,7 +117,7 @@ test.describe('touch-equivalent interaction at 360px', () => {
   test('opens and closes both modals and dismisses a local notice by tap', async ({
     page,
   }) => {
-    await page.goto('./');
+    await page.goto('./dev/ui');
     const copy = messages.showcase;
     await page.getByRole('tab', { name: copy.overlays }).tap();
     for (const [triggerName, title] of [
@@ -153,7 +152,7 @@ test('honours the reduced-motion preference for animation and scrolling', async 
       .locator('span[aria-hidden="true"]');
 
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page.goto('./');
+  await page.goto('./dev/ui');
   await expect(busyIndicator()).toBeVisible();
   expect(
     await busyIndicator().evaluate((element) => {
@@ -184,8 +183,12 @@ test('honours the reduced-motion preference for animation and scrolling', async 
 test('supports keyboard skip, modal focus containment and trigger restoration', async ({
   page,
 }) => {
-  await page.goto('./');
+  await page.goto('./dev/ui');
   const copy = messages.showcase;
+  // The page loads lazily: press Tab only once the shell and page are rendered.
+  await expect(
+    page.getByRole('heading', { name: copy.title, level: 2 }),
+  ).toBeVisible();
   await page.keyboard.press('Tab');
   const skip = page.getByRole('link', { name: layoutMessages.skipToContent });
   await expect(skip).toBeFocused();

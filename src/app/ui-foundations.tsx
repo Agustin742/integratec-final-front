@@ -40,9 +40,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/components/ui/toast';
 import { formatDateOnly, formatDeadline } from '@/lib/dates';
 import { messages } from './messages';
+import { useDocumentTitle } from './router/document-title';
 
 export function UiFoundations() {
   const copy = messages.showcase;
+  useDocumentTitle(copy.title);
   const [examplePage, setExamplePage] = useState(1);
 
   return (
