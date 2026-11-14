@@ -7,6 +7,10 @@ export type ErrorEnvelopePayload = components['schemas']['ErrorEnvelope'];
 
 export type ClassroomDetailPayload =
   components['schemas']['ClassroomDetailResponseDto'];
+export type RegisterRequestPayload =
+  components['schemas']['RegisterRequestDto'];
+export type RegisterResponsePayload =
+  components['schemas']['RegisterResponseDto'];
 
 export const TEST_API_BASE_URL = 'https://api.example.invalid';
 
@@ -73,6 +77,56 @@ export function createClassroomDetailHandler(
   return http.get(`${baseUrl}/classrooms/${id}`, () =>
     HttpResponse.json(payload),
   );
+}
+
+export interface CreateRegisterHandlerOptions {
+  readonly baseUrl?: string;
+  readonly status?: number;
+  readonly response?: Partial<RegisterResponsePayload>;
+  readonly onRequest?: (
+    request: Request,
+    body: RegisterRequestPayload,
+  ) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `POST /auth/register`
+ * (`AuthController_register`), echoing the chosen path and returning a
+ * school summary when `path === 'SCHOOL'`.
+ */
+export function createRegisterHandler(
+  options: CreateRegisterHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  return http.post(`${baseUrl}/auth/register`, async ({ request }) => {
+    const body = (await request
+      .clone()
+      .json()) as Partial<RegisterRequestPayload>;
+    await options.onRequest?.(request, body as RegisterRequestPayload);
+
+    const path = body.path === 'SCHOOL' ? 'SCHOOL' : 'INDEPENDENT_TEACHER';
+    const defaultSchool =
+      path === 'SCHOOL'
+        ? {
+            id: 'school-test-1',
+            name: body.schoolName?.trim() || 'Escuela Demo',
+            slug: 'escuela-demo',
+            timeZone: 'America/Argentina/Buenos_Aires',
+          }
+        : undefined;
+
+    const payload: RegisterResponsePayload = {
+      id: 'user-test-1',
+      email: (body.email ?? 'docente@example.com').trim().toLowerCase(),
+      displayName: body.displayName?.trim() || 'Docente Demo',
+      path,
+      ...(defaultSchool ? { school: defaultSchool } : {}),
+      createdAt: '2026-11-14T12:00:00.000Z',
+      ...options.response,
+    };
+
+    return HttpResponse.json(payload, { status: options.status ?? 201 });
+  });
 }
 
 export const defaultHandlers: readonly HttpHandler[] = [createHealthHandler()];
