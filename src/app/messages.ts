@@ -13,7 +13,8 @@ export const messages = {
     },
     register: {
       title: 'Crear cuenta',
-      description: 'Acá vas a poder registrarte. Pantalla en construcción.',
+      description:
+        'Elegí cómo vas a usar IntegrarTec y creá tu cuenta para empezar.',
     },
     passwordReset: {
       title: 'Restablecer contraseña',

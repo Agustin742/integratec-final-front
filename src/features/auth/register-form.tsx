@@ -1,4 +1,4 @@
-import { useId, useState, type MouseEvent } from 'react';
+import { useEffect, useId, useRef, useState, type MouseEvent } from 'react';
 import { Controller, useWatch } from 'react-hook-form';
 import { Link, useSearchParams } from 'react-router';
 import { LOGIN_PATH, RETURN_TARGET_PARAM } from '@/app/router/return-target';
@@ -64,6 +64,13 @@ export function RegisterForm({ title }: RegisterFormProps) {
   const pathGroupId = useId();
   const invitationHeadingId = useId();
   const confirmedHeadingId = useId();
+  const confirmedHeadingRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    if (confirmed !== null) {
+      confirmedHeadingRef.current?.focus();
+    }
+  }, [confirmed]);
 
   const form = useZodForm<RegisterFormInput, RegisterFormOutput>({
     schema: registerFormSchema,
@@ -86,7 +93,7 @@ export function RegisterForm({ title }: RegisterFormProps) {
     dirtyFields.displayName ||
     dirtyFields.email ||
     dirtyFields.password ||
-    dirtyFields.schoolName,
+    (selectedPath === 'SCHOOL' && dirtyFields.schoolName),
   );
 
   const { confirmNavigation } = useUnsavedChangesGuard(
@@ -105,7 +112,7 @@ export function RegisterForm({ title }: RegisterFormProps) {
     try {
       const response = await registerAccount(client, dto);
       form.setValue('password', '', {
-        shouldDirty: false,
+        shouldDirty: true,
         shouldTouch: false,
         shouldValidate: false,
       });
@@ -113,7 +120,7 @@ export function RegisterForm({ title }: RegisterFormProps) {
     } catch (error) {
       // Never retain plaintext passwords in React state after any failure.
       form.setValue('password', '', {
-        shouldDirty: false,
+        shouldDirty: true,
         shouldTouch: false,
         shouldValidate: false,
       });
@@ -133,7 +140,7 @@ export function RegisterForm({ title }: RegisterFormProps) {
 
   if (confirmed !== null) {
     return (
-      <section aria-labelledby={confirmedHeadingId} className="space-y-6">
+      <section className="space-y-6">
         <div className="space-y-1.5">
           <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">
             {title}
@@ -154,7 +161,13 @@ export function RegisterForm({ title }: RegisterFormProps) {
             role="group"
             aria-labelledby={confirmedHeadingId}
           >
-            <AlertTitle as="h3" id={confirmedHeadingId}>
+            <AlertTitle
+              as="h3"
+              id={confirmedHeadingId}
+              ref={confirmedHeadingRef}
+              tabIndex={-1}
+              className="outline-none"
+            >
               {authMessages.confirmed.title}
             </AlertTitle>
             <AlertDescription>
@@ -238,6 +251,7 @@ export function RegisterForm({ title }: RegisterFormProps) {
                   const option = authMessages.paths.options[choice];
                   const isSelected = field.value === choice;
                   const radioId = `${pathGroupId}-${choice}`;
+                  const radioTitleId = `${radioId}-title`;
                   const radioDescId = `${radioId}-desc`;
                   return (
                     <div key={choice} className="relative">
@@ -247,6 +261,7 @@ export function RegisterForm({ title }: RegisterFormProps) {
                         name={field.name}
                         value={choice}
                         checked={isSelected}
+                        aria-labelledby={radioTitleId}
                         aria-describedby={radioDescId}
                         onBlur={field.onBlur}
                         onChange={() => {
@@ -265,7 +280,10 @@ export function RegisterForm({ title }: RegisterFormProps) {
                             : 'border-edge bg-card hover:bg-tray/45',
                         )}
                       >
-                        <span className="flex flex-wrap items-center gap-2.5 font-display text-base font-semibold text-foreground">
+                        <span
+                          id={radioTitleId}
+                          className="flex flex-wrap items-center gap-2.5 font-display text-base font-semibold text-foreground"
+                        >
                           <span
                             aria-hidden="true"
                             className={cn(
