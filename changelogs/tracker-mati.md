@@ -2,12 +2,15 @@
 
 ## 2026-11-14 — Implement account registration and organizational path selection screen (#27)
 
-- **Status:** in-progress
-- **Area / files:** `docs/threat-model.md`, `src/features/auth/`, `src/app/pages/register-page.tsx`, `src/test/msw/handlers.ts`, `e2e/register.spec.ts`, `docs/routing.md`, `docs/assets/auth/`, `changelogs/tracker-mati.md`
-- **Change:** Implementing [issue #27](https://github.com/Agustin742/integratec-final-front/issues/27) (`HU-AUT-001`) on `feat/27-account-registration` with contract-aligned Zod/RHF validation, organizational path selection (`INDEPENDENT_TEACHER`, `SCHOOL`, and handoff to `/invitations/accept`), server-confirmed structure view, MSW handlers, and security threat model.
-- **Reason:** Allow visitors to register an account and select their organizational path before signing in (`rules/classrooms-and-roles.md`, `rules/forms-and-validation.md`, `rules/security.md`).
-- **Verification:** Pending implementation and full profile checks.
-- **Next step:** Deliver registration contract, UI, tests, screenshots, and audit on `feat/27-account-registration`.
+- **Status:** in-progress (ready for PR review)
+- **Area / files:** `docs/threat-model.md`, `src/features/auth/`, `src/app/pages/register-page.tsx`, `src/test/setup.ts`, `src/test/msw/handlers.ts`, `e2e/register.spec.ts`, `docs/routing.md`, `docs/assets/auth/`, `changelogs/tracker-mati.md`
+- **Change:** Implemented [issue #27](https://github.com/Agustin742/integratec-final-front/issues/27) (`HU-AUT-001`) on `feat/27-account-registration` in three work units:
+  1. Recorded project workflow profile in `AGENTS.md` and closed `#21` in tracker.
+  2. Added `docs/threat-model.md`, centralized `es-AR` auth messages (`src/features/auth/messages.ts`), jitless Zod registration/response schemas (`src/features/auth/register-schema.ts`), `POST /auth/register` client service (`src/features/auth/register-service.ts`), MSW `createRegisterHandler` (`src/test/msw/handlers.ts`), and 15 unit/service tests (`src/features/auth/register-schema.test.ts`).
+  3. Implemented `RegisterForm` (`src/features/auth/register-form.tsx`), `RegisterPage` (`src/app/pages/register-page.tsx`), `asyncUtilTimeout` adjustment for lazy feature routes (`src/test/setup.ts`), 9 RTL + MSW integration tests (`src/features/auth/register-page.test.tsx`), Playwright E2E coverage (`e2e/register.spec.ts`), desktop/mobile UI screenshots (`docs/assets/auth/register-1280.png`, `docs/assets/auth/register-360.png`), and `docs/routing.md` updates.
+- **Reason:** Allow visitors to register an account and select their organizational path (`INDEPENDENT_TEACHER`, `SCHOOL`, or handoff to `/invitations/accept`) before signing in (`rules/classrooms-and-roles.md`, `rules/forms-and-validation.md`, `rules/security.md`).
+- **Verification:** On Node `22.23.4` and pnpm `10.34.9`: `pnpm lint`, `pnpm typecheck`, `pnpm test` (36 files, 386 tests passed), `pnpm build`, `pnpm security:check`, `pnpm format:check`, and `pnpm e2e` (34/34 Playwright desktop and mobile scenarios including `e2e/register.spec.ts`, active CSP headers, and zero horizontal overflow) passed; `impeccable detect` returned `[]`. Local `python3` / `py` (`C:\Python314\python.exe` missing) and `actionlint` 1.7.7 are unavailable on this Windows workstation and run in the Ubuntu GitHub Actions `checks` job.
+- **Next step:** Run full profile checks and blind audit (`rdd-auditor`), obtain confirmation to push and open PR into `develop`.
 
 ## 2026-11-10 — Add strict Content-Security-Policy and security headers for Amplify (FD1 mitigation) (#21)
 

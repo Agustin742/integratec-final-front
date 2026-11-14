@@ -1,0 +1,573 @@
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
+import { createMemoryRouter } from 'react-router';
+import { RouterProvider } from 'react-router/dom';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  test,
+  vi,
+} from 'vitest';
+import { createApiClient } from '@/api/client';
+import { fakeSession } from '@/app/router/fake-session';
+import { createAppRoutes } from '@/app/router/routes';
+import { SessionProvider } from '@/session/provider';
+import { expectAccessible } from '@/test/accessibility';
+import {
+  TEST_API_BASE_URL,
+  createErrorEnvelopeResponse,
+  createRegisterHandler,
+} from '@/test/msw/handlers';
+import { mswServer } from '@/test/msw/server';
+import { render } from '@/test/render';
+import '@/app/pages/register-page';
+import { authMessages } from './messages';
+
+beforeAll(() => {
+  mswServer.listen({ onUnhandledFrame: 'error' });
+});
+
+beforeEach(() => {
+  vi.stubEnv('VITE_APP_ENV', 'test');
+  vi.stubEnv('VITE_API_BASE_URL', TEST_API_BASE_URL);
+  vi.stubEnv('VITE_REALTIME_URL', 'wss://realtime.example.invalid');
+});
+
+afterEach(() => {
+  mswServer.resetHandlers();
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+});
+
+afterAll(() => {
+  mswServer.close();
+});
+
+function renderRegisterRoute(initialEntry = '/register') {
+  const client = createApiClient({ baseUrl: TEST_API_BASE_URL });
+  const { service } = fakeSession({ status: 'unauthenticated' }, client);
+  const router = createMemoryRouter(createAppRoutes(), {
+    initialEntries: [initialEntry],
+  });
+
+  return {
+    router,
+    ...render(
+      <SessionProvider service={service}>
+        <RouterProvider router={router} />
+      </SessionProvider>,
+    ),
+  };
+}
+
+function findMainRegion() {
+  return screen.findByRole('main');
+}
+
+describe('RegisterPage (/register)', () => {
+  test('renders path choices and completes INDEPENDENT_TEACHER registration after server confirmation (preserving safe ?next=)', async () => {
+    let resolveResponse!: () => void;
+    const responseGate = new Promise<void>((resolve) => {
+      resolveResponse = resolve;
+    });
+    let receivedBody: unknown;
+
+    mswServer.use(
+      http.post(`${TEST_API_BASE_URL}/auth/register`, async ({ request }) => {
+        receivedBody = await request.json();
+        await responseGate;
+        return HttpResponse.json(
+          {
+            id: 'user-1',
+            email: 'sofia@example.com',
+            displayName: 'Sofía Martínez',
+            path: 'INDEPENDENT_TEACHER',
+            createdAt: '2026-11-14T12:00:00.000Z',
+          },
+          { status: 201 },
+        );
+      }),
+    );
+
+    const { container } = renderRegisterRoute('/register?next=%2F');
+    const main = await findMainRegion();
+
+    await waitFor(() => {
+      expect(
+        within(main).getByRole('heading', { level: 2, name: 'Crear cuenta' }),
+      ).toBeInTheDocument();
+    });
+
+    await expectAccessible(container);
+
+    fireEvent.change(
+      within(main).getByLabelText(authMessages.fields.displayName.label),
+      { target: { value: 'Sofía Martínez' } },
+    );
+    fireEvent.change(
+      within(main).getByLabelText(authMessages.fields.email.label),
+      { target: { value: 'Sofia@Example.com' } },
+    );
+    fireEvent.change(
+      within(main).getByLabelText(authMessages.fields.password.label),
+      { target: { value: 'ClaveSegura123' } },
+    );
+
+    const submitButton = within(main).getByRole('button', {
+      name: authMessages.actions.submit,
+    });
+    fireEvent.click(submitButton);
+
+    await waitFor(() => {
+      const busyButton = within(main).getByRole('button', {
+        name: authMessages.actions.submitting,
+      });
+      expect(busyButton).toHaveAttribute('aria-busy', 'true');
+    });
+
+    // Confirmation view MUST NOT appear before server returns 201 Created.
+    expect(
+      within(main).queryByText(authMessages.confirmed.independentTitle),
+    ).not.toBeInTheDocument();
+
+    resolveResponse();
+
+    await waitFor(() => {
+      const statusRegion = within(main).getByRole('status');
+      expect(statusRegion).toBeInTheDocument();
+      expect(
+        within(statusRegion).getByText(authMessages.confirmed.independentTitle),
+      ).toBeInTheDocument();
+      expect(
+        within(statusRegion).getByText('Sofía Martínez'),
+      ).toBeInTheDocument();
+      expect(
+        within(statusRegion).getByText('sofia@example.com'),
+      ).toBeInTheDocument();
+    });
+
+    const loginCta = within(main).getByRole('link', {
+      name: authMessages.confirmed.loginCta,
+    });
+    expect(loginCta).toHaveAttribute('href', '/login?next=%2F');
+    expect(receivedBody).toEqual({
+      path: 'INDEPENDENT_TEACHER',
+      displayName: 'Sofía Martínez',
+      email: 'sofia@example.com',
+      password: 'ClaveSegura123',
+    });
+
+    await expectAccessible(container);
+  });
+
+  test('strips unsafe external ?next= parameter from login links', async () => {
+    mswServer.use(createRegisterHandler());
+
+    renderRegisterRoute('/register?next=https%3A%2F%2Fevil.example%2Fphish');
+    const main = await findMainRegion();
+
+    const footerLoginLink = within(main).getByRole('link', {
+      name: authMessages.actions.loginLink,
+    });
+    expect(footerLoginLink).toHaveAttribute('href', '/login');
+
+    fireEvent.change(
+      within(main).getByLabelText(authMessages.fields.displayName.label),
+      { target: { value: 'Sofía Martínez' } },
+    );
+    fireEvent.change(
+      within(main).getByLabelText(authMessages.fields.email.label),
+      { target: { value: 'sofia@example.com' } },
+    );
+    fireEvent.change(
+      within(main).getByLabelText(authMessages.fields.password.label),
+      { target: { value: 'ClaveSegura123' } },
+    );
+    fireEvent.click(
+      within(main).getByRole('button', { name: authMessages.actions.submit }),
+    );
+
+    await waitFor(() => {
+      const loginCta = within(main).getByRole('link', {
+        name: authMessages.confirmed.loginCta,
+      });
+      expect(loginCta).toHaveAttribute('href', '/login');
+    });
+  });
+
+  test('requires schoolName when SCHOOL is selected and confirms created school only after 201', async () => {
+    let submittedBody: unknown;
+
+    mswServer.use(
+      createRegisterHandler({
+        onRequest: (_request, body) => {
+          submittedBody = body;
+        },
+      }),
+    );
+
+    renderRegisterRoute('/register');
+    const main = await findMainRegion();
+
+    expect(
+      within(main).queryByLabelText(authMessages.fields.schoolName.label),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(
+      within(main).getByRole('radio', {
+        name: new RegExp(authMessages.paths.options.SCHOOL.title, 'i'),
+      }),
+    );
+
+    const schoolInput = within(main).getByLabelText(
+      authMessages.fields.schoolName.label,
+    );
+    expect(schoolInput).toBeInTheDocument();
+
+    fireEvent.change(
+      within(main).getByLabelText(authMessages.fields.displayName.label),
+      { target: { value: 'Carlos Gómez' } },
+    );
+    fireEvent.change(
+      within(main).getByLabelText(authMessages.fields.email.label),
+      { target: { value: 'carlos@escuela.edu.ar' } },
+    );
+    fireEvent.change(
+      within(main).getByLabelText(authMessages.fields.password.label),
+      { target: { value: 'ClaveSegura123' } },
+    );
+    fireEvent.change(schoolInput, {
+      target: { value: 'Escuela Técnica N.º 4' },
+    });
+
+    fireEvent.click(
+      within(main).getByRole('button', { name: authMessages.actions.submit }),
+    );
+
+    await waitFor(() => {
+      const statusRegion = within(main).getByRole('status');
+      expect(
+        within(statusRegion).getByText(
+          `${authMessages.confirmed.schoolTitlePrefix} Escuela Técnica N.º 4`,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    expect(submittedBody).toEqual({
+      path: 'SCHOOL',
+      displayName: 'Carlos Gómez',
+      email: 'carlos@escuela.edu.ar',
+      password: 'ClaveSegura123',
+      schoolName: 'Escuela Técnica N.º 4',
+    });
+  });
+
+  test('shows field-level accessible errors and skips network call on invalid client input', async () => {
+    let networkCalls = 0;
+    mswServer.use(
+      http.post(`${TEST_API_BASE_URL}/auth/register`, () => {
+        networkCalls += 1;
+        return HttpResponse.json({}, { status: 201 });
+      }),
+    );
+
+    const { container } = renderRegisterRoute('/register');
+    const main = await findMainRegion();
+
+    fireEvent.click(
+      within(main).getByRole('radio', {
+        name: new RegExp(authMessages.paths.options.SCHOOL.title, 'i'),
+      }),
+    );
+
+    fireEvent.change(
+      within(main).getByLabelText(authMessages.fields.email.label),
+      { target: { value: 'correo-invalido' } },
+    );
+    fireEvent.change(
+      within(main).getByLabelText(authMessages.fields.password.label),
+      { target: { value: 'corta' } },
+    );
+
+    fireEvent.click(
+      within(main).getByRole('button', { name: authMessages.actions.submit }),
+    );
+
+    await waitFor(() => {
+      expect(
+        within(main).getByText(authMessages.validation.displayNameRequired),
+      ).toBeInTheDocument();
+      expect(
+        within(main).getByText(authMessages.validation.emailInvalid),
+      ).toBeInTheDocument();
+      expect(
+        within(main).getByText(authMessages.validation.passwordMin),
+      ).toBeInTheDocument();
+      expect(
+        within(main).getByText(authMessages.validation.schoolNameRequired),
+      ).toBeInTheDocument();
+    });
+
+    expect(
+      within(main).getByLabelText(authMessages.fields.email.label),
+    ).toHaveAttribute('aria-invalid', 'true');
+    expect(within(main).getAllByRole('alert').length).toBeGreaterThanOrEqual(4);
+    expect(networkCalls).toBe(0);
+
+    await expectAccessible(container);
+  });
+
+  test('on 409 existing email shows clear non-duplicate error on email, preserves non-secret fields, and clears password', async () => {
+    mswServer.use(
+      http.post(`${TEST_API_BASE_URL}/auth/register`, () =>
+        createErrorEnvelopeResponse(409, {
+          code: 'CONFLICT',
+          message: 'A user with this email address already exists',
+          correlationId: 'corr-409',
+        }),
+      ),
+    );
+
+    const { container } = renderRegisterRoute('/register');
+    const main = await findMainRegion();
+
+    const nameInput = within(main).getByLabelText(
+      authMessages.fields.displayName.label,
+    ) as HTMLInputElement;
+    const emailInput = within(main).getByLabelText(
+      authMessages.fields.email.label,
+    ) as HTMLInputElement;
+    const passwordInput = within(main).getByLabelText(
+      authMessages.fields.password.label,
+    ) as HTMLInputElement;
+
+    fireEvent.change(nameInput, { target: { value: 'Sofía Martínez' } });
+    fireEvent.change(emailInput, { target: { value: 'sofia@example.com' } });
+    fireEvent.change(passwordInput, { target: { value: 'ClaveSegura123' } });
+
+    fireEvent.click(
+      within(main).getByRole('button', { name: authMessages.actions.submit }),
+    );
+
+    await waitFor(() => {
+      expect(
+        within(main).getByText(authMessages.errors.emailConflict),
+      ).toBeInTheDocument();
+    });
+
+    expect(emailInput).toHaveAttribute('aria-invalid', 'true');
+    expect(nameInput.value).toBe('Sofía Martínez');
+    expect(emailInput.value).toBe('sofia@example.com');
+    expect(passwordInput.value).toBe('');
+    expect(within(main).queryByRole('status')).not.toBeInTheDocument();
+
+    await expectAccessible(container);
+  });
+
+  test('maps 400 VALIDATION_FAILED server field errors and clears password', async () => {
+    mswServer.use(
+      http.post(`${TEST_API_BASE_URL}/auth/register`, () =>
+        createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Validation failed',
+          correlationId: 'corr-400',
+          details: [
+            {
+              field: 'schoolName',
+              messages: ['Ese nombre institucional requiere revisión.'],
+            },
+          ],
+        }),
+      ),
+    );
+
+    renderRegisterRoute('/register');
+    const main = await findMainRegion();
+
+    fireEvent.click(
+      within(main).getByRole('radio', {
+        name: new RegExp(authMessages.paths.options.SCHOOL.title, 'i'),
+      }),
+    );
+
+    const schoolInput = within(main).getByLabelText(
+      authMessages.fields.schoolName.label,
+    ) as HTMLInputElement;
+    const passwordInput = within(main).getByLabelText(
+      authMessages.fields.password.label,
+    ) as HTMLInputElement;
+
+    fireEvent.change(
+      within(main).getByLabelText(authMessages.fields.displayName.label),
+      { target: { value: 'Carlos Gómez' } },
+    );
+    fireEvent.change(
+      within(main).getByLabelText(authMessages.fields.email.label),
+      { target: { value: 'carlos@escuela.edu.ar' } },
+    );
+    fireEvent.change(passwordInput, { target: { value: 'ClaveSegura123' } });
+    fireEvent.change(schoolInput, { target: { value: 'Escuela Central' } });
+
+    fireEvent.click(
+      within(main).getByRole('button', { name: authMessages.actions.submit }),
+    );
+
+    await waitFor(() => {
+      expect(
+        within(main).getByText('Ese nombre institucional requiere revisión.'),
+      ).toBeInTheDocument();
+    });
+
+    expect(schoolInput).toHaveAttribute('aria-invalid', 'true');
+    expect(schoolInput.value).toBe('Escuela Central');
+    expect(passwordInput.value).toBe('');
+  });
+
+  test('shows root error on 500 or network failure, keeps form editable, and clears password', async () => {
+    mswServer.use(
+      http.post(`${TEST_API_BASE_URL}/auth/register`, () =>
+        createErrorEnvelopeResponse(500, {
+          code: 'INTERNAL_ERROR',
+          message: 'Database timeout',
+          correlationId: 'corr-500',
+        }),
+      ),
+    );
+
+    renderRegisterRoute('/register');
+    const main = await findMainRegion();
+
+    const emailInput = within(main).getByLabelText(
+      authMessages.fields.email.label,
+    ) as HTMLInputElement;
+    const passwordInput = within(main).getByLabelText(
+      authMessages.fields.password.label,
+    ) as HTMLInputElement;
+
+    fireEvent.change(
+      within(main).getByLabelText(authMessages.fields.displayName.label),
+      { target: { value: 'Lucía Fernández' } },
+    );
+    fireEvent.change(emailInput, { target: { value: 'lucia@example.com' } });
+    fireEvent.change(passwordInput, { target: { value: 'ClaveSegura123' } });
+
+    fireEvent.click(
+      within(main).getByRole('button', { name: authMessages.actions.submit }),
+    );
+
+    await waitFor(() => {
+      expect(
+        within(main).getByText(authMessages.errors.unexpected),
+      ).toBeInTheDocument();
+    });
+
+    expect(within(main).queryByRole('status')).not.toBeInTheDocument();
+    expect(emailInput.value).toBe('lucia@example.com');
+    expect(passwordInput.value).toBe('');
+  });
+
+  test('guards against duplicate submission on rapid double click while request is in flight', async () => {
+    let requestCount = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    mswServer.use(
+      http.post(`${TEST_API_BASE_URL}/auth/register`, async () => {
+        requestCount += 1;
+        await gate;
+        return HttpResponse.json(
+          {
+            id: 'user-1',
+            email: 'sofia@example.com',
+            displayName: 'Sofía',
+            path: 'INDEPENDENT_TEACHER',
+            createdAt: '2026-11-14T12:00:00.000Z',
+          },
+          { status: 201 },
+        );
+      }),
+    );
+
+    renderRegisterRoute('/register');
+    const main = await findMainRegion();
+
+    fireEvent.change(
+      within(main).getByLabelText(authMessages.fields.displayName.label),
+      { target: { value: 'Sofía' } },
+    );
+    fireEvent.change(
+      within(main).getByLabelText(authMessages.fields.email.label),
+      { target: { value: 'sofia@example.com' } },
+    );
+    fireEvent.change(
+      within(main).getByLabelText(authMessages.fields.password.label),
+      { target: { value: 'ClaveSegura123' } },
+    );
+
+    const submitButton = within(main).getByRole('button', {
+      name: authMessages.actions.submit,
+    });
+    fireEvent.click(submitButton);
+    fireEvent.click(submitButton);
+
+    await waitFor(() => {
+      expect(requestCount).toBe(1);
+    });
+
+    release();
+
+    await waitFor(() => {
+      expect(within(main).getByRole('status')).toBeInTheDocument();
+    });
+    expect(requestCount).toBe(1);
+  });
+
+  test('INVITATION choice hides registration inputs and navigates to /invitations/accept without API call', async () => {
+    let networkCalls = 0;
+    mswServer.use(
+      http.post(`${TEST_API_BASE_URL}/auth/register`, () => {
+        networkCalls += 1;
+        return HttpResponse.json({}, { status: 201 });
+      }),
+    );
+
+    const { container, router } = renderRegisterRoute('/register');
+    const main = await findMainRegion();
+
+    fireEvent.click(
+      within(main).getByRole('radio', {
+        name: new RegExp(authMessages.paths.options.INVITATION.title, 'i'),
+      }),
+    );
+
+    expect(
+      within(main).queryByLabelText(authMessages.fields.email.label),
+    ).not.toBeInTheDocument();
+    expect(
+      within(main).queryByRole('button', { name: authMessages.actions.submit }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(main).getByText(authMessages.invitationNotice.heading),
+    ).toBeInTheDocument();
+
+    await expectAccessible(container);
+
+    const invitationLink = within(main).getByRole('link', {
+      name: authMessages.invitationNotice.cta,
+    });
+    expect(invitationLink).toHaveAttribute('href', '/invitations/accept');
+
+    fireEvent.click(invitationLink);
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/invitations/accept');
+    });
+    expect(networkCalls).toBe(0);
+  });
+});

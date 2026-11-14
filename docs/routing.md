@@ -21,6 +21,18 @@ Every page is a lazy route module (`lazy: { Component }`), so its chunk loads wh
 Two pathless layout routes sit under the root route. Both mount the single toast host and a `main` landmark with the same id, and focus after navigation is handled once above them (`RouterRoot`), so moving between layouts (for example login to home) is still announced.
 
 - `AuthLayout` (`/login`, `/register`, `/password-reset`, `/invitations/accept`): a split screen with no sidebar. The brand panel (the only `h1`, the product name, a one-line value statement and a text placeholder where the 3D classroom model will go) comes first in the DOM, so on phones it stacks above the content and on wide screens it sits on the right. The form column is `[data-auth-slot]`: feature screens render their form inside it and inherit its width and surface.
+
+## Account registration (`/register`)
+
+The `/register` route (`src/app/pages/register-page.tsx`, rendering `RegisterForm` from `src/features/auth/register-form.tsx`) guides visitors through choosing their initial organizational path before signing in:
+
+- **Path options:** `INDEPENDENT_TEACHER` (personal teaching space), `SCHOOL` (provisions a new institution via the conditional `schoolName` field), and `INVITATION` (hides account creation inputs and links directly to `/invitations/accept` without duplicating invitation acceptance logic).
+- **Contract and feedback:** `registerFormSchema` mirrors the backend `RegisterRequestDto` rules in `es-AR`, clears passwords on every failed attempt, relies on `useProtectedSubmit` to prevent duplicate requests, validates the `201 Created` payload with `registerResponseSchema` before showing the `role="status"` confirmed structure view, and offers a CTA to `/login` preserving only `safeSessionRedirect`-approved `?next=` targets. See [threat-model.md](./threat-model.md) for the security boundary analysis.
+
+![Account registration desktop screen (1280px)](./assets/auth/register-1280.png)
+
+![Account registration mobile screen (360px)](./assets/auth/register-360.png)
+
 - `AppShell` (everything else, including the `*` catch-all): `BaseLayout` (skip link, banner with the only `h1`, `main`) and `<Outlet />`. It has no sidebar: navigation arrives with the features that need it, and an empty aside is not rendered. The showcase at `/dev/ui` is reached by URL only; nothing links to it. If the shell later gets signed-in-only chrome, move `*` to a neutral layout so a signed-out 404 does not show it.
 
 Pages use `h2` for their title. The not found, forbidden and error views share `StatusView` (a decorative scene from `src/components/illustrations/scenes.tsx`, title, explanation, actions) and take the width of whichever layout hosts them.

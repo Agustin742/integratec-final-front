@@ -1,6 +1,10 @@
+import { RegisterForm } from '@/features/auth/register-form';
 import { messages } from '../messages';
-import { AuthPlaceholderPage } from './auth-placeholder-page';
+import { useDocumentTitle } from '../router/document-title';
 
 export function RegisterPage() {
-  return <AuthPlaceholderPage {...messages.pages.register} />;
+  const { title } = messages.pages.register;
+  useDocumentTitle(title);
+
+  return <RegisterForm title={title} />;
 }
