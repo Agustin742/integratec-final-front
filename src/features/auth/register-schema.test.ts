@@ -11,6 +11,7 @@ import {
 } from 'vitest';
 import { createApiClient } from '@/api/client';
 import { ApiError } from '@/api/errors';
+import { apiErrorMessages } from '@/api/messages';
 import {
   TEST_API_BASE_URL,
   createErrorEnvelopeResponse,
@@ -485,6 +486,55 @@ describe('registerAccount & createRegisterHandler', () => {
     ).rejects.toMatchObject({
       kind: 'unexpected',
       userMessage: authMessages.errors.invalidResponse,
+    });
+
+    mswServer.use(
+      http.post(`${TEST_API_BASE_URL}/auth/register`, () =>
+        createErrorEnvelopeResponse(500, {
+          code: 'INTERNAL_ERROR',
+          message: 'Database connection reset',
+          correlationId: 'corr-500-unit',
+        }),
+      ),
+    );
+
+    await expect(
+      registerAccount(client, {
+        path: 'INDEPENDENT_TEACHER',
+        displayName: 'Ana',
+        email: 'ana@example.com',
+        password: 'ClaveSegura123',
+      }),
+    ).rejects.toMatchObject({
+      kind: 'unexpected',
+      status: 500,
+      userMessage: authMessages.errors.unexpected,
+    });
+    expect(authMessages.errors.unexpected).not.toMatch(
+      /No se guardó ninguna estructura/i,
+    );
+
+    mswServer.use(
+      http.post(`${TEST_API_BASE_URL}/auth/register`, () =>
+        createErrorEnvelopeResponse(400, {
+          code: 'BAD_REQUEST',
+          message: 'Malformed payload',
+          correlationId: 'corr-400-bad',
+        }),
+      ),
+    );
+
+    await expect(
+      registerAccount(client, {
+        path: 'INDEPENDENT_TEACHER',
+        displayName: 'Ana',
+        email: 'ana@example.com',
+        password: 'ClaveSegura123',
+      }),
+    ).rejects.toMatchObject({
+      kind: 'bad-request',
+      status: 400,
+      userMessage: apiErrorMessages.badRequest,
     });
   });
 

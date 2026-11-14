@@ -88,9 +88,9 @@ export const authMessages = {
     validationFailed:
       'Revisá los campos marcados antes de volver a enviar el formulario.',
     invalidResponse:
-      'La respuesta del servidor no coincide con el formato esperado. No confirmamos ningún alta; intentá nuevamente.',
+      'La respuesta del servidor no coincide con el formato esperado. No pudimos confirmar si se completó el registro; probá iniciar sesión con tu correo antes de volver a enviar el formulario.',
     unexpected:
-      'No pudimos crear la cuenta en este momento. No se guardó ninguna estructura; intentá nuevamente.',
+      'No pudimos confirmar si se completó el registro por un error inesperado. Probá iniciar sesión con tu correo antes de volver a enviar el formulario.',
   },
   confirmed: {
     title: 'Cuenta creada',

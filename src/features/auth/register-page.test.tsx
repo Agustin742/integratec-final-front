@@ -438,7 +438,7 @@ describe('RegisterPage (/register)', () => {
     expect(passwordInput.value).toBe('');
   });
 
-  test('shows root error on 500, keeps form editable, and clears password', async () => {
+  test('shows uncertainty-aware root error on 500 without claiming rollback or confirming creation, and clears password', async () => {
     mswServer.use(
       http.post(`${TEST_API_BASE_URL}/auth/register`, () =>
         createErrorEnvelopeResponse(500, {
@@ -471,12 +471,20 @@ describe('RegisterPage (/register)', () => {
     );
 
     await waitFor(() => {
-      expect(
-        within(main).getByText(authMessages.errors.unexpected),
-      ).toBeInTheDocument();
+      const alertText = within(main).getByText(authMessages.errors.unexpected);
+      expect(alertText).toBeInTheDocument();
+      expect(alertText.textContent).toMatch(
+        /No pudimos confirmar si se completó el registro/,
+      );
     });
 
+    expect(
+      within(main).queryByText(/No se guardó ninguna estructura/i),
+    ).not.toBeInTheDocument();
     expect(within(main).queryByRole('status')).not.toBeInTheDocument();
+    expect(
+      within(main).queryByText(authMessages.confirmed.independentTitle),
+    ).not.toBeInTheDocument();
     expect(emailInput.value).toBe('lucia@example.com');
     expect(passwordInput.value).toBe('');
   });

@@ -86,7 +86,7 @@ const translateRegistrationError = (
     });
   }
 
-  if (baseError.kind === 'unexpected' || baseError.kind === 'bad-request') {
+  if (baseError.kind === 'unexpected') {
     return new ApiError({
       kind: baseError.kind,
       status: baseError.status,
