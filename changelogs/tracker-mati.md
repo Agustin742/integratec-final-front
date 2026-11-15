@@ -2,15 +2,15 @@
 
 ## 2026-11-15 — Implement login, password reset, and logout screens (#28)
 
-- **Status:** in-progress (formatting and full verification pending)
+- **Status:** completed (ready for PR review)
 - **Area / files:** `docs/threat-model.md`, `src/session/`, `src/features/auth/`, `src/app/messages.ts`, `src/app/pages/login-page.tsx`, `src/app/pages/password-reset-page.tsx`, `src/app/router/`, `src/test/msw/handlers.ts`, `e2e/auth-session.spec.ts`, `docs/routing.md`, `docs/session-lifecycle.md`, `docs/assets/auth/`, `changelogs/tracker-mati.md`
 - **Change:** Implemented [issue #28](https://github.com/Agustin742/integratec-final-front/issues/28) (`HU-AUT-002`) on `feat/28-login-password-reset-logout` in three reviewable work units:
   1. Updated `docs/threat-model.md`, added `LoginFailureReason`/`LoginResult` and `verifySession` in `src/session/controller.ts`, added `src/app/router/return-target.ts` helpers (reused in `RegisterForm`), centralized `es-AR` auth/shell messages, added jitless Zod schemas & password-reset services, and added MSW auth handlers (`f8a78fe`).
   2. Implemented `LoginForm`/`LoginPage`, wired authenticated `displayName` + `Cerrar sesión` toast-aware logout in `AppShell`, and added component/shell regression suites (`a0ae432`).
-  3. Implemented `PasswordResetForm`/`PasswordResetPage` (request & `?token=` confirm modes), fixed `createSessionMiddleware` null-body (`204`/`205`/`304`) reconstruction uncovered during browser testing (plus regression test in `src/session/middleware.test.ts`), added Playwright coverage (`e2e/auth-session.spec.ts`), captured `1280px`/`360px` screenshots under `docs/assets/auth/`, and updated `docs/routing.md` & `docs/session-lifecycle.md`.
+  3. Implemented `PasswordResetForm`/`PasswordResetPage` (request & `?token=` confirm modes), fixed `createSessionMiddleware` null-body (`204`/`205`/`304`) reconstruction uncovered during browser testing (plus regression test in `src/session/middleware.test.ts`), added Playwright coverage (`e2e/auth-session.spec.ts`), captured `1280px`/`360px` screenshots under `docs/assets/auth/`, and updated `docs/routing.md` & `docs/session-lifecycle.md` (`221070c`).
 - **Reason:** Complete the user-facing session lifecycle screens and flows (`rules/authentication-and-session.md`, `rules/forms-and-validation.md`, `rules/error-handling-and-feedback.md`, `rules/security.md`).
-- **Verification:** Password-reset/routes unit checks (`36/36`), middleware checks (`27/27`), and `e2e/auth-session.spec.ts` (`10/10` desktop and mobile) passed; full profile checks and blind RDD audit pending.
-- **Next step:** Commit Work Unit 3, run full profile checks + `impeccable detect` + `rdd-auditor`, and stop for review before pushing.
+- **Verification:** On Node `22.23.4` and pnpm `10.34.9`: `pnpm lint`, `pnpm typecheck`, `pnpm test` (39 files, 429 tests passed), `pnpm build`, `pnpm security:check`, `pnpm format:check`, `pnpm e2e` (44/44 Playwright desktop and mobile scenarios including `e2e/auth-session.spec.ts`, active CSP checks, and zero horizontal overflow), `git diff --check origin/develop..HEAD --`, and Node Markdown link check passed; `impeccable detect` returned `[]`. Blind RDD audit on `221070c`: `Audit: APPROVED · 221070c74ccb399193d4d884d559cc4670777c11 · lenses: risk, resilience, readability, reliability · blockers fixed: 0 · follow-ups: none`. Local `python3` / `py` (`C:\Python314\python.exe` missing) and `actionlint` 1.7.7 are unavailable on this Windows workstation and run in the Ubuntu GitHub Actions `checks` job.
+- **Next step:** Push `feat/28-login-password-reset-logout` and open the PR targeting `develop` after user review/confirmation.
 
 ## 2026-11-14 — Implement account registration and organizational path selection screen (#27)
 
