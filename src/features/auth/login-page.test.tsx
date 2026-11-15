@@ -29,6 +29,7 @@ import {
 import { mswServer } from '@/test/msw/server';
 import { render } from '@/test/render';
 import '@/app/pages/login-page';
+import '@/app/pages/password-reset-page';
 import { authMessages } from './messages';
 
 beforeAll(() => {
@@ -46,6 +47,7 @@ afterEach(() => {
   mswServer.resetHandlers();
   window.sessionStorage.clear();
   vi.unstubAllEnvs();
+  vi.restoreAllMocks();
 });
 
 afterAll(() => {
@@ -471,5 +473,59 @@ describe('LoginPage (/login)', () => {
     expect(
       screen.getByText(authMessages.login.returnContextNotice),
     ).toBeVisible();
+  });
+
+  test('prompts before leaving /login with dirty inputs and clears password dirty state on failed submit', async () => {
+    mswServer.use(
+      createLoginHandler({
+        error: {
+          status: 401,
+          body: {
+            code: 'UNAUTHENTICATED',
+            message: 'Invalid email or password',
+            correlationId: 'corr-401-guard',
+          },
+        },
+      }),
+    );
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const { router } = renderLoginRoute('/login');
+    const emailInput = (await waitForLoginForm()) as HTMLInputElement;
+    const passwordInput = screen.getByLabelText(
+      authMessages.login.fields.password.label,
+    ) as HTMLInputElement;
+
+    fireEvent.change(emailInput, { target: { value: 'ana@ejemplo.com' } });
+    fireEvent.change(passwordInput, { target: { value: 'ClaveSegura123' } });
+
+    const forgotLink = screen.getByRole('link', {
+      name: authMessages.login.actions.forgotPasswordLink,
+    });
+    const registerLink = screen.getByRole('link', {
+      name: authMessages.login.actions.registerLink,
+    });
+
+    fireEvent.click(forgotLink);
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(router.state.location.pathname).toBe('/login');
+
+    fireEvent.click(registerLink);
+    expect(confirmSpy).toHaveBeenCalledTimes(2);
+    expect(router.state.location.pathname).toBe('/login');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: authMessages.login.actions.submit }),
+    );
+    await screen.findByRole('alert');
+    expect(passwordInput.value).toBe('');
+
+    fireEvent.change(emailInput, { target: { value: '' } });
+    await screen.findByText(authMessages.login.validation.emailRequired);
+    fireEvent.click(forgotLink);
+    expect(confirmSpy).toHaveBeenCalledTimes(2);
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe('/password-reset'),
+    );
   });
 });

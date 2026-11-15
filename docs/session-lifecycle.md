@@ -174,13 +174,18 @@ remains application-owned; its pending identity initialization is shared on remo
   `205`, `304`), preventing `TypeError` failures in browsers where empty streams expose a
   non-null `ReadableStream` on endpoints such as `POST /auth/password-reset/confirm`.
 - `AppShell` renders the signed-in user's `displayName` and `Cerrar sesión` button only
-  when `snapshot.status === 'authenticated'`. Invoking `controller.logout()` distinguishes
-  confirmed revocation (`toast.success`) from unconfirmed local cleanup (`toast.warning`
-  when `!serverConfirmed || cleanupFailed`).
+  when `snapshot.status === 'authenticated'`. `SessionController.logout()` is
+  single-flight (concurrent invocations share the active `POST /auth/logout` call instead
+  of aborting server revocation, while a subsequent `login()` supersedes any still-pending
+  logout epoch so `serverConfirmed` resolves `false`), and `AppShell` ignores duplicate
+  clicks while logout is running (`isLoggingOutRef`). Invoking `controller.logout()`
+  distinguishes confirmed revocation (`toast.success`) from unconfirmed local cleanup
+  (`toast.warning` when `!serverConfirmed || cleanupFailed`).
 - Password recovery (`requestPasswordReset` and `confirmPasswordReset`) validates inputs
   with jitless Zod schemas, calls `POST /auth/password-reset/request` (`202`) and
   `POST /auth/password-reset/confirm` (`204`) with `credentials: 'omit'` and
-  `redirect: 'error'`, and relies on non-enumerating request confirmation copy.
+  `redirect: 'error'`, scrubs `?token=` from browser URLs into React component memory
+  immediately on load, and relies on non-enumerating request confirmation copy.
 
 ## Verification and remaining work
 

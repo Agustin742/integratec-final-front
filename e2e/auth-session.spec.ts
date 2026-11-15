@@ -274,6 +274,19 @@ test('completes password reset request and token confirmation flows', async ({
     newPassword: 'NuevaClave123!',
   });
 
+  await page.goto('./password-reset?token=second-reset-token-654321&next=%2F');
+  await expect(
+    page.getByLabel(
+      authMessages.passwordReset.confirm.fields.newPassword.label,
+    ),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/\/password-reset\?next=%2F$/);
+  await expect(
+    page.getByRole('link', {
+      name: authMessages.passwordReset.confirm.actions.goToLogin,
+    }),
+  ).toHaveAttribute('href', '/login?next=%2F');
+
   expect(cspViolations).toEqual([]);
   expect(pageErrors).toEqual([]);
 });

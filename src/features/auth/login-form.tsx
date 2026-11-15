@@ -1,3 +1,4 @@
+import type { MouseEvent } from 'react';
 import { useSearchParams, Link } from 'react-router';
 import { ApiError, type ApiErrorInit } from '@/api/errors';
 import {
@@ -69,7 +70,9 @@ export function LoginForm({ title }: LoginFormProps) {
   });
 
   const dirtyFields = form.formState.dirtyFields;
-  useUnsavedChangesGuard(Boolean(dirtyFields.email || dirtyFields.password));
+  const { confirmNavigation } = useUnsavedChangesGuard(
+    Boolean(dirtyFields.email || dirtyFields.password),
+  );
 
   const showReturnNotice = hasValidReturnTarget(searchParams);
   const forgotPasswordHref = buildAuthReturnHref(
@@ -78,9 +81,15 @@ export function LoginForm({ title }: LoginFormProps) {
   );
   const registerHref = buildAuthReturnHref(REGISTER_PATH, searchParams);
 
+  const handleLeaveWithGuard = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (!confirmNavigation()) {
+      event.preventDefault();
+    }
+  };
+
   const clearPasswordField = () => {
     form.setValue('password', '', {
-      shouldDirty: false,
+      shouldDirty: true,
       shouldTouch: false,
       shouldValidate: false,
     });
@@ -89,13 +98,11 @@ export function LoginForm({ title }: LoginFormProps) {
   const onValid = async (values: LoginFormOutput): Promise<void> => {
     try {
       const result = await controller.login(values);
-      clearPasswordField();
       if (!result.ok) {
         throw new ApiError(LOGIN_ERROR_BY_REASON[result.reason]);
       }
-    } catch (error) {
+    } finally {
       clearPasswordField();
-      throw error;
     }
   };
 
@@ -161,6 +168,7 @@ export function LoginForm({ title }: LoginFormProps) {
         <div className="flex justify-end">
           <Link
             to={forgotPasswordHref}
+            onClick={handleLeaveWithGuard}
             className="inline-flex min-h-11 items-center rounded-sm px-1 text-sm font-semibold text-primary underline underline-offset-4 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
           >
             {authMessages.login.actions.forgotPasswordLink}
@@ -178,6 +186,7 @@ export function LoginForm({ title }: LoginFormProps) {
         {authMessages.login.actions.noAccountPrompt}{' '}
         <Link
           to={registerHref}
+          onClick={handleLeaveWithGuard}
           className="inline-flex min-h-11 items-center rounded-sm px-1 font-semibold text-primary underline underline-offset-4 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
         >
           {authMessages.login.actions.registerLink}

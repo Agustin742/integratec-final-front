@@ -311,6 +311,49 @@ describe('session lifecycle public boundary', () => {
     expect(aborted).toBe(false);
   });
 
+  test('superseding an in-flight logout with login invalidates confirmation and allows a fresh logout afterward', async () => {
+    const pendingLogout = deferred<Response>();
+    let logoutCalls = 0;
+    const h = harness((request) => {
+      if (request.url.endsWith('/auth/logout')) {
+        logoutCalls += 1;
+        return logoutCalls === 1
+          ? pendingLogout.promise
+          : new Response(null, { status: 204 });
+      }
+      if (request.url.endsWith('/auth/login')) {
+        return json(rotated);
+      }
+      return json(profile);
+    }, saved());
+    const { controller } = createSession(h);
+    await controller.initialize();
+
+    const firstLogout = controller.logout();
+    await vi.waitFor(() => expect(logoutCalls).toBe(1));
+
+    await expect(controller.login(login)).resolves.toEqual({
+      ok: true,
+      cleanupFailed: false,
+    });
+    expect(controller.getSnapshot()).toEqual({
+      status: 'authenticated',
+      user: profile,
+    });
+
+    pendingLogout.resolve(new Response(null, { status: 204 }));
+    await expect(firstLogout).resolves.toEqual({
+      serverConfirmed: false,
+      cleanupFailed: false,
+    });
+
+    await expect(controller.logout()).resolves.toEqual({
+      serverConfirmed: true,
+      cleanupFailed: false,
+    });
+    expect(logoutCalls).toBe(2);
+  });
+
   test('late login cannot replace a newer account', async () => {
     const old = deferred<Response>();
     let logins = 0;

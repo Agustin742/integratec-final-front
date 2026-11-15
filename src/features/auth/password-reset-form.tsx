@@ -61,8 +61,14 @@ interface ModeViewProps {
   readonly searchParams: URLSearchParams;
 }
 
-interface TokenModeViewProps extends ModeViewProps {
-  readonly onRequestNewLink: (event: MouseEvent<HTMLAnchorElement>) => void;
+function createLeaveGuardHandler(
+  confirmNavigation: () => boolean,
+): (event: MouseEvent<HTMLAnchorElement>) => void {
+  return (event) => {
+    if (!confirmNavigation()) {
+      event.preventDefault();
+    }
+  };
 }
 
 function PasswordResetRequestView({ title, searchParams }: ModeViewProps) {
@@ -85,9 +91,10 @@ function PasswordResetRequestView({ title, searchParams }: ModeViewProps) {
     defaultValues: { email: '' },
   });
 
-  useUnsavedChangesGuard(
+  const { confirmNavigation } = useUnsavedChangesGuard(
     Boolean(form.formState.dirtyFields.email) && !requested,
   );
+  const handleLeaveWithGuard = createLeaveGuardHandler(confirmNavigation);
 
   const loginHref = buildAuthReturnHref(LOGIN_PATH, searchParams);
   const copy = authMessages.passwordReset.request;
@@ -183,7 +190,11 @@ function PasswordResetRequestView({ title, searchParams }: ModeViewProps) {
       </form>
 
       <p className="border-t border-edge pt-4 text-center text-sm text-muted-foreground">
-        <Link to={loginHref} className={secondaryTextLinkClass}>
+        <Link
+          to={loginHref}
+          onClick={handleLeaveWithGuard}
+          className={secondaryTextLinkClass}
+        >
           {copy.actions.backToLogin}
         </Link>
       </p>
@@ -191,11 +202,7 @@ function PasswordResetRequestView({ title, searchParams }: ModeViewProps) {
   );
 }
 
-function InvalidResetTokenView({
-  title,
-  searchParams,
-  onRequestNewLink,
-}: TokenModeViewProps) {
+function InvalidResetTokenView({ title, searchParams }: ModeViewProps) {
   const copy = authMessages.passwordReset.confirm;
   const headingId = useId();
   const requestNewHref = buildAuthReturnHref(PASSWORD_RESET_PATH, searchParams);
@@ -212,11 +219,7 @@ function InvalidResetTokenView({
         <AlertDescription>{copy.invalidToken.body}</AlertDescription>
       </Alert>
 
-      <Link
-        to={requestNewHref}
-        className={primaryCtaLinkClass}
-        onClick={onRequestNewLink}
-      >
+      <Link to={requestNewHref} state={null} className={primaryCtaLinkClass}>
         {copy.actions.requestNewLink}
       </Link>
 
@@ -233,8 +236,7 @@ function PasswordResetConfirmView({
   title,
   token,
   searchParams,
-  onRequestNewLink,
-}: TokenModeViewProps & { readonly token: string }) {
+}: ModeViewProps & { readonly token: string }) {
   const { client } = useSessionService();
   const [confirmed, setConfirmed] = useState(false);
   const [tokenRejected, setTokenRejected] = useState(false);
@@ -255,9 +257,10 @@ function PasswordResetConfirmView({
     defaultValues: { newPassword: '' },
   });
 
-  useUnsavedChangesGuard(
+  const { confirmNavigation } = useUnsavedChangesGuard(
     Boolean(form.formState.dirtyFields.newPassword) && !confirmed,
   );
+  const handleLeaveWithGuard = createLeaveGuardHandler(confirmNavigation);
 
   const loginHref = buildAuthReturnHref(LOGIN_PATH, searchParams);
   const requestNewHref = buildAuthReturnHref(PASSWORD_RESET_PATH, searchParams);
@@ -265,7 +268,7 @@ function PasswordResetConfirmView({
 
   const clearNewPassword = () => {
     form.setValue('newPassword', '', {
-      shouldDirty: false,
+      shouldDirty: true,
       shouldTouch: false,
       shouldValidate: false,
     });
@@ -280,14 +283,14 @@ function PasswordResetConfirmView({
           token,
           newPassword: values.newPassword,
         });
-        clearNewPassword();
         setConfirmed(true);
       } catch (error) {
-        clearNewPassword();
         if (error instanceof ApiError && error.kind === 'bad-request') {
           setTokenRejected(true);
         }
         throw error;
+      } finally {
+        clearNewPassword();
       }
     },
     { knownFields: ['newPassword'] },
@@ -362,14 +365,19 @@ function PasswordResetConfirmView({
       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-t border-edge pt-4 text-sm text-muted-foreground">
         <Link
           to={requestNewHref}
+          state={null}
+          onClick={handleLeaveWithGuard}
           className={
             tokenRejected ? primaryCtaLinkClass : secondaryTextLinkClass
           }
-          onClick={onRequestNewLink}
         >
           {copy.actions.requestNewLink}
         </Link>
-        <Link to={loginHref} className={secondaryTextLinkClass}>
+        <Link
+          to={loginHref}
+          onClick={handleLeaveWithGuard}
+          className={secondaryTextLinkClass}
+        >
           {copy.actions.goToLogin}
         </Link>
       </div>
@@ -381,6 +389,15 @@ type ResetRouteState =
   | { readonly mode: 'request' }
   | { readonly mode: 'invalid' }
   | { readonly mode: 'confirm'; readonly token: string };
+
+function isScrubbedLocationState(state: unknown): boolean {
+  return (
+    typeof state === 'object' &&
+    state !== null &&
+    'resetTokenScrubbed' in state &&
+    (state as { resetTokenScrubbed?: unknown }).resetTokenScrubbed === true
+  );
+}
 
 function parseResetRouteState(searchParams: URLSearchParams): ResetRouteState {
   if (!searchParams.has('token')) {
@@ -416,9 +433,10 @@ export function PasswordResetForm({ title }: PasswordResetFormProps) {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   // Latch ?token= into component state before removing it from the URL so the
-  // secret does not persist in location history or Referer headers (TM-006).
-  // Key latching to location.key ensures an explicit reset back to request mode
-  // is not overwritten while the replace-navigation transition is still settling.
+  // secret does not persist in location history, window.history.state, or Referer
+  // headers (TM-006). Marking the scrubbed entry with a non-secret flag ensures
+  // replace-navigation keeps confirm/invalid mounted while Back or explicit
+  // /password-reset links return cleanly to request mode.
   const [latchedLocationKey, setLatchedLocationKey] = useState(location.key);
   const [routeState, setRouteState] = useState<ResetRouteState>(() =>
     parseResetRouteState(searchParams),
@@ -431,6 +449,11 @@ export function PasswordResetForm({ title }: PasswordResetFormProps) {
       if (!areResetRouteStatesEqual(routeState, incomingState)) {
         setRouteState(incomingState);
       }
+    } else if (
+      !isScrubbedLocationState(location.state) &&
+      routeState.mode !== 'request'
+    ) {
+      setRouteState({ mode: 'request' });
     }
   }
 
@@ -440,21 +463,11 @@ export function PasswordResetForm({ title }: PasswordResetFormProps) {
     }
     const nextParams = new URLSearchParams(searchParams);
     nextParams.delete('token');
-    setSearchParams(nextParams, { replace: true });
+    setSearchParams(nextParams, {
+      replace: true,
+      state: { resetTokenScrubbed: true },
+    });
   }, [searchParams, setSearchParams]);
-
-  const handleRequestNewLink = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (
-      event.button !== 0 ||
-      event.metaKey ||
-      event.ctrlKey ||
-      event.shiftKey ||
-      event.altKey
-    ) {
-      return;
-    }
-    setRouteState({ mode: 'request' });
-  };
 
   if (routeState.mode === 'request') {
     return (
@@ -472,7 +485,6 @@ export function PasswordResetForm({ title }: PasswordResetFormProps) {
         key="invalid-token"
         title={title}
         searchParams={searchParams}
-        onRequestNewLink={handleRequestNewLink}
       />
     );
   }
@@ -483,7 +495,6 @@ export function PasswordResetForm({ title }: PasswordResetFormProps) {
       title={title}
       token={routeState.token}
       searchParams={searchParams}
-      onRequestNewLink={handleRequestNewLink}
     />
   );
 }

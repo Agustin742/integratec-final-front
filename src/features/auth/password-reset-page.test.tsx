@@ -24,6 +24,7 @@ import {
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
 import { render } from '@/test/render';
+import '@/app/pages/login-page';
 import '@/app/pages/password-reset-page';
 import { authMessages } from './messages';
 
@@ -42,6 +43,7 @@ afterEach(() => {
   mswServer.resetHandlers();
   window.sessionStorage.clear();
   vi.unstubAllEnvs();
+  vi.restoreAllMocks();
 });
 
 afterAll(() => {
@@ -435,5 +437,102 @@ describe('PasswordResetPage (/password-reset)', () => {
       ),
     );
     expect(passwordInput.value).toBe('');
+  });
+
+  test('guards unsaved email and newPassword links and clears password dirty state on failed confirm submit', async () => {
+    mswServer.use(
+      createPasswordResetConfirmHandler({
+        error: {
+          status: 400,
+          body: {
+            code: 'BAD_REQUEST',
+            message: 'Invalid or expired reset token',
+            correlationId: 'corr-400-guard',
+          },
+        },
+      }),
+    );
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const requestView = renderPasswordResetRoute('/password-reset');
+    const emailInput = (await screen.findByLabelText(
+      authMessages.passwordReset.request.fields.email.label,
+    )) as HTMLInputElement;
+    const backToLoginLink = screen.getByRole('link', {
+      name: authMessages.passwordReset.request.actions.backToLogin,
+    });
+
+    fireEvent.change(emailInput, { target: { value: 'ana@ejemplo.com' } });
+    fireEvent.click(backToLoginLink);
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(requestView.router.state.location.pathname).toBe('/password-reset');
+
+    fireEvent.change(emailInput, { target: { value: '' } });
+    fireEvent.click(backToLoginLink);
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(requestView.router.state.location.pathname).toBe('/login'),
+    );
+    requestView.unmount();
+
+    const confirmView = renderPasswordResetRoute(
+      '/password-reset?token=valid-token-guard',
+    );
+    const passwordInput = (await screen.findByLabelText(
+      authMessages.passwordReset.confirm.fields.newPassword.label,
+    )) as HTMLInputElement;
+    await waitFor(() =>
+      expect(confirmView.router.state.location.search).toBe(''),
+    );
+
+    fireEvent.change(passwordInput, {
+      target: { value: 'NuevaClaveSegura2026' },
+    });
+    const requestNewLink = screen.getByRole('link', {
+      name: authMessages.passwordReset.confirm.actions.requestNewLink,
+    });
+    fireEvent.click(requestNewLink);
+    expect(confirmSpy).toHaveBeenCalledTimes(2);
+    expect(passwordInput).toBeInTheDocument();
+    expect(passwordInput.value).toBe('NuevaClaveSegura2026');
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: authMessages.passwordReset.confirm.actions.submit,
+      }),
+    );
+    await screen.findByRole('alert');
+    expect(passwordInput.value).toBe('');
+
+    fireEvent.click(requestNewLink);
+    expect(confirmSpy).toHaveBeenCalledTimes(2);
+    expect(
+      await screen.findByLabelText(
+        authMessages.passwordReset.request.fields.email.label,
+      ),
+    ).toBeVisible();
+  });
+
+  test('returns to request mode on browser Back after URL token scrubbing without storing token in history state', async () => {
+    const { router } = renderPasswordResetRoute('/password-reset');
+    await screen.findByLabelText(
+      authMessages.passwordReset.request.fields.email.label,
+    );
+
+    await router.navigate('/password-reset?token=valid-reset-token-123');
+    await screen.findByLabelText(
+      authMessages.passwordReset.confirm.fields.newPassword.label,
+    );
+    await waitFor(() => expect(router.state.location.search).toBe(''));
+    expect(JSON.stringify(router.state.location.state ?? null)).not.toContain(
+      'valid-reset-token-123',
+    );
+
+    await router.navigate(-1);
+    expect(
+      await screen.findByLabelText(
+        authMessages.passwordReset.request.fields.email.label,
+      ),
+    ).toBeVisible();
   });
 });
