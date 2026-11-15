@@ -33,3 +33,17 @@ Before editing an area someone else touched recently, review the relevant tracke
 ## Local work plans and inspection artifacts
 
 The root `odd/` directory contains local agent work plans (`odd/tasks/`), offline Blender authoring scripts (`odd/scripts/blender/`), temporary Blender test renders (`*.png`), check reports (`*.json`), and browser preview captures (`odd/previews/`, `odd/artifacts/`). Keep `odd/` untracked; do not commit `odd/` contents or force-add ignored files. Document delivered features, assets, technical decisions, and verification in `docs/` as required by [Quality and testing](rules/quality-and-testing.md) and [Documentation and decisions](rules/documentation-and-decisions.md).
+
+## Workflow profile
+
+- Base branch: `develop`
+- Branch naming: `<feat|fix|chore|docs|test>/<issue>-<slug>`
+- Rule index: `rules/index.md`
+- Local checks (run in order): `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm security:check`, `pnpm format:check`, `pnpm e2e`, `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/ci -p 'test_*.py' -v`, `python3 scripts/ci/check_docs.py`, `git diff --check origin/develop..HEAD --`
+- Tracker: `changelogs/tracker-mati.md`
+- Board: `rules/github-projects.md`
+- UI design rules: `rules/art-direction.md`, `rules/ui-and-accessibility.md`
+- UI evidence: `screenshots at 1280px and 360px under docs/assets/, linked in the relevant docs/ guide and embedded in the PR`
+- Threat model: `docs/threat-model.md`
+- AI usage evidence: `docs/ai-usage.md`
+- Local work plans: `odd/ (untracked)`

@@ -27,6 +27,17 @@ Pages use `h2` for their title. The not found, forbidden and error views share `
 
 The table leaves room for the parent area (extended scope): it mounts as its own branch next to the protected one, with its own guard. It is not implemented.
 
+## Account registration (`/register`)
+
+The `/register` route (`src/app/pages/register-page.tsx`, rendering `RegisterForm` from `src/features/auth/register-form.tsx`) guides visitors through choosing their initial organizational path before signing in:
+
+- **Path options:** `INDEPENDENT_TEACHER` (personal teaching space), `SCHOOL` (provisions a new institution via the conditional `schoolName` field), and `INVITATION` (hides account creation inputs and links directly to `/invitations/accept` without duplicating invitation acceptance logic).
+- **Contract and feedback:** `registerFormSchema` mirrors the backend `RegisterRequestDto` rules in `es-AR`, clears passwords on every failed attempt, relies on `useProtectedSubmit` to prevent duplicate requests, validates the `201 Created` payload with `registerResponseSchema` before showing the `role="status"` confirmed structure view, and offers a CTA to `/login` preserving only `safeSessionRedirect`-approved `?next=` targets. See [threat-model.md](./threat-model.md) for the security boundary analysis.
+
+![Account registration desktop screen (1280px)](./assets/auth/register-1280.png)
+
+![Account registration mobile screen (360px)](./assets/auth/register-360.png)
+
 ## Guards
 
 Guards are components that read `useSessionSnapshot()`; auth is not decided in loaders, because the session is asynchronous and owned by the session controller (see [session lifecycle](./session-lifecycle.md)).
