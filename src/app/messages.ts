@@ -8,8 +8,7 @@ export const messages = {
   pages: {
     login: {
       title: 'Iniciar sesión',
-      description:
-        'Acá vas a poder ingresar con tu cuenta. Pantalla en construcción.',
+      description: 'Ingresá con tu cuenta para acceder a tus aulas.',
     },
     register: {
       title: 'Crear cuenta',
@@ -19,7 +18,7 @@ export const messages = {
     passwordReset: {
       title: 'Restablecer contraseña',
       description:
-        'Acá vas a poder recuperar el acceso a tu cuenta. Pantalla en construcción.',
+        'Recuperá el acceso a tu cuenta con un enlace enviado a tu correo.',
     },
     invitationAccept: {
       title: 'Aceptar invitación',
@@ -68,6 +67,16 @@ export const messages = {
     unableTitle: 'No pudimos verificar tu sesión',
     unableDescription:
       'No pudimos comprobar si tu sesión sigue activa. Revisá tu conexión e intentá de nuevo.',
+  },
+  shell: {
+    signedInAsPrefix: 'Sesión activa:',
+    logoutAction: 'Cerrar sesión',
+    loggingOutAction: 'Cerrando sesión...',
+    logoutConfirmedTitle: 'Sesión cerrada',
+    logoutConfirmedBody: 'Cerraste tu sesión en este navegador.',
+    logoutLocalOnlyTitle: 'Datos locales de sesión eliminados',
+    logoutLocalOnlyBody:
+      'Borramos tu sesión local en este navegador, pero no pudimos confirmar el cierre remoto en el servidor.',
   },
   showcase: {
     title: 'Componentes de interfaz',

@@ -31,6 +31,35 @@ export interface SessionOptions {
   readonly tabOwner?: () => string | undefined;
   readonly now?: () => number;
 }
+export type LoginFailureReason =
+  'invalid-credentials' | 'rate-limited' | 'network' | 'unexpected';
+
+export type LoginResult =
+  | { readonly ok: true; readonly cleanupFailed: boolean }
+  | {
+      readonly ok: false;
+      readonly cleanupFailed: boolean;
+      readonly reason: LoginFailureReason;
+    };
+
+function classifyLoginError(
+  error: unknown,
+  fromProfileVerification = false,
+): LoginFailureReason {
+  if (error instanceof ApiError) {
+    if (!fromProfileVerification && error.status === 401) {
+      return 'invalid-credentials';
+    }
+    if (error.kind === 'rate-limited' || error.status === 429) {
+      return 'rate-limited';
+    }
+    if (error.kind === 'network') {
+      return 'network';
+    }
+  }
+  return 'unexpected';
+}
+
 export interface SessionController {
   getSnapshot(): SessionSnapshot;
   getCleanupFailure(): boolean;
@@ -38,7 +67,7 @@ export interface SessionController {
   registerCleanup(cleanup: () => void): () => void;
   releasePrivateState(): void;
   initialize(): Promise<void>;
-  login(input: LoginInput): Promise<{ ok: boolean; cleanupFailed: boolean }>;
+  login(input: LoginInput): Promise<LoginResult>;
   logout(): Promise<{ serverConfirmed: boolean; cleanupFailed: boolean }>;
 }
 export interface SessionService {
@@ -183,7 +212,12 @@ export function createSession(options: SessionOptions = {}): SessionService {
     ),
   );
 
-  async function verify(expectedEpoch: number): Promise<boolean> {
+  async function verifySession(
+    expectedEpoch: number,
+  ): Promise<
+    | { readonly ok: true }
+    | { readonly ok: false; readonly reason: LoginFailureReason }
+  > {
     try {
       const payload: unknown = await requestApi(() => client.GET('/users/me'));
       assertSessionEpoch(epochPort, expectedEpoch);
@@ -194,10 +228,10 @@ export function createSession(options: SessionOptions = {}): SessionService {
         avatar: Object.freeze(result.data.avatar),
       });
       publish({ status: 'authenticated', user });
-      return true;
-    } catch {
+      return { ok: true };
+    } catch (error) {
       if (epoch === expectedEpoch) transition('unable-to-verify', false);
-      return false;
+      return { ok: false, reason: classifyLoginError(error, true) };
     }
   }
 
@@ -233,7 +267,7 @@ export function createSession(options: SessionOptions = {}): SessionService {
       }
       publish({ status: 'initializing' });
       const expectedEpoch = epoch;
-      const pending = verify(expectedEpoch).then(() => {});
+      const pending = verifySession(expectedEpoch).then(() => {});
       initializing = pending;
       void pending.finally(() => {
         if (initializing === pending) initializing = undefined;
@@ -248,8 +282,18 @@ export function createSession(options: SessionOptions = {}): SessionService {
         if (storageUnavailable) throw safeSessionError();
         const pair = await auth.login(input, abort.signal);
         install(pair, expectedEpoch);
-        const ok = await verify(expectedEpoch);
-        return { ok, cleanupFailed: transitionCleanupFailed || cleanupFailed };
+        const verification = await verifySession(expectedEpoch);
+        if (verification.ok) {
+          return {
+            ok: true,
+            cleanupFailed: transitionCleanupFailed || cleanupFailed,
+          };
+        }
+        return {
+          ok: false,
+          cleanupFailed: transitionCleanupFailed || cleanupFailed,
+          reason: verification.reason,
+        };
       } catch (error) {
         if (epoch === expectedEpoch) {
           const rejected = error instanceof ApiError && error.status === 401;
@@ -258,6 +302,7 @@ export function createSession(options: SessionOptions = {}): SessionService {
         return {
           ok: false,
           cleanupFailed: transitionCleanupFailed || cleanupFailed,
+          reason: classifyLoginError(error),
         };
       }
     },

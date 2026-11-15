@@ -1,5 +1,12 @@
 import { expect, test } from 'vitest';
-import { buildLoginRedirect, readReturnTarget } from './return-target';
+import {
+  buildAuthReturnHref,
+  buildLoginRedirect,
+  hasValidReturnTarget,
+  PASSWORD_RESET_PATH,
+  readReturnTarget,
+  REGISTER_PATH,
+} from './return-target';
 
 const hostile = [
   '//evil.example',
@@ -62,4 +69,46 @@ test('the production allowlist still degrades a non-default destination to "/"',
 test('repeated next parameters are absent even when each value is approved', () => {
   const params = new URLSearchParams('next=%2Fclassrooms&next=%2Fclassrooms');
   expect(readReturnTarget(params, withClassrooms)).toBe('/');
+});
+
+test('hasValidReturnTarget returns true only for single approved return targets', () => {
+  expect(hasValidReturnTarget(new URLSearchParams('next=%2F'))).toBe(true);
+  expect(hasValidReturnTarget(new URLSearchParams(''))).toBe(false);
+  expect(hasValidReturnTarget(new URLSearchParams('next=//evil.example'))).toBe(
+    false,
+  );
+  expect(hasValidReturnTarget(new URLSearchParams('next=%2F&next=%2F'))).toBe(
+    false,
+  );
+  expect(
+    hasValidReturnTarget(
+      new URLSearchParams('next=%2Fclassrooms'),
+      withClassrooms,
+    ),
+  ).toBe(true);
+});
+
+test('buildAuthReturnHref forwards valid return targets and strips absent or hostile ones', () => {
+  expect(
+    buildAuthReturnHref(PASSWORD_RESET_PATH, new URLSearchParams('next=%2F')),
+  ).toBe('/password-reset?next=%2F');
+  expect(
+    buildAuthReturnHref(
+      REGISTER_PATH,
+      new URLSearchParams('next=https://evil.example'),
+    ),
+  ).toBe('/register');
+  expect(
+    buildAuthReturnHref(
+      REGISTER_PATH,
+      new URLSearchParams('next=%2F&next=%2F'),
+    ),
+  ).toBe('/register');
+  expect(
+    buildAuthReturnHref(
+      PASSWORD_RESET_PATH,
+      new URLSearchParams('next=%2Fclassrooms'),
+      withClassrooms,
+    ),
+  ).toBe('/password-reset?next=%2Fclassrooms');
 });

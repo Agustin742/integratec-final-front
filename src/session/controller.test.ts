@@ -299,4 +299,73 @@ describe('session lifecycle public boundary', () => {
     });
     expect(h.storage.getItem(storageKey)).not.toContain('old-account');
   });
+
+  test('login reports invalid-credentials and transitions unauthenticated on 401', async () => {
+    const h = harness(() => json({}, 401));
+    const { controller } = createSession(h);
+
+    expect(await controller.login(login)).toEqual({
+      ok: false,
+      cleanupFailed: false,
+      reason: 'invalid-credentials',
+    });
+    expect(controller.getSnapshot()).toEqual({ status: 'unauthenticated' });
+    expect(h.storage.getItem(storageKey)).toBeNull();
+  });
+
+  test('login distinguishes rate-limited, network, and unexpected failures from 401', async () => {
+    const rateLimited = createSession(harness(() => json({}, 429)));
+    expect(await rateLimited.controller.login(login)).toEqual({
+      ok: false,
+      cleanupFailed: false,
+      reason: 'rate-limited',
+    });
+    expect(rateLimited.controller.getSnapshot()).toEqual({
+      status: 'unable-to-verify',
+    });
+
+    const offline = createSession(
+      harness(() => {
+        throw new TypeError('synthetic network down');
+      }),
+    );
+    expect(await offline.controller.login(login)).toEqual({
+      ok: false,
+      cleanupFailed: false,
+      reason: 'network',
+    });
+    expect(offline.controller.getSnapshot()).toEqual({
+      status: 'unable-to-verify',
+    });
+
+    const serverError = createSession(harness(() => json({}, 500)));
+    expect(await serverError.controller.login(login)).toEqual({
+      ok: false,
+      cleanupFailed: false,
+      reason: 'unexpected',
+    });
+    expect(serverError.controller.getSnapshot()).toEqual({
+      status: 'unable-to-verify',
+    });
+  });
+
+  test('login preserves failure reason when profile verification fails after tokens arrive', async () => {
+    const networkProfileFailure = createSession(
+      harness((request) => {
+        if (request.url.endsWith('/users/me')) {
+          throw new TypeError('profile offline');
+        }
+        return json(tokens);
+      }),
+    );
+
+    expect(await networkProfileFailure.controller.login(login)).toEqual({
+      ok: false,
+      cleanupFailed: false,
+      reason: 'network',
+    });
+    expect(networkProfileFailure.controller.getSnapshot()).toEqual({
+      status: 'unable-to-verify',
+    });
+  });
 });
