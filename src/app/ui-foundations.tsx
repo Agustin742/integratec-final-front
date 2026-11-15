@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
+import { worldMessages } from '@/features/world/messages';
 import {
   EmptyState,
   ErrorState,
@@ -42,6 +43,12 @@ import { formatDateOnly, formatDeadline } from '@/lib/dates';
 import { messages } from './messages';
 import { useDocumentTitle } from './router/document-title';
 
+const WorldReference = lazy(() =>
+  import('@/features/world').then((module) => ({
+    default: module.WorldReference,
+  })),
+);
+
 export function UiFoundations() {
   const copy = messages.showcase;
   useDocumentTitle(copy.title);
@@ -77,6 +84,9 @@ export function UiFoundations() {
           <Badge className="max-w-full whitespace-normal">{copy.success}</Badge>
         </div>
       </div>
+      <Suspense fallback={<p role="status">{worldMessages.loading}</p>}>
+        <WorldReference />
+      </Suspense>
       <Alert variant="destructive">
         <AlertTitle>{copy.error}</AlertTitle>
         <AlertDescription>{copy.errorHelp}</AlertDescription>

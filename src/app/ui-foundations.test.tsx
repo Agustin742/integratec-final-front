@@ -1,8 +1,25 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { render } from '@/test/render';
 import { UiFoundations } from './ui-foundations';
 import { messages } from './messages';
+
+vi.mock('@/features/world', () => ({
+  WorldReference: () => <h3>Referencia técnica 3D</h3>,
+}));
+
+test('adds the technical world reference without replacing existing controls', async () => {
+  render(<UiFoundations />);
+  expect(
+    await screen.findByRole('heading', { name: 'Referencia técnica 3D' }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole('textbox', { name: messages.showcase.fieldLabel }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole('button', { name: messages.showcase.openDialog }),
+  ).toBeVisible();
+});
 
 test('identifies every feedback state as a local example', () => {
   render(<UiFoundations />);
