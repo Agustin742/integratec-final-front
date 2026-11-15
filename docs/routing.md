@@ -21,7 +21,7 @@ Every page is a lazy route module (`lazy: { Component }`), so its chunk loads wh
 Two pathless layout routes sit under the root route. Both mount the single toast host and a `main` landmark with the same id, and focus after navigation is handled once above them (`RouterRoot`), so moving between layouts (for example login to home) is still announced.
 
 - `AuthLayout` (`/login`, `/register`, `/password-reset`, `/invitations/accept`): a split screen with no sidebar. The brand panel (the only `h1`, the product name, a one-line value statement and a text placeholder where the 3D classroom model will go) comes first in the DOM, so on phones it stacks above the content and on wide screens it sits on the right. The form column is `[data-auth-slot]`: feature screens render their form inside it and inherit its width and surface.
-- `AppShell` (everything else, including the `*` catch-all): `BaseLayout` (skip link, banner with the only `h1`, `main`) and `<Outlet />`. It has no sidebar: navigation arrives with the features that need it, and an empty aside is not rendered. The showcase at `/dev/ui` is reached by URL only; nothing links to it. If the shell later gets signed-in-only chrome, move `*` to a neutral layout so a signed-out 404 does not show it.
+- `AppShell` (everything else, including the `*` catch-all): `BaseLayout` (skip link, banner with the only `h1`, `main`) and `<Outlet />`. It has no sidebar: navigation arrives with the features that need it, and an empty aside is not rendered. When `snapshot.status === 'authenticated'`, the banner displays the signed-in user's `displayName` and the `Cerrar sesión` action; signed-out views (including `*` 404) never render signed-in controls. The showcase at `/dev/ui` is reached by URL only; nothing links to it.
 
 Pages use `h2` for their title. The not found, forbidden and error views share `StatusView` (a decorative scene from `src/components/illustrations/scenes.tsx`, title, explanation, actions) and take the width of whichever layout hosts them.
 
@@ -37,6 +37,28 @@ The `/register` route (`src/app/pages/register-page.tsx`, rendering `RegisterFor
 ![Account registration desktop screen (1280px)](./assets/auth/register-1280.png)
 
 ![Account registration mobile screen (360px)](./assets/auth/register-360.png)
+
+## Login (`/login`)
+
+The `/login` route (`src/app/pages/login-page.tsx`, rendering `LoginForm` from `src/features/auth/login-form.tsx`) authenticates users through `SessionController.login()` while keeping return targets safe:
+
+- **Validation and error isolation:** `loginFormSchema` trims and lowercases `email` without trimming `password`, enforces the UTF-8 72-byte bcrypt ceiling, clears the password input on every submit outcome, and maps `LoginFailureReason` into centralized `es-AR` messages (`401` renders a generic credential error, while `429`, network, and unexpected failures remain distinct).
+- **Return target and navigation:** Shows contextual return notice when `?next=` passes `safeSessionRedirect`, and propagates only approved return targets to `/password-reset` and `/register` links via `buildAuthReturnHref`. See [threat-model.md](./threat-model.md) and [session lifecycle](./session-lifecycle.md) for details.
+
+![Login desktop screen (1280px)](./assets/auth/login-1280.png)
+
+![Login mobile screen (360px)](./assets/auth/login-360.png)
+
+## Password reset (`/password-reset`)
+
+The `/password-reset` route (`src/app/pages/password-reset-page.tsx`, rendering `PasswordResetForm` from `src/features/auth/password-reset-form.tsx`) switches between request mode and confirmation mode based on query parameters:
+
+- **Request mode (`/password-reset`):** Sends `POST /auth/password-reset/request` (`credentials: 'omit'`, `redirect: 'error'`) and displays an identical `role="status"` confirmation message for any accepted `202` submission without revealing account existence, focusing the confirmation heading for assistive technology.
+- **Confirmation mode (`/password-reset?token=<token>`):** Rejects empty, whitespace-only, overlong, or repeated `?token=` query parameters immediately without calling the API. Valid submissions send `POST /auth/password-reset/confirm` expecting `204 No Content`, clear the password input, separate expired/used `400` token rejections from policy validation and uncertain `429`/network/`5xx` outcomes, and focus the confirmation heading on success with a CTA back to `/login`.
+
+![Password reset desktop screen (1280px)](./assets/auth/password-reset-1280.png)
+
+![Password reset mobile screen (360px)](./assets/auth/password-reset-360.png)
 
 ## Guards
 

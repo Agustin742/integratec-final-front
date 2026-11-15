@@ -162,6 +162,26 @@ remains application-owned; its pending identity initialization is shared on remo
 - If renewal succeeds but `/users/me` returns a transient failure, a later explicit
   `initialize()` reuses the rotated credentials and verifies identity again.
 
+## User-facing authentication, recovery, and logout
+
+- `SessionController.login()` returns a discriminated `LoginResult`
+  (`{ ok: true, cleanupFailed } | { ok: false, cleanupFailed, reason: LoginFailureReason }`)
+  classifying failures as `invalid-credentials`, `rate-limited`, `network`, or
+  `unexpected`. `LoginForm` maps `invalid-credentials` to a generic credential message
+  while treating a `401` during `/users/me` verification as `unexpected`.
+- `createSessionMiddleware` buffers non-empty responses before the final epoch check and
+  passes `null` as the body when reconstructing null-body HTTP status responses (`204`,
+  `205`, `304`), preventing `TypeError` failures in browsers where empty streams expose a
+  non-null `ReadableStream` on endpoints such as `POST /auth/password-reset/confirm`.
+- `AppShell` renders the signed-in user's `displayName` and `Cerrar sesión` button only
+  when `snapshot.status === 'authenticated'`. Invoking `controller.logout()` distinguishes
+  confirmed revocation (`toast.success`) from unconfirmed local cleanup (`toast.warning`
+  when `!serverConfirmed || cleanupFailed`).
+- Password recovery (`requestPasswordReset` and `confirmPasswordReset`) validates inputs
+  with jitless Zod schemas, calls `POST /auth/password-reset/request` (`202`) and
+  `POST /auth/password-reset/confirm` (`204`) with `credentials: 'omit'` and
+  `redirect: 'error'`, and relies on non-enumerating request confirmation copy.
+
 ## Verification and remaining work
 
 Synthetic controlled-fetch tests exercise the public factory/controller/client:

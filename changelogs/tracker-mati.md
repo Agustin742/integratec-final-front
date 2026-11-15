@@ -2,12 +2,15 @@
 
 ## 2026-11-15 — Implement login, password reset, and logout screens (#28)
 
-- **Status:** in-progress
+- **Status:** in-progress (formatting and full verification pending)
 - **Area / files:** `docs/threat-model.md`, `src/session/`, `src/features/auth/`, `src/app/messages.ts`, `src/app/pages/login-page.tsx`, `src/app/pages/password-reset-page.tsx`, `src/app/router/`, `src/test/msw/handlers.ts`, `e2e/auth-session.spec.ts`, `docs/routing.md`, `docs/session-lifecycle.md`, `docs/assets/auth/`, `changelogs/tracker-mati.md`
-- **Change:** Started [issue #28](https://github.com/Agustin742/integratec-final-front/issues/28) (`HU-AUT-002`) on `feat/28-login-password-reset-logout` branched from `origin/develop` (`55e4e5a`). Marked prior `#27` entry as completed following PR #75 merge. Implementing login (`/login`), password reset request & confirmation (`/password-reset`), authenticated logout in `AppShell`, safe return-target preservation, typed `LoginFailureReason`, MSW handlers, tests, E2E coverage, screenshots, and documentation.
+- **Change:** Implemented [issue #28](https://github.com/Agustin742/integratec-final-front/issues/28) (`HU-AUT-002`) on `feat/28-login-password-reset-logout` in three reviewable work units:
+  1. Updated `docs/threat-model.md`, added `LoginFailureReason`/`LoginResult` and `verifySession` in `src/session/controller.ts`, added `src/app/router/return-target.ts` helpers (reused in `RegisterForm`), centralized `es-AR` auth/shell messages, added jitless Zod schemas & password-reset services, and added MSW auth handlers (`f8a78fe`).
+  2. Implemented `LoginForm`/`LoginPage`, wired authenticated `displayName` + `Cerrar sesión` toast-aware logout in `AppShell`, and added component/shell regression suites (`a0ae432`).
+  3. Implemented `PasswordResetForm`/`PasswordResetPage` (request & `?token=` confirm modes), fixed `createSessionMiddleware` null-body (`204`/`205`/`304`) reconstruction uncovered during browser testing (plus regression test in `src/session/middleware.test.ts`), added Playwright coverage (`e2e/auth-session.spec.ts`), captured `1280px`/`360px` screenshots under `docs/assets/auth/`, and updated `docs/routing.md` & `docs/session-lifecycle.md`.
 - **Reason:** Complete the user-facing session lifecycle screens and flows (`rules/authentication-and-session.md`, `rules/forms-and-validation.md`, `rules/error-handling-and-feedback.md`, `rules/security.md`).
-- **Verification:** Pending implementation and profile checks.
-- **Next step:** Complete Work Units 1–3, run full profile checks and blind audit (`rdd-auditor`), then request review before pushing.
+- **Verification:** Password-reset/routes unit checks (`36/36`), middleware checks (`27/27`), and `e2e/auth-session.spec.ts` (`10/10` desktop and mobile) passed; full profile checks and blind RDD audit pending.
+- **Next step:** Commit Work Unit 3, run full profile checks + `impeccable detect` + `rdd-auditor`, and stop for review before pushing.
 
 ## 2026-11-14 — Implement account registration and organizational path selection screen (#27)
 
