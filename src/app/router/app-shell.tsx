@@ -1,7 +1,10 @@
+import { useEffect, useRef, useState } from 'react';
 import { Outlet } from 'react-router';
 import { LoadingState } from '@/components/feedback/states';
 import { BaseLayout } from '@/components/layout/base-layout';
-import { Toast } from '@/components/ui/toast';
+import { Button } from '@/components/ui/button';
+import { Toast, toast } from '@/components/ui/toast';
+import { useSessionService, useSessionSnapshot } from '@/session/provider';
 import { messages } from '../messages';
 import { MAIN_CONTENT_ID } from './focus-on-navigation';
 
@@ -15,12 +18,77 @@ export const SHOWCASE_PATH = '/dev/ui';
  * features that need it, and an empty aside would only take space.
  */
 export function AppShell() {
+  const snapshot = useSessionSnapshot();
+  const { controller } = useSessionService();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const handleLogout = async () => {
+    if (isLoggingOut) {
+      return;
+    }
+    setIsLoggingOut(true);
+    try {
+      const result = await controller.logout();
+      if (result.serverConfirmed && !result.cleanupFailed) {
+        toast.success(messages.shell.logoutConfirmedTitle, {
+          id: 'session-logout',
+          description: messages.shell.logoutConfirmedBody,
+        });
+      } else {
+        toast.warning(messages.shell.logoutLocalOnlyTitle, {
+          id: 'session-logout',
+          description: messages.shell.logoutLocalOnlyBody,
+        });
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setIsLoggingOut(false);
+      }
+    }
+  };
+
   return (
     <>
       <BaseLayout
         mainId={MAIN_CONTENT_ID}
         header={
-          <h1 className="text-2xl font-bold text-primary">{messages.title}</h1>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-2xl font-bold text-primary">
+              {messages.title}
+            </h1>
+            {snapshot.status === 'authenticated' && (
+              <div className="flex min-w-0 flex-wrap items-center gap-3">
+                <p className="min-w-0 text-sm text-muted-foreground">
+                  <span className="sr-only">
+                    {messages.shell.signedInAsPrefix}{' '}
+                  </span>
+                  <span className="font-semibold text-foreground">
+                    {snapshot.user.displayName}
+                  </span>
+                </p>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="min-h-11"
+                  busy={isLoggingOut}
+                  onClick={() => void handleLogout()}
+                >
+                  {isLoggingOut
+                    ? messages.shell.loggingOutAction
+                    : messages.shell.logoutAction}
+                </Button>
+              </div>
+            )}
+          </div>
         }
       >
         <Outlet />
