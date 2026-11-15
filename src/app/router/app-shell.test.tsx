@@ -278,6 +278,61 @@ describe('AppShell logout control (#28)', () => {
     expect(laterMeAuth).toBeNull();
   });
 
+  test('rapid double click on logout sends one non-aborted request and confirms once', async () => {
+    let logoutCalls = 0;
+    let aborted = false;
+    let releaseLogout: (() => void) | undefined;
+
+    mswServer.use(
+      createOwnProfileHandler({ response: { displayName: 'Ana López' } }),
+      http.post(`${TEST_API_BASE_URL}/auth/logout`, ({ request }) => {
+        logoutCalls += 1;
+        request.signal.addEventListener('abort', () => {
+          aborted = true;
+        });
+        return new Promise<Response>((resolve) => {
+          releaseLogout = () => resolve(new Response(null, { status: 204 }));
+        });
+      }),
+    );
+
+    const session = seedTabOwnedSession('tab-logout-double-click');
+    const router = createMemoryRouter(createAppRoutes(), {
+      initialEntries: ['/'],
+    });
+    render(
+      <SessionProvider service={session}>
+        <RouterProvider router={router} />
+      </SessionProvider>,
+    );
+
+    await heading(messages.pages.home.title);
+
+    const logoutButton = within(screen.getByRole('banner')).getByRole(
+      'button',
+      {
+        name: messages.shell.logoutAction,
+      },
+    );
+    fireEvent.click(logoutButton);
+    fireEvent.click(logoutButton);
+
+    await waitFor(() => expect(logoutCalls).toBe(1));
+    expect(aborted).toBe(false);
+
+    releaseLogout?.();
+
+    await heading(messages.pages.login.title);
+    expect(
+      await screen.findByText(messages.shell.logoutConfirmedTitle),
+    ).toBeVisible();
+    expect(
+      screen.queryByText(messages.shell.logoutLocalOnlyTitle),
+    ).not.toBeInTheDocument();
+    expect(logoutCalls).toBe(1);
+    expect(aborted).toBe(false);
+  });
+
   test.each(['service-unavailable', 'network'] as const)(
     'unconfirmed logout (%s) clears local session and cache while warning without claiming remote revocation',
     async (failureMode) => {

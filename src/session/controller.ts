@@ -92,6 +92,8 @@ export function createSession(options: SessionOptions = {}): SessionService {
   let refreshing: Promise<void> | undefined;
   let refreshUnauthorized = false;
   let initializing: Promise<void> | undefined;
+  let loggingOut:
+    Promise<{ serverConfirmed: boolean; cleanupFailed: boolean }> | undefined;
   let cleanupFailed = false;
   const listeners = new Set<() => void>();
   const cleanups = new Set<() => void>();
@@ -124,6 +126,7 @@ export function createSession(options: SessionOptions = {}): SessionService {
     abort = new AbortController();
     refreshing = undefined;
     initializing = undefined;
+    loggingOut = undefined;
     cleanupFailed = false;
     if (clear) {
       credentials = undefined;
@@ -306,21 +309,30 @@ export function createSession(options: SessionOptions = {}): SessionService {
         };
       }
     },
-    async logout() {
+    logout() {
+      if (loggingOut) return loggingOut;
       const accessToken = credentials?.accessToken;
       transition('unauthenticated', true);
       const expectedEpoch = epoch;
       const transitionCleanupFailed = cleanupFailed;
-      let serverConfirmed = false;
-      if (accessToken) {
-        try {
-          await auth.logout(accessToken, abort.signal);
-          serverConfirmed = epoch === expectedEpoch;
-        } catch {
-          /* Local logout remains complete; server invalidation is unconfirmed. */
+      const pending = (async () => {
+        let serverConfirmed = false;
+        if (accessToken) {
+          try {
+            await auth.logout(accessToken, abort.signal);
+            serverConfirmed = epoch === expectedEpoch;
+          } catch {
+            /* Local logout remains complete; server invalidation is unconfirmed. */
+          }
         }
-      }
-      return { serverConfirmed, cleanupFailed: transitionCleanupFailed };
+        return { serverConfirmed, cleanupFailed: transitionCleanupFailed };
+      })();
+      loggingOut = pending;
+      const release = () => {
+        if (loggingOut === pending) loggingOut = undefined;
+      };
+      void pending.then(release, release);
+      return pending;
     },
   };
   return { controller, client };

@@ -279,6 +279,38 @@ describe('session lifecycle public boundary', () => {
     expect(h.storage.getItem(storageKey)).toBeNull();
   });
 
+  test('concurrent logout calls share the in-flight request without aborting it', async () => {
+    const pending = deferred<Response>();
+    let aborted = false;
+    const h = harness((request) => {
+      if (request.url.endsWith('/auth/logout')) {
+        request.signal.addEventListener('abort', () => {
+          aborted = true;
+        });
+        return pending.promise;
+      }
+      return json(profile);
+    }, saved());
+    const { controller } = createSession(h);
+    await controller.initialize();
+
+    const first = controller.logout();
+    const second = controller.logout();
+
+    expect(first).toBe(second);
+    expect(
+      h.requests.filter((request) => request.url.endsWith('/auth/logout')),
+    ).toHaveLength(1);
+    expect(aborted).toBe(false);
+
+    pending.resolve(new Response(null, { status: 204 }));
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { serverConfirmed: true, cleanupFailed: false },
+      { serverConfirmed: true, cleanupFailed: false },
+    ]);
+    expect(aborted).toBe(false);
+  });
+
   test('late login cannot replace a newer account', async () => {
     const old = deferred<Response>();
     let logins = 0;

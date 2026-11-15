@@ -21,6 +21,7 @@ export function AppShell() {
   const snapshot = useSessionSnapshot();
   const { controller } = useSessionService();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const isLoggingOutRef = useRef(false);
   const isMountedRef = useRef(true);
 
   useEffect(() => {
@@ -31,9 +32,10 @@ export function AppShell() {
   }, []);
 
   const handleLogout = async () => {
-    if (isLoggingOut) {
+    if (isLoggingOutRef.current) {
       return;
     }
+    isLoggingOutRef.current = true;
     setIsLoggingOut(true);
     try {
       const result = await controller.logout();
@@ -49,6 +51,7 @@ export function AppShell() {
         });
       }
     } finally {
+      isLoggingOutRef.current = false;
       if (isMountedRef.current) {
         setIsLoggingOut(false);
       }
