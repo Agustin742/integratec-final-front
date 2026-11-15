@@ -1,5 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { useEffect, useId, useRef, useState, type MouseEvent } from 'react';
+import { Link, useLocation, useSearchParams } from 'react-router';
 import { ApiError } from '@/api/errors';
 import {
   buildAuthReturnHref,
@@ -59,6 +59,10 @@ function SectionHeader({
 interface ModeViewProps {
   readonly title: string;
   readonly searchParams: URLSearchParams;
+}
+
+interface TokenModeViewProps extends ModeViewProps {
+  readonly onRequestNewLink: (event: MouseEvent<HTMLAnchorElement>) => void;
 }
 
 function PasswordResetRequestView({ title, searchParams }: ModeViewProps) {
@@ -187,7 +191,11 @@ function PasswordResetRequestView({ title, searchParams }: ModeViewProps) {
   );
 }
 
-function InvalidResetTokenView({ title, searchParams }: ModeViewProps) {
+function InvalidResetTokenView({
+  title,
+  searchParams,
+  onRequestNewLink,
+}: TokenModeViewProps) {
   const copy = authMessages.passwordReset.confirm;
   const headingId = useId();
   const requestNewHref = buildAuthReturnHref(PASSWORD_RESET_PATH, searchParams);
@@ -204,7 +212,11 @@ function InvalidResetTokenView({ title, searchParams }: ModeViewProps) {
         <AlertDescription>{copy.invalidToken.body}</AlertDescription>
       </Alert>
 
-      <Link to={requestNewHref} className={primaryCtaLinkClass}>
+      <Link
+        to={requestNewHref}
+        className={primaryCtaLinkClass}
+        onClick={onRequestNewLink}
+      >
         {copy.actions.requestNewLink}
       </Link>
 
@@ -221,7 +233,8 @@ function PasswordResetConfirmView({
   title,
   token,
   searchParams,
-}: ModeViewProps & { readonly token: string }) {
+  onRequestNewLink,
+}: TokenModeViewProps & { readonly token: string }) {
   const { client } = useSessionService();
   const [confirmed, setConfirmed] = useState(false);
   const [tokenRejected, setTokenRejected] = useState(false);
@@ -352,6 +365,7 @@ function PasswordResetConfirmView({
           className={
             tokenRejected ? primaryCtaLinkClass : secondaryTextLinkClass
           }
+          onClick={onRequestNewLink}
         >
           {copy.actions.requestNewLink}
         </Link>
@@ -363,15 +377,86 @@ function PasswordResetConfirmView({
   );
 }
 
+type ResetRouteState =
+  | { readonly mode: 'request' }
+  | { readonly mode: 'invalid' }
+  | { readonly mode: 'confirm'; readonly token: string };
+
+function parseResetRouteState(searchParams: URLSearchParams): ResetRouteState {
+  if (!searchParams.has('token')) {
+    return { mode: 'request' };
+  }
+  const rawTokens = searchParams.getAll('token');
+  const parsedToken =
+    rawTokens.length === 1 ? resetTokenSchema.safeParse(rawTokens[0]) : null;
+  if (!parsedToken?.success) {
+    return { mode: 'invalid' };
+  }
+  return { mode: 'confirm', token: parsedToken.data };
+}
+
+function areResetRouteStatesEqual(
+  left: ResetRouteState,
+  right: ResetRouteState,
+): boolean {
+  if (left.mode !== right.mode) {
+    return false;
+  }
+  if (left.mode === 'confirm' && right.mode === 'confirm') {
+    return left.token === right.token;
+  }
+  return true;
+}
+
 export interface PasswordResetFormProps {
   readonly title: string;
 }
 
 export function PasswordResetForm({ title }: PasswordResetFormProps) {
-  const [searchParams] = useSearchParams();
-  const hasTokenParam = searchParams.has('token');
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Latch ?token= into component state before removing it from the URL so the
+  // secret does not persist in location history or Referer headers (TM-006).
+  // Key latching to location.key ensures an explicit reset back to request mode
+  // is not overwritten while the replace-navigation transition is still settling.
+  const [latchedLocationKey, setLatchedLocationKey] = useState(location.key);
+  const [routeState, setRouteState] = useState<ResetRouteState>(() =>
+    parseResetRouteState(searchParams),
+  );
 
-  if (!hasTokenParam) {
+  if (location.key !== latchedLocationKey) {
+    setLatchedLocationKey(location.key);
+    if (searchParams.has('token')) {
+      const incomingState = parseResetRouteState(searchParams);
+      if (!areResetRouteStatesEqual(routeState, incomingState)) {
+        setRouteState(incomingState);
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!searchParams.has('token')) {
+      return;
+    }
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('token');
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const handleRequestNewLink = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+    setRouteState({ mode: 'request' });
+  };
+
+  if (routeState.mode === 'request') {
     return (
       <PasswordResetRequestView
         key="request"
@@ -381,26 +466,24 @@ export function PasswordResetForm({ title }: PasswordResetFormProps) {
     );
   }
 
-  const rawTokens = searchParams.getAll('token');
-  const parsedToken =
-    rawTokens.length === 1 ? resetTokenSchema.safeParse(rawTokens[0]) : null;
-
-  if (!parsedToken?.success) {
+  if (routeState.mode === 'invalid') {
     return (
       <InvalidResetTokenView
         key="invalid-token"
         title={title}
         searchParams={searchParams}
+        onRequestNewLink={handleRequestNewLink}
       />
     );
   }
 
   return (
     <PasswordResetConfirmView
-      key={parsedToken.data}
+      key={routeState.token}
       title={title}
-      token={parsedToken.data}
+      token={routeState.token}
       searchParams={searchParams}
+      onRequestNewLink={handleRequestNewLink}
     />
   );
 }

@@ -224,12 +224,14 @@ describe('PasswordResetPage (/password-reset)', () => {
       }),
     );
 
-    const { container } = renderPasswordResetRoute(
+    const { container, router } = renderPasswordResetRoute(
       '/password-reset?token=opaque-reset-token-123&next=%2F',
     );
     const passwordInput = (await screen.findByLabelText(
       authMessages.passwordReset.confirm.fields.newPassword.label,
     )) as HTMLInputElement;
+
+    await waitFor(() => expect(router.state.location.search).toBe('?next=%2F'));
 
     expect(
       screen.getByText(
@@ -333,9 +335,10 @@ describe('PasswordResetPage (/password-reset)', () => {
         }),
       );
 
-      renderPasswordResetRoute(malformedUrl);
+      const { router } = renderPasswordResetRoute(malformedUrl);
 
       const alert = await screen.findByRole('alert');
+      await waitFor(() => expect(router.state.location.search).toBe(''));
       expect(alert).toHaveTextContent(
         authMessages.passwordReset.confirm.invalidToken.title,
       );
@@ -347,12 +350,18 @@ describe('PasswordResetPage (/password-reset)', () => {
           authMessages.passwordReset.confirm.fields.newPassword.label,
         ),
       ).not.toBeInTheDocument();
-      expect(
-        screen.getByRole('link', {
-          name: authMessages.passwordReset.confirm.actions.requestNewLink,
-        }),
-      ).toHaveAttribute('href', '/password-reset');
+      const requestNewLink = screen.getByRole('link', {
+        name: authMessages.passwordReset.confirm.actions.requestNewLink,
+      });
+      expect(requestNewLink).toHaveAttribute('href', '/password-reset');
       expect(apiCalls).toBe(0);
+
+      fireEvent.click(requestNewLink);
+      expect(
+        await screen.findByLabelText(
+          authMessages.passwordReset.request.fields.email.label,
+        ),
+      ).toBeVisible();
     },
   );
 

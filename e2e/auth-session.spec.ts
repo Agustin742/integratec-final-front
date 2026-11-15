@@ -245,6 +245,8 @@ test('completes password reset request and token confirmation flows', async ({
   const passwordInput = page.getByLabel(
     authMessages.passwordReset.confirm.fields.newPassword.label,
   );
+  await expect(passwordInput).toBeVisible();
+  await expect(page).toHaveURL(/\/password-reset$/);
   await passwordInput.fill('NuevaClave123!');
   await page
     .getByRole('button', {
