@@ -10,7 +10,6 @@ import {
   vi,
 } from 'vitest';
 import { createApiClient } from '@/api/client';
-import { ApiError } from '@/api/errors';
 import { apiErrorMessages } from '@/api/messages';
 import {
   TEST_API_BASE_URL,
@@ -553,7 +552,14 @@ describe('registerAccount & createRegisterHandler', () => {
         email: 'ana@example.com',
         password: 'ClaveSegura123',
       }),
-    ).rejects.toBeInstanceOf(ApiError);
+    ).rejects.toMatchObject({
+      kind: 'network',
+      status: null,
+      userMessage: authMessages.errors.networkUncertain,
+    });
+    expect(authMessages.errors.networkUncertain).not.toBe(
+      apiErrorMessages.network,
+    );
 
     const controller = new AbortController();
     controller.abort();

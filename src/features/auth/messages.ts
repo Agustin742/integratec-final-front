@@ -91,6 +91,8 @@ export const authMessages = {
       'La respuesta del servidor no coincide con el formato esperado. No pudimos confirmar si se completó el registro; probá iniciar sesión con tu correo antes de volver a enviar el formulario.',
     unexpected:
       'No pudimos confirmar si se completó el registro por un error inesperado. Probá iniciar sesión con tu correo antes de volver a enviar el formulario.',
+    networkUncertain:
+      'No pudimos confirmar si se completó el registro por una falla de conexión. Probá iniciar sesión con tu correo antes de volver a enviar el formulario.',
   },
   confirmed: {
     title: 'Cuenta creada',

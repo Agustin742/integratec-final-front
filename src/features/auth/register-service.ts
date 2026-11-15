@@ -124,7 +124,22 @@ export async function registerAccount(
     if (isAbortError(cause)) {
       throw cause;
     }
-    throw mapNetworkError(cause);
+    // Network failures during registration are outcome-uncertain: the server
+    // may have created the account even though the response never arrived, so
+    // the message must not claim the write did not happen. Guidance matches
+    // unexpected errors: reconcile via login before resubmitting
+    // (rules/error-handling-and-feedback.md).
+    const networkError = mapNetworkError(cause);
+    throw new ApiError({
+      kind: 'network',
+      status: networkError.status,
+      code: networkError.code,
+      userMessage: authMessages.errors.networkUncertain,
+      details: networkError.details,
+      fieldErrors: networkError.fieldErrors,
+      correlationId: networkError.correlationId,
+      cause,
+    });
   }
 
   if (result.error !== undefined || !result.response.ok) {

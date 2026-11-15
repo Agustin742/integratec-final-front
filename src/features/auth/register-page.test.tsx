@@ -489,7 +489,7 @@ describe('RegisterPage (/register)', () => {
     expect(passwordInput.value).toBe('');
   });
 
-  test('shows network error on transport failure, keeps form editable, and clears password', async () => {
+  test('shows uncertainty-aware network error without claiming the write did not happen, keeps form editable, and clears password', async () => {
     mswServer.use(
       http.post(`${TEST_API_BASE_URL}/auth/register`, () =>
         HttpResponse.error(),
@@ -518,11 +518,19 @@ describe('RegisterPage (/register)', () => {
     );
 
     await waitFor(() => {
-      expect(
-        within(main).getByText(apiErrorMessages.network),
-      ).toBeInTheDocument();
+      const alertText = within(main).getByText(
+        authMessages.errors.networkUncertain,
+      );
+      expect(alertText).toBeInTheDocument();
+      expect(alertText.textContent).toMatch(
+        /No pudimos confirmar si se completó el registro/,
+      );
+      expect(alertText.textContent).toMatch(/probá iniciar sesión/i);
     });
 
+    expect(
+      within(main).queryByText(apiErrorMessages.network),
+    ).not.toBeInTheDocument();
     expect(within(main).queryByRole('status')).not.toBeInTheDocument();
     expect(emailInput.value).toBe('lucia@example.com');
     expect(passwordInput.value).toBe('');
