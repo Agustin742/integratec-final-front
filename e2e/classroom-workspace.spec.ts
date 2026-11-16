@@ -192,6 +192,74 @@ for (const status of [403, 404]) {
   });
 }
 
+test('default panel entry traps focus, closes to its classroom and fits the viewport', async ({
+  page,
+}, testInfo) => {
+  const width = testInfo.project.name === 'mobile' ? 360 : 1280;
+  await page.setViewportSize({ width, height: 800 });
+  await page.route(classroomURL, (route) => route.fulfill({ json: classroom }));
+  await page.goto(`${entry}/panels/grades`);
+  const dialog = page.getByRole('dialog', {
+    name: 'Calificaciones',
+    exact: true,
+  });
+  await expect(dialog).toBeVisible();
+  await expect(
+    dialog.getByText('Funcionalidad pendiente', { exact: true }),
+  ).toBeVisible();
+  const close = dialog.getByRole('button', { name: 'Cerrar', exact: true });
+  await expect(close).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(close).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(close).toBeFocused();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: `docs/assets/classroom-panels/entry-${width}.png`,
+    fullPage: true,
+  });
+  await page.evaluate(() => {
+    document.documentElement.style.zoom = '2';
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  // Zoom can require scrolling within the existing bounded dialog.
+  await close.scrollIntoViewIfNeeded();
+  await expect(close).toBeInViewport();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL(new RegExp(`/classrooms/${classroomId}$`));
+  await expect(heading(page, classroom.name)).toBeFocused();
+});
+
+for (const key of ['settings', 'pet', 'unknown']) {
+  test(`default catalog denies unavailable or reserved ${key}`, async ({
+    page,
+  }) => {
+    await page.route(classroomURL, (route) =>
+      route.fulfill({
+        json: {
+          ...classroom,
+          availablePanels: [...classroom.availablePanels, 'pet'],
+        },
+      }),
+    );
+    await page.goto(`${entry}/panels/${key}`);
+    await expect(heading(page, messages.pages.notFound.title)).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(
+      page.getByText('Funcionalidad pendiente', { exact: true }),
+    ).toHaveCount(0);
+  });
+}
+
 test('recovers through the actual retry control', async ({ page }) => {
   let requests = 0;
   await page.route(classroomURL, (route) => {

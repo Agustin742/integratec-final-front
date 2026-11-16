@@ -142,7 +142,7 @@ function ScopedPanels(props: ClassroomPanelsProps) {
         >
           <DialogContent
             key={descriptor.key}
-            className="[overflow-wrap:anywhere]"
+            className="max-h-[calc(100%-2rem)] [overflow-wrap:anywhere]"
             onCloseAutoFocus={(event) => {
               event.preventDefault();
               if (!focusIfUsable(active.invoker))

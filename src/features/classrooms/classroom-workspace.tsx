@@ -7,6 +7,7 @@ import { ErrorState, LoadingState } from '@/components/feedback/states';
 import { classroomMessages as messages } from './messages';
 import { useClassroomContext } from './use-classroom-capabilities';
 import { useClassroomContextEvents } from './use-classroom-context-events';
+import { classroomPanelCatalog } from './panels/classroom-panel-catalog';
 import {
   ClassroomPanelsProvider,
   type PanelDescriptor,
@@ -16,9 +17,9 @@ type WorkspacePanel = PanelDescriptor & {
   key: components['schemas']['ClassroomPanelKey'];
 };
 type WorkspaceProps = { panels?: readonly WorkspacePanel[] };
-const EMPTY_PANELS: readonly WorkspacePanel[] = [];
-
-export function ClassroomWorkspace({ panels = EMPTY_PANELS }: WorkspaceProps) {
+export function ClassroomWorkspace({
+  panels = classroomPanelCatalog,
+}: WorkspaceProps) {
   const { classroomId } = useParams();
   const safeFocus = useRef<HTMLDivElement>(null);
   return (

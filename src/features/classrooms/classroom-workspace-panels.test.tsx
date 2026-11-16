@@ -27,7 +27,11 @@ function Consumer() {
     </button>
   );
 }
-function setup(availablePanels: unknown = ['grades'], path = '/classrooms/a') {
+function setup(
+  availablePanels: unknown = ['grades'],
+  path = '/classrooms/a',
+  productionCatalog = false,
+) {
   let availability = availablePanels;
   let status = 200;
   let stream: ReadableStreamDefaultController<Uint8Array> | undefined;
@@ -86,7 +90,11 @@ function setup(availablePanels: unknown = ['grades'], path = '/classrooms/a') {
     [
       {
         path: '/classrooms/:classroomId',
-        element: <ClassroomWorkspace panels={panels} />,
+        element: productionCatalog ? (
+          <ClassroomWorkspace />
+        ) : (
+          <ClassroomWorkspace panels={panels} />
+        ),
         children: [
           { index: true, Component: Consumer },
           { path: 'panels/:panelKey', Component: ClassroomPanelRoute },
@@ -134,6 +142,83 @@ function setup(availablePanels: unknown = ['grades'], path = '/classrooms/a') {
     },
   };
 }
+const catalogCases = [
+  ['activities', 'Actividades'],
+  ['material', 'Material'],
+  ['grades', 'Calificaciones'],
+  ['chat', 'Chat'],
+  ['notices', 'Avisos'],
+  ['shop', 'Tienda'],
+  ['bot', 'Asistente de estudio'],
+  ['members', 'Integrantes'],
+  ['settings', 'Configuración'],
+] as const;
+
+test.each(catalogCases)(
+  'default catalog opens %s by URL with honest pending content and no action capabilities',
+  async (key, title) => {
+    const view = setup([key], `/classrooms/a/panels/${key}`, true);
+    const dialog = await screen.findByRole('dialog', { name: title });
+    expect(dialog).toHaveTextContent('Funcionalidad pendiente');
+    expect(dialog).toHaveTextContent(
+      'Este panel todavía no incluye su contenido. Podés cerrarlo y volver al aula.',
+    );
+    expect(dialog).not.toHaveTextContent('Synthetic');
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+    await screen.findByRole('button', { name: 'Open grades' });
+    expect(view.router.state.location.pathname).toBe('/classrooms/a');
+    expect(view.router.state.historyAction).toBe('REPLACE');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(document.activeElement).toHaveTextContent('Classroom a');
+  },
+);
+
+test.each([
+  [[], 'grades'],
+  [['pet'], 'pet'],
+  [['unknown'], 'unknown'],
+  [undefined, 'settings'],
+  [['settings', 42], 'settings'],
+])(
+  'default catalog denies %j for %s without exposing a panel',
+  async (keys, key) => {
+    setup(keys, `/classrooms/a/panels/${key}`, true);
+    await screen.findByRole('heading', { name: 'Página no encontrada' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Funcionalidad pendiente'),
+    ).not.toBeInTheDocument();
+  },
+);
+
+test('default catalog shares controller opening and closes immediately on revoked availability', async () => {
+  const view = setup(['grades'], '/classrooms/a', true);
+  const trigger = await screen.findByRole('button', { name: 'Open grades' });
+  trigger.focus();
+  fireEvent.click(trigger);
+  await screen.findByRole('dialog', { name: 'Calificaciones' });
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+  await waitFor(() => expect(trigger).toHaveFocus());
+  fireEvent.click(trigger);
+  await screen.findByRole('dialog');
+  await view.refresh([]);
+  await waitFor(() =>
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+  );
+  await view.refresh(['grades']);
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test('default catalog drops an open panel when the classroom changes', async () => {
+  const view = setup(['grades'], '/classrooms/a/panels/grades', true);
+  await screen.findByRole('dialog', { name: 'Calificaciones' });
+  await act(() => view.router.navigate('/classrooms/b'));
+  await screen.findByRole('heading', { name: 'Classroom b' });
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(screen.queryByText('Classroom a')).not.toBeInTheDocument();
+  expect(view.router.state.location.pathname).toBe('/classrooms/b');
+});
+
 test('SSE hint immediately removes private panel and guards until fresh REST confirmation', async () => {
   const view = setup();
   await open();

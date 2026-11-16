@@ -1,12 +1,12 @@
 # Classroom context foundation
 
-`/classrooms/:classroomId` is a protected, context-only entry. It displays the server's classroom name and resolved role, without panel links or classroom tools. A returned parent context gets the same neutral metadata, not a new parent classroom experience. This slice does **not** complete #26.
+`/classrooms/:classroomId` is a protected, context-only entry. It displays the server's classroom name and resolved role, without panel links or classroom tools. A returned parent context gets the same neutral metadata, not a new parent classroom experience. The production panel entry catalog now follows the [approved #26 scope reconciliation](./classroom-panels.md#approved-scope-reconciliation); panel business functionality remains outside this workspace foundation.
 
 ## Data and lifecycle
 
 - `useClassroomContext` and the existing capability-only hook share `GET /classrooms/{id}` and `classroomDetailQueryKey(userId, classroomId)` in `src/features/classrooms/use-classroom-capabilities.ts`. There is no persisted role, permission mapping, or second authoritative cache.
 - The ready context contains the generated GET-only `ClassroomContextResponseDto`. The shell passes that DTO to its `Outlet`, including `adultMode`, `chatMuted`, `collaborationLocked`, `gamesDisabled`, server capabilities and `availablePanels`. The nested `/classrooms/:classroomId/panels/:panelKey` route submits a one-shot intent through that same registry; unknown, unavailable and unregistered keys share the not-found view.
-- The workspace mounts the [panel provider](./classroom-panels.md) using only server `availablePanels`, never a role-to-panel or capability-to-panel map. Real panel components can be registered through its typed `panels` prop; the default registry is empty. Missing/malformed availability denies opening. An observed refresh failure unmounts the panel host; account/classroom switches discard its state.
+- The workspace mounts the [panel provider](./classroom-panels.md) using only server `availablePanels`, never a role-to-panel or capability-to-panel map. The default registry provides nine minimum pending-content entries. Real panel components can replace that catalog through its typed `panels` prop; `pet` remains reserved and unregistered. Missing/malformed availability denies opening. An observed refresh failure unmounts the panel host; account/classroom switches discard its state.
 - Query cancellation reaches the supported request `signal`. Changing classroom/user scopes isolates responses; pending states contain no previous classroom. The shell keys its subtree by user and classroom so future local child state is released on a scope change. URL intents are consumed once per navigation, outside the private subtree: REST reloads and account changes cannot reopen an old intent. Closing a URL-opened dialog replaces the URL with the encoded classroom workspace path, rather than going back to an unrelated history entry.
 - Signed-out snapshots expose no context. The existing session provider owns private-cache teardown; this hook does not replace session cleanup.
 - Initial loading uses the shared loading state. Both 403 and 404 at this entry show the same not-found view without confirming existence. Other errors offer a retry. Any observed failed refresh removes confirmed context, even while a bounded automatic retry is pending. The existing capability guard retains its distinct 403/404 policy.
@@ -56,6 +56,6 @@ Synthetic component tests cover loading, server name/parent metadata, exact Outl
 
 ## Deferred
 
-Product panel registration/navigation and content, 2D/3D experiences, and parent tools are not delivered. B/SSE invalidation is consumed, but this slice promises no globally instantaneous propagation. Login return destinations remain restricted to `/`.
+Panel business content, 2D/3D navigation/layout/objects, and parent tools are not delivered. Panel registration and nested URL opening are provided; the human-approved minimum entries explicitly identify their content as pending. B/SSE invalidation is consumed, but this slice promises no globally instantaneous propagation. Login return destinations remain restricted to `/`.
 
 See [routing](./routing.md), [state ownership](../rules/state-management.md), and [classroom authority](../rules/classrooms-and-roles.md).
