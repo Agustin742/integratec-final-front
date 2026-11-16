@@ -22,6 +22,11 @@ export function selectionIntent(
   return undefined;
 }
 
+/**
+ * Reserved helper for a future non-DOM raycast selection path; it currently
+ * has no production caller, so keep it tested but treat new uses as a
+ * deliberate API decision.
+ */
 export function raycastInteractables(
   raycaster: Raycaster,
   roots: ReadonlyMap<Object3D, string>,

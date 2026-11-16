@@ -1,5 +1,6 @@
 import {
   Component,
+  Suspense,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -34,7 +35,9 @@ class SceneBoundary extends Component<
     this.props.onError();
   }
   render() {
-    return this.state.failed ? <WorldFallback /> : this.props.children;
+    // The host owner renders the shared fallback when `onError` fires;
+    // rendering its own would mount the status node twice.
+    return this.state.failed ? null : this.props.children;
   }
 }
 
@@ -87,9 +90,12 @@ export function WorldCanvas({ children, label }: WorldCanvasProps) {
       );
     };
     if (element && typeof IntersectionObserver !== 'undefined') {
-      observer = new IntersectionObserver(([entry]) =>
-        setVisible(entry.isIntersecting),
-      );
+      // Fast scrolling can queue several entries per callback; only the
+      // newest describes the current geometry.
+      observer = new IntersectionObserver((entries) => {
+        const newest = entries[entries.length - 1];
+        if (newest) setVisible(newest.isIntersecting);
+      });
       observer.observe(element);
     } else {
       checkBounds();
@@ -158,7 +164,10 @@ export function WorldCanvas({ children, label }: WorldCanvasProps) {
                 onCreated={({ gl }) => setCanvas(gl.domElement)}
               >
                 <CameraFraming />
-                {children}
+                {/* Keep future loader suspensions inside the R3F subtree
+                    instead of rethrowing past Canvas and replacing the whole
+                    section with the outer loading fallback. */}
+                <Suspense fallback={null}>{children}</Suspense>
               </Canvas>
             </div>
           </SceneBoundary>

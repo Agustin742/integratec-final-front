@@ -1,5 +1,5 @@
-import { useId, useRef, useState } from 'react';
-import { Group } from 'three';
+import { useEffect, useId, useRef, useState } from 'react';
+import { Group, type Object3D } from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import { Button } from '@/components/ui/button';
 import { WorldCanvas } from './world-canvas';
@@ -12,12 +12,14 @@ function ReferenceGeometry({
   onIntent: (intent: WorldIntent) => void;
 }) {
   const target = useRef<Group>(null);
+  // Built once instead of per click: the handler lives on the target group
+  // itself, so ancestry only needs the single registered root.
+  const roots = useRef(new Map<Object3D, string>());
+  useEffect(() => {
+    if (target.current) roots.current.set(target.current, 'reference-2m');
+  }, []);
   const onSelect = (event: ThreeEvent<MouseEvent>) => {
-    if (!target.current) return;
-    const intent = selectionIntent(
-      event.object,
-      new Map([[target.current, 'reference-2m']]),
-    );
+    const intent = selectionIntent(event.object, roots.current);
     if (intent) {
       event.stopPropagation();
       onIntent(intent);

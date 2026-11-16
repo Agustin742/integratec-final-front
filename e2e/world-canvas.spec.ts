@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { OrthographicCamera, Vector3 } from 'three';
 import { frameCamera } from '../src/features/world/camera';
+import { worldMessages as copy } from '../src/features/world/messages';
 
 // The selectable reference capsule sits at world (1.5, 1, 0) with radius 0.3
 // (world-reference.tsx) and the host camera framing is deterministic, so the
@@ -21,9 +22,10 @@ async function capsulePosition(canvas: Locator) {
 }
 
 async function openReference(page: Page) {
-  await page.goto('/dev/ui');
+  // Relative navigation preserves any PLAYWRIGHT_BASE_URL path prefix.
+  await page.goto('./dev/ui');
   const region = page.getByRole('region', {
-    name: 'Vista isométrica de referencia',
+    name: copy.canvas,
   });
   await region.scrollIntoViewIfNeeded();
   const canvas = region.locator('canvas');
@@ -47,15 +49,9 @@ test('renders actual WebGL with DOM keyboard/touch access and no horizontal over
 }, info) => {
   await page.setViewportSize({ width: isMobile ? 360 : 1280, height: 800 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  const idle = page.getByText(
-    'Seleccioná la referencia alta o usá el botón. No hay navegación ni acciones del aula.',
-  );
-  const selected = page.getByText(
-    'Referencia de 2 m seleccionada. Es una intención local, sin cambios guardados.',
-  );
-  const button = page.getByRole('button', {
-    name: 'Seleccionar referencia de 2 m',
-  });
+  const idle = page.getByText(copy.idle);
+  const selected = page.getByText(copy.selected);
+  const button = page.getByRole('button', { name: copy.select });
 
   // Keyboard activation from a verifiably idle state.
   const { region } = await openReference(page);
@@ -88,7 +84,7 @@ test('renders actual WebGL with DOM keyboard/touch access and no horizontal over
     ),
   ).toBe(true);
   await page
-    .getByRole('heading', { name: 'Referencia técnica 3D' })
+    .getByRole('heading', { name: copy.title })
     .locator('..')
     .screenshot({ path: `odd/previews/world-canvas/${info.project.name}.png` });
 });
@@ -112,14 +108,12 @@ test('handles unavailable WebGL creation without an uncaught page failure', asyn
       },
     });
   });
-  await page.goto('/dev/ui');
+  await page.goto('./dev/ui');
   const region = page.getByRole('region', {
-    name: 'Vista isométrica de referencia',
+    name: copy.canvas,
   });
   await region.scrollIntoViewIfNeeded();
-  await expect(region.getByRole('status')).toContainText(
-    'La vista 3D no está disponible',
-  );
+  await expect(region.getByRole('status')).toContainText(copy.unavailable);
   await expect(region.locator('canvas')).toHaveCount(0);
   expect(failures).toEqual([]);
 });
@@ -137,20 +131,10 @@ test('replaces a lost WebGL context with a truthful accessible fallback', async 
     return true;
   });
   test.skip(!supported, 'WEBGL_lose_context is unavailable on this browser');
-  await expect(region.getByRole('status')).toContainText(
-    'La vista 3D no está disponible',
-  );
-  await expect(region.getByRole('status')).toContainText(
-    'El modo clásico 2D todavía no está disponible',
-  );
+  await expect(region.getByRole('status')).toContainText(copy.unavailable);
+  await expect(region.getByRole('status')).toContainText(copy.alternative);
   await expect(region.locator('canvas')).toHaveCount(0);
   await expect(region.getByRole('link')).toHaveCount(0);
-  await page
-    .getByRole('button', { name: 'Seleccionar referencia de 2 m' })
-    .click();
-  await expect(
-    page.getByText(
-      'Referencia de 2 m seleccionada. Es una intención local, sin cambios guardados.',
-    ),
-  ).toBeVisible();
+  await page.getByRole('button', { name: copy.select }).click();
+  await expect(page.getByText(copy.selected)).toBeVisible();
 });

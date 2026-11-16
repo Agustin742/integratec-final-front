@@ -1,4 +1,4 @@
-import { Children, StrictMode, useEffect, useRef } from 'react';
+import { StrictMode, useEffect, useRef } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, expect, test, vi } from 'vitest';
 import { OrthographicCamera } from 'three';
@@ -52,12 +52,13 @@ vi.mock('@react-three/fiber', () => ({
     return (
       <>
         <canvas ref={canvas} />
-        {Children.toArray(props.children)[0]}
+        {props.children}
       </>
     );
   },
 }));
 let intersect: (visible: boolean) => void;
+let intersectBatch: (visibilities: boolean[]) => void;
 const disconnect = vi.fn();
 beforeEach(() => {
   vi.clearAllMocks();
@@ -72,11 +73,16 @@ beforeEach(() => {
     'IntersectionObserver',
     class {
       constructor(callback: IntersectionObserverCallback) {
-        intersect = (visible) =>
+        const fire = (visibilities: boolean[]) =>
           callback(
-            [{ isIntersecting: visible } as IntersectionObserverEntry],
+            visibilities.map(
+              (isIntersecting) =>
+                ({ isIntersecting }) as IntersectionObserverEntry,
+            ),
             this as unknown as IntersectionObserver,
           );
+        intersect = (visible) => fire([visible]);
+        intersectBatch = fire;
       }
       observe() {}
       disconnect = disconnect;
@@ -111,6 +117,40 @@ test('pauses for offscreen and hidden tabs and resumes demand only when both vis
   expect(renderer.props.frameloop).toBe('never');
   act(() => intersect(true));
   expect(renderer.props.frameloop).toBe('demand');
+});
+test('uses the newest queued intersection entry when several arrive', () => {
+  render(<WorldCanvas label="Technical world" />);
+  act(() => intersectBatch([true, false]));
+  expect(renderer.props.frameloop).toBe('never');
+  act(() => intersectBatch([false, true]));
+  expect(renderer.props.frameloop).toBe('demand');
+});
+test('renders the shared fallback once when the scene subtree throws', () => {
+  function BrokenScene(): never {
+    throw new Error('scene failure');
+  }
+  const view = render(
+    <WorldCanvas label="Technical world">
+      <BrokenScene />
+    </WorldCanvas>,
+  );
+  const statuses = screen.getAllByRole('status');
+  expect(statuses).toHaveLength(1);
+  expect(statuses[0]).toHaveTextContent('La vista 3D no está disponible');
+  expect(view.container.querySelector('canvas')).toBeNull();
+});
+test('keeps the canvas mounted while scene children suspend', () => {
+  function Suspender(): never {
+    throw new Promise<void>(() => {});
+  }
+  const view = render(
+    <WorldCanvas label="Technical world">
+      <Suspender />
+    </WorldCanvas>,
+  );
+  expect(view.container.querySelector('canvas')).not.toBeNull();
+  expect(screen.queryByText('Preparando la vista 3D…')).not.toBeInTheDocument();
+  expect(screen.getByRole('region', { name: 'Technical world' })).toBeVisible();
 });
 test('never starts a frame loop when initially hidden, including reduced motion', () => {
   Object.defineProperty(document, 'hidden', {
