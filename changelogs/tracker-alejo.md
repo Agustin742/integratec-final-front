@@ -1,5 +1,13 @@
 # Tracker — Alejo
 
+## 2026-11-16 — PR #76 review corrections (isometric canvas)
+
+- **Status:** in-progress (all four blocking review items implemented and verified; the five non-blocking suggestions follow in a second pass; push to `feat/24-isometric-canvas` per Alejo's instruction to work directly on the PR branch).
+- **Area / files:** `src/features/world/`, `src/app/ui-foundations.tsx`, `src/app/ui-foundations.test.tsx`, `e2e/world-canvas.spec.ts`, `docs/world-canvas.md`; branch `feat/24-isometric-canvas`.
+- **Change:** Address the [review](https://github.com/Agustin742/integratec-final-front/pull/76#pullrequestreview-5924300763) by Agustin: (1) drop the R3F `fallback` prop and rely on the host `failed` state; (2) bound the lazy `/dev/ui` world import with an error boundary rendering the world fallback; (3) move the loading live region outside the `aria-busy` container; (4) assert idle/keyboard/touch selection separately and exercise canvas 3D picking in the E2E suite. Non-blocking suggestions follow in a second pass.
+- **Reason:** Blocking review comments must be resolved before merge; Alejo also asked to apply the non-blocking suggestions.
+- **Verification:** Focused world/showcase tests 27/27; full Playwright suite 40/40 (38.1 s) including the new idle/keyboard/touch/pick flow. Typecheck, lint (exit 0 with the pre-existing JSXEmptyExpression warning), configured formatting of the touched files, production/showcase builds and security check pass. Full Vitest suite 411/413: two pre-existing `/register` tests fail only under full-suite load and pass in isolation, and reproduce identically on the PR base commit with the corrections stashed, so they are not caused by these changes. Node 22.23.4 was fetched into an ignored temp directory because no installed runtime satisfies the required `>=22.23.4 <23` range; a stale `vite preview` process from an earlier session was stopped to free port 4173 for the Playwright web server.
+
 ## 2026-11-14 — Isometric canvas foundation (#24)
 
 - **Status:** completed (verified implementation published in PR #76; published-head CI and teammate approval are tracked in the PR, not inferred from local checks).
@@ -41,7 +49,6 @@
 - **Staged candidate assessment:** After explicitly staging the intended browser test and all eight correction paths, native ASSESS succeeded: native medium, item-3 escalation high, `reviewDue: false` (`under_budget`), 177 changed lines. Required independent verification is recorded above; no native START or approval was needed or claimed. This resolves the earlier untracked-declaration assessment limitation.
 - **Delivery authorization:** Alejo explicitly requested “hace el commit y push”. Prepare one conventional correction commit on `feat/20-router-shell` with Alejo's configured identity, preserving Agustin's history and including the regression tests/docs; push normally to the existing PR #74 branch. No force push, PR merge, issue closure, or new remote comment is authorized.
 - **Next step:** Verify the published PR head and its CI, then obtain teammate approval before merge. All implementation and independent-verification children are finished; no merge or issue closure performed.
-
 
 ## 2026-11-10 — Session lifecycle and PR #72 review corrections (#18)
 

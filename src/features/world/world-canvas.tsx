@@ -15,22 +15,11 @@ import {
 } from 'three';
 import { frameCamera } from './camera';
 import { worldMessages as copy } from './messages';
+import { WorldFallback } from './world-fallback';
 
 export interface WorldCanvasProps {
   children?: ReactNode;
   label: string;
-}
-
-function WorldFallback() {
-  return (
-    <div
-      role="status"
-      className="space-y-2 rounded-xl border border-edge bg-card p-5"
-    >
-      <p className="font-semibold">{copy.unavailable}</p>
-      <p>{copy.alternative}</p>
-    </div>
-  );
 }
 
 class SceneBoundary extends Component<
@@ -143,34 +132,38 @@ export function WorldCanvas({ children, label }: WorldCanvasProps) {
   };
 
   return (
-    <div
-      ref={host}
-      role="region"
-      aria-label={label}
-      aria-busy={!failed && !canvas}
-      className="min-w-0"
-    >
-      {failed ? (
-        <WorldFallback />
-      ) : (
-        <SceneBoundary onError={() => setFailed(true)}>
-          {!canvas && <p aria-live="polite">{copy.loading}</p>}
-          <div style={{ height: 'clamp(20rem, 60vh, 32rem)', width: '100%' }}>
-            <Canvas
-              orthographic
-              camera={{ manual: true }}
-              dpr={[1, 2]}
-              frameloop={visible && tabVisible ? 'demand' : 'never'}
-              gl={createRenderer}
-              fallback={<WorldFallback />}
-              onCreated={({ gl }) => setCanvas(gl.domElement)}
-            >
-              <CameraFraming />
-              {children}
-            </Canvas>
-          </div>
-        </SceneBoundary>
-      )}
-    </div>
+    <>
+      {/* The loading announcement lives outside the busy region: a live
+          region under an `aria-busy` ancestor can be held back by screen
+          readers. `role="status"` already implies polite live semantics. */}
+      {!failed && !canvas && <p role="status">{copy.loading}</p>}
+      <div
+        ref={host}
+        role="region"
+        aria-label={label}
+        aria-busy={!failed && !canvas}
+        className="min-w-0"
+      >
+        {failed ? (
+          <WorldFallback />
+        ) : (
+          <SceneBoundary onError={() => setFailed(true)}>
+            <div style={{ height: 'clamp(20rem, 60vh, 32rem)', width: '100%' }}>
+              <Canvas
+                orthographic
+                camera={{ manual: true }}
+                dpr={[1, 2]}
+                frameloop={visible && tabVisible ? 'demand' : 'never'}
+                gl={createRenderer}
+                onCreated={({ gl }) => setCanvas(gl.domElement)}
+              >
+                <CameraFraming />
+                {children}
+              </Canvas>
+            </div>
+          </SceneBoundary>
+        )}
+      </div>
+    </>
   );
 }

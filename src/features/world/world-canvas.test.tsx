@@ -9,8 +9,9 @@ const renderer = vi.hoisted(() => ({
   props: {} as CanvasProps,
   dispose: vi.fn(),
   fail: false,
-  unsupported: false,
   failure: new Error('creation failed'),
+  delayOnCreated: false,
+  created: undefined as CanvasProps['onCreated'],
 }));
 const state = {
   camera: new OrthographicCamera(),
@@ -33,10 +34,13 @@ vi.mock('@react-three/fiber', () => ({
     const initialProps = useRef(props);
     useEffect(() => {
       const props = initialProps.current;
-      if (renderer.unsupported) return;
       try {
         if (typeof props.gl === 'function')
           props.gl({ canvas: canvas.current! });
+        if (renderer.delayOnCreated) {
+          renderer.created = props.onCreated;
+          return () => renderer.dispose();
+        }
         props.onCreated?.({ gl: { domElement: canvas.current } } as RootState);
       } catch (reason) {
         const event = new Event('unhandledrejection', { cancelable: true });
@@ -45,9 +49,7 @@ vi.mock('@react-three/fiber', () => ({
       }
       return () => renderer.dispose();
     }, []);
-    return renderer.unsupported ? (
-      props.fallback
-    ) : (
+    return (
       <>
         <canvas ref={canvas} />
         {Children.toArray(props.children)[0]}
@@ -60,7 +62,8 @@ const disconnect = vi.fn();
 beforeEach(() => {
   vi.clearAllMocks();
   renderer.fail = false;
-  renderer.unsupported = false;
+  renderer.delayOnCreated = false;
+  renderer.created = undefined;
   Object.defineProperty(document, 'hidden', {
     configurable: true,
     value: false,
@@ -154,13 +157,28 @@ test('handles actual renderer creation rejection without claiming a working 2D r
   );
   expect(screen.queryByRole('link')).not.toBeInTheDocument();
 });
-test('supplies accessible fallback content when Canvas detects unsupported WebGL', () => {
-  renderer.unsupported = true;
+test('does not expose canvas fallback content while WebGL renders', () => {
   render(<WorldCanvas label="Technical world" />);
-  expect(screen.getByRole('status')).toHaveTextContent(
-    'La vista 3D no está disponible',
-  );
-  expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  expect(renderer.props.fallback).toBeUndefined();
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  expect(
+    screen.queryByText('La vista 3D no está disponible'),
+  ).not.toBeInTheDocument();
+});
+test('announces loading outside the busy container until the canvas is ready', () => {
+  renderer.delayOnCreated = true;
+  render(<WorldCanvas label="Technical world" />);
+  const region = screen.getByRole('region', { name: 'Technical world' });
+  expect(region).toHaveAttribute('aria-busy', 'true');
+  const loading = screen.getByText('Preparando la vista 3D…');
+  expect(loading.closest('[aria-busy="true"]')).toBeNull();
+  act(() => {
+    renderer.created?.({
+      gl: { domElement: document.createElement('canvas') },
+    } as RootState);
+  });
+  expect(screen.queryByText('Preparando la vista 3D…')).not.toBeInTheDocument();
+  expect(region).toHaveAttribute('aria-busy', 'false');
 });
 test('checks offscreen bounds and cleans fallback listeners without IntersectionObserver', () => {
   vi.stubGlobal('IntersectionObserver', undefined);

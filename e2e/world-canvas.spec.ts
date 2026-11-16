@@ -1,4 +1,24 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
+import { OrthographicCamera, Vector3 } from 'three';
+import { frameCamera } from '../src/features/world/camera';
+
+// The selectable reference capsule sits at world (1.5, 1, 0) with radius 0.3
+// (world-reference.tsx) and the host camera framing is deterministic, so the
+// expected screen position of the capsule can be computed from the real
+// framing code instead of hand-picked pixel coordinates.
+const CAPSULE_CENTER = new Vector3(1.5, 1, 0);
+
+async function capsulePosition(canvas: Locator) {
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('Canvas is not visible');
+  const camera = new OrthographicCamera();
+  frameCamera(camera, box.width, box.height);
+  const point = CAPSULE_CENTER.clone().project(camera);
+  return {
+    x: ((point.x + 1) / 2) * box.width,
+    y: (1 - (point.y + 1) / 2) * box.height,
+  };
+}
 
 async function openReference(page: Page) {
   await page.goto('/dev/ui');
@@ -27,20 +47,40 @@ test('renders actual WebGL with DOM keyboard/touch access and no horizontal over
 }, info) => {
   await page.setViewportSize({ width: isMobile ? 360 : 1280, height: 800 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  const { region } = await openReference(page);
+  const idle = page.getByText(
+    'Seleccioná la referencia alta o usá el botón. No hay navegación ni acciones del aula.',
+  );
+  const selected = page.getByText(
+    'Referencia de 2 m seleccionada. Es una intención local, sin cambios guardados.',
+  );
   const button = page.getByRole('button', {
     name: 'Seleccionar referencia de 2 m',
   });
+
+  // Keyboard activation from a verifiably idle state.
+  const { region } = await openReference(page);
+  await expect(idle).toBeVisible();
   await button.focus();
   await expect(button).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(
-    page.getByText(
-      'Referencia de 2 m seleccionada. Es una intención local, sin cambios guardados.',
-    ),
-  ).toBeVisible();
+  await expect(selected).toBeVisible();
+
+  // Pointer/touch activation on the DOM control, from a fresh idle page.
+  await page.reload();
+  await expect(idle).toBeVisible();
   if (isMobile) await button.tap();
   else await button.click();
+  await expect(selected).toBeVisible();
+
+  // Direct 3D picking on the canvas reference object, from a fresh idle page.
+  const reopened = await openReference(page);
+  await expect(idle).toBeVisible();
+  const canvas = reopened.canvas;
+  const position = await capsulePosition(canvas);
+  if (isMobile) await canvas.tap({ position });
+  else await canvas.click({ position });
+  await expect(selected).toBeVisible();
+
   expect(await region.getByRole('button').count()).toBe(0);
   expect(
     await page.evaluate(
