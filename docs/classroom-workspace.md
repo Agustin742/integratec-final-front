@@ -13,10 +13,12 @@
 
 ## Contract source
 
-REST types were generated through `pnpm api:sync` from backend A's merged
-`develop` commit `1f7bf1fdd7bf3c1f8be715b896b05886a75ac6d0` (backend #88),
-not B's open branch. The generated REST file also contains previously published
-backend endpoints; it was not manually reduced to A. Realtime changes from that
+The preceding contract PR provides REST types generated through `pnpm api:sync`
+from backend B's final merged `develop` commit
+`4e4fae1a07073b1c486a79504e1e515040e8e5c7` (backend #93). The generated REST file
+also contains previously published backend endpoints; it was not manually reduced
+to A. Runtime consumption in this foundation remains A: server classroom context
+and `availablePanels`. B/SSE consumption waits for PR 3. Realtime changes from the
 sync are excluded from this REST-only slice: the room-state artifact references
 an unpublished-to-this-frontend sibling `Avatar` module and requires a separate
 realtime integration. Existing realtime files are preserved; no dependencies added.
