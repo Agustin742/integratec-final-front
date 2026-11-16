@@ -2,12 +2,12 @@
 
 ## 2026-11-16 — Complete the classroom panel entry catalog (#26)
 
-- **Status:** completed (local approved scope; remote PR update and team approval pending)
+- **Status:** in-progress (implementation verified; authorized PR #80 publication underway)
 - **Area / files:** `src/features/classrooms/`, `docs/classroom-panels.md`, `docs/classroom-workspace.md`, panel route/browser tests.
 - **Change:** Complete the production panel entry catalog with explicitly pending content, server-confirmed availability and reserved pet exclusion, following the human-approved scope reconciliation.
 - **Reason:** Existing PRs #78–#80 implement the infrastructure but leave the production catalog empty; opening a PR did not establish full acceptance.
 - **Verification:** Initial RED 11 failures/28 passes; corrected focused 39/39 and final full suite 477/477 pass. Final lint/types/build/security/format/docs/whitespace pass; Python CI 8/8 pass after fixing HEAD-identical CRLF checkout noise (152 normalized files; unchanged logical diff). Independent review 55/55 passes; focused structural recheck accepts the subsequent one-class height correction. Correct-worktree browser run had 51/52 passes; the sole mobile 200% zoom failure is corrected, with desktop/mobile 2/2 passing on the final UI (across runs, not a single final 52/52 run). Captures at 1280/360 are linked in `docs/classroom-panels.md`. Earlier asynchronous-test, CRLF, wrong-preview/undefined-pnpm setup, missing-capture and zoom failures are retained in local evidence. Native assessment: medium/under-budget/review not due; item-2 independent verification fulfilled, no native review approval claimed. Mock evidence is not live-backend or distributed SSE proof.
-- **Next step:** Publish the local follow-up to PR #80 only with human authorization, obtain team acceptance of the documented scope reconciliation, then integrate #78 → #79 → #80 in order. No PR merge, remote issue closure or deployment performed.
+- **Next step:** Human authorized publication of the local closure to PR #80 and issue #26 evidence update. Verify the published head, then obtain team acceptance and integrate #78 → #79 → #80 in order. No PR merge, premature issue closure or deployment.
 
 ## 2026-11-14 — Implement account registration and organizational path selection screen (#27)
 
