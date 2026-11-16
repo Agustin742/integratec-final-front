@@ -1,11 +1,12 @@
-import { useRef } from 'react';
-import { Outlet, useParams } from 'react-router';
+import { useLayoutEffect, useRef, type RefObject } from 'react';
+import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import type { components } from '@/api/schema.generated';
 import { NotFoundPage } from '@/app/pages/not-found-page';
 import { useDocumentTitle } from '@/app/router/document-title';
 import { ErrorState, LoadingState } from '@/components/feedback/states';
 import { classroomMessages as messages } from './messages';
 import { useClassroomContext } from './use-classroom-capabilities';
+import { useClassroomContextEvents } from './use-classroom-context-events';
 import {
   ClassroomPanelsProvider,
   type PanelDescriptor,
@@ -19,22 +20,53 @@ const EMPTY_PANELS: readonly WorkspacePanel[] = [];
 
 export function ClassroomWorkspace({ panels = EMPTY_PANELS }: WorkspaceProps) {
   const { classroomId } = useParams();
-  return classroomId ? (
-    <WorkspaceContext classroomId={classroomId} panels={panels} />
-  ) : (
-    <NotFoundPage />
+  const safeFocus = useRef<HTMLDivElement>(null);
+  return (
+    <div ref={safeFocus} tabIndex={-1} aria-label={messages.title}>
+      {classroomId ? (
+        <WorkspaceContext
+          classroomId={classroomId}
+          panels={panels}
+          safeFocus={safeFocus}
+        />
+      ) : (
+        <NotFoundPage />
+      )}
+    </div>
   );
 }
 
 function WorkspaceContext({
   classroomId,
   panels,
+  safeFocus,
 }: {
   classroomId: string;
   panels: readonly WorkspacePanel[];
+  safeFocus: RefObject<HTMLDivElement | null>;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const latestLocation = useRef(location);
+  const consumedRoute = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    latestLocation.current = location;
+  }, [location]);
+  const claimPanelRoute = () => {
+    if (consumedRoute.current === location.key) return false;
+    consumedRoute.current = location.key;
+    return true;
+  };
+  const closePanelRoute = () => {
+    // A departing dialog must not redirect a newer classroom/navigation.
+    if (latestLocation.current.key === location.key)
+      void navigate(`/classrooms/${encodeURIComponent(classroomId)}`, {
+        replace: true,
+      });
+  };
   const context = useClassroomContext(classroomId);
+  useClassroomContextEvents(classroomId);
   useDocumentTitle(
     context.status === 'ready' ? context.classroom.name : messages.title,
   );
@@ -71,10 +103,11 @@ function WorkspaceContext({
       <ClassroomPanelsProvider
         userId={userId}
         classroomId={classroomId}
+        routeOwner={location.key}
         registry={panels}
         availability={availability}
         description={messages.panelDescription}
-        fallbackFocus={() => heading.current}
+        fallbackFocus={() => heading.current ?? safeFocus.current}
       >
         <header className="min-w-0 space-y-2">
           <h2
@@ -88,7 +121,10 @@ function WorkspaceContext({
             {messages.role}: {messages.roles[classroom.myRole]}
           </p>
         </header>
-        <Outlet context={classroom} />
+        <Outlet
+          key={location.key}
+          context={{ ...classroom, claimPanelRoute, closePanelRoute }}
+        />
       </ClassroomPanelsProvider>
     </section>
   );

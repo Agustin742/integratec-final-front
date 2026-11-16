@@ -91,6 +91,15 @@ test.beforeEach(async ({ page, baseURL }) => {
       expect(request.headers().authorization).toBe('Bearer synthetic-access');
       return route.fulfill({ json: profile });
     }
+    if (request.url() === `${classroomURL}/context-events`) {
+      expect(request.method()).toBe('GET');
+      expect(request.headers().authorization).toBe('Bearer synthetic-access');
+      expect(request.headers().accept).toBe('text/event-stream');
+      // Hold the synthetic SSE handshake until teardown. These REST-shell tests
+      // do not emit hints/EOF that would reset their deliberately gated reads.
+      await new Promise<void>((resolve) => page.once('close', () => resolve()));
+      return;
+    }
     await route.abort();
     throw new Error(
       `Unexpected external request: ${url.origin}${url.pathname}`,

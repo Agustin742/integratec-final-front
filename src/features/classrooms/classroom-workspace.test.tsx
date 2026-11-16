@@ -46,7 +46,17 @@ function ContextProbe() {
 function setup(fetch: typeof globalThis.fetch, path = '/classrooms/a') {
   const session = fakeSession(
     { status: 'authenticated', user: profile },
-    createApiClient({ baseUrl: 'https://api.example.invalid', fetch }),
+    createApiClient({
+      baseUrl: 'https://api.example.invalid',
+      fetch: (input, init) =>
+        (input as Request).url.endsWith('/context-events')
+          ? Promise.resolve(
+              new Response(new ReadableStream(), {
+                headers: { 'content-type': 'text/event-stream' },
+              }),
+            )
+          : fetch(input, init),
+    }),
   );
   const queryClient = createAppQueryClient({
     defaultOptions: { queries: { retryDelay: 0 } },

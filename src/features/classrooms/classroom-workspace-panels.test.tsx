@@ -10,6 +10,7 @@ import { SessionProvider } from '@/session/provider';
 import { profile } from '@/session/test-fixtures';
 import { render } from '@/test/render';
 import { ClassroomWorkspace } from './classroom-workspace';
+import { ClassroomPanelRoute } from './classroom-panel-route';
 import { useClassroomPanels } from './panels/classroom-panels';
 
 function SyntheticGrades() {
@@ -26,15 +27,35 @@ function Consumer() {
     </button>
   );
 }
-function setup(availablePanels: unknown = ['grades']) {
+function setup(availablePanels: unknown = ['grades'], path = '/classrooms/a') {
   let availability = availablePanels;
   let status = 200;
+  let stream: ReadableStreamDefaultController<Uint8Array> | undefined;
+  let holdRead = false;
+  let releaseRead: (() => void) | undefined;
+  const streamSignals: AbortSignal[] = [];
   const session = fakeSession(
     { status: 'authenticated', user: profile },
     createApiClient({
       baseUrl: 'https://api.example.invalid',
       fetch: async (input) => {
-        const id = new URL((input as Request).url).pathname.split('/').pop();
+        const request = input as Request;
+        if (request.url.endsWith('/context-events')) {
+          streamSignals.push(request.signal);
+          return new Response(
+            new ReadableStream<Uint8Array>({
+              start(controller) {
+                stream = controller;
+              },
+            }),
+            { headers: { 'content-type': 'text/event-stream' } },
+          );
+        }
+        if (holdRead)
+          await new Promise<void>((resolve) => {
+            releaseRead = resolve;
+          });
+        const id = new URL(request.url).pathname.split('/').pop();
         return status !== 200
           ? new Response(null, { status })
           : Response.json({
@@ -66,10 +87,13 @@ function setup(availablePanels: unknown = ['grades']) {
       {
         path: '/classrooms/:classroomId',
         element: <ClassroomWorkspace panels={panels} />,
-        children: [{ index: true, Component: Consumer }],
+        children: [
+          { index: true, Component: Consumer },
+          { path: 'panels/:panelKey', Component: ClassroomPanelRoute },
+        ],
       },
     ],
-    { initialEntries: ['/classrooms/a'] },
+    { initialEntries: [path] },
   );
   render(
     <ApiQueryProvider client={queryClient}>
@@ -81,6 +105,24 @@ function setup(availablePanels: unknown = ['grades']) {
   return {
     router,
     session,
+    streamSignals,
+    hint: async (next: unknown = []) => {
+      availability = next;
+      holdRead = true;
+      await act(async () => {
+        stream?.enqueue(
+          new TextEncoder().encode(
+            'event: classroom.context-invalidated\ndata: {"classroomId":"a"}\n\n',
+          ),
+        );
+      });
+    },
+    release: async () => {
+      holdRead = false;
+      await act(async () => {
+        releaseRead?.();
+      });
+    },
     refresh: async (next: unknown, nextStatus = 200) => {
       availability = next;
       status = nextStatus;
@@ -92,6 +134,130 @@ function setup(availablePanels: unknown = ['grades']) {
     },
   };
 }
+test('SSE hint immediately removes private panel and guards until fresh REST confirmation', async () => {
+  const view = setup();
+  await open();
+  fireEvent.change(screen.getByRole('textbox'), {
+    target: { value: 'restricted draft' },
+  });
+  await view.hint();
+  await waitFor(() =>
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+  );
+  expect(screen.queryByText('Classroom a')).not.toBeInTheDocument();
+  expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  await waitFor(() => {
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toBeVisible();
+    expect(document.activeElement).toHaveAccessibleName();
+    expect(document.activeElement).toHaveAttribute('tabindex', '-1');
+  });
+  await view.release();
+  await screen.findByRole('heading', { name: 'Classroom a' });
+  await open();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(view.streamSignals).toHaveLength(1);
+});
+
+test('nested registry URL closes to the workspace without reopening or adding history', async () => {
+  const view = setup(['grades'], '/classrooms/a/panels/grades');
+  await screen.findByRole('dialog', { name: 'Synthetic grades' });
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+  await screen.findByRole('button', { name: 'Open grades' });
+  expect(view.router.state.location.pathname).toBe('/classrooms/a');
+  expect(view.router.state.historyAction).toBe('REPLACE');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test.each([
+  [['grades'], 'unknown'],
+  [[], 'grades'],
+  [['settings'], 'settings'],
+] as const)(
+  'nested URL denies unavailable, unknown and unregistered keys uniformly (%j, %s)',
+  async (availability, key) => {
+    setup(availability, `/classrooms/a/panels/${key}`);
+    await screen.findByRole('heading', { name: 'Página no encontrada' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  },
+);
+
+test('invalidating a nested panel consumes the old URL intent and drops its draft', async () => {
+  const view = setup(['grades'], '/classrooms/a/panels/grades');
+  await screen.findByRole('dialog');
+  fireEvent.change(screen.getByRole('textbox'), {
+    target: { value: 'private' },
+  });
+  await view.hint(['grades']);
+  await waitFor(() =>
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument(),
+  );
+  await view.release();
+  await screen.findByRole('heading', { name: 'Classroom a' });
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test('a user change cannot reopen the retained nested URL intent', async () => {
+  const view = setup(['grades'], '/classrooms/a/panels/grades');
+  await screen.findByRole('dialog');
+  act(() =>
+    view.session.set({
+      status: 'authenticated',
+      user: { ...profile, id: 'other' },
+    }),
+  );
+  await waitFor(() =>
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+  );
+  await screen.findByRole('heading', { name: 'Classroom a' });
+  expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+});
+
+test('leaving a nested dialog for another classroom cannot redirect back or retain its draft', async () => {
+  const view = setup(['grades'], '/classrooms/a/panels/grades');
+  await screen.findByRole('dialog');
+  fireEvent.change(screen.getByRole('textbox'), {
+    target: { value: 'old draft' },
+  });
+  await act(() => view.router.navigate('/classrooms/b'));
+  await screen.findByRole('heading', { name: 'Classroom b' });
+  expect(view.router.state.location.pathname).toBe('/classrooms/b');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  await open();
+  expect(screen.getByRole('textbox')).toHaveValue('');
+});
+
+test('F1: valid to unknown URL removes the owned dialog and draft without redirecting', async () => {
+  const view = setup(['grades'], '/classrooms/a/panels/grades');
+  await screen.findByRole('dialog');
+  fireEvent.change(screen.getByRole('textbox'), {
+    target: { value: 'old draft' },
+  });
+  await act(() => view.router.navigate('/classrooms/a/panels/unknown'));
+  await screen.findByRole('heading', { name: 'Página no encontrada' });
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  expect(view.router.state.location.pathname).toBe(
+    '/classrooms/a/panels/unknown',
+  );
+});
+
+test('F1: old URL teardown cannot redirect or retain a draft in a newer valid URL', async () => {
+  const view = setup(['grades'], '/classrooms/a/panels/grades');
+  await screen.findByRole('dialog');
+  fireEvent.change(screen.getByRole('textbox'), {
+    target: { value: 'old draft' },
+  });
+  await act(() =>
+    view.router.navigate('/classrooms/a/panels/grades?replacement=1'),
+  );
+  await waitFor(() => expect(screen.getByRole('textbox')).toHaveValue(''));
+  expect(view.router.state.location.pathname).toBe(
+    '/classrooms/a/panels/grades',
+  );
+  expect(view.router.state.location.search).toBe('?replacement=1');
+});
+
 async function open() {
   const trigger = await screen.findByRole('button', { name: 'Open grades' });
   trigger.focus();

@@ -6,7 +6,7 @@ import {
   within,
 } from '@testing-library/react';
 import { RouterProvider } from 'react-router/dom';
-import { createMemoryRouter } from 'react-router';
+import { createMemoryRouter, type RouteObject } from 'react-router';
 import { expect, test } from 'vitest';
 import { expectAccessible } from '@/test/accessibility';
 import { SessionProvider } from '@/session/provider';
@@ -17,27 +17,75 @@ import { fakeSession } from './fake-session';
 import { createAppRoutes } from './routes';
 
 /** Signed out by default; the protected home needs an authenticated session. */
-function renderAt(
+async function renderAt(
   path: string,
   options?: { showcase?: boolean; authenticated?: boolean },
+  routes: RouteObject[] = createAppRoutes(options),
 ) {
   const { service } = fakeSession(
     options?.authenticated
       ? { status: 'authenticated', user: profile }
       : { status: 'unauthenticated' },
   );
-  const router = createMemoryRouter(createAppRoutes(options), {
+  const router = createMemoryRouter(routes, {
     initialEntries: [path],
   });
-  return {
-    router,
-    ...render(
+  let view!: ReturnType<typeof render>;
+  await act(async () => {
+    view = render(
       <SessionProvider service={service}>
         <RouterProvider router={router} />
       </SessionProvider>,
-    ),
-  };
+    );
+    // Lazy modules resolve before their guards render. Start DOM assertions only
+    // after that public router lifecycle, without extending their query timeout.
+    if (!router.state.initialized) {
+      await new Promise<void>((resolve) => {
+        const unsubscribe = router.subscribe((state) => {
+          if (state.initialized) {
+            unsubscribe();
+            resolve();
+          }
+        });
+      });
+    }
+  });
+  return { router, ...view };
 }
+
+test('the render helper waits for deferred lazy route initialization', async () => {
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let ready = false;
+  const rendered = Promise.resolve(
+    renderAt('/deferred', undefined, [
+      {
+        path: '/deferred',
+        HydrateFallback: () => null,
+        lazy: {
+          Component: async () => {
+            await pending;
+            return () => null;
+          },
+        },
+      },
+    ]),
+  ).then((view) => {
+    ready = true;
+    return view;
+  });
+
+  await Promise.resolve();
+  try {
+    expect(ready).toBe(false);
+  } finally {
+    release();
+    await rendered;
+  }
+  expect((await rendered).router.state.initialized).toBe(true);
+});
 
 const authPages = [
   ['/login', messages.pages.login.title],
@@ -56,7 +104,7 @@ const noShowcaseLink = () =>
 test.each(pages)(
   'renders %s lazily with one h1, one main and one toast host',
   async (path, title) => {
-    const { container } = renderAt(path, { authenticated: path === '/' });
+    const { container } = await renderAt(path, { authenticated: path === '/' });
 
     expect(
       await screen.findByRole('heading', { level: 2, name: title }),
@@ -84,7 +132,7 @@ test.each(pages)(
 test.each(pages)(
   'never shows a sidebar or the showcase link on %s, even when the showcase is enabled',
   async (path, title) => {
-    renderAt(path, { authenticated: path === '/', showcase: true });
+    await renderAt(path, { authenticated: path === '/', showcase: true });
     await screen.findByRole('heading', { level: 2, name: title });
 
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
@@ -96,7 +144,7 @@ test.each(pages)(
 test.each(authPages)(
   'the auth layout on %s puts the brand panel above the form column and reserves a form slot',
   async (path, title) => {
-    renderAt(path);
+    await renderAt(path);
     await screen.findByRole('heading', { level: 2, name: title });
 
     const banner = screen.getByRole('banner');
@@ -119,7 +167,7 @@ test.each(authPages)(
 test.each(pages)(
   'the skip link on %s reaches the focusable main landmark',
   async (path, title) => {
-    renderAt(path, { authenticated: path === '/' });
+    await renderAt(path, { authenticated: path === '/' });
     await screen.findByRole('heading', { level: 2, name: title });
 
     const skipLink = screen.getByRole('link', { name: /Saltar al contenido/ });
@@ -133,7 +181,7 @@ test.each(pages)(
 );
 
 test.each(pages)('sets the document title on %s', async (path, title) => {
-  renderAt(path, { authenticated: path === '/' });
+  await renderAt(path, { authenticated: path === '/' });
   await screen.findByRole('heading', { level: 2, name: title });
 
   // The title is written in an effect, which can land just after the heading.
@@ -142,35 +190,23 @@ test.each(pages)('sets the document title on %s', async (path, title) => {
   );
 });
 
-test('protects the classroom workspace instead of treating it as an unknown path', async () => {
-  let router!: ReturnType<typeof createMemoryRouter>;
-  await act(async () => {
-    ({ router } = renderAt('/classrooms/synthetic'));
-    // React Router resolves the matched lazy module before rendering its guard.
-    // Await that lifecycle, rather than racing the default DOM query window.
-    if (!router.state.initialized) {
-      await new Promise<void>((resolve) => {
-        const unsubscribe = router.subscribe((state) => {
-          if (state.initialized) {
-            unsubscribe();
-            resolve();
-          }
-        });
-      });
-    }
-  });
+test.each(['/classrooms/synthetic', '/classrooms/synthetic/panels/grades'])(
+  'protects the classroom workspace URL %s instead of treating it as unknown',
+  async (path) => {
+    const { router } = await renderAt(path);
 
-  expect(router.state.location.pathname).toBe('/login');
-  expect(
-    await screen.findByRole('heading', {
-      level: 2,
-      name: messages.pages.login.title,
-    }),
-  ).toBeVisible();
-});
+    expect(router.state.location.pathname).toBe('/login');
+    expect(
+      await screen.findByRole('heading', {
+        level: 2,
+        name: messages.pages.login.title,
+      }),
+    ).toBeVisible();
+  },
+);
 
 test('renders the not found page for an unknown path', async () => {
-  const { container } = renderAt('/no-such-page');
+  const { container } = await renderAt('/no-such-page');
 
   expect(
     await screen.findByRole('heading', {
@@ -186,7 +222,7 @@ test('renders the not found page for an unknown path', async () => {
 });
 
 test('the catch-all 404 for a signed-out visitor shows no app-only chrome', async () => {
-  renderAt('/no-such-page', { showcase: true });
+  await renderAt('/no-such-page', { showcase: true });
 
   await screen.findByRole('heading', {
     level: 2,
@@ -204,7 +240,7 @@ test('the catch-all 404 for a signed-out visitor shows no app-only chrome', asyn
 });
 
 test('serves the component showcase at /dev/ui when it is enabled', async () => {
-  renderAt('/dev/ui', { showcase: true });
+  await renderAt('/dev/ui', { showcase: true });
 
   expect(
     await screen.findByRole(
@@ -219,7 +255,7 @@ test('serves the component showcase at /dev/ui when it is enabled', async () => 
 });
 
 test('does not register the showcase route when it is disabled', async () => {
-  renderAt('/dev/ui', { showcase: false });
+  await renderAt('/dev/ui', { showcase: false });
 
   expect(
     await screen.findByRole('heading', {

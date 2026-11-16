@@ -11,7 +11,9 @@ optional `panels` prop; keys derive from the generated `ClassroomPanelKey` enum.
 Nested consumers call `useClassroomPanels` from
 `src/features/classrooms/panels/classroom-panels.tsx`. The workspace supplies
 current user/classroom scope, server availability, description and heading focus
-fallback. Its Outlet still receives the complete classroom context.
+fallback. Its Outlet still receives the complete classroom context, plus the
+one-shot URL-intent claim and close callbacks. If invalidation removes the heading,
+focus returns to the labeled, stable workspace container outside private content.
 
 For a standalone host, import `ClassroomPanelsProvider` and its public types:
 
@@ -23,9 +25,14 @@ For a standalone host, import `ClassroomPanelsProvider` and its public types:
 - Supply a meaningful centralized es-AR `description` and descriptor titles.
   `fallbackFocus()` must resolve a current, connected, focusable workspace target
   (for example, a heading with `tabIndex={-1}`), not a removed trigger.
-- Consumers call `openPanel(key, invoker?)`. It returns whether opening was
-  accepted; DOM controls pass their initiating HTMLElement. Non-DOM intents omit
+- Consumers call `openPanel(key, invoker?, onClose?)`. The optional close callback
+  lets the nested route replace its URL when the dialog leaves. The call returns
+  whether opening was accepted; DOM controls pass their initiating HTMLElement. Non-DOM intents omit
   it and use the workspace fallback. Denied calls do not move focus.
+- URL consumers additionally supply a navigation ownership token. Departed URL-owned
+  panels are released without closing unrelated manually opened panels.
+- `canOpenPanel(key)` derives visibility from the same registry/availability check;
+  it does not grant action authorization.
 
 The provider owns local open state and the incumbent Radix Dialog host. Loss of
 availability or registry membership immediately removes the active subtree and
@@ -42,10 +49,20 @@ passes only that field to its host; absent/non-array/non-string entries deny all
 An empty list or an available but unregistered key also denies opening. A failed
 context refresh unmounts the host. Restoring availability never restores a draft.
 
-Product components, nested panel URLs, 2D/3D consumers, and general permission
-propagation remain deferred; this slice does not complete #26. Backend
-[B (#93)](https://github.com/Agustin742/integratec-final-back/pull/93) is not consumed:
-A reflects permission changes only when REST is refetched, not instantaneously.
+The protected `/classrooms/:classroomId/panels/:panelKey` URL uses this same
+controller, without registering any product descriptors. Denied keys share a
+not-found presentation. Close replaces the nested URL with the workspace URL;
+revocation and scope changes discard the intent and draft without reopening.
+
+Product components and 2D/3D consumers remain separate stories; this
+infrastructure does not implement their contents. Backend
+[B (#93)](https://github.com/Agustin742/integratec-final-back/pull/93) is consumed by
+one workspace-owned authenticated fetch stream. Connection, invalidation hints
+(including the initial hint), and EOF reset the shared context query and reload
+complete REST authority. Observed hints immediately remove private panel contents
+and drafts while confirmation is pending; later confirmation never reopens them.
+This is not guaranteed globally immediate delivery. See the [stream lifecycle and
+contract provenance](./classroom-workspace.md#context-invalidation-b).
 Never infer availability from `myRole` or action capabilities; panel reads and
 mutations still require their own server checks. See [security rules](../rules/security.md).
 Synthetic rendered tests cover denial, opening/closing, focus containment and
