@@ -6,7 +6,7 @@ import { classroomDetailQueryKey } from '@/api/query-keys';
 import type { components } from '@/api/schema.generated';
 import { useSessionService, useSessionSnapshot } from '@/session/provider';
 
-type ClassroomDetail = components['schemas']['ClassroomDetailResponseDto'];
+type ClassroomDetail = components['schemas']['ClassroomContextResponseDto'];
 
 /** Role the server resolved for the caller in one classroom. */
 export type ClassroomRole = ClassroomDetail['myRole'];
@@ -45,7 +45,20 @@ function toApiError(error: unknown): ApiError {
   });
 }
 
-const PENDING: ClassroomCapabilities = Object.freeze({ status: 'pending' });
+export type ClassroomContext =
+  | { readonly status: 'pending' }
+  | {
+      readonly status: 'error';
+      readonly error: ApiError;
+      readonly retry: () => void;
+    }
+  | {
+      readonly status: 'ready';
+      readonly classroom: ClassroomDetail;
+      readonly userId: string;
+    };
+
+const PENDING = Object.freeze({ status: 'pending' as const });
 
 /**
  * What the current user may do in one classroom, as decided by the server
@@ -61,9 +74,7 @@ const PENDING: ClassroomCapabilities = Object.freeze({ status: 'pending' });
  *   role is insufficient; both arrive as `ApiError` in `error`. Callers decide
  *   how to present them (see `RequireCapability`).
  */
-export function useClassroomCapabilities(
-  classroomId: string,
-): ClassroomCapabilities {
+export function useClassroomContext(classroomId: string): ClassroomContext {
   const { client } = useSessionService();
   const snapshot = useSessionSnapshot();
   const userId = snapshot.status === 'authenticated' ? snapshot.user.id : null;
@@ -72,22 +83,39 @@ export function useClassroomCapabilities(
     // Without a signed-in user the query stays disabled; the key only needs
     // to be valid and is never fetched or filled.
     queryKey: classroomDetailQueryKey(userId ?? 'signed-out', classroomId),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       requestApi(() =>
         client.GET('/classrooms/{id}', {
           params: { path: { id: classroomId } },
+          signal,
         }),
       ),
     enabled: userId !== null,
   });
 
-  if (query.isError) {
-    return { status: 'error', error: toApiError(query.error) };
+  if (userId === null) return PENDING;
+  // Even a retryable failed refresh stops exposing private confirmed content.
+  if (query.isError || query.failureCount > 0) {
+    return {
+      status: 'error',
+      error: toApiError(query.error ?? query.failureReason),
+      retry: () => void query.refetch(),
+    };
   }
-  if (query.data === undefined) {
-    return PENDING;
+  if (query.data === undefined) return PENDING;
+  return { status: 'ready', classroom: query.data, userId };
+}
+
+/** Public capability-only view of the same authoritative context query. */
+export function useClassroomCapabilities(
+  classroomId: string,
+): ClassroomCapabilities {
+  const context = useClassroomContext(classroomId);
+  if (context.status === 'pending') return PENDING;
+  if (context.status === 'error') {
+    return { status: 'error', error: context.error };
   }
-  const { myRole, capabilities } = query.data;
+  const { myRole, capabilities } = context.classroom;
   const granted = new Set<Capability>(capabilities);
   return {
     status: 'ready',

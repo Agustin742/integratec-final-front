@@ -128,6 +128,15 @@ export function createAppRoutes({
                       },
                     },
                     ...protectedRoutes,
+                    {
+                      path: 'classrooms/:classroomId',
+                      lazy: {
+                        Component: async () =>
+                          (
+                            await import('@/features/classrooms/classroom-workspace')
+                          ).ClassroomWorkspace,
+                      },
+                    },
                   ],
                 },
                 // Reserved: a separate minimal area for parent users (extended scope)

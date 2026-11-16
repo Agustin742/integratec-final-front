@@ -215,6 +215,24 @@ describe('useClassroomCapabilities', () => {
     expect(setItem).not.toHaveBeenCalled();
   });
 
+  test('cancels an obsolete classroom read through the request signal', async () => {
+    const signals: AbortSignal[] = [];
+    const client = createApiClient({
+      baseUrl: TEST_API_BASE_URL,
+      fetch: (request) => {
+        signals.push((request as Request).signal);
+        return new Promise<Response>(() => {});
+      },
+    });
+    const { rerender } = setup(CLASSROOM_A, client);
+    await waitFor(() => expect(signals.length).toBeGreaterThan(0));
+    const previous = signals.at(-1)!;
+
+    rerender({ id: CLASSROOM_B });
+
+    expect(previous.aborted).toBe(true);
+  });
+
   test('wraps a failure that is not an ApiError instead of casting it', async () => {
     const failing = {
       GET: () => Promise.reject(new DOMException('aborted', 'AbortError')),

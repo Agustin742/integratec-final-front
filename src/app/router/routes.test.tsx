@@ -1,4 +1,10 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { RouterProvider } from 'react-router/dom';
 import { createMemoryRouter } from 'react-router';
 import { expect, test } from 'vitest';
@@ -134,6 +140,33 @@ test.each(pages)('sets the document title on %s', async (path, title) => {
   await waitFor(() =>
     expect(document.title).toBe(`${title} · ${messages.title}`),
   );
+});
+
+test('protects the classroom workspace instead of treating it as an unknown path', async () => {
+  let router!: ReturnType<typeof createMemoryRouter>;
+  await act(async () => {
+    ({ router } = renderAt('/classrooms/synthetic'));
+    // React Router resolves the matched lazy module before rendering its guard.
+    // Await that lifecycle, rather than racing the default DOM query window.
+    if (!router.state.initialized) {
+      await new Promise<void>((resolve) => {
+        const unsubscribe = router.subscribe((state) => {
+          if (state.initialized) {
+            unsubscribe();
+            resolve();
+          }
+        });
+      });
+    }
+  });
+
+  expect(router.state.location.pathname).toBe('/login');
+  expect(
+    await screen.findByRole('heading', {
+      level: 2,
+      name: messages.pages.login.title,
+    }),
+  ).toBeVisible();
 });
 
 test('renders the not found page for an unknown path', async () => {
