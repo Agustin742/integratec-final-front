@@ -2,11 +2,14 @@
 
 ## 2026-11-16 — Publish three stacked classroom PRs (#26)
 
-- **Status:** in-progress.
+- **Status:** completed (three stacked PRs published; CI/team review and merge remain separate).
 - **Area / files:** three new #26 delivery branches, existing classroom/API/session changes and PR evidence.
 - **Change:** Alejo selected three stacked PRs after reviewing approximate sizes: generated contract into `develop`, workspace foundation into the contract branch, live integration into the foundation branch. Preserve the completed original branch at `c5b0fea`; no history rewrite or merge authorized.
 - **Reason:** Reduce review scope without eight separate PRs or removing tests. Manual slices intentionally exceed the advisory 400-line guideline with Alejo's explicit selection; generated diff stays isolated.
-- **Next step:** Prepare and verify each slice, resolve due native review per candidate, then push the new branches and open the three linked PRs. Current CI only triggers for protected-base PRs, so feature-targeted slices require local verification and disclosure; no workflow changes or merge implied.
+- **Published stack:** [PR #78](https://github.com/Agustin742/integratec-final-front/pull/78) → `develop` (4,393 changed lines: 4,203 generated plus existing route-test readiness prerequisite); [PR #79](https://github.com/Agustin742/integratec-final-front/pull/79) → #78 branch (1,255); [PR #80](https://github.com/Agustin742/integratec-final-front/pull/80) → #79 branch (1,187 before passive delivery tracking). Original branch remains at `c5b0fea`; no reset/rebase/amend or remote merge.
+- **Verification:** Contract/base/live unit suites **393/393**, **434/434**, **461/461** and browser suites **34/34**, **44/44**, **44/44** passed. Lint/types/build/security/docs/final formatting/whitespace passed. Initial two lazy-route failures per intermediate were fixed by moving the already verified helper change forward, without production changes or weaker assertions. Checkout-only CRLF (617 HEAD-equal files plus four corrected helpers), occupied port and one artifact config-import failure remain recorded; browser used isolated strict ports without killing the unknown server. No passed suite was repeated solely for metadata.
+- **Independent/native:** Initial structural verification found one intermediate contract-provenance documentation blocker; one correction and focused recheck passed. Forward merges preserve all history; final production/tests/docs equal original `c5b0fea`. Each final PR range assessed native medium, `reviewDue: false`, `under_budget`; no native reviewer run/approval. No custom approval/type/size labels were invented.
+- **Next step:** Review/merge in order #78 → #79 → #80, retargeting the next PR to `develop` after its parent lands. CI run `43880123786` passed for #78 (checks, including docs/CI tooling/actionlint, lint, formatting, types, tests and build/security). Feature-targeted #79/#80 have no CI until retargeted, explicitly disclosed. Existing GitHub annotations warn about forced Node 24 action runtimes and the Ubuntu image migration; no CI failures. No workflow changes, team approval, merge or deployment claimed.
 
 ## 2026-11-15 — Review PR #77 (#28 login, password reset, logout)
 
