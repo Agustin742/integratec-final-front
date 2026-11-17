@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { Component, lazy, Suspense, useState, type ReactNode } from 'react';
+import { worldMessages } from '@/features/world/messages';
+import { WorldFallback } from '@/features/world/world-fallback';
 import {
   EmptyState,
   ErrorState,
@@ -42,6 +44,41 @@ import { formatDateOnly, formatDeadline } from '@/lib/dates';
 import { messages } from './messages';
 import { useDocumentTitle } from './router/document-title';
 
+const loadWorldReference = () =>
+  import('@/features/world').then((module) => ({
+    default: module.WorldReference,
+  }));
+
+class WorldReferenceBoundary extends Component<
+  { children: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? <WorldFallback /> : this.props.children;
+  }
+}
+
+/**
+ * Lazy world reference with a local boundary: a failed chunk load or a render
+ * error shows the world fallback without replacing the existing showcase
+ * controls. The lazy wrapper is created per mount, so remounting (a fresh
+ * page load) retries the import instead of replaying a cached rejection.
+ */
+function WorldReferenceSection() {
+  const [WorldReference] = useState(() => lazy(loadWorldReference));
+  return (
+    <WorldReferenceBoundary>
+      <Suspense fallback={<p role="status">{worldMessages.loading}</p>}>
+        <WorldReference />
+      </Suspense>
+    </WorldReferenceBoundary>
+  );
+}
+
 export function UiFoundations() {
   const copy = messages.showcase;
   useDocumentTitle(copy.title);
@@ -77,6 +114,7 @@ export function UiFoundations() {
           <Badge className="max-w-full whitespace-normal">{copy.success}</Badge>
         </div>
       </div>
+      <WorldReferenceSection />
       <Alert variant="destructive">
         <AlertTitle>{copy.error}</AlertTitle>
         <AlertDescription>{copy.errorHelp}</AlertDescription>

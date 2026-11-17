@@ -8,7 +8,7 @@ React Router (FD4) runs in data mode: `createBrowserRouter` with `RouterProvider
 | -------------------------- | ----------------------- | --------------------------------------------- |
 | `/login`                   | `PublicOnly`            | `src/app/pages/login-page`                    |
 | `/register`                | `PublicOnly`            | `src/app/pages/register-page`                 |
-| `/password-reset`          | `PublicOnly`            | `src/app/pages/password-reset-page`           |
+| `/password-reset`          | none (signed in or out) | `src/app/pages/password-reset-page`           |
 | `/invitations/accept`      | none (signed in or out) | `src/app/pages/invitation-accept-page`        |
 | `/`                        | `RequireAuth`           | `src/app/pages/home-page`                     |
 | `/classrooms/:classroomId` | `RequireAuth`           | `src/features/classrooms/classroom-workspace` |
@@ -22,7 +22,7 @@ Every page is a lazy route module (`lazy: { Component }`), so its chunk loads wh
 Two pathless layout routes sit under the root route. Both mount the single toast host and a `main` landmark with the same id, and focus after navigation is handled once above them (`RouterRoot`), so moving between layouts (for example login to home) is still announced.
 
 - `AuthLayout` (`/login`, `/register`, `/password-reset`, `/invitations/accept`): a split screen with no sidebar. The brand panel (the only `h1`, the product name, a one-line value statement and a text placeholder where the 3D classroom model will go) comes first in the DOM, so on phones it stacks above the content and on wide screens it sits on the right. The form column is `[data-auth-slot]`: feature screens render their form inside it and inherit its width and surface.
-- `AppShell` (everything else, including the `*` catch-all): `BaseLayout` (skip link, banner with the only `h1`, `main`) and `<Outlet />`. It has no sidebar: navigation arrives with the features that need it, and an empty aside is not rendered. The showcase at `/dev/ui` is reached by URL only; nothing links to it. If the shell later gets signed-in-only chrome, move `*` to a neutral layout so a signed-out 404 does not show it.
+- `AppShell` (everything else, including the `*` catch-all): `BaseLayout` (skip link, banner with the only `h1`, `main`) and `<Outlet />`. It has no sidebar: navigation arrives with the features that need it, and an empty aside is not rendered. When `snapshot.status === 'authenticated'`, the banner displays the signed-in user's `displayName` and the `Cerrar sesión` action; signed-out views (including `*` 404) never render signed-in controls. The showcase at `/dev/ui` is reached by URL only; nothing links to it.
 
 Pages use `h2` for their title. The not found, forbidden and error views share `StatusView` (a decorative scene from `src/components/illustrations/scenes.tsx`, title, explanation, actions) and take the width of whichever layout hosts them.
 
@@ -39,12 +39,36 @@ The `/register` route (`src/app/pages/register-page.tsx`, rendering `RegisterFor
 
 ![Account registration mobile screen (360px)](./assets/auth/register-360.png)
 
+## Login (`/login`)
+
+The `/login` route (`src/app/pages/login-page.tsx`, rendering `LoginForm` from `src/features/auth/login-form.tsx`) authenticates users through `SessionController.login()` while keeping return targets safe:
+
+- **Validation and error isolation:** `loginFormSchema` trims and lowercases `email` without trimming `password`, enforces the UTF-8 72-byte bcrypt ceiling, clears the password input (`shouldDirty: true`) on every submit outcome, guards dirty inputs across browser tab close and in-app link clicks (`useUnsavedChangesGuard`), and maps `LoginFailureReason` into centralized `es-AR` messages (`401` renders a generic credential error, while `429`, network, and unexpected failures remain distinct).
+- **Return target and navigation:** Shows contextual return notice when `?next=` passes `safeSessionRedirect`, and propagates only approved return targets to `/password-reset` and `/register` links via `buildAuthReturnHref`. See [threat-model.md](./threat-model.md) and [session lifecycle](./session-lifecycle.md) for details.
+
+![Login desktop screen (1280px)](./assets/auth/login-1280.png)
+
+![Login mobile screen (360px)](./assets/auth/login-360.png)
+
+## Password reset (`/password-reset`)
+
+The `/password-reset` route (`src/app/pages/password-reset-page.tsx`, rendering `PasswordResetForm` from `src/features/auth/password-reset-form.tsx`) is reachable signed in or out and switches between request mode and confirmation mode based on query parameters:
+
+- **Request mode (`/password-reset`):** Sends `POST /auth/password-reset/request` (`credentials: 'omit'`, `redirect: 'error'`) and displays an identical `role="status"` confirmation message for any accepted `202` submission without revealing account existence, focusing the confirmation heading for assistive technology.
+- **Confirmation mode (`/password-reset?token=<token>`):** Latches the parsed state in React component memory and immediately scrubs `?token=` from the URL via `replace` navigation (preserving safe `?next=` parameters and marking only a non-secret `resetTokenScrubbed` flag so neither URL history, `window.history.state`, nor `Referer` headers retain the token). Browser Back or explicit `/password-reset` links return cleanly to request mode, and `useUnsavedChangesGuard` protects unsaved `email` or `newPassword` inputs across in-app links. Rejects empty, whitespace-only, overlong, or repeated `?token=` query parameters immediately without calling the API. Valid submissions send `POST /auth/password-reset/confirm` expecting `204 No Content`, clear the password input (`shouldDirty: true`), separate expired/used `400` token rejections from policy validation and uncertain `429`/network/`5xx` outcomes, and focus the confirmation heading on success with a CTA back to `/login`.
+
+Successful confirmation calls the existing session controller logout path, synchronously clearing local credentials and private caches before showing success. Server logout is best-effort because password reset already revokes sessions by contract. Cancelled requests (including session transitions or leaving the reset view) do not show success or a failure alert; other errors retain the shared form error contract. Caller abort signals fence completion alongside the session middleware's epoch guards, so late reset responses cannot clear a newer session.
+
+![Password reset desktop screen (1280px)](./assets/auth/password-reset-1280.png)
+
+![Password reset mobile screen (360px)](./assets/auth/password-reset-360.png)
+
 ## Guards
 
 Guards are components that read `useSessionSnapshot()`; auth is not decided in loaders, because the session is asynchronous and owned by the session controller (see [session lifecycle](./session-lifecycle.md)).
 
 - `RequireAuth` wraps the protected branch. `initializing` shows loading, `unauthenticated` redirects to `/login?next=<path>`, `unable-to-verify` shows a retry state, and only `authenticated` renders the nested routes. Protected content is never rendered before the session resolves.
-- `PublicOnly` wraps login, register and password reset. A signed-in user is sent to the return target.
+- `PublicOnly` wraps login and register. A signed-in user is sent to the return target. Password reset and invitation acceptance remain reachable in either session state.
 - The return target goes through `safeSessionRedirect` both when written and when read, so a hostile `?next=` degrades to `/`. Repeated `next` parameters count as absent.
 
 A 403 or 404 from a resource never reaches the guards, so it cannot cause a login redirect loop.
