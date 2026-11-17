@@ -227,6 +227,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/classrooms/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Join a classroom with access code
+         * @description Redeems a valid classroom join code to atomically enroll the authenticated student and assign an available desk. Protected by sliding-window rate limiting against brute force attempts. Dynamic desk auto-expansion ensures desk allocation even if default desks are fully occupied.
+         */
+        post: operations["ClassroomsController_joinClassroom"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/classrooms/{id}": {
         parameters: {
             query?: never;
@@ -236,7 +256,7 @@ export interface paths {
         };
         /**
          * Get classroom details and caller capabilities
-         * @description Returns the persistent state of a virtual classroom, its pet, desk count, and the server-derived role and capabilities for the authenticated caller.
+         * @description Returns persistent classroom state, pet, desk count, and the server-derived role, capabilities and availablePanels. Panels are UI availability, not operation authorization; pet is reserved and never available. Linked parents receive only the grades panel; adult mode disables parent access.
          */
         get: operations["ClassroomsController_findOne"];
         put?: never;
@@ -251,6 +271,74 @@ export interface paths {
         patch: operations["ClassroomsController_update"];
         trace?: never;
     };
+    "/classrooms/{id}/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List email invitations for a classroom
+         * @description Returns a paginated list of email invitations for the classroom. Restricted to classroom staff.
+         */
+        get: operations["ClassroomsController_listInvitations"];
+        put?: never;
+        /**
+         * Issue an email invitation to join a classroom
+         * @description Issues a single-use email invitation for the specified classroom and schedules asynchronous email delivery via the transactional outbox. Restricted to teaching staff (School Owner/Admin or the classroom Teacher). Completely preserves non-disclosure (never reveals whether the email exists).
+         */
+        post: operations["ClassroomsController_createInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/invitations/{invitationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke an email invitation
+         * @description Marks an active email invitation as REVOKED so it can no longer be accepted. Restricted to classroom staff.
+         */
+        delete: operations["ClassroomsController_revokeInvitation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/join-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate or regenerate classroom join code
+         * @description Generates a new shareable join code for the classroom. If an active join code already exists, marks the previous code as REVOKED. The raw join code is returned ONCE in this response; only its SHA-256 hash is persisted. Restricted to classroom staff.
+         */
+        post: operations["ClassroomsController_generateJoinCode"];
+        /**
+         * Revoke active classroom join code
+         * @description Revokes the current active join code for this classroom, preventing any further student enrolments using it. Restricted to classroom staff.
+         */
+        delete: operations["ClassroomsController_revokeJoinCode"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/classrooms": {
         parameters: {
             query?: never;
@@ -263,6 +351,412 @@ export interface paths {
          * @description Returns a paginated list of classrooms accessible to the authenticated user (as School Owner/Admin, Teacher, enrolled Student, or active linked Parent when adultMode is false) with derived role and capabilities.
          */
         get: operations["MeClassroomsController_listMyClassrooms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept an email invitation to join a classroom
+         * @description Atomically binds the authenticated user account to the classroom specified in the email invitation and assigns an available desk. Idempotent: re-accepting by an already enrolled student succeeds and returns the existing desk without error.
+         */
+        post: operations["InvitationsController_accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List currently accessible notifications
+         * @description Own recipient only. Current classroom and exact student access are checked before pagination and total. Fixed order: createdAt DESC, id DESC; no sort override.
+         */
+        get: operations["NotificationsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Mark all currently accessible notifications read
+         * @description Idempotent. Updates only unread visible notices; preserves previous readAt values. No request body.
+         */
+        patch: operations["NotificationsController_readAll"];
+        trace?: never;
+    };
+    "/notifications/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Mark one currently accessible notification read
+         * @description Idempotent: replay preserves the original readAt. No request body.
+         */
+        patch: operations["NotificationsController_read"];
+        trace?: never;
+    };
+    "/activities/{activityId}/submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit files to an activity
+         * @description Student only. Uploads 1-5 files (PDF, PNG, JPEG or DOCX, up to 10 MB each, type detected from the bytes) to a published FILE activity of the student's classroom. One submission per student and activity. The server clock decides the window: before `opensAt` or after `dueAt` with `allowLate = false` is rejected (409); after `dueAt` with `allowLate = true` is stored with `isLate = true`. Retrying with the same `Idempotency-Key` returns the stored submission (200) without storing anything new; a different key after a submission exists is 409. Unknown, malformed, draft or deactivated activities and non-members answer 404, so an unpublished activity never leaks its existence; staff and linked parents answer 403 on published activities only.
+         */
+        post: operations["SubmissionsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/activities/{activityId}/submissions/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read my submission to an activity
+         * @description Student only. Returns the calling student's submission with a short-lived signed `downloadUrl` per file (lifetime from `STORAGE_SIGNED_URL_TTL`, reported in `downloadUrlExpiresAt`). The response is not cacheable. A student who has not submitted yet gets 404 `Submission not found`; unknown, malformed, draft or deactivated activities and non-members get 404 `Activity not found` (a draft never leaks its existence), and staff and linked parents get 403 on published activities only.
+         */
+        get: operations["SubmissionsController_readOwn"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/submissions/{submissionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a submission
+         * @description Readable by the student who submitted it and by teacher-level staff of the activity's classroom (teacher, school Owner or Admin). Returns a short-lived signed `downloadUrl` per file; the response is not cacheable. Every other caller (another student, a linked parent, a non-member) gets the same 404 as for an unknown id, so existence never leaks.
+         */
+        get: operations["SubmissionReadController_readById"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get authenticated student points wallet and ledger movements
+         * @description Returns the server-derived points balance (SUM of ledger amounts) and paginated immutable movements for the authenticated active student in the classroom. Supports sort=createdAt|amount (prefix "-" for descending; default -createdAt) with a matching id tiebreaker. No balance writes or student-to-student transfers are permitted.
+         */
+        get: operations["PointsController_getOwnWallet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/students/{studentId}/points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a student points wallet and ledger movements
+         * @description Returns the server-derived points balance and paginated immutable movements for an active enrolled student in the classroom. Accessible to the student themselves, classroom staff (Owner, Admin, Teacher), and active linked parents when adultMode is disabled. Classmates receive 403; strangers, unlinked parents, and adult-mode parent requests receive 404. Supports sort=createdAt|amount (default -createdAt) with a matching id tiebreaker.
+         */
+        get: operations["PointsController_getStudentWallet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/shop/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List classroom shop catalog items
+         * @description Returns paginated active shop items available in the classroom for an active enrolled student, resolving per-classroom price overrides and availability, student/classroom ownership flags, and server-side purchasability. Supports optional kind filter and sort=defaultPrice|name|createdAt (default createdAt) with a matching id tiebreaker.
+         */
+        get: operations["ShopController_listItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/shop/purchases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List authenticated student shop purchases in the classroom
+         * @description Returns paginated immutable purchase records for the authenticated active student in the classroom. Supports sort=createdAt|pricePaid (default -createdAt) with a matching id tiebreaker.
+         */
+        get: operations["ShopController_listPurchases"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/shop/purchase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Purchase a classroom shop item atomically
+         * @description Atomically validates student membership, catalog availability, implementation status, and unique ownership; debits the server-derived effective price from the points ledger; and records the purchase (plus ClassroomItem for classroom_item kinds). Requires an Idempotency-Key header (1-128 trimmed characters): returns 201 Created on new purchases and 200 OK on idempotent replays.
+         */
+        post: operations["ShopController_purchase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/roster": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List student roster for classroom staff
+         * @description Includes active and inactive student memberships and historical guardian links. Ordered by displayName ascending, then membership id ascending. Separate from the D12 member directory.
+         */
+        get: operations["ClassroomRosterController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List classroom member directory readable by members
+         * @description Provides public member cards (displayName, role, avatar) for classroom members. Accessible to active teachers, enrolled students, and school staff. Ordered by displayName ascending, then user id ascending as tiebreaker (using localeCompare semantics). Supports pagination and optional case-insensitive displayName prefix filter q. Strict privacy: never leaks emails, parent links, password hashes, or grades.
+         */
+        get: operations["ClassroomDirectoryController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/students/{studentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Logically remove a student and revoke child-specific parent access */
+        delete: operations["ClassroomRemovalController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/desks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the complete classroom desk map
+         * @description Available to enrolled students, classroom teachers and the school Owner/Admin. Includes free and expanded desks, ordered by deskIndex ascending. One unpaginated physical layout; no mutations or implicit repair. Parent-only access is excluded.
+         */
+        get: operations["ClassroomDesksController_read"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/activities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List activities
+         * @description Staff see drafts and published (filter with `state`); students see published only (their `state` filter is ignored). Linked parents are not part of the activity matrix (403). Deactivated activities are never listed. Sortable by `dueAt` (default, ascending) or `createdAt`; `id` is the tiebreaker.
+         */
+        get: operations["ActivitiesController_list"];
+        put?: never;
+        /**
+         * Create a draft activity
+         * @description Teacher-level staff only. Creates a DRAFT (invisible to students). Cross-field rules checked by the service: `opensAt` only for EXAM and strictly before `dueAt`.
+         */
+        post: operations["ActivitiesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/activities/{activityId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get one activity
+         * @description Role-dependent shape: staff receive the teacher view (questions with `isCorrect`); students receive the student view (no `isCorrect` anywhere) and only published activities. Linked parents receive 403.
+         */
+        get: operations["ActivitiesController_get"];
+        put?: never;
+        post?: never;
+        /**
+         * Deactivate an activity
+         * @description Teacher-level staff only. Logical deletion (`deletedAt`); rows are never physically removed. Refused (409) once any student has submitted.
+         */
+        delete: operations["ActivitiesController_deactivate"];
+        options?: never;
+        head?: never;
+        /**
+         * Update an activity
+         * @description Teacher-level staff only. Partial update; `type` and `format` are immutable. `questions` replaces all questions and stays editable only until the first submission exists (409 afterwards); title, description and dates remain editable.
+         */
+        patch: operations["ActivitiesController_update"];
+        trace?: never;
+    };
+    "/classrooms/{id}/activities/{activityId}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish a draft activity
+         * @description Teacher-level staff only. Moves DRAFT to PUBLISHED (one way) and records one `activity_published` notification per active student in the same transaction, so notices are delivered only after the publish commits. `dueAt` must still be in the future and multiple-choice activities need valid questions (400).
+         */
+        post: operations["ActivitiesController_publish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/context-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Subscribe to live context hints; refetch classroom context on every connection and hint */
+        get: operations["ClassroomContextEventsController_connect"];
         put?: never;
         post?: never;
         delete?: never;
@@ -734,6 +1228,125 @@ export interface components {
              */
             updatedAt: string;
         };
+        JoinClassroomWithCodeDto: {
+            /**
+             * @description Classroom access code (normalized uppercase alphanumeric)
+             * @example K7P9X2M
+             */
+            code: string;
+        };
+        AssignedDeskDto: {
+            /** @description Desk UUID */
+            id: string;
+            /** @description 1-based index of the assigned desk in the classroom. When every desk is taken, the server creates a new desk (highest index + 1) so each enrolled student has one; classrooms have no capacity limit */
+            deskIndex: number;
+        };
+        JoinClassroomResponseDto: {
+            /** @description Classroom UUID */
+            classroomId: string;
+            /** @description Created or existing membership UUID */
+            membershipId: string;
+            /**
+             * @default STUDENT
+             * @enum {string}
+             */
+            role: "TEACHER" | "STUDENT";
+            desk: components["schemas"]["AssignedDeskDto"] | null;
+            /** @description True if the caller was already enrolled in this classroom (idempotent rejoin) */
+            alreadyMember: boolean;
+        };
+        ClassroomContextResponseDto: {
+            /**
+             * @description Unique classroom identifier (UUID)
+             * @example 4e5f6a7b-0000-4000-8000-000000000002
+             */
+            id: string;
+            /**
+             * @description Display name of the virtual classroom
+             * @example 3° Año B - Matemática
+             */
+            name: string;
+            /**
+             * @description Optional subject or course description
+             * @example Matemática y Geometría
+             */
+            subject: string | null;
+            /**
+             * @description Owning school UUID when the classroom belongs to a school, or null
+             * @example 3f6c2d9e-0000-4000-8000-000000000000
+             */
+            schoolId: string | null;
+            /**
+             * @description Owning independent teacher user UUID when the classroom belongs to an independent teacher, or null
+             * @example null
+             */
+            independentTeacherId: string | null;
+            /**
+             * @description Whether the classroom runs in adult education mode
+             * @example false
+             */
+            adultMode: boolean;
+            /**
+             * @description Whether the classroom student chat is muted
+             * @example false
+             */
+            chatMuted: boolean;
+            /**
+             * @description Whether collaborative editing is locked
+             * @example false
+             */
+            collaborationLocked: boolean;
+            /**
+             * @description Whether interactive classroom games are disabled
+             * @example false
+             */
+            gamesDisabled: boolean;
+            /**
+             * @description Resolved role of the authenticated caller in this classroom
+             * @example TEACHER
+             * @enum {string}
+             */
+            myRole: "OWNER" | "ADMIN" | "TEACHER" | "STUDENT" | "PARENT";
+            /**
+             * @description Server-derived capabilities granted to the caller in this classroom
+             * @example [
+             *       "configure_classroom",
+             *       "invite_members",
+             *       "publish_content",
+             *       "moderate_chat",
+             *       "configure_bot",
+             *       "view_metrics",
+             *       "chat_classmates",
+             *       "list_directory",
+             *       "message_teacher"
+             *     ]
+             */
+            capabilities: ("manage_school" | "configure_classroom" | "invite_members" | "publish_content" | "moderate_chat" | "configure_bot" | "view_metrics" | "participate_activities" | "chat_classmates" | "list_directory" | "message_teacher")[];
+            /**
+             * @description Classroom creation timestamp in UTC (ISO 8601)
+             * @example 2026-11-07T20:00:00.000Z
+             */
+            createdAt: string;
+            /**
+             * @description Classroom last update timestamp in UTC (ISO 8601)
+             * @example 2026-11-07T20:00:00.000Z
+             */
+            updatedAt: string;
+            /**
+             * @description Total number of desks provisioned in the classroom
+             * @example 12
+             */
+            deskCount: number;
+            /** @description The classroom pet state */
+            pet: components["schemas"]["ClassroomPetSummaryDto"] | null;
+            /**
+             * @description Stable, unique panel availability for the authorized caller, not action permissions. An absent panel is unavailable; a present panel may be empty. Pet is reserved and never emitted.
+             * @example [
+             *       "grades"
+             *     ]
+             */
+            availablePanels: components["schemas"]["ClassroomPanelKey"][];
+        };
         UpdateClassroomDto: {
             /**
              * @description Updated display name of the virtual classroom
@@ -766,6 +1379,702 @@ export interface components {
              */
             gamesDisabled?: boolean;
         };
+        CreateClassroomInvitationDto: {
+            /**
+             * @description Target email address to invite
+             * @example student@example.edu.ar
+             */
+            email: string;
+            /**
+             * @description Classroom role for the invitee. Only STUDENT is supported; teacher invitations are out of scope for classroom invitations.
+             * @default STUDENT
+             * @enum {string}
+             */
+            role: "STUDENT";
+        };
+        CreatedClassroomInvitationResponseDto: {
+            /** @description Invitation UUID */
+            id: string;
+            /**
+             * @description Type of invitation
+             * @enum {string}
+             */
+            kind: "EMAIL" | "JOIN_CODE";
+            /** @description Target email for EMAIL invitations */
+            targetEmail?: Record<string, never> | null;
+            /**
+             * @description Assigned role upon joining
+             * @enum {string}
+             */
+            role: "OWNER" | "ADMIN" | "TEACHER" | "STUDENT";
+            /** @description Maximum allowed uses, null if unlimited */
+            maxUses?: Record<string, never> | null;
+            /** @description Number of times this invitation has been used */
+            useCount: number;
+            /**
+             * @description Current lifecycle state
+             * @enum {string}
+             */
+            state: "PENDING" | "USED" | "REVOKED" | "EXPIRED";
+            /**
+             * Format: date-time
+             * @description Expiration timestamp
+             */
+            expiresAt: string;
+            /**
+             * Format: date-time
+             * @description Creation timestamp
+             */
+            createdAt: string;
+            /**
+             * @description Raw invitation secret token, returned only once upon creation
+             * @example 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b
+             */
+            token: string;
+        };
+        ClassroomInvitationResponseDto: {
+            /** @description Invitation UUID */
+            id: string;
+            /**
+             * @description Type of invitation
+             * @enum {string}
+             */
+            kind: "EMAIL" | "JOIN_CODE";
+            /** @description Target email for EMAIL invitations */
+            targetEmail?: Record<string, never> | null;
+            /**
+             * @description Assigned role upon joining
+             * @enum {string}
+             */
+            role: "OWNER" | "ADMIN" | "TEACHER" | "STUDENT";
+            /** @description Maximum allowed uses, null if unlimited */
+            maxUses?: Record<string, never> | null;
+            /** @description Number of times this invitation has been used */
+            useCount: number;
+            /**
+             * @description Current lifecycle state
+             * @enum {string}
+             */
+            state: "PENDING" | "USED" | "REVOKED" | "EXPIRED";
+            /**
+             * Format: date-time
+             * @description Expiration timestamp
+             */
+            expiresAt: string;
+            /**
+             * Format: date-time
+             * @description Creation timestamp
+             */
+            createdAt: string;
+        };
+        RevokeInvitationResponseDto: {
+            /** @description Revoked invitation UUID */
+            id: string;
+            /**
+             * @example REVOKED
+             * @enum {string}
+             */
+            state: "PENDING" | "USED" | "REVOKED" | "EXPIRED";
+        };
+        CreateJoinCodeDto: {
+            /** @description Maximum uses for this join code (omit for unlimited) */
+            maxUses?: number;
+            /** @description Lifetime in seconds for this join code (defaults to server config INVITATION_TTL) */
+            expiresInSeconds?: number;
+        };
+        JoinCodeResponseDto: {
+            /** @description Invitation UUID */
+            id: string;
+            /**
+             * @description Raw shareable join code (6-8 alphanumeric characters). Shown ONCE upon generation.
+             * @example K7P9X2M
+             */
+            code: string;
+            /**
+             * @default STUDENT
+             * @enum {string}
+             */
+            role: "OWNER" | "ADMIN" | "TEACHER" | "STUDENT";
+            /** @description Maximum uses, null if unlimited */
+            maxUses?: Record<string, never> | null;
+            /**
+             * @description Current use count
+             * @default 0
+             */
+            useCount: number;
+            /**
+             * @default PENDING
+             * @enum {string}
+             */
+            state: "PENDING" | "USED" | "REVOKED" | "EXPIRED";
+            /**
+             * Format: date-time
+             * @description Expiration timestamp
+             */
+            expiresAt: string;
+            /**
+             * Format: date-time
+             * @description Creation timestamp
+             */
+            createdAt: string;
+        };
+        AcceptInvitationDto: {
+            /**
+             * @description Opaque token received via invitation email
+             * @example 4f7e2d9a8c1b3e5f7a9d0c2e4b6a8f1d3c5e7b9a0c2e4f6a8b0d2e4f6a8b0c2e
+             */
+            token: string;
+        };
+        NotificationDto: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "activity_published" | "grade_posted" | "announcement" | "mention";
+            /**
+             * Format: uuid
+             * @description Navigation only; source endpoint authorizes detail access independently.
+             */
+            resourceId: string;
+            /** Format: uuid */
+            classroomId: string;
+            /** Format: uuid */
+            studentId: string | null;
+            /** Format: date-time */
+            readAt: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        NotificationsReadResultDto: {
+            /** @description Number of previously unread, currently visible notices changed by this request. */
+            updated: number;
+        };
+        CreateSubmissionBodyDto: {
+            /** @description 1-5 files of at most 10 MB each. Allowed content (detected from the bytes): PDF, PNG, JPEG, DOCX. */
+            files: string[];
+        };
+        SubmissionFileResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** @description Sanitized display name (no path, no control characters). */
+            originalName: string;
+            /**
+             * @description Detected from the file bytes, never from the client-declared type.
+             * @example application/pdf
+             */
+            contentType: string;
+            sizeBytes: number;
+            /** @description Zero-based order in which the files were sent. */
+            position: number;
+        };
+        SubmissionResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            activityId: string;
+            /**
+             * Format: date-time
+             * @description Server clock, ISO 8601 UTC, taken once the activity row was locked.
+             */
+            submittedAt: string;
+            /** @description True when submitted after `dueAt` on an activity with `allowLate`. */
+            isLate: boolean;
+            /**
+             * @description Derived state of the work.
+             * @enum {string}
+             */
+            status: "submitted";
+            files: components["schemas"]["SubmissionFileResponseDto"][];
+        };
+        SubmissionFileDownloadDto: {
+            /** Format: uuid */
+            id: string;
+            /** @description Sanitized display name (no path, no control characters). */
+            originalName: string;
+            /**
+             * @description Detected from the file bytes, never from the client-declared type.
+             * @example application/pdf
+             */
+            contentType: string;
+            sizeBytes: number;
+            /** @description Zero-based order in which the files were sent. */
+            position: number;
+            /** @description Short-lived signed URL that downloads the file without credentials. Treat it as a secret: do not log or share it; request the submission again for a fresh one. */
+            downloadUrl: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 UTC instant after which `downloadUrl` stops working.
+             */
+            downloadUrlExpiresAt: string;
+        };
+        SubmissionDownloadResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            activityId: string;
+            /**
+             * Format: date-time
+             * @description Server clock, ISO 8601 UTC, taken once the activity row was locked.
+             */
+            submittedAt: string;
+            /** @description True when submitted after `dueAt` on an activity with `allowLate`. */
+            isLate: boolean;
+            /**
+             * @description Derived state of the work.
+             * @enum {string}
+             */
+            status: "submitted";
+            files: components["schemas"]["SubmissionFileDownloadDto"][];
+        };
+        /** @enum {string} */
+        PointEntryKind: "EARNING" | "DEBIT" | "COMPENSATION";
+        PointMovementDto: {
+            /** Format: uuid */
+            id: string;
+            entryKind: components["schemas"]["PointEntryKind"];
+            /**
+             * @description Signed integer delta: positive for earnings, negative for debits, non-zero signed for compensations.
+             * @example 50
+             */
+            amount: number;
+            /** @example submission_grade */
+            sourceType: string;
+            /** Format: uuid */
+            sourceId: string;
+            /** @example Activity graded: Fractions Quiz */
+            reason: string;
+            /** Format: uuid */
+            actorId: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        StudentWalletDto: {
+            /** Format: uuid */
+            classroomId: string;
+            /** Format: uuid */
+            studentId: string;
+            /**
+             * @description Server-derived current balance computed as SUM(amount) in the classroom.
+             * @example 120
+             */
+            balance: number;
+            items: components["schemas"]["PointMovementDto"][];
+            /** @example 1 */
+            page: number;
+            /** @example 20 */
+            pageSize: number;
+            /**
+             * @description Total number of ledger entries for this student in the classroom.
+             * @example 3
+             */
+            total: number;
+        };
+        /** @enum {string} */
+        ShopItemKind: "CLASSROOM_ITEM" | "AVATAR_ACCESSORY" | "DESK_UPGRADE" | "PET_ACCESSORY";
+        ShopCatalogItemDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example cap_blue */
+            code: string;
+            /** @example Blue Classroom Cap */
+            name: string;
+            /** @example Classic blue cap accessory for your 3D avatar. */
+            description: string;
+            kind: components["schemas"]["ShopItemKind"];
+            /**
+             * @description Effective server price in this classroom (override when set, else defaultPrice).
+             * @example 50
+             */
+            price: number;
+            /** @description Whether this catalog item has a working server/client implementation. */
+            isImplemented: boolean;
+            /** @description True when implemented and not already owned by the student or classroom. */
+            isPurchasable: boolean;
+            ownedByStudent: boolean;
+            ownedByClassroom: boolean;
+            /**
+             * @description Server-defined item metadata for client asset rendering.
+             * @example {
+             *       "assetId": "cap",
+             *       "slot": "head"
+             *     }
+             */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            createdAt: string;
+        };
+        StudentPurchaseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            classroomId: string;
+            /** Format: uuid */
+            studentId: string;
+            /** Format: uuid */
+            shopItemId: string;
+            /** @example cap_blue */
+            shopItemCode: string;
+            /** @example Blue Classroom Cap */
+            shopItemName: string;
+            shopItemKind: components["schemas"]["ShopItemKind"];
+            /** Format: uuid */
+            pointTransactionId: string;
+            /**
+             * @description Server-recorded points paid at purchase time.
+             * @example 50
+             */
+            pricePaid: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PurchaseShopItemDto: {
+            /**
+             * Format: uuid
+             * @description UUID of the catalog shop item to purchase.
+             * @example 00000000-0000-4000-8000-000000000101
+             */
+            shopItemId: string;
+        };
+        /** @enum {string} */
+        ClassroomItemState: "UNLOCKED" | "ACTIVE" | "DISABLED";
+        ClassroomItemDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            classroomId: string;
+            /** Format: uuid */
+            shopItemId: string;
+            /** Format: uuid */
+            purchaseId: string;
+            state: components["schemas"]["ClassroomItemState"];
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PurchaseResponseDto: {
+            purchase: components["schemas"]["StudentPurchaseDto"];
+            classroomItem: components["schemas"]["ClassroomItemDto"] | null;
+            /**
+             * @description Server-derived student points balance after this operation.
+             * @example 70
+             */
+            balance: number;
+            /** @description True when the response replays an earlier purchase for the same Idempotency-Key. */
+            replayed: boolean;
+        };
+        RosterGuardianDto: {
+            /** Format: uuid */
+            id: string;
+            displayName: string;
+            /**
+             * @description Historical link state, not access authority.
+             * @enum {string}
+             */
+            state: "ACTIVE" | "INACTIVE";
+        };
+        RosterStudentDto: {
+            /** Format: uuid */
+            membershipId: string;
+            /** Format: uuid */
+            userId: string;
+            displayName: string;
+            /** @enum {string} */
+            state: "ACTIVE" | "INACTIVE";
+            /** Format: date-time */
+            deletedAt: string | null;
+            guardians: components["schemas"]["RosterGuardianDto"][];
+        };
+        ClassroomMemberDto: {
+            /**
+             * Format: uuid
+             * @description User identifier.
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description User identifier (matches id).
+             */
+            userId: string;
+            /** @description Display name. */
+            displayName: string;
+            /**
+             * @description Classroom member role (Teacher or Student).
+             * @enum {string}
+             */
+            role: "TEACHER" | "STUDENT";
+            /** @description Avatar appearance configuration. */
+            avatar: components["schemas"]["AvatarDto"];
+        };
+        ClassroomDeskDto: {
+            /**
+             * Format: uuid
+             * @description Stable physical desk identifier.
+             */
+            id: string;
+            /** @description Persisted 1-based layout index; not a fixed seat count. */
+            deskIndex: number;
+            /**
+             * Format: uuid
+             * @description Assigned enrollment, or null for a free desk.
+             */
+            membershipId: string | null;
+            /**
+             * Format: uuid
+             * @description Assigned student user identifier, or null for a free desk. No directory profile data.
+             */
+            userId: string | null;
+        };
+        ClassroomDeskMapDto: {
+            /** @description Complete physical layout ordered by deskIndex ascending, including unassigned desks. Unpaginated. */
+            items: components["schemas"]["ClassroomDeskDto"][];
+        };
+        OptionInputDto: {
+            label: string;
+            /** @description Exactly one option per question must be correct. */
+            isCorrect: boolean;
+        };
+        QuestionInputDto: {
+            prompt: string;
+            /** @description Order is the display order. Exactly one option must have `isCorrect: true` (single answer). */
+            options: components["schemas"]["OptionInputDto"][];
+        };
+        CreateActivityDto: {
+            /** @enum {string} */
+            type: "TP" | "EXAM";
+            /**
+             * @description Immutable after creation.
+             * @enum {string}
+             */
+            format: "FILE" | "MULTIPLE_CHOICE";
+            title: string;
+            /** @default  */
+            description: string;
+            /**
+             * Format: date-time
+             * @description Only meaningful for EXAM (TP must not set it; enforced by the service). Must be strictly before dueAt. ISO 8601 with offset; stored as UTC. Omit it for no window; `null` is rejected, so it cannot be removed through PATCH.
+             */
+            opensAt?: string;
+            /**
+             * Format: date-time
+             * @description Deadline. ISO 8601 with offset; stored as UTC.
+             */
+            dueAt: string;
+            /**
+             * @description Accept submissions after dueAt.
+             * @default false
+             */
+            allowLate: boolean;
+            maxScore: number;
+            /**
+             * @description Weight in the period average. At most 2 decimals. Defaults are applied by the service, not on the DTO, so PATCH never resets them.
+             * @default 1
+             */
+            weightMultiplier: number;
+            /** @description Required when format is MULTIPLE_CHOICE; forbidden for FILE. */
+            questions?: components["schemas"]["QuestionInputDto"][];
+        };
+        TeacherOptionDto: {
+            /** Format: uuid */
+            id: string;
+            position: number;
+            label: string;
+            /** @description Teacher view only; never present in the student view. */
+            isCorrect: boolean;
+        };
+        TeacherQuestionDto: {
+            /** Format: uuid */
+            id: string;
+            position: number;
+            prompt: string;
+            options: components["schemas"]["TeacherOptionDto"][];
+        };
+        TeacherActivityResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            classroomId: string;
+            /** @enum {string} */
+            type: "TP" | "EXAM";
+            /** @enum {string} */
+            format: "FILE" | "MULTIPLE_CHOICE";
+            /** @enum {string} */
+            state: "DRAFT" | "PUBLISHED";
+            title: string;
+            description: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 UTC.
+             */
+            opensAt: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 UTC.
+             */
+            dueAt: string;
+            allowLate: boolean;
+            maxScore: number;
+            /**
+             * @description Number, not a decimal string.
+             * @example 1.5
+             */
+            weightMultiplier: number;
+            /**
+             * Format: date-time
+             * @description ISO 8601 UTC.
+             */
+            publishedAt: string | null;
+            /**
+             * @description School IANA time zone for rendering the instants above.
+             * @example America/Argentina/Buenos_Aires
+             */
+            timeZone: string;
+            questionCount: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: uuid */
+            createdById: string;
+            /** @description Includes correct answers. */
+            questions: components["schemas"]["TeacherQuestionDto"][];
+        };
+        ActivitySummaryDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            classroomId: string;
+            /** @enum {string} */
+            type: "TP" | "EXAM";
+            /** @enum {string} */
+            format: "FILE" | "MULTIPLE_CHOICE";
+            /** @enum {string} */
+            state: "DRAFT" | "PUBLISHED";
+            title: string;
+            description: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 UTC.
+             */
+            opensAt: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 UTC.
+             */
+            dueAt: string;
+            allowLate: boolean;
+            maxScore: number;
+            /**
+             * @description Number, not a decimal string.
+             * @example 1.5
+             */
+            weightMultiplier: number;
+            /**
+             * Format: date-time
+             * @description ISO 8601 UTC.
+             */
+            publishedAt: string | null;
+            /**
+             * @description School IANA time zone for rendering the instants above.
+             * @example America/Argentina/Buenos_Aires
+             */
+            timeZone: string;
+            questionCount: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        StudentOptionDto: {
+            /** Format: uuid */
+            id: string;
+            position: number;
+            label: string;
+        };
+        StudentQuestionDto: {
+            /** Format: uuid */
+            id: string;
+            position: number;
+            prompt: string;
+            options: components["schemas"]["StudentOptionDto"][];
+        };
+        StudentActivityResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            classroomId: string;
+            /** @enum {string} */
+            type: "TP" | "EXAM";
+            /** @enum {string} */
+            format: "FILE" | "MULTIPLE_CHOICE";
+            /** @enum {string} */
+            state: "DRAFT" | "PUBLISHED";
+            title: string;
+            description: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 UTC.
+             */
+            opensAt: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 UTC.
+             */
+            dueAt: string;
+            allowLate: boolean;
+            maxScore: number;
+            /**
+             * @description Number, not a decimal string.
+             * @example 1.5
+             */
+            weightMultiplier: number;
+            /**
+             * Format: date-time
+             * @description ISO 8601 UTC.
+             */
+            publishedAt: string | null;
+            /**
+             * @description School IANA time zone for rendering the instants above.
+             * @example America/Argentina/Buenos_Aires
+             */
+            timeZone: string;
+            questionCount: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description Never includes correct answers. */
+            questions: components["schemas"]["StudentQuestionDto"][];
+        };
+        UpdateActivityDto: {
+            title?: string;
+            /** @default  */
+            description: string;
+            /**
+             * Format: date-time
+             * @description Only meaningful for EXAM (TP must not set it; enforced by the service). Must be strictly before dueAt. ISO 8601 with offset; stored as UTC. Omit it for no window; `null` is rejected, so it cannot be removed through PATCH.
+             */
+            opensAt?: string;
+            /**
+             * Format: date-time
+             * @description Deadline. ISO 8601 with offset; stored as UTC.
+             */
+            dueAt?: string;
+            /**
+             * @description Accept submissions after dueAt.
+             * @default false
+             */
+            allowLate: boolean;
+            maxScore?: number;
+            /**
+             * @description Weight in the period average. At most 2 decimals. Defaults are applied by the service, not on the DTO, so PATCH never resets them.
+             * @default 1
+             */
+            weightMultiplier: number;
+            /** @description Replaces all questions and options. Only for MULTIPLE_CHOICE activities, and only until the first submission exists (then 409). */
+            questions?: components["schemas"]["QuestionInputDto"][];
+        };
+        /** @enum {string} */
+        ClassroomPanelKey: "activities" | "material" | "grades" | "chat" | "notices" | "shop" | "bot" | "members" | "settings" | "pet";
     };
     responses: never;
     parameters: never;
@@ -1247,6 +2556,75 @@ export interface operations {
             };
         };
     };
+    ClassroomsController_joinClassroom: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JoinClassroomWithCodeDto"];
+            };
+        };
+        responses: {
+            /** @description Successfully joined the classroom with desk allocated. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinClassroomResponseDto"];
+                };
+            };
+            /** @description Malformed code or join code is no longer active / expired. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Join code does not exist or classroom was deleted. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Join code has reached maximum uses or concurrent join conflict occurred. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded: too many invalid join code attempts. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
     ClassroomsController_findOne: {
         parameters: {
             query?: never;
@@ -1259,13 +2637,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Classroom details and caller capabilities. */
+            /** @description Classroom details, caller capabilities and available panels. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ClassroomDetailResponseDto"];
+                    "application/json": components["schemas"]["ClassroomContextResponseDto"];
                 };
             };
             /** @description Missing, malformed, expired, or revoked access token. */
@@ -1351,6 +2729,318 @@ export interface operations {
             };
         };
     };
+    ClassroomsController_listInvitations: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+                /** @description Field to order by; prefix with "-" for descending. Allowed fields and the default order are listed per endpoint. */
+                sort?: string;
+                /** @description Filter invitations by status (default is PENDING) */
+                status?: "PENDING" | "USED" | "REVOKED" | "EXPIRED" | "ALL";
+            };
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of invitations. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ClassroomInvitationResponseDto"][];
+                        /** @example 1 */
+                        page: number;
+                        /** @example 20 */
+                        pageSize: number;
+                        /**
+                         * @description Item count across all pages.
+                         * @example 42
+                         */
+                        total: number;
+                    };
+                };
+            };
+            /** @description Invalid pagination or status filter parameters. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Caller is a student or parent without invite_members capability. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Classroom does not exist or caller has no relationship with it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ClassroomsController_createInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateClassroomInvitationDto"];
+            };
+        };
+        responses: {
+            /** @description Email invitation created, raw secret token returned once, and outbox event scheduled. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedClassroomInvitationResponseDto"];
+                };
+            };
+            /** @description Validation failed on email or role. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Caller is a student or parent without invite_members capability. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Classroom does not exist or caller has no relationship with it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ClassroomsController_revokeInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Invitation UUID to revoke */
+                invitationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invitation revoked successfully. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevokeInvitationResponseDto"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Caller lacks invite_members authority. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Classroom or invitation does not exist. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ClassroomsController_generateJoinCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateJoinCodeDto"];
+            };
+        };
+        responses: {
+            /** @description New join code created. Raw code is exposed only in this response. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinCodeResponseDto"];
+                };
+            };
+            /** @description Invalid parameters for maxUses or expiresInSeconds. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Caller lacks invite_members authority. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Classroom does not exist or caller has no relationship with it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ClassroomsController_revokeJoinCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Join code revoked successfully. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @example true */
+                        success?: boolean;
+                        /** @example Join code revoked successfully */
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Caller lacks invite_members authority. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Classroom not found or no active join code exists. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
     MeClassroomsController_listMyClassrooms: {
         parameters: {
             query?: {
@@ -1404,6 +3094,1443 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
+            };
+        };
+    };
+    InvitationsController_accept: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptInvitationDto"];
+            };
+        };
+        responses: {
+            /** @description Classroom membership established and desk assigned. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinClassroomResponseDto"];
+                };
+            };
+            /** @description Invitation token is malformed, expired, or already used. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invitation token does not exist or classroom was deleted. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Concurrent invitation acceptance conflict. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    NotificationsController_list: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Minimal navigation metadata; no source content. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["NotificationDto"][];
+                        /** @example 1 */
+                        page: number;
+                        /** @example 20 */
+                        pageSize: number;
+                        /**
+                         * @description Item count across all pages.
+                         * @example 42
+                         */
+                        total: number;
+                    };
+                };
+            };
+            /** @description Invalid or unknown query parameters. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing or invalid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    NotificationsController_readAll: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationsReadResultDto"];
+                };
+            };
+            /** @description Missing or invalid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    NotificationsController_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Notification UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationDto"];
+                };
+            };
+            /** @description Missing or invalid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Malformed, nonexistent, foreign-recipient or currently inaccessible notification. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    SubmissionsController_create: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated key, 1-255 characters (a UUID is recommended). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description Activity UUID */
+                activityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["CreateSubmissionBodyDto"];
+            };
+        };
+        responses: {
+            /** @description Idempotent replay: the existing submission, nothing new stored. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionResponseDto"];
+                };
+            };
+            /** @description Submission stored. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionResponseDto"];
+                };
+            };
+            /** @description Missing or invalid `Idempotency-Key`, no files, disallowed or empty files (`VALIDATION_FAILED` with details), or too many files / unexpected field (`BAD_REQUEST`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom but not a student (staff, linked parent). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent, draft or deactivated activity, or not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Already submitted with another key, window closed or not yet open, or not a file activity (`details` names the reason). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description A file exceeds 10 MB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    SubmissionsController_readOwn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Activity UUID */
+                activityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionDownloadResponseDto"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom but not a student (staff, linked parent). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent, draft or deactivated activity, not a member, or nothing submitted yet. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    SubmissionReadController_readById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Submission UUID */
+                submissionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionDownloadResponseDto"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Malformed or unknown id, deactivated activity, or the caller may not read it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    PointsController_getOwnWallet: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+                /** @description Field to order by; prefix with "-" for descending. Allowed fields and the default order are listed per endpoint. */
+                sort?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentWalletDto"];
+                };
+            };
+            /** @description Invalid pagination, sort, or unknown query parameters. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing or invalid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom, but caller is not an active enrolled student. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Malformed, nonexistent, or inaccessible classroom. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    PointsController_getStudentWallet: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+                /** @description Field to order by; prefix with "-" for descending. Allowed fields and the default order are listed per endpoint. */
+                sort?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Target student user UUID */
+                studentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentWalletDto"];
+                };
+            };
+            /** @description Invalid pagination, sort, or unknown query parameters. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing or invalid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Classmate student cannot access another student points wallet. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Malformed, nonexistent, or inaccessible classroom or student resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ShopController_listItems: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+                /** @description Field to order by; prefix with "-" for descending. Allowed fields and the default order are listed per endpoint. */
+                sort?: string;
+                /** @description Optional filter by shop item kind. */
+                kind?: components["schemas"]["ShopItemKind"];
+            };
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated classroom shop catalog items. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ShopCatalogItemDto"][];
+                        /** @example 1 */
+                        page: number;
+                        /** @example 20 */
+                        pageSize: number;
+                        /**
+                         * @description Item count across all pages.
+                         * @example 42
+                         */
+                        total: number;
+                    };
+                };
+            };
+            /** @description Invalid pagination, sort, kind filter, or unknown query parameters. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing or invalid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom, but caller is not an active enrolled student. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Malformed, nonexistent, or inaccessible classroom or shop item. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ShopController_listPurchases: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+                /** @description Field to order by; prefix with "-" for descending. Allowed fields and the default order are listed per endpoint. */
+                sort?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated student shop purchases. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["StudentPurchaseDto"][];
+                        /** @example 1 */
+                        page: number;
+                        /** @example 20 */
+                        pageSize: number;
+                        /**
+                         * @description Item count across all pages.
+                         * @example 42
+                         */
+                        total: number;
+                    };
+                };
+            };
+            /** @description Invalid pagination, sort, or unknown query parameters. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing or invalid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom, but caller is not an active enrolled student. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Malformed, nonexistent, or inaccessible classroom or shop item. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ShopController_purchase: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Client-generated idempotency key (1-128 trimmed non-empty characters). */
+                "Idempotency-Key": string;
+            };
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurchaseShopItemDto"];
+            };
+        };
+        responses: {
+            /** @description Idempotent replay of a previous purchase; no second debit occurred. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseResponseDto"];
+                };
+            };
+            /** @description New purchase recorded and points debited from the student ledger. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseResponseDto"];
+                };
+            };
+            /** @description Missing/invalid Idempotency-Key header, invalid shopItemId, or extra body fields. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing or invalid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom, but caller is not an active enrolled student. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Malformed, nonexistent, or inaccessible classroom or shop item. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Insufficient points balance, unimplemented item, duplicate ownership, or Idempotency-Key reused with another item. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Per-user purchase rate limit exceeded. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ClassroomRosterController_list: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+                /** @description Omit to include both states. */
+                state?: "ACTIVE" | "INACTIVE";
+                /** @description Case-insensitive display-name prefix. */
+                q?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Student roster including historical logical rows. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["RosterStudentDto"][];
+                        /** @example 1 */
+                        page: number;
+                        /** @example 20 */
+                        pageSize: number;
+                        /**
+                         * @description Item count across all pages.
+                         * @example 42
+                         */
+                        total: number;
+                    };
+                };
+            };
+            /** @description Invalid or unknown query parameters. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom but insufficient role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent or out-of-scope classroom. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ClassroomDirectoryController_list: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+                /** @description Case-insensitive display-name prefix. */
+                q?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Classroom member directory. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ClassroomMemberDto"][];
+                        /** @example 1 */
+                        page: number;
+                        /** @example 20 */
+                        pageSize: number;
+                        /**
+                         * @description Item count across all pages.
+                         * @example 42
+                         */
+                        total: number;
+                    };
+                };
+            };
+            /** @description Invalid or unknown query parameters. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Classroom member directory is only accessible to classroom members. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent or out-of-scope classroom. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ClassroomRemovalController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Student USER UUID, not membership UUID */
+                studentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed, or already inactive/deleted; no response body. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom, insufficient role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid UUID, foreign/unknown classroom, or unknown/nonstudent target. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ClassroomDesksController_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassroomDeskMapDto"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Parent-only access to a visible classroom. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent, deleted or out-of-scope classroom. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ActivitiesController_list: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+                /** @description Field to order by; prefix with "-" for descending. Default `dueAt` ascending; `id` is the tiebreaker. */
+                sort?: "dueAt" | "createdAt" | "-dueAt" | "-createdAt";
+                /** @description Staff only. Students always receive published activities only and may not filter drafts. */
+                state?: "DRAFT" | "PUBLISHED";
+            };
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Activities without questions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ActivitySummaryDto"][];
+                        /** @example 1 */
+                        page: number;
+                        /** @example 20 */
+                        pageSize: number;
+                        /**
+                         * @description Item count across all pages.
+                         * @example 42
+                         */
+                        total: number;
+                    };
+                };
+            };
+            /** @description Invalid query parameters. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom but insufficient role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent or out-of-scope classroom or activity. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ActivitiesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateActivityDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeacherActivityResponseDto"];
+                };
+            };
+            /** @description Validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom but insufficient role (for example a student). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent or out-of-scope classroom or activity. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ActivitiesController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Activity UUID */
+                activityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Teacher view for staff, student view for students. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeacherActivityResponseDto"] | components["schemas"]["StudentActivityResponseDto"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom but insufficient role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent or out-of-scope classroom or activity. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ActivitiesController_deactivate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Activity UUID */
+                activityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deactivated. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Insufficient role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent or out-of-scope classroom or activity. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description The activity has submissions and cannot be deleted. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ActivitiesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Activity UUID */
+                activityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateActivityDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeacherActivityResponseDto"];
+                };
+            };
+            /** @description Validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Insufficient role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent or out-of-scope classroom or activity. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Questions can no longer change because a submission exists. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ActivitiesController_publish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Activity UUID */
+                activityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeacherActivityResponseDto"];
+                };
+            };
+            /** @description The activity is not publishable (past `dueAt`, invalid questions). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Insufficient role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent or out-of-scope classroom or activity. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Activity is already published. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ClassroomContextEventsController_connect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description classroom.context-invalidated events with JSON data {classroomId}; no replay */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            /** @description Missing, invalid, expired or revoked session */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Classroom unavailable or inaccessible */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authorization setup timed out or service is stopping */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
