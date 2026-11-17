@@ -197,99 +197,163 @@ test('shows a generic error on 401 login, keeps email, and clears password', asy
   expect(pageErrors).toEqual([]);
 });
 
-test('completes password reset request and token confirmation flows', async ({
-  page,
-}) => {
-  const { cspViolations, pageErrors } = await attachRuntimeMonitors(page);
-  let capturedConfirmBody: Record<string, unknown> | null = null;
+for (const signedIn of [false, true]) {
+  test(`completes password reset request and token confirmation flows (${signedIn ? 'signed in' : 'signed out'})`, async ({
+    page,
+  }) => {
+    const { cspViolations, pageErrors } = await attachRuntimeMonitors(page);
+    let capturedConfirmBody: Record<string, unknown> | null = null;
 
-  await page.route('**/auth/password-reset/request', async (route) => {
-    await route.fulfill({
-      status: 202,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        message: 'If the email is registered, reset instructions were sent.',
-      }),
+    await page.route('**/auth/password-reset/request', async (route) => {
+      await route.fulfill({
+        status: 202,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: 'If the email is registered, reset instructions were sent.',
+        }),
+      });
     });
-  });
 
-  await page.route('**/auth/password-reset/confirm', async (route) => {
-    capturedConfirmBody = route.request().postDataJSON() as Record<
-      string,
-      unknown
-    >;
-    await route.fulfill({ status: 204, body: '' });
-  });
+    await page.route('**/auth/password-reset/confirm', async (route) => {
+      capturedConfirmBody = route.request().postDataJSON() as Record<
+        string,
+        unknown
+      >;
+      await route.fulfill({ status: 204, body: '' });
+    });
 
-  await page.goto('./password-reset');
-  await page
-    .getByLabel(authMessages.passwordReset.request.fields.email.label)
-    .fill('ana@example.com');
-  await page
-    .getByRole('button', {
-      name: authMessages.passwordReset.request.actions.submit,
-    })
-    .click();
+    if (signedIn) {
+      await page.route('**/auth/login', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            accessToken: TEST_ACCESS_TOKEN,
+            refreshToken: TEST_REFRESH_TOKEN,
+            tokenType: 'Bearer',
+            expiresIn: 900,
+          }),
+        }),
+      );
+      await page.route('**/users/me', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            id: '00000000-0000-4000-8000-000000000001',
+            email: 'ana@example.com',
+            displayName: 'Synthetic Learner',
+            avatar: {
+              bodyId: 'female',
+              hairId: 'original',
+              topId: 'hoodie',
+              hairColor: '#6C4D48',
+              clothingColor: '#5B4F96',
+            },
+          }),
+        }),
+      );
+      await page.route('**/auth/logout', (route) =>
+        route.fulfill({ status: 204, body: '' }),
+      );
+      await page.goto('./login');
+      await page
+        .getByLabel(authMessages.login.fields.email.label)
+        .fill('ana@example.com');
+      await page
+        .getByLabel(authMessages.login.fields.password.label)
+        .fill('SyntheticPassword123');
+      await page
+        .getByRole('button', { name: authMessages.login.actions.submit })
+        .click();
+      await expect(
+        page.getByRole('heading', { name: messages.pages.home.title }),
+      ).toBeVisible();
+    }
 
-  await expect(
-    page.getByRole('heading', {
-      level: 3,
-      name: authMessages.passwordReset.request.confirmation.title,
-    }),
-  ).toBeVisible();
-  await expect(
-    page.getByText(authMessages.passwordReset.request.confirmation.body),
-  ).toBeVisible();
+    await page.goto('./password-reset');
+    await page
+      .getByLabel(authMessages.passwordReset.request.fields.email.label)
+      .fill('ana@example.com');
+    await page
+      .getByRole('button', {
+        name: authMessages.passwordReset.request.actions.submit,
+      })
+      .click();
 
-  await page.goto('./password-reset?token=valid-reset-token-123456');
-  const passwordInput = page.getByLabel(
-    authMessages.passwordReset.confirm.fields.newPassword.label,
-  );
-  await expect(passwordInput).toBeVisible();
-  await expect(page).toHaveURL(/\/password-reset$/);
-  await passwordInput.fill('NuevaClave123!');
-  await page
-    .getByRole('button', {
-      name: authMessages.passwordReset.confirm.actions.submit,
-    })
-    .click();
+    await expect(
+      page.getByRole('heading', {
+        level: 3,
+        name: authMessages.passwordReset.request.confirmation.title,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(authMessages.passwordReset.request.confirmation.body),
+    ).toBeVisible();
 
-  await expect(
-    page.getByRole('heading', {
-      level: 3,
-      name: authMessages.passwordReset.confirm.confirmed.title,
-    }),
-  ).toBeFocused();
-  await expect(
-    page.getByText(authMessages.passwordReset.confirm.confirmed.body),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('link', {
-      name: authMessages.passwordReset.confirm.actions.goToLogin,
-    }),
-  ).toHaveAttribute('href', '/login');
-
-  expect(capturedConfirmBody).toEqual({
-    token: 'valid-reset-token-123456',
-    newPassword: 'NuevaClave123!',
-  });
-
-  await page.goto('./password-reset?token=second-reset-token-654321&next=%2F');
-  await expect(
-    page.getByLabel(
+    expect(
+      await page.evaluate(
+        () => sessionStorage.getItem('integratec.session') !== null,
+      ),
+    ).toBe(signedIn);
+    await page.goto('./password-reset?token=valid-reset-token-123456');
+    const passwordInput = page.getByLabel(
       authMessages.passwordReset.confirm.fields.newPassword.label,
-    ),
-  ).toBeVisible();
-  await expect(page).toHaveURL(/\/password-reset\?next=%2F$/);
-  await expect(
-    page.getByRole('link', {
-      name: authMessages.passwordReset.confirm.actions.goToLogin,
-    }),
-  ).toHaveAttribute('href', '/login?next=%2F');
+    );
+    await expect(passwordInput).toBeVisible();
+    await expect(page).toHaveURL(/\/password-reset$/);
+    expect(
+      await page.evaluate(() => JSON.stringify(history.state)),
+    ).not.toContain('valid-reset-token-123456');
+    await passwordInput.fill('NuevaClave123!');
+    await page
+      .getByRole('button', {
+        name: authMessages.passwordReset.confirm.actions.submit,
+      })
+      .click();
 
-  expect(cspViolations).toEqual([]);
-  expect(pageErrors).toEqual([]);
-});
+    await expect(
+      page.getByRole('heading', {
+        level: 3,
+        name: authMessages.passwordReset.confirm.confirmed.title,
+      }),
+    ).toBeFocused();
+    await expect(
+      page.getByText(authMessages.passwordReset.confirm.confirmed.body),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('link', {
+        name: authMessages.passwordReset.confirm.actions.goToLogin,
+      }),
+    ).toHaveAttribute('href', '/login');
+
+    expect(
+      await page.evaluate(() => sessionStorage.getItem('integratec.session')),
+    ).toBeNull();
+    expect(capturedConfirmBody).toEqual({
+      token: 'valid-reset-token-123456',
+      newPassword: 'NuevaClave123!',
+    });
+
+    await page.goto(
+      './password-reset?token=second-reset-token-654321&next=%2F',
+    );
+    await expect(
+      page.getByLabel(
+        authMessages.passwordReset.confirm.fields.newPassword.label,
+      ),
+    ).toBeVisible();
+    await expect(page).toHaveURL(/\/password-reset\?next=%2F$/);
+    await expect(
+      page.getByRole('link', {
+        name: authMessages.passwordReset.confirm.actions.goToLogin,
+      }),
+    ).toHaveAttribute('href', '/login?next=%2F');
+
+    expect(cspViolations).toEqual([]);
+    expect(pageErrors).toEqual([]);
+  });
+}
 
 for (const width of [360, 1280]) {
   test(`renders login and password reset cleanly at ${width}px without overflow`, async ({

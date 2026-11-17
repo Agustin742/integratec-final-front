@@ -1,4 +1,10 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
@@ -13,7 +19,17 @@ import {
   vi,
 } from 'vitest';
 import { createAppRoutes } from '@/app/router/routes';
+import { createAppQueryClient } from '@/api/query-client';
 import { createSession } from '@/session/controller';
+import {
+  deferred,
+  harness,
+  json,
+  login,
+  profile,
+  storageKey,
+  tokens,
+} from '@/session/test-fixtures';
 import { SessionProvider } from '@/session/provider';
 import { expectAccessible } from '@/test/accessibility';
 import {
@@ -50,8 +66,11 @@ afterAll(() => {
   mswServer.close();
 });
 
-function renderPasswordResetRoute(initialPath = '/password-reset') {
-  const session = createSession({ baseUrl: TEST_API_BASE_URL });
+function renderPasswordResetRoute(
+  initialPath = '/password-reset',
+  session = createSession({ baseUrl: TEST_API_BASE_URL }),
+) {
+  const queryClient = createAppQueryClient();
   const router = createMemoryRouter(createAppRoutes(), {
     initialEntries: [initialPath],
   });
@@ -60,12 +79,249 @@ function renderPasswordResetRoute(initialPath = '/password-reset') {
     <SessionProvider service={session}>
       <RouterProvider router={router} />
     </SessionProvider>,
+    { queryClient },
   );
 
-  return { router, session, ...view };
+  return { router, session, queryClient, ...view };
 }
 
 describe('PasswordResetPage (/password-reset)', () => {
+  test.each(['request', 'confirm'] as const)(
+    'S1: signed-in %s mode stays reachable and only confirmed reset clears session and private cache',
+    async (mode) => {
+      const h = harness((request) => {
+        if (request.url.endsWith('/auth/password-reset/request')) {
+          return json({ message: 'Synthetic accepted request' }, 202);
+        }
+        if (
+          request.url.endsWith('/auth/password-reset/confirm') ||
+          request.url.endsWith('/auth/logout')
+        ) {
+          return new Response(null, { status: 204 });
+        }
+        return request.url.endsWith('/users/me') ? json(profile) : json(tokens);
+      });
+      const session = createSession(h);
+      expect((await session.controller.login(login)).ok).toBe(true);
+      const before = h.storage.getItem(storageKey);
+      const { router, queryClient } = renderPasswordResetRoute(
+        mode === 'confirm'
+          ? '/password-reset?token=synthetic-reset-token&next=%2F'
+          : '/password-reset',
+        session,
+      );
+      const copy = authMessages.passwordReset[mode];
+      const field = await screen.findByLabelText(
+        mode === 'confirm'
+          ? authMessages.passwordReset.confirm.fields.newPassword.label
+          : authMessages.passwordReset.request.fields.email.label,
+      );
+      queryClient.setQueryData(['private', 'synthetic-user'], {
+        private: true,
+      });
+      expect(router.state.location.pathname).toBe('/password-reset');
+      await waitFor(() =>
+        expect(router.state.location.search).not.toContain('token'),
+      );
+      expect(JSON.stringify(router.state.location.state)).not.toContain(
+        'synthetic-reset-token',
+      );
+      fireEvent.change(field, {
+        target: {
+          value: mode === 'confirm' ? 'NuevaPassword2026' : 'ana@example.com',
+        },
+      });
+      fireEvent.click(
+        screen.getByRole('button', { name: copy.actions.submit }),
+      );
+      await screen.findByRole('status');
+      expect(session.controller.getSnapshot().status).toBe(
+        mode === 'confirm' ? 'unauthenticated' : 'authenticated',
+      );
+      expect(h.storage.getItem(storageKey)).toBe(
+        mode === 'confirm' ? null : before,
+      );
+      expect(queryClient.getQueryData(['private', 'synthetic-user'])).toEqual(
+        mode === 'confirm' ? undefined : { private: true },
+      );
+      expect(
+        h.requests.filter((request) => request.url.endsWith('/auth/logout')),
+      ).toHaveLength(mode === 'confirm' ? 1 : 0);
+    },
+  );
+
+  test.each(['request', 'confirm'] as const)(
+    'S1: %s cancellation settles without an alert, success, credential drift or unhandled rejection',
+    async (mode) => {
+      let rejectReset!: (reason: unknown) => void;
+      const h = harness((request) => {
+        if (request.url.includes('/auth/password-reset/')) {
+          return new Promise<Response>((_resolve, reject) => {
+            rejectReset = reject;
+          });
+        }
+        throw new Error('Unexpected API request');
+      });
+      const session = createSession(h);
+      const { queryClient } = renderPasswordResetRoute(
+        mode === 'confirm'
+          ? '/password-reset?token=synthetic-reset-token'
+          : '/password-reset',
+        session,
+      );
+      const copy = authMessages.passwordReset[mode];
+      const field = await screen.findByLabelText(
+        mode === 'confirm'
+          ? authMessages.passwordReset.confirm.fields.newPassword.label
+          : authMessages.passwordReset.request.fields.email.label,
+      );
+      queryClient.setQueryData(['public-test'], 'unchanged');
+      const before = h.storage.getItem(storageKey);
+      fireEvent.change(field, {
+        target: {
+          value: mode === 'confirm' ? 'NuevaPassword2026' : 'ana@example.com',
+        },
+      });
+      fireEvent.click(
+        screen.getByRole('button', { name: copy.actions.submit }),
+      );
+      await waitFor(() => expect(rejectReset).toBeTypeOf('function'));
+      rejectReset(new DOMException('Synthetic cancellation', 'AbortError'));
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: copy.actions.submit }),
+        ).toBeEnabled(),
+      );
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      expect(h.storage.getItem(storageKey)).toBe(before);
+      expect(queryClient.getQueryData(['public-test'])).toBe('unchanged');
+      expect(h.requests).toHaveLength(1);
+      expect(session.controller.getSnapshot().status).toBe('unauthenticated');
+    },
+  );
+
+  test.each(['request', 'confirm'] as const)(
+    'S1: late %s response cannot affect a newer session even if fetch ignores abort',
+    async (mode) => {
+      const response = deferred<Response>();
+      let resetSignal: AbortSignal | undefined;
+      let loginCount = 0;
+      const h = harness((request) => {
+        if (request.url.includes('/auth/password-reset/')) {
+          resetSignal = request.signal;
+          return response.promise;
+        }
+        if (request.url.endsWith('/users/me')) return json(profile);
+        if (request.url.endsWith('/auth/login')) {
+          loginCount += 1;
+          return json({
+            ...tokens,
+            accessToken: `synthetic-access-${loginCount}`,
+          });
+        }
+        throw new Error('Unexpected API request');
+      });
+      const session = createSession(h);
+      expect((await session.controller.login(login)).ok).toBe(true);
+      const { queryClient } = renderPasswordResetRoute(
+        mode === 'confirm'
+          ? '/password-reset?token=synthetic-reset-token'
+          : '/password-reset',
+        session,
+      );
+      const copy = authMessages.passwordReset[mode];
+      const field = await screen.findByLabelText(
+        mode === 'confirm'
+          ? authMessages.passwordReset.confirm.fields.newPassword.label
+          : authMessages.passwordReset.request.fields.email.label,
+      );
+      fireEvent.change(field, {
+        target: {
+          value: mode === 'confirm' ? 'NuevaPassword2026' : 'ana@example.com',
+        },
+      });
+      fireEvent.click(
+        screen.getByRole('button', { name: copy.actions.submit }),
+      );
+      await waitFor(() => expect(resetSignal).toBeDefined());
+      await act(async () => {
+        expect((await session.controller.login(login)).ok).toBe(true);
+      });
+      expect(resetSignal?.aborted).toBe(true);
+      const credentials = h.storage.getItem(storageKey);
+      queryClient.setQueryData(['private', 'new-session'], 'new private data');
+      response.resolve(
+        mode === 'confirm'
+          ? new Response(null, { status: 204 })
+          : json({ message: 'Accepted' }, 202),
+      );
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: copy.actions.submit }),
+        ).toBeEnabled(),
+      );
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(h.storage.getItem(storageKey)).toBe(credentials);
+      expect(queryClient.getQueryData(['private', 'new-session'])).toBe(
+        'new private data',
+      );
+      expect(session.controller.getSnapshot().status).toBe('authenticated');
+      expect(
+        h.requests.filter((request) =>
+          request.url.includes('/auth/password-reset/'),
+        ),
+      ).toHaveLength(1);
+      expect(
+        h.requests.filter((request) => request.url.endsWith('/auth/logout')),
+      ).toHaveLength(0);
+    },
+  );
+
+  test.each(['request', 'confirm'] as const)(
+    'S1: leaving %s mode aborts the caller signal without retrying',
+    async (mode) => {
+      let resetSignal: AbortSignal | undefined;
+      const h = harness((request) => {
+        resetSignal = request.signal;
+        return new Promise<Response>((_resolve, reject) => {
+          request.signal.addEventListener(
+            'abort',
+            () => reject(request.signal.reason),
+            { once: true },
+          );
+        });
+      });
+      const session = createSession(h);
+      const { unmount } = renderPasswordResetRoute(
+        mode === 'confirm'
+          ? '/password-reset?token=synthetic-reset-token'
+          : '/password-reset',
+        session,
+      );
+      const copy = authMessages.passwordReset[mode];
+      const field = await screen.findByLabelText(
+        mode === 'confirm'
+          ? authMessages.passwordReset.confirm.fields.newPassword.label
+          : authMessages.passwordReset.request.fields.email.label,
+      );
+      fireEvent.change(field, {
+        target: {
+          value: mode === 'confirm' ? 'NuevaPassword2026' : 'ana@example.com',
+        },
+      });
+      fireEvent.click(
+        screen.getByRole('button', { name: copy.actions.submit }),
+      );
+      await waitFor(() => expect(resetSignal).toBeDefined());
+      unmount();
+      expect(resetSignal?.aborted).toBe(true);
+      expect(h.requests).toHaveLength(1);
+      expect(h.storage.getItem(storageKey)).toBeNull();
+    },
+  );
+
   test('S3: shows the identical confirmation message for any submitted email and focuses the confirmation heading', async () => {
     const capturedEmails: string[] = [];
     mswServer.use(

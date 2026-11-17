@@ -8,7 +8,7 @@ React Router (FD4) runs in data mode: `createBrowserRouter` with `RouterProvider
 | --------------------- | ----------------------- | -------------------------------------- |
 | `/login`              | `PublicOnly`            | `src/app/pages/login-page`             |
 | `/register`           | `PublicOnly`            | `src/app/pages/register-page`          |
-| `/password-reset`     | `PublicOnly`            | `src/app/pages/password-reset-page`    |
+| `/password-reset`     | none (signed in or out) | `src/app/pages/password-reset-page`    |
 | `/invitations/accept` | none (signed in or out) | `src/app/pages/invitation-accept-page` |
 | `/`                   | `RequireAuth`           | `src/app/pages/home-page`              |
 | `/dev/ui`             | none, dev/showcase only | `src/app/ui-foundations`               |
@@ -51,10 +51,12 @@ The `/login` route (`src/app/pages/login-page.tsx`, rendering `LoginForm` from `
 
 ## Password reset (`/password-reset`)
 
-The `/password-reset` route (`src/app/pages/password-reset-page.tsx`, rendering `PasswordResetForm` from `src/features/auth/password-reset-form.tsx`) switches between request mode and confirmation mode based on query parameters:
+The `/password-reset` route (`src/app/pages/password-reset-page.tsx`, rendering `PasswordResetForm` from `src/features/auth/password-reset-form.tsx`) is reachable signed in or out and switches between request mode and confirmation mode based on query parameters:
 
 - **Request mode (`/password-reset`):** Sends `POST /auth/password-reset/request` (`credentials: 'omit'`, `redirect: 'error'`) and displays an identical `role="status"` confirmation message for any accepted `202` submission without revealing account existence, focusing the confirmation heading for assistive technology.
 - **Confirmation mode (`/password-reset?token=<token>`):** Latches the parsed state in React component memory and immediately scrubs `?token=` from the URL via `replace` navigation (preserving safe `?next=` parameters and marking only a non-secret `resetTokenScrubbed` flag so neither URL history, `window.history.state`, nor `Referer` headers retain the token). Browser Back or explicit `/password-reset` links return cleanly to request mode, and `useUnsavedChangesGuard` protects unsaved `email` or `newPassword` inputs across in-app links. Rejects empty, whitespace-only, overlong, or repeated `?token=` query parameters immediately without calling the API. Valid submissions send `POST /auth/password-reset/confirm` expecting `204 No Content`, clear the password input (`shouldDirty: true`), separate expired/used `400` token rejections from policy validation and uncertain `429`/network/`5xx` outcomes, and focus the confirmation heading on success with a CTA back to `/login`.
+
+Successful confirmation calls the existing session controller logout path, synchronously clearing local credentials and private caches before showing success. Server logout is best-effort because password reset already revokes sessions by contract. Cancelled requests (including session transitions or leaving the reset view) do not show success or a failure alert; other errors retain the shared form error contract. Caller abort signals fence completion alongside the session middleware's epoch guards, so late reset responses cannot clear a newer session.
 
 ![Password reset desktop screen (1280px)](./assets/auth/password-reset-1280.png)
 
@@ -65,7 +67,7 @@ The `/password-reset` route (`src/app/pages/password-reset-page.tsx`, rendering 
 Guards are components that read `useSessionSnapshot()`; auth is not decided in loaders, because the session is asynchronous and owned by the session controller (see [session lifecycle](./session-lifecycle.md)).
 
 - `RequireAuth` wraps the protected branch. `initializing` shows loading, `unauthenticated` redirects to `/login?next=<path>`, `unable-to-verify` shows a retry state, and only `authenticated` renders the nested routes. Protected content is never rendered before the session resolves.
-- `PublicOnly` wraps login, register and password reset. A signed-in user is sent to the return target.
+- `PublicOnly` wraps login and register. A signed-in user is sent to the return target. Password reset and invitation acceptance remain reachable in either session state.
 - The return target goes through `safeSessionRedirect` both when written and when read, so a hostile `?next=` degrades to `/`. Repeated `next` parameters count as absent.
 
 A 403 or 404 from a resource never reaches the guards, so it cannot cause a login redirect loop.

@@ -114,6 +114,33 @@ describe('passwordReset schemas', () => {
   });
 });
 
+describe('password reset cancellation and programming errors', () => {
+  test.each(['request', 'confirm'] as const)(
+    '%s propagates AbortError identity and unknown programming errors',
+    async (mode) => {
+      const client = createApiClient({ baseUrl: TEST_API_BASE_URL });
+      const failure = new Error('Synthetic programming error');
+      const cancellation = new DOMException(
+        'Synthetic cancellation',
+        'AbortError',
+      );
+      const post = vi.spyOn(client, 'POST');
+      for (const error of [cancellation, failure]) {
+        post.mockRejectedValueOnce(error);
+        const pending =
+          mode === 'request'
+            ? requestPasswordReset(client, { email: 'ana@example.com' })
+            : confirmPasswordReset(client, {
+                token: 'synthetic-reset-token',
+                newPassword: 'NuevaPassword2026',
+              });
+        await expect(pending).rejects.toBe(error);
+      }
+      expect(post).toHaveBeenCalledTimes(2);
+    },
+  );
+});
+
 describe('requestPasswordReset service', () => {
   test('sends credentials: omit and redirect: error and returns validated 202 response', async () => {
     let observedCredentials: RequestCredentials | undefined;

@@ -12,7 +12,7 @@ export interface PasswordResetServiceOptions {
   readonly signal?: AbortSignal;
 }
 
-const isAbortError = (cause: unknown): boolean =>
+export const isPasswordResetCancellation = (cause: unknown): boolean =>
   (cause instanceof Error || cause instanceof DOMException) &&
   cause.name === 'AbortError';
 
@@ -69,7 +69,13 @@ export async function requestPasswordReset(
       redirect: 'error',
     });
   } catch (cause) {
-    if (isAbortError(cause)) {
+    if (
+      isPasswordResetCancellation(cause) ||
+      !(
+        cause instanceof TypeError ||
+        (cause instanceof ApiError && cause.kind === 'network')
+      )
+    ) {
       throw cause;
     }
     throw buildNetworkError(
@@ -136,7 +142,13 @@ export async function confirmPasswordReset(
       redirect: 'error',
     });
   } catch (cause) {
-    if (isAbortError(cause)) {
+    if (
+      isPasswordResetCancellation(cause) ||
+      !(
+        cause instanceof TypeError ||
+        (cause instanceof ApiError && cause.kind === 'network')
+      )
+    ) {
       throw cause;
     }
     throw buildNetworkError(cause, copy.network);

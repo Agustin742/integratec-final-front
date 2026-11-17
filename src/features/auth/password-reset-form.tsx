@@ -30,6 +30,7 @@ import {
 } from './password-reset-schema';
 import {
   confirmPasswordReset,
+  isPasswordResetCancellation,
   requestPasswordReset,
 } from './password-reset-service';
 
@@ -71,8 +72,29 @@ function createLeaveGuardHandler(
   };
 }
 
+// Session middleware fences transport responses by epoch. This caller signal also
+// fences completion after body parsing and cancels work when its view is removed.
+function useResetSubmissionSignal() {
+  const { controller } = useSessionService();
+  const pending = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const cancel = () => pending.current?.abort();
+    const unregister = controller.registerCleanup(cancel);
+    return () => {
+      cancel();
+      unregister();
+    };
+  }, [controller]);
+  return () => {
+    const submission = new AbortController();
+    pending.current = submission;
+    return submission.signal;
+  };
+}
+
 function PasswordResetRequestView({ title, searchParams }: ModeViewProps) {
   const { client } = useSessionService();
+  const beginSubmission = useResetSubmissionSignal();
   const [requested, setRequested] = useState(false);
   const confirmedHeadingId = useId();
   const confirmedHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -102,8 +124,14 @@ function PasswordResetRequestView({ title, searchParams }: ModeViewProps) {
   const { isSubmitting, handleSubmit } = useProtectedSubmit(
     form,
     async (values) => {
-      await requestPasswordReset(client, values);
-      setRequested(true);
+      const signal = beginSubmission();
+      try {
+        await requestPasswordReset(client, values, { signal });
+        signal.throwIfAborted();
+        setRequested(true);
+      } catch (error) {
+        if (!isPasswordResetCancellation(error)) throw error;
+      }
     },
     { knownFields: ['email'] },
   );
@@ -237,7 +265,8 @@ function PasswordResetConfirmView({
   token,
   searchParams,
 }: ModeViewProps & { readonly token: string }) {
-  const { client } = useSessionService();
+  const { client, controller } = useSessionService();
+  const beginSubmission = useResetSubmissionSignal();
   const [confirmed, setConfirmed] = useState(false);
   const [tokenRejected, setTokenRejected] = useState(false);
   const confirmedHeadingId = useId();
@@ -278,13 +307,23 @@ function PasswordResetConfirmView({
     form,
     async (values) => {
       setTokenRejected(false);
+      const signal = beginSubmission();
       try {
-        await confirmPasswordReset(client, {
-          token,
-          newPassword: values.newPassword,
-        });
+        await confirmPasswordReset(
+          client,
+          {
+            token,
+            newPassword: values.newPassword,
+          },
+          { signal },
+        );
+        signal.throwIfAborted();
+        // Local credentials and private owners are cleared synchronously. Do not
+        // delay success on best-effort revocation of an already revoked session.
+        void controller.logout();
         setConfirmed(true);
       } catch (error) {
+        if (isPasswordResetCancellation(error)) return;
         if (error instanceof ApiError && error.kind === 'bad-request') {
           setTokenRejected(true);
         }
