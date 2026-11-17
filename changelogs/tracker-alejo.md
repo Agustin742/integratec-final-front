@@ -1,5 +1,16 @@
 # Tracker — Alejo
 
+## 2026-11-16 — PR #77 authentication review follow-ups (#28)
+
+- **Status:** in-progress (all corrections and independent proof complete; authorized publication and Linux CI pending).
+- **Area / files:** session controller, auth forms/services, routing, shell feedback, tests and documentation; local branch `fix/28-pr-77-followups` based on `c706b55`.
+- **Change:** Reconcile the four requested changes and six suggestions in [PR #77](https://github.com/Agustin742/integratec-final-front/pull/77) using el Gentleman/Pi assistance; add regression tests before fixes.
+- **Reason:** Finish issue #28 review corrections while preserving Mati's commits and the unrelated #24 worktree.
+- **Observed checks:** All ten review comments addressed locally. Node 22 lint/typecheck/474 tests/production build/security check passed; 46 Playwright desktop/mobile cases passed. Historical-source schema differential matched 390 outcomes and seven constants. Docs checker (63 files) and whitespace checks passed. Configured format check failed on 133 checkout files. Python CI failed on CRLF shell bytes; isolated LF attempt still failed five absent-script subcases after one setup correction (7/8 tests pass). Original CI files remain unchanged. Initial bare-Node attempt was rejected by engine-strict before app checks; it is not a functional failure. Build chunk-size and lint JSXEmptyExpression advisories remain.
+- **Independent verification:** All ten review comments passed (unused descriptions statically); 180/180 isolated tests across 12 files, including six independent race/unmount probes, passed with no actionable candidate regression. Source-integrity proof found zero unexpected mutations; actual historical-source differential hashes matched. Configured format passed after 134 proven mechanical normalizations. CI continuation remains 7/8 with 15 failing Node/WSL subcases; its docs check failed before validation on Windows worktree metadata. Isolated typecheck failed because the verifier copy omitted an API-sync tooling module (one missing-module and three dependent diagnostics), not from an authentication defect; no retry. Optional handoff-file generation failed before writes; the direct report preserved evidence.
+- **Authorized continuation:** Alejo replied “si dale” to publication in the existing PR #77 for Linux CI and one bounded isolated-typecheck repair. Fresh isolated typecheck passed after adding only the omitted original API-sync module/declaration; original inputs and sealed snapshot stayed unchanged. Earlier failures above remain recorded. Source work units are `caf1a25` (login), `a05696a` (reset) and `a3d9670` (logout/validators), preserving Mati's history. Candidate-specific native review was declined separately for each high-risk unit; no lineages or native approvals were created. Independent verification remains passed.
+- **Next step:** Publish normally to existing `feat/28-login-password-reset-logout`, verify current-head Linux CI and obtain teammate review. No force push, merge or card closure authorized.
+
 ## 2026-11-13 — PR #74 routing review corrections (#20)
 
 - **Status:** completed (local corrections, functional checks and final independent security-test delta verification pass; publication/CI/teammate approval remain separate delivery actions).
@@ -24,7 +35,6 @@
 - **Staged candidate assessment:** After explicitly staging the intended browser test and all eight correction paths, native ASSESS succeeded: native medium, item-3 escalation high, `reviewDue: false` (`under_budget`), 177 changed lines. Required independent verification is recorded above; no native START or approval was needed or claimed. This resolves the earlier untracked-declaration assessment limitation.
 - **Delivery authorization:** Alejo explicitly requested “hace el commit y push”. Prepare one conventional correction commit on `feat/20-router-shell` with Alejo's configured identity, preserving Agustin's history and including the regression tests/docs; push normally to the existing PR #74 branch. No force push, PR merge, issue closure, or new remote comment is authorized.
 - **Next step:** Verify the published PR head and its CI, then obtain teammate approval before merge. All implementation and independent-verification children are finished; no merge or issue closure performed.
-
 
 ## 2026-11-10 — Session lifecycle and PR #72 review corrections (#18)
 
