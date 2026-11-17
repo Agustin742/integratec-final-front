@@ -1,6 +1,10 @@
+import { LoginForm } from '@/features/auth/login-form';
 import { messages } from '../messages';
-import { AuthPlaceholderPage } from './auth-placeholder-page';
+import { useDocumentTitle } from '../router/document-title';
 
 export function LoginPage() {
-  return <AuthPlaceholderPage {...messages.pages.login} />;
+  const { title } = messages.pages.login;
+  useDocumentTitle(title);
+
+  return <LoginForm title={title} />;
 }
