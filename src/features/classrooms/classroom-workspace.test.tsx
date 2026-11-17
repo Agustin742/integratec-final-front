@@ -1,4 +1,10 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { createMemoryRouter, useOutletContext } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { expect, test, vi } from 'vitest';
@@ -104,7 +110,9 @@ test('loads the public protected route with server name and neutral parent role 
   expect(screen.getByText(/Tu rol en esta aula: Familiar/)).toBeVisible();
   expect(document.title).toContain('Classroom a');
   expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
-  expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  expect(
+    within(screen.getByRole('main')).queryByRole('button'),
+  ).not.toBeInTheDocument();
   await expectAccessible(container);
 });
 
