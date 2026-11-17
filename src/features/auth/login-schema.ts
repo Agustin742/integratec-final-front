@@ -1,37 +1,22 @@
 import { z } from 'zod';
 import type { components } from '@/api/schema.generated';
 import { authMessages } from './messages';
-import { EMAIL_MAX_LENGTH, PASSWORD_MAX_UTF8_BYTES } from './register-schema';
+import {
+  createNormalizedEmailSchema,
+  isWithinUtf8ByteLimit,
+} from './auth-validation';
+
+// Preserve the existing imports used by password-reset-schema and other consumers.
+export {
+  createNormalizedEmailSchema,
+  isWithinUtf8ByteLimit,
+} from './auth-validation';
 
 // Ensure Zod v4 runs in jitless mode so schema validation never attempts
 // `new Function()` under strict Content-Security-Policy (FD1).
 z.config({ jitless: true });
 
 export type LoginRequestDto = components['schemas']['LoginRequestDto'];
-
-const utf8Encoder = new TextEncoder();
-
-/** Checks whether a raw password fits within bcrypt's 72-byte UTF-8 ceiling. */
-export function isWithinUtf8ByteLimit(value: string): boolean {
-  return utf8Encoder.encode(value).byteLength <= PASSWORD_MAX_UTF8_BYTES;
-}
-
-/**
- * Shared trimmed + lowercased email schema matching backend auth DTO normalization.
- */
-export function createNormalizedEmailSchema(messages: {
-  readonly required: string;
-  readonly invalid: string;
-  readonly tooLong: string;
-}) {
-  return z
-    .string()
-    .trim()
-    .min(1, messages.required)
-    .max(EMAIL_MAX_LENGTH, messages.tooLong)
-    .pipe(z.email({ error: messages.invalid }))
-    .transform((value) => value.toLowerCase());
-}
 
 export const loginFormSchema: z.ZodType<
   LoginRequestDto,

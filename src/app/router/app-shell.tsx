@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Outlet } from 'react-router';
 import { LoadingState } from '@/components/feedback/states';
 import { BaseLayout } from '@/components/layout/base-layout';
@@ -22,14 +22,6 @@ export function AppShell() {
   const { controller } = useSessionService();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const isLoggingOutRef = useRef(false);
-  const isMountedRef = useRef(true);
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
 
   const handleLogout = async () => {
     if (isLoggingOutRef.current) {
@@ -39,7 +31,12 @@ export function AppShell() {
     setIsLoggingOut(true);
     try {
       const result = await controller.logout();
-      if (result.serverConfirmed && !result.cleanupFailed) {
+      if (result.cleanupFailed) {
+        toast.warning(messages.shell.logoutCleanupFailedTitle, {
+          id: 'session-logout',
+          description: messages.shell.logoutCleanupFailedBody,
+        });
+      } else if (result.serverConfirmed) {
         toast.success(messages.shell.logoutConfirmedTitle, {
           id: 'session-logout',
           description: messages.shell.logoutConfirmedBody,
@@ -52,9 +49,7 @@ export function AppShell() {
       }
     } finally {
       isLoggingOutRef.current = false;
-      if (isMountedRef.current) {
-        setIsLoggingOut(false);
-      }
+      setIsLoggingOut(false);
     }
   };
 

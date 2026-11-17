@@ -1,16 +1,25 @@
 import { z } from 'zod';
 import type { components } from '@/api/schema.generated';
 import { authMessages } from './messages';
+import {
+  createNormalizedEmailSchema,
+  isWithinUtf8ByteLimit,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+} from './auth-validation';
+
+export {
+  EMAIL_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MAX_UTF8_BYTES,
+} from './auth-validation';
 
 // Ensure Zod v4 runs in jitless mode so schema validation never attempts
 // `new Function()` under strict Content-Security-Policy (FD1).
 z.config({ jitless: true });
 
 export const DISPLAY_NAME_MAX_LENGTH = 100;
-export const EMAIL_MAX_LENGTH = 255;
-export const PASSWORD_MIN_LENGTH = 8;
-export const PASSWORD_MAX_LENGTH = 72;
-export const PASSWORD_MAX_UTF8_BYTES = 72;
 export const SCHOOL_NAME_MAX_LENGTH = 150;
 
 export const REGISTRATION_CHOICES = [
@@ -25,8 +34,6 @@ export type RegisterResponseDto = components['schemas']['RegisterResponseDto'];
 export type SchoolSummaryDto = components['schemas']['SchoolSummaryDto'];
 export type RegistrationPath = RegisterRequestDto['path'];
 
-const utf8Encoder = new TextEncoder();
-
 export const registrationChoiceSchema = z.enum(REGISTRATION_CHOICES, {
   error: authMessages.validation.pathRequired,
 });
@@ -39,25 +46,19 @@ export const registerFormSchema = z
       .trim()
       .min(1, authMessages.validation.displayNameRequired)
       .max(DISPLAY_NAME_MAX_LENGTH, authMessages.validation.displayNameTooLong),
-    email: z
-      .string()
-      .trim()
-      .min(1, authMessages.validation.emailRequired)
-      .max(EMAIL_MAX_LENGTH, authMessages.validation.emailTooLong)
-      .pipe(z.email({ error: authMessages.validation.emailInvalid }))
-      .transform((value) => value.toLowerCase()),
+    email: createNormalizedEmailSchema({
+      required: authMessages.validation.emailRequired,
+      invalid: authMessages.validation.emailInvalid,
+      tooLong: authMessages.validation.emailTooLong,
+    }),
     // Passwords are never trimmed so intentional leading/trailing spaces remain valid.
     password: z
       .string()
       .min(PASSWORD_MIN_LENGTH, authMessages.validation.passwordMin)
       .max(PASSWORD_MAX_LENGTH, authMessages.validation.passwordMax)
-      .refine(
-        (value) =>
-          utf8Encoder.encode(value).byteLength <= PASSWORD_MAX_UTF8_BYTES,
-        {
-          message: authMessages.validation.passwordMaxBytes,
-        },
-      ),
+      .refine(isWithinUtf8ByteLimit, {
+        message: authMessages.validation.passwordMaxBytes,
+      }),
     schoolName: z.string(),
   })
   .superRefine((data, ctx) => {

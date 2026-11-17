@@ -8,7 +8,6 @@ export const messages = {
   pages: {
     login: {
       title: 'Iniciar sesión',
-      description: 'Ingresá con tu cuenta para acceder a tus aulas.',
     },
     register: {
       title: 'Crear cuenta',
@@ -17,8 +16,6 @@ export const messages = {
     },
     passwordReset: {
       title: 'Restablecer contraseña',
-      description:
-        'Recuperá el acceso a tu cuenta con un enlace enviado a tu correo.',
     },
     invitationAccept: {
       title: 'Aceptar invitación',
@@ -74,6 +71,10 @@ export const messages = {
     loggingOutAction: 'Cerrando sesión...',
     logoutConfirmedTitle: 'Sesión cerrada',
     logoutConfirmedBody: 'Cerraste tu sesión en este navegador.',
+    logoutCleanupFailedTitle:
+      'No pudimos borrar todos los datos locales de sesión',
+    logoutCleanupFailedBody:
+      'Cerrá el navegador o borrá los datos de este sitio antes de volver a usarlo en un equipo compartido.',
     logoutLocalOnlyTitle: 'Datos locales de sesión eliminados',
     logoutLocalOnlyBody:
       'Borramos tu sesión local en este navegador, pero no pudimos confirmar el cierre remoto en el servidor.',

@@ -279,6 +279,7 @@ describe('AppShell logout control (#28)', () => {
   });
 
   test('rapid double click on logout sends one non-aborted request and confirms once', async () => {
+    const success = vi.spyOn(toast, 'success');
     let logoutCalls = 0;
     let aborted = false;
     let releaseLogout: (() => void) | undefined;
@@ -331,6 +332,7 @@ describe('AppShell logout control (#28)', () => {
     ).not.toBeInTheDocument();
     expect(logoutCalls).toBe(1);
     expect(aborted).toBe(false);
+    expect(success).toHaveBeenCalledTimes(1);
   });
 
   test.each(['service-unavailable', 'network'] as const)(
@@ -393,6 +395,43 @@ describe('AppShell logout control (#28)', () => {
       expect(
         screen.getByText(messages.shell.logoutLocalOnlyBody),
       ).toBeVisible();
+      expect(
+        screen.queryByText(messages.shell.logoutConfirmedTitle),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  test.each([true, false])(
+    'warns honestly when local cleanup fails (serverConfirmed=%s)',
+    async (serverConfirmed) => {
+      const session = fakeSession({ status: 'authenticated', user: profile });
+      vi.spyOn(session.service.controller, 'logout').mockResolvedValue({
+        serverConfirmed,
+        cleanupFailed: true,
+      });
+      const warning = vi.spyOn(toast, 'warning');
+      const success = vi.spyOn(toast, 'success');
+      renderAt('/', { session });
+      await heading(messages.pages.home.title);
+
+      fireEvent.click(
+        screen.getByRole('button', { name: messages.shell.logoutAction }),
+      );
+
+      await waitFor(() =>
+        expect(warning).toHaveBeenCalledWith(
+          'No pudimos borrar todos los datos locales de sesión',
+          {
+            id: 'session-logout',
+            description:
+              'Cerrá el navegador o borrá los datos de este sitio antes de volver a usarlo en un equipo compartido.',
+          },
+        ),
+      );
+      expect(success).not.toHaveBeenCalled();
+      expect(
+        screen.queryByText(messages.shell.logoutLocalOnlyTitle),
+      ).not.toBeInTheDocument();
       expect(
         screen.queryByText(messages.shell.logoutConfirmedTitle),
       ).not.toBeInTheDocument();
