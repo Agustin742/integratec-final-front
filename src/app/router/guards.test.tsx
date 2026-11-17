@@ -163,7 +163,7 @@ test.each(['/login', '/register'])(
 test.each(['/password-reset', '/password-reset?token=synthetic-reset-token'])(
   'keeps password reset reachable for an authenticated user at %s',
   async (path) => {
-    const { router } = renderAt(path, authenticated);
+    const { router } = await renderAt(path, authenticated);
 
     expect(
       await screen.findByRole('heading', {
