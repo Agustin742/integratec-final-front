@@ -8,8 +8,6 @@ export const messages = {
   pages: {
     login: {
       title: 'Iniciar sesión',
-      description:
-        'Acá vas a poder ingresar con tu cuenta. Pantalla en construcción.',
     },
     register: {
       title: 'Crear cuenta',
@@ -18,8 +16,6 @@ export const messages = {
     },
     passwordReset: {
       title: 'Restablecer contraseña',
-      description:
-        'Acá vas a poder recuperar el acceso a tu cuenta. Pantalla en construcción.',
     },
     invitationAccept: {
       title: 'Aceptar invitación',
@@ -68,6 +64,20 @@ export const messages = {
     unableTitle: 'No pudimos verificar tu sesión',
     unableDescription:
       'No pudimos comprobar si tu sesión sigue activa. Revisá tu conexión e intentá de nuevo.',
+  },
+  shell: {
+    signedInAsPrefix: 'Sesión activa:',
+    logoutAction: 'Cerrar sesión',
+    loggingOutAction: 'Cerrando sesión...',
+    logoutConfirmedTitle: 'Sesión cerrada',
+    logoutConfirmedBody: 'Cerraste tu sesión en este navegador.',
+    logoutCleanupFailedTitle:
+      'No pudimos borrar todos los datos locales de sesión',
+    logoutCleanupFailedBody:
+      'Cerrá el navegador o borrá los datos de este sitio antes de volver a usarlo en un equipo compartido.',
+    logoutLocalOnlyTitle: 'Datos locales de sesión eliminados',
+    logoutLocalOnlyBody:
+      'Borramos tu sesión local en este navegador, pero no pudimos confirmar el cierre remoto en el servidor.',
   },
   showcase: {
     title: 'Componentes de interfaz',

@@ -108,4 +108,130 @@ export const authMessages = {
     schoolTimeZonePrefix: 'Zona horaria asignada:',
     loginCta: 'Ir a iniciar sesión',
   },
+  login: {
+    subtitle: 'Ingresá con tu correo y contraseña para entrar a tus aulas.',
+    returnContextNotice:
+      'Iniciá sesión para continuar hacia la página que solicitaste.',
+    fields: {
+      email: {
+        label: 'Correo electrónico',
+        placeholder: 'nombre@ejemplo.com',
+      },
+      password: {
+        label: 'Contraseña',
+        placeholder: 'Tu contraseña',
+      },
+    },
+    validation: {
+      emailRequired: 'Ingresá tu correo electrónico.',
+      emailInvalid: 'Ingresá un correo electrónico válido.',
+      emailTooLong: 'El correo no puede superar los 255 caracteres.',
+      passwordRequired: 'Ingresá tu contraseña.',
+      passwordMaxBytes: 'La contraseña no puede superar los 72 bytes en UTF-8.',
+    },
+    actions: {
+      submit: 'Iniciar sesión',
+      submitting: 'Iniciando sesión...',
+      forgotPasswordLink: '¿Olvidaste tu contraseña?',
+      noAccountPrompt: '¿Todavía no tenés una cuenta?',
+      registerLink: 'Crear cuenta',
+    },
+    errors: {
+      rootTitle: 'No pudimos iniciar sesión',
+      invalidCredentials:
+        'El correo o la contraseña no son correctos. Revisá los datos e intentá de nuevo.',
+      rateLimited:
+        'Realizaste demasiados intentos seguidos. Esperá unos minutos antes de volver a intentar.',
+      network:
+        'No pudimos conectarnos con el servidor. Verificá tu conexión e intentá de nuevo.',
+      unexpected:
+        'Ocurrió un problema inesperado al iniciar sesión. Intentá de nuevo en unos instantes.',
+    },
+  },
+  passwordReset: {
+    request: {
+      subtitle:
+        'Ingresá tu correo y te enviamos un enlace temporal si corresponde a una cuenta activa.',
+      fields: {
+        email: {
+          label: 'Correo electrónico',
+          placeholder: 'nombre@ejemplo.com',
+          description:
+            'El enlace de restablecimiento es de un solo uso y vence automáticamente.',
+        },
+      },
+      validation: {
+        emailRequired: 'Ingresá tu correo electrónico.',
+        emailInvalid: 'Ingresá un correo electrónico válido.',
+        emailTooLong: 'El correo no puede superar los 255 caracteres.',
+      },
+      actions: {
+        submit: 'Enviar enlace de recuperación',
+        submitting: 'Enviando enlace...',
+        backToLogin: 'Volver a iniciar sesión',
+        sendAnother: 'Enviar a otro correo',
+      },
+      confirmation: {
+        badge: 'Solicitud procesada',
+        title: 'Revisá tu correo electrónico',
+        body: 'Si el correo ingresado pertenece a una cuenta registrada, te enviamos un enlace temporal de un solo uso para definir una contraseña nueva.',
+      },
+      errors: {
+        rootTitle: 'No pudimos procesar tu solicitud',
+        validationFailed:
+          'Revisá el correo ingresado antes de volver a enviarlo.',
+        rateLimited:
+          'Realizaste demasiadas solicitudes seguidas. Esperá unos minutos e intentá de nuevo.',
+        network:
+          'No pudimos conectarnos con el servidor. Verificá tu conexión e intentá de nuevo.',
+        unexpected:
+          'Ocurrió un problema inesperado al procesar la solicitud. Intentá de nuevo en unos instantes.',
+      },
+    },
+    confirm: {
+      subtitle:
+        'Elegí una contraseña nueva para recuperar el acceso a tu cuenta.',
+      fields: {
+        newPassword: {
+          label: 'Contraseña nueva',
+          placeholder: 'Mínimo 8 caracteres',
+          description: 'Entre 8 y 72 caracteres (máximo 72 bytes UTF-8).',
+        },
+      },
+      validation: {
+        passwordMin: 'La contraseña debe tener al menos 8 caracteres.',
+        passwordMax: 'La contraseña no puede superar los 72 caracteres.',
+        passwordMaxBytes:
+          'La contraseña no puede superar los 72 bytes en UTF-8.',
+      },
+      actions: {
+        submit: 'Guardar nueva contraseña',
+        submitting: 'Guardando contraseña...',
+        requestNewLink: 'Solicitar un nuevo enlace',
+        goToLogin: 'Ir a iniciar sesión',
+      },
+      invalidToken: {
+        title: 'El enlace ya no es válido o venció',
+        body: 'Este enlace de restablecimiento no es válido, ya fue utilizado o expiró. Solicitá uno nuevo para continuar.',
+      },
+      confirmed: {
+        badge: 'Contraseña actualizada',
+        title: 'Actualizamos tu contraseña',
+        body: 'Cerramos todas tus sesiones anteriores por seguridad. Iniciá sesión nuevamente con tu contraseña nueva.',
+      },
+      errors: {
+        rootTitle: 'No pudimos actualizar tu contraseña',
+        invalidOrExpiredToken:
+          'El enlace de restablecimiento no es válido, ya fue utilizado o expiró. Solicitá un enlace nuevo.',
+        validationFailed:
+          'Revisá la contraseña ingresada antes de volver a enviar el formulario.',
+        rateLimited:
+          'Realizaste demasiados intentos seguidos. Esperá unos minutos antes de volver a intentar.',
+        network:
+          'No pudimos confirmar si se actualizó tu contraseña por una falla de conexión. Probá iniciar sesión con tu nueva contraseña antes de pedir otro enlace.',
+        unexpected:
+          'No pudimos confirmar si se actualizó tu contraseña por un error inesperado. Probá iniciar sesión o solicitá un enlace nuevo.',
+      },
+    },
+  },
 } as const;

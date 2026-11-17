@@ -31,6 +31,37 @@ export interface SessionOptions {
   readonly tabOwner?: () => string | undefined;
   readonly now?: () => number;
 }
+export type LoginFailureReason =
+  'invalid-credentials' | 'rate-limited' | 'network' | 'unexpected';
+
+export type LoginResult =
+  | { readonly ok: true; readonly cleanupFailed: boolean }
+  | {
+      readonly ok: false;
+      readonly cleanupFailed: boolean;
+      readonly reason: LoginFailureReason;
+      readonly fieldErrors?: ApiError['fieldErrors'];
+      readonly correlationId?: string;
+    };
+
+function classifyLoginError(
+  error: unknown,
+  fromProfileVerification = false,
+): LoginFailureReason {
+  if (error instanceof ApiError) {
+    if (!fromProfileVerification && error.status === 401) {
+      return 'invalid-credentials';
+    }
+    if (error.kind === 'rate-limited' || error.status === 429) {
+      return 'rate-limited';
+    }
+    if (error.kind === 'network') {
+      return 'network';
+    }
+  }
+  return 'unexpected';
+}
+
 export interface SessionController {
   getSnapshot(): SessionSnapshot;
   getCleanupFailure(): boolean;
@@ -38,7 +69,7 @@ export interface SessionController {
   registerCleanup(cleanup: () => void): () => void;
   releasePrivateState(): void;
   initialize(): Promise<void>;
-  login(input: LoginInput): Promise<{ ok: boolean; cleanupFailed: boolean }>;
+  login(input: LoginInput): Promise<LoginResult>;
   logout(): Promise<{ serverConfirmed: boolean; cleanupFailed: boolean }>;
 }
 export interface SessionService {
@@ -63,6 +94,9 @@ export function createSession(options: SessionOptions = {}): SessionService {
   let refreshing: Promise<void> | undefined;
   let refreshUnauthorized = false;
   let initializing: Promise<void> | undefined;
+  let loginVerificationEpoch: number | undefined;
+  let loggingOut:
+    Promise<{ serverConfirmed: boolean; cleanupFailed: boolean }> | undefined;
   let cleanupFailed = false;
   const listeners = new Set<() => void>();
   const cleanups = new Set<() => void>();
@@ -95,6 +129,7 @@ export function createSession(options: SessionOptions = {}): SessionService {
     abort = new AbortController();
     refreshing = undefined;
     initializing = undefined;
+    loggingOut = undefined;
     cleanupFailed = false;
     if (clear) {
       credentials = undefined;
@@ -153,9 +188,10 @@ export function createSession(options: SessionOptions = {}): SessionService {
           error instanceof ApiError &&
           error.kind === 'unexpected' &&
           error.status === null;
+        const fromLogin = loginVerificationEpoch === expectedEpoch;
         transition(
-          definitive ? 'unauthenticated' : 'unable-to-verify',
-          definitive || malformed || refreshUnauthorized,
+          definitive || fromLogin ? 'unauthenticated' : 'unable-to-verify',
+          definitive || malformed || refreshUnauthorized || fromLogin,
         );
         throw safeSessionError(error);
       }
@@ -183,7 +219,14 @@ export function createSession(options: SessionOptions = {}): SessionService {
     ),
   );
 
-  async function verify(expectedEpoch: number): Promise<boolean> {
+  async function verifySession(
+    expectedEpoch: number,
+    fromLogin = false,
+  ): Promise<
+    | { readonly ok: true }
+    | { readonly ok: false; readonly reason: LoginFailureReason }
+  > {
+    if (fromLogin) loginVerificationEpoch = expectedEpoch;
     try {
       const payload: unknown = await requestApi(() => client.GET('/users/me'));
       assertSessionEpoch(epochPort, expectedEpoch);
@@ -194,10 +237,19 @@ export function createSession(options: SessionOptions = {}): SessionService {
         avatar: Object.freeze(result.data.avatar),
       });
       publish({ status: 'authenticated', user });
-      return true;
-    } catch {
-      if (epoch === expectedEpoch) transition('unable-to-verify', false);
-      return false;
+      return { ok: true };
+    } catch (error) {
+      if (epoch === expectedEpoch) {
+        transition(
+          fromLogin ? 'unauthenticated' : 'unable-to-verify',
+          fromLogin,
+        );
+      }
+      return { ok: false, reason: classifyLoginError(error, true) };
+    } finally {
+      if (fromLogin && loginVerificationEpoch === expectedEpoch) {
+        loginVerificationEpoch = undefined;
+      }
     }
   }
 
@@ -233,7 +285,7 @@ export function createSession(options: SessionOptions = {}): SessionService {
       }
       publish({ status: 'initializing' });
       const expectedEpoch = epoch;
-      const pending = verify(expectedEpoch).then(() => {});
+      const pending = verifySession(expectedEpoch).then(() => {});
       initializing = pending;
       void pending.finally(() => {
         if (initializing === pending) initializing = undefined;
@@ -248,34 +300,66 @@ export function createSession(options: SessionOptions = {}): SessionService {
         if (storageUnavailable) throw safeSessionError();
         const pair = await auth.login(input, abort.signal);
         install(pair, expectedEpoch);
-        const ok = await verify(expectedEpoch);
-        return { ok, cleanupFailed: transitionCleanupFailed || cleanupFailed };
-      } catch (error) {
-        if (epoch === expectedEpoch) {
-          const rejected = error instanceof ApiError && error.status === 401;
-          transition(rejected ? 'unauthenticated' : 'unable-to-verify', true);
+        const verification = await verifySession(expectedEpoch, true);
+        if (verification.ok) {
+          return {
+            ok: true,
+            cleanupFailed: transitionCleanupFailed || cleanupFailed,
+          };
         }
         return {
           ok: false,
           cleanupFailed: transitionCleanupFailed || cleanupFailed,
+          reason: verification.reason,
+        };
+      } catch (error) {
+        if (epoch === expectedEpoch) {
+          transition(
+            storageUnavailable ? 'unable-to-verify' : 'unauthenticated',
+            true,
+          );
+        }
+        return {
+          ok: false,
+          cleanupFailed: transitionCleanupFailed || cleanupFailed,
+          reason: classifyLoginError(error),
+          ...(error instanceof ApiError && error.status !== 401
+            ? {
+                ...(Object.keys(error.fieldErrors).length > 0
+                  ? { fieldErrors: error.fieldErrors }
+                  : {}),
+                ...(error.correlationId
+                  ? { correlationId: error.correlationId }
+                  : {}),
+              }
+            : {}),
         };
       }
     },
-    async logout() {
+    logout() {
+      if (loggingOut) return loggingOut;
       const accessToken = credentials?.accessToken;
       transition('unauthenticated', true);
       const expectedEpoch = epoch;
       const transitionCleanupFailed = cleanupFailed;
-      let serverConfirmed = false;
-      if (accessToken) {
-        try {
-          await auth.logout(accessToken, abort.signal);
-          serverConfirmed = epoch === expectedEpoch;
-        } catch {
-          /* Local logout remains complete; server invalidation is unconfirmed. */
+      const pending = (async () => {
+        let serverConfirmed = false;
+        if (accessToken) {
+          try {
+            await auth.logout(accessToken, abort.signal);
+            serverConfirmed = epoch === expectedEpoch;
+          } catch {
+            /* Local logout remains complete; server invalidation is unconfirmed. */
+          }
         }
-      }
-      return { serverConfirmed, cleanupFailed: transitionCleanupFailed };
+        return { serverConfirmed, cleanupFailed: transitionCleanupFailed };
+      })();
+      loggingOut = pending;
+      const release = () => {
+        if (loggingOut === pending) loggingOut = undefined;
+      };
+      void pending.then(release, release);
+      return pending;
     },
   };
   return { controller, client };

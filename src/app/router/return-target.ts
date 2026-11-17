@@ -1,6 +1,8 @@
 import { safeSessionRedirect } from '@/session/redirect';
 
 export const LOGIN_PATH = '/login';
+export const REGISTER_PATH = '/register';
+export const PASSWORD_RESET_PATH = '/password-reset';
 export const RETURN_TARGET_PARAM = 'next';
 
 type LocationLike = { pathname: string; search: string; hash: string };
@@ -36,4 +38,39 @@ export function readReturnTarget(
     values.length === 1 ? values[0] : undefined,
     approved,
   );
+}
+
+/**
+ * Reports whether `?next=` carries a single destination explicitly approved by
+ * the session redirect policy. Used to show return-context hints without
+ * trusting tampered or repeated query parameters.
+ */
+export function hasValidReturnTarget(
+  searchParams: URLSearchParams,
+  approved?: ReadonlySet<string>,
+): boolean {
+  const values = searchParams.getAll(RETURN_TARGET_PARAM);
+  return (
+    values.length === 1 &&
+    safeSessionRedirect(values[0], approved) === values[0]
+  );
+}
+
+/**
+ * Builds an auth sibling route href (for example `/register` or `/password-reset`)
+ * carrying `?next=` only when the current query string contains a single approved target.
+ */
+export function buildAuthReturnHref(
+  pathname: string,
+  searchParams: URLSearchParams,
+  approved?: ReadonlySet<string>,
+): string {
+  if (!hasValidReturnTarget(searchParams, approved)) {
+    return pathname;
+  }
+  const target = searchParams.get(RETURN_TARGET_PARAM)!;
+  const nextParams = new URLSearchParams({
+    [RETURN_TARGET_PARAM]: target,
+  });
+  return `${pathname}?${nextParams.toString()}`;
 }

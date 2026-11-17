@@ -439,4 +439,27 @@ describe('session middleware bounded recovery', () => {
     expect(h.requests[0].headers.has('Authorization')).toBe(false);
     expect(h.requests).toHaveLength(1);
   });
+
+  test('204 responses exposing an empty ReadableStream body reconstruct cleanly', async () => {
+    const h = harness(() => {
+      const response = new Response(null, { status: 204 });
+      Object.defineProperty(response, 'body', {
+        value: new ReadableStream({
+          start(controller) {
+            controller.close();
+          },
+        }),
+      });
+      return response;
+    });
+    const { client } = createSession(h);
+    const result = await client.POST('/auth/password-reset/confirm', {
+      body: {
+        token: 'reset-token-123456',
+        newPassword: 'NewPassword123!',
+      },
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.response.status).toBe(204);
+  });
 });
