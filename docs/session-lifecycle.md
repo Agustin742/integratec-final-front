@@ -159,16 +159,30 @@ remains application-owned; its pending identity initialization is shared on remo
   middleware (including read replay), not mapped to retryable network errors.
 - Storage configures Zod's jitless validation on standalone import, so it never
   needs a dynamic `Function` probe regardless of application import order.
-- If renewal succeeds but `/users/me` returns a transient failure, a later explicit
-  `initialize()` reuses the rotated credentials and verifies identity again.
+- During initialization, if renewal succeeds but `/users/me` returns a transient
+  failure, a later explicit `initialize()` reuses the rotated credentials and verifies
+  identity again. Login is different: until profile verification succeeds, any failure
+  discards that attempt's installed credentials and leaves it unauthenticated.
+  This includes expiry-triggered renewal failure during login verification. Late
+  failures never clear or transition a superseding login/logout epoch.
 
 ## User-facing authentication, recovery, and logout
 
 - `SessionController.login()` returns a discriminated `LoginResult`
-  (`{ ok: true, cleanupFailed } | { ok: false, cleanupFailed, reason: LoginFailureReason }`)
+  (`{ ok: true, cleanupFailed } | { ok: false, cleanupFailed, reason: LoginFailureReason, fieldErrors?, correlationId? }`)
   classifying failures as `invalid-credentials`, `rate-limited`, `network`, or
-  `unexpected`. `LoginForm` maps `invalid-credentials` to a generic credential message
-  while treating a `401` during `/users/me` verification as `unexpected`.
+  `unexpected`. Failed login without credentials leaves an `unauthenticated` snapshot;
+  unavailable storage still fails closed as `unable-to-verify`. This does not change
+  initialization's network-uncertainty semantics. `LoginForm` maps `invalid-credentials`
+  to a generic credential message without field hints while treating a `401` during
+  `/users/me` verification as `unexpected`, not invalid submitted credentials.
+  Non-401 login API errors retain mapped field feedback and correlation IDs, never
+  raw backend messages, diagnostics or exception causes. Refresh/logout retain their
+  existing sanitization. The form preserves email and wipes the password after each
+  settled submission.
+- The login return-context notice excludes the default `/` destination. Approved
+  `next` values still flow through sibling auth links and redirect validation;
+  registration's existing return-target behavior is unchanged.
 - `createSessionMiddleware` buffers non-empty responses before the final epoch check and
   passes `null` as the body when reconstructing null-body HTTP status responses (`204`,
   `205`, `304`), preventing `TypeError` failures in browsers where empty streams expose a
@@ -194,7 +208,13 @@ concurrent/delayed `401`, expiry, unsafe writes, malformed storage/DTOs, uncerta
 failures, cleanup exceptions and late account responses. Focused regressions cover
 caller/logout cancellation without retry classification, exact cancellation error
 preservation, genuine network failures, standalone CSP-safe storage validation and
-explicit initialization recovery using rotated credentials.
+explicit initialization recovery using rotated credentials. Login regressions cover
+failed profile verification (network, 503, malformed profile and 401), expiry-renewal
+cleanup, superseding-account isolation, non-401 field/correlation retention, generic
+401 feedback, password wiping and the default-root notice. An in-memory differential
+against `c706b55` confirmed identical public effects for initialization offline,
+rotated-credential recovery after profile 503, session expiration and confirmed logout;
+these synthetic checks are not live-backend verification.
 
 Use Node 22.23.4/pnpm 10.34.9 from the repository root:
 

@@ -6,6 +6,7 @@ import {
   hasValidReturnTarget,
   PASSWORD_RESET_PATH,
   REGISTER_PATH,
+  readReturnTarget,
 } from '@/app/router/return-target';
 import {
   FormField,
@@ -74,7 +75,9 @@ export function LoginForm({ title }: LoginFormProps) {
     Boolean(dirtyFields.email || dirtyFields.password),
   );
 
-  const showReturnNotice = hasValidReturnTarget(searchParams);
+  const showReturnNotice =
+    hasValidReturnTarget(searchParams) &&
+    readReturnTarget(searchParams) !== '/';
   const forgotPasswordHref = buildAuthReturnHref(
     PASSWORD_RESET_PATH,
     searchParams,
@@ -99,7 +102,15 @@ export function LoginForm({ title }: LoginFormProps) {
     try {
       const result = await controller.login(values);
       if (!result.ok) {
-        throw new ApiError(LOGIN_ERROR_BY_REASON[result.reason]);
+        throw new ApiError({
+          ...LOGIN_ERROR_BY_REASON[result.reason],
+          ...(result.reason !== 'invalid-credentials'
+            ? {
+                fieldErrors: result.fieldErrors,
+                correlationId: result.correlationId,
+              }
+            : {}),
+        });
       }
     } finally {
       clearPasswordField();

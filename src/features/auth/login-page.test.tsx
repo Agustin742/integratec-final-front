@@ -143,15 +143,15 @@ describe('LoginPage (/login)', () => {
     );
   });
 
-  test('renders contextual notice and preserves approved ?next= across sibling auth links, while stripping unsafe targets', async () => {
+  test('hides default root notice and preserves approved ?next= across sibling auth links, while stripping unsafe targets', async () => {
     mswServer.use(createLoginHandler(), createOwnProfileHandler());
 
     const safeView = renderLoginRoute('/login?next=%2F');
     await waitForLoginForm();
 
     expect(
-      screen.getByText(authMessages.login.returnContextNotice),
-    ).toBeVisible();
+      screen.queryByText(authMessages.login.returnContextNotice),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByRole('link', {
         name: authMessages.login.actions.forgotPasswordLink,
@@ -212,6 +212,9 @@ describe('LoginPage (/login)', () => {
             code: 'UNAUTHENTICATED',
             message: 'Invalid email or password',
             correlationId: 'corr-401-login',
+            details: [
+              { field: 'email', messages: ['Synthetic private field hint'] },
+            ],
           },
         },
       }),
@@ -237,6 +240,9 @@ describe('LoginPage (/login)', () => {
     expect(passwordInput).not.toHaveAttribute('aria-invalid', 'true');
     expect(emailInput.value).toBe('ana@ejemplo.com');
     expect(passwordInput.value).toBe('');
+    expect(
+      screen.queryByText('Synthetic private field hint'),
+    ).not.toBeInTheDocument();
   });
 
   test('distinguishes 429 rate limit, network failure, and 500 unexpected errors from 401 and clears password', async () => {
@@ -308,6 +314,48 @@ describe('LoginPage (/login)', () => {
       );
     });
     expect(passwordInput.value).toBe('');
+  });
+
+  test('shows non-401 field errors, keeps email, wipes password, and retains correlation', async () => {
+    const fieldMessage = 'Synthetic safe email validation';
+    mswServer.use(
+      createLoginHandler({
+        error: {
+          status: 400,
+          body: {
+            code: 'VALIDATION_FAILED',
+            message: 'Synthetic internal diagnostic',
+            details: [{ field: 'email', messages: [fieldMessage] }],
+            correlationId: 'corr-safe-login',
+          },
+        },
+      }),
+    );
+    const { session } = renderLoginRoute('/login');
+    const loginSpy = vi.spyOn(session.controller, 'login');
+    const emailInput = await waitForLoginForm();
+    const passwordInput = screen.getByLabelText(
+      authMessages.login.fields.password.label,
+    );
+    fireEvent.change(emailInput, { target: { value: 'ana@ejemplo.com' } });
+    fireEvent.change(passwordInput, { target: { value: 'ClaveSegura123' } });
+    fireEvent.click(
+      screen.getByRole('button', { name: authMessages.login.actions.submit }),
+    );
+    expect(await screen.findByText(fieldMessage)).toBeVisible();
+    expect(emailInput).toHaveAttribute('aria-invalid', 'true');
+    expect(emailInput).toHaveValue('ana@ejemplo.com');
+    expect(passwordInput).toHaveValue('');
+    expect(
+      screen.queryByText('Synthetic internal diagnostic'),
+    ).not.toBeInTheDocument();
+    await expect(loginSpy.mock.results[0].value).resolves.toMatchObject({
+      correlationId: 'corr-safe-login',
+    });
+    expect(session.controller.getSnapshot()).toEqual({
+      status: 'unauthenticated',
+    });
+    expect(window.sessionStorage.getItem(storageKey)).toBeNull();
   });
 
   test('validates required fields on client before sending requests and focuses the first invalid control', async () => {
@@ -471,8 +519,8 @@ describe('LoginPage (/login)', () => {
     expect(expiredRouter.state.location.pathname).toBe('/login');
     expect(expiredRouter.state.location.search).toBe('?next=%2F');
     expect(
-      screen.getByText(authMessages.login.returnContextNotice),
-    ).toBeVisible();
+      screen.queryByText(authMessages.login.returnContextNotice),
+    ).not.toBeInTheDocument();
   });
 
   test('prompts before leaving /login with dirty inputs and clears password dirty state on failed submit', async () => {

@@ -31,7 +31,7 @@ export const profileSchema = z.object({
   }),
 }) satisfies z.ZodType<OwnProfile>;
 
-// Never propagate raw fetch exceptions, validation payloads or server details from auth.
+// Never propagate raw fetch exceptions, validation payloads or server diagnostics from auth.
 export function safeSessionError(error?: unknown): ApiError {
   if (error instanceof ApiError && error.status !== null) {
     return mapApiError(undefined, {
@@ -48,12 +48,25 @@ export function createAuthTransport(options: CreateApiClientOptions) {
   const client = createApiClient(options);
   async function validate(
     execute: () => Promise<TokenPair>,
+    preserveLoginMetadata = false,
   ): Promise<TokenPair> {
     let payload: unknown;
     try {
       payload = await execute();
     } catch (error) {
-      throw safeSessionError(error);
+      const safe = safeSessionError(error);
+      if (
+        preserveLoginMetadata &&
+        error instanceof ApiError &&
+        error.status !== 401
+      ) {
+        throw new ApiError({
+          ...safe,
+          fieldErrors: error.fieldErrors,
+          correlationId: error.correlationId,
+        });
+      }
+      throw safe;
     }
     const parsed = tokenPairSchema.safeParse(payload);
     if (!parsed.success) throw safeSessionError();
@@ -61,15 +74,17 @@ export function createAuthTransport(options: CreateApiClientOptions) {
   }
   return {
     login: (body: LoginInput, signal: AbortSignal): Promise<TokenPair> =>
-      validate(() =>
-        requestApi(() =>
-          client.POST('/auth/login', {
-            body,
-            signal,
-            credentials: 'omit',
-            redirect: 'error',
-          }),
-        ),
+      validate(
+        () =>
+          requestApi(() =>
+            client.POST('/auth/login', {
+              body,
+              signal,
+              credentials: 'omit',
+              redirect: 'error',
+            }),
+          ),
+        true,
       ),
     refresh: (refreshToken: string, signal: AbortSignal): Promise<TokenPair> =>
       validate(() =>

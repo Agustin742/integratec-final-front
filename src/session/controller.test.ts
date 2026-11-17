@@ -101,7 +101,7 @@ describe('session lifecycle public boundary', () => {
     const h = harness(() => json(payload));
     const { controller } = createSession(h);
     expect(await controller.login(login)).toMatchObject({ ok: false });
-    expect(controller.getSnapshot().status).toBe('unable-to-verify');
+    expect(controller.getSnapshot().status).toBe('unauthenticated');
     expect(h.storage.getItem(storageKey)).toBeNull();
     expect(h.requests).toHaveLength(1);
   });
@@ -396,7 +396,7 @@ describe('session lifecycle public boundary', () => {
       reason: 'rate-limited',
     });
     expect(rateLimited.controller.getSnapshot()).toEqual({
-      status: 'unable-to-verify',
+      status: 'unauthenticated',
     });
 
     const offline = createSession(
@@ -410,7 +410,7 @@ describe('session lifecycle public boundary', () => {
       reason: 'network',
     });
     expect(offline.controller.getSnapshot()).toEqual({
-      status: 'unable-to-verify',
+      status: 'unauthenticated',
     });
 
     const serverError = createSession(harness(() => json({}, 500)));
@@ -420,7 +420,7 @@ describe('session lifecycle public boundary', () => {
       reason: 'unexpected',
     });
     expect(serverError.controller.getSnapshot()).toEqual({
-      status: 'unable-to-verify',
+      status: 'unauthenticated',
     });
   });
 
@@ -440,7 +440,107 @@ describe('session lifecycle public boundary', () => {
       reason: 'network',
     });
     expect(networkProfileFailure.controller.getSnapshot()).toEqual({
-      status: 'unable-to-verify',
+      status: 'unauthenticated',
     });
+  });
+
+  test.each(['network', '503', 'malformed', '401'])(
+    'failed login profile verification clears both tokens: %s',
+    async (failure) => {
+      const h = harness((request) => {
+        if (request.url.endsWith('/auth/login')) return json(tokens);
+        if (failure === 'network') throw new TypeError('synthetic offline');
+        return json({}, failure === 'malformed' ? 200 : Number(failure));
+      });
+      const { controller } = createSession(h);
+      expect(await controller.login(login)).toMatchObject({
+        ok: false,
+        reason: failure === 'network' ? 'network' : 'unexpected',
+      });
+      expect(h.storage.getItem(storageKey)).toBeNull();
+      expect(controller.getSnapshot()).toEqual({ status: 'unauthenticated' });
+      const requests = h.requests.length;
+      await controller.initialize();
+      expect(h.requests).toHaveLength(requests);
+    },
+  );
+
+  test('failed expiry renewal during login verification also removes installed credentials', async () => {
+    let clock = 0;
+    const h = harness((request) => {
+      if (request.url.endsWith('/auth/login')) return json(tokens);
+      throw new TypeError('synthetic renewal offline');
+    });
+    const { controller } = createSession({
+      ...h,
+      now: () => {
+        const current = clock;
+        clock = tokens.expiresIn * 1000 + 1;
+        return current;
+      },
+    });
+    await expect(controller.login(login)).resolves.toMatchObject({
+      ok: false,
+      reason: 'network',
+    });
+    expect(h.requests.map((request) => new URL(request.url).pathname)).toEqual([
+      '/auth/login',
+      '/auth/refresh',
+    ]);
+    expect(h.storage.getItem(storageKey)).toBeNull();
+    expect(controller.getSnapshot()).toEqual({ status: 'unauthenticated' });
+  });
+
+  test('late failed login verification cannot clean up a newer authenticated epoch', async () => {
+    const oldProfile = deferred<Response>();
+    let profiles = 0;
+    const h = harness((request) => {
+      if (request.url.endsWith('/users/me')) {
+        return ++profiles === 1 ? oldProfile.promise : json(profile);
+      }
+      return json(profiles === 0 ? tokens : rotated);
+    });
+    const { controller } = createSession(h);
+    const first = controller.login(login);
+    await vi.waitFor(() => expect(profiles).toBe(1));
+    await expect(controller.login(login)).resolves.toMatchObject({ ok: true });
+    const cleanup = vi.fn();
+    controller.registerCleanup(cleanup);
+    const currentStorage = h.storage.getItem(storageKey);
+    oldProfile.resolve(json({}, 503));
+    await expect(first).resolves.toMatchObject({ ok: false });
+    expect(controller.getSnapshot()).toEqual({
+      status: 'authenticated',
+      user: profile,
+    });
+    expect(h.storage.getItem(storageKey)).toBe(currentStorage);
+    expect(JSON.parse(currentStorage!)).toMatchObject(rotated);
+    expect(cleanup).not.toHaveBeenCalled();
+  });
+
+  test('login retains safe non-401 field errors and correlation without raw backend messages', async () => {
+    const h = harness(() =>
+      json(
+        {
+          error: {
+            code: 'VALIDATION_FAILED',
+            message: 'synthetic internal message',
+            details: [{ field: 'email', messages: ['Revisá el correo.'] }],
+            correlationId: 'corr-login-validation',
+          },
+        },
+        400,
+      ),
+    );
+    const { controller } = createSession(h);
+    const result = await controller.login(login);
+    expect(result).toMatchObject({
+      ok: false,
+      fieldErrors: { email: ['Revisá el correo.'] },
+      correlationId: 'corr-login-validation',
+    });
+    expect(JSON.stringify(result)).not.toContain('synthetic internal message');
+    expect(controller.getSnapshot()).toEqual({ status: 'unauthenticated' });
+    expect(h.storage.getItem(storageKey)).toBeNull();
   });
 });
