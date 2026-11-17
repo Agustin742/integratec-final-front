@@ -162,7 +162,9 @@ export function createSessionMiddleware(
       const body = result.body === null ? null : await result.arrayBuffer();
       assertSessionEpoch(port, context.epoch);
       if (context.protected && result.status === 401) port.invalidate();
-      return new Response(body, {
+      const nullBodyStatus =
+        result.status === 204 || result.status === 205 || result.status === 304;
+      return new Response(nullBodyStatus ? null : body, {
         status: result.status,
         statusText: result.statusText,
         headers: result.headers,

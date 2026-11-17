@@ -53,7 +53,7 @@ export function createAppRoutes({
       children: [
         {
           // Public layout route: split screen with no navigation, for every
-          // signed-out screen. Its own error boundary keeps the layout mounted.
+          // account screen. Its own error boundary keeps the layout mounted.
           Component: AuthLayout,
           HydrateFallback: AppHydrateFallback,
           children: [
@@ -80,17 +80,17 @@ export function createAppRoutes({
                           (await import('../pages/register-page')).RegisterPage,
                       },
                     },
-                    {
-                      path: 'password-reset',
-                      lazy: {
-                        Component: async () =>
-                          (await import('../pages/password-reset-page'))
-                            .PasswordResetPage,
-                      },
-                    },
                   ],
                 },
-                // Reachable signed in or out: an invited user may already have an account.
+                // Recovery links and invitations must work signed in or out.
+                {
+                  path: 'password-reset',
+                  lazy: {
+                    Component: async () =>
+                      (await import('../pages/password-reset-page'))
+                        .PasswordResetPage,
+                  },
+                },
                 {
                   path: 'invitations/accept',
                   lazy: {

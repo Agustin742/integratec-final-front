@@ -1,6 +1,10 @@
+import { PasswordResetForm } from '@/features/auth/password-reset-form';
 import { messages } from '../messages';
-import { AuthPlaceholderPage } from './auth-placeholder-page';
+import { useDocumentTitle } from '../router/document-title';
 
 export function PasswordResetPage() {
-  return <AuthPlaceholderPage {...messages.pages.passwordReset} />;
+  const { title } = messages.pages.passwordReset;
+  useDocumentTitle(title);
+
+  return <PasswordResetForm title={title} />;
 }

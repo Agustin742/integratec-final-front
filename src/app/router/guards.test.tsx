@@ -150,13 +150,27 @@ test('falls back to the root when the return target is hostile', async () => {
   expect(router.state.location.search).toBe('');
 });
 
-test.each(['/login', '/register', '/password-reset'])(
+test.each(['/login', '/register'])(
   'redirects an authenticated user away from %s',
   async (path) => {
     const { router } = await renderAt(path, authenticated);
 
     await home();
     expect(router.state.location.pathname).toBe('/');
+  },
+);
+
+test.each(['/password-reset', '/password-reset?token=synthetic-reset-token'])(
+  'keeps password reset reachable for an authenticated user at %s',
+  async (path) => {
+    const { router } = await renderAt(path, authenticated);
+
+    expect(
+      await screen.findByRole('heading', {
+        name: messages.pages.passwordReset.title,
+      }),
+    ).toBeVisible();
+    expect(router.state.location.pathname).toBe('/password-reset');
   },
 );
 

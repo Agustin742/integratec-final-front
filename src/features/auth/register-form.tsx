@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type MouseEvent } from 'react';
 import { Controller, useWatch } from 'react-hook-form';
 import { Link, useSearchParams } from 'react-router';
-import { LOGIN_PATH, RETURN_TARGET_PARAM } from '@/app/router/return-target';
+import { buildAuthReturnHref, LOGIN_PATH } from '@/app/router/return-target';
 import {
   FormField,
   FormRootError,
@@ -15,7 +15,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useSessionService } from '@/session/provider';
-import { safeSessionRedirect } from '@/session/redirect';
 import { authMessages } from './messages';
 import {
   REGISTRATION_CHOICES,
@@ -32,24 +31,6 @@ const INVITATION_ACCEPT_PATH = '/invitations/accept';
 
 const primaryCtaLinkClass =
   'inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-5 py-2.5 font-display text-base font-semibold text-primary-foreground [--key:var(--key-primary)] key-bevel motion-press focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring';
-
-function buildAuthReturnHref(
-  pathname: string,
-  searchParams: URLSearchParams,
-): string {
-  const values = searchParams.getAll(RETURN_TARGET_PARAM);
-  if (values.length !== 1) {
-    return pathname;
-  }
-  const candidate = values[0];
-  if (safeSessionRedirect(candidate) !== candidate) {
-    return pathname;
-  }
-  const nextParams = new URLSearchParams({
-    [RETURN_TARGET_PARAM]: candidate,
-  });
-  return `${pathname}?${nextParams.toString()}`;
-}
 
 export interface RegisterFormProps {
   readonly title: string;
