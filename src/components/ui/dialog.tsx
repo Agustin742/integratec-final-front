@@ -22,15 +22,15 @@ export function DialogContent({
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-foreground/45 data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in" />
       <DialogPrimitive.Content
         className={cn(
-          'fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex flex-col overflow-hidden rounded-3xl border border-edge bg-popover py-6 text-popover-foreground shadow-float data-[state=closed]:animate-dialog-out data-[state=open]:animate-dialog-in',
+          'fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex flex-col overflow-hidden rounded-3xl border border-edge bg-popover text-popover-foreground shadow-float data-[state=closed]:animate-dialog-out data-[state=open]:animate-dialog-in',
           className,
         )}
         {...props}
       >
-        {/* The shell clips to the radius; only this inset wrapper scrolls, so the scrollbar never meets the rounded corners. */}
+        {/* The shell clips to the radius; only this wrapper scrolls. It starts below the pinned close key and is inset from the right and bottom edges, so the scrollbar never meets the key, the border or the corners. */}
         <div
           data-dialog-scroll
-          className="min-h-0 flex-1 overflow-y-auto px-7 pt-10 pb-1"
+          className="mt-14 mr-2 mb-4 min-h-0 flex-1 overflow-y-auto pt-2 pr-5 pb-3 pl-7"
         >
           {children}
         </div>
