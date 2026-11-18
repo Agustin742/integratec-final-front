@@ -111,3 +111,75 @@ export function classroomDetailQueryKey(
 ): ScopedQueryKey {
   return createScopedQueryKey({ userId, classroomId }, 'classrooms', 'detail');
 }
+
+export type ClassroomSortOrder = 'createdAt' | '-createdAt' | 'name' | '-name';
+
+export interface ClassroomListQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+  readonly sort?: ClassroomSortOrder;
+}
+
+export interface NormalizedClassroomListQueryParams {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly sort: ClassroomSortOrder;
+}
+
+function clampListParam(
+  value: number | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  if (value === undefined || !Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.max(min, Math.min(max, Math.trunc(value)));
+}
+
+/**
+ * Key of `GET /me/classrooms`: paginated list of accessible classrooms for one
+ * authenticated user, isolated per `userId` (`rules/state-management.md`).
+ */
+export function classroomListQueryKey(
+  userId: string,
+  params: ClassroomListQueryParams = {},
+): ScopedQueryKey<NormalizedClassroomListQueryParams> {
+  const normalizedParams = Object.freeze({
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+    sort: params.sort ?? '-createdAt',
+  });
+  return createScopedQueryKey(
+    { userId },
+    'classrooms',
+    'list',
+    normalizedParams,
+  );
+}
+
+/**
+ * Predicate matching every classroom list query entry owned by `userId`.
+ */
+export function createClassroomListPredicate(
+  userId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.domain === 'classrooms' &&
+      segment.resource === 'list'
+    );
+  };
+}
