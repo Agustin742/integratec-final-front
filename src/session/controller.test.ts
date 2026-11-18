@@ -582,4 +582,53 @@ describe('session lifecycle public boundary', () => {
       user: updated,
     });
   });
+
+  test('getAccessToken and refreshAccessToken expose bounded F08 token renewal for realtime joins (#23)', async () => {
+    let refreshCalls = 0;
+    let shouldFailRefresh = false;
+    const rotated = {
+      accessToken: 'rotated-access-token',
+      refreshToken: 'rotated-refresh-token',
+      tokenType: 'Bearer' as const,
+      expiresIn: 900,
+    };
+    const h = harness((request) => {
+      const path = new URL(request.url).pathname;
+      if (path === '/auth/login') return json(tokens);
+      if (path === '/users/me') return json(profile);
+      if (path === '/auth/refresh') {
+        refreshCalls += 1;
+        if (shouldFailRefresh) {
+          return json(
+            { error: { code: 'UNAUTHORIZED', message: 'revoked' } },
+            401,
+          );
+        }
+        return json(rotated);
+      }
+      return json({}, 404);
+    });
+    const { controller } = createSession(h);
+
+    expect(controller.getAccessToken()).toBeUndefined();
+    expect(await controller.refreshAccessToken()).toBeUndefined();
+
+    await controller.login(login);
+    expect(controller.getAccessToken()).toBe(tokens.accessToken);
+
+    const [first, second] = await Promise.all([
+      controller.refreshAccessToken(),
+      controller.refreshAccessToken(),
+    ]);
+    expect(refreshCalls).toBe(1);
+    expect(first).toBe(rotated.accessToken);
+    expect(second).toBe(rotated.accessToken);
+    expect(controller.getAccessToken()).toBe(rotated.accessToken);
+
+    shouldFailRefresh = true;
+    const failed = await controller.refreshAccessToken();
+    expect(failed).toBeUndefined();
+    expect(controller.getAccessToken()).toBeUndefined();
+    expect(controller.getSnapshot()).toEqual({ status: 'unauthenticated' });
+  });
 });
