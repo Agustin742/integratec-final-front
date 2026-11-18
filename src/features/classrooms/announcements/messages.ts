@@ -55,10 +55,9 @@ export const announcementMessages = {
     titleSingleLine: 'El título debe tener una sola línea.',
     titleMaxLength: 'El título no puede superar los 200 caracteres.',
     contentLabel: 'Contenido',
-    contentPlaceholder:
-      'Escribí el aviso en texto plano. Podés mencionar integrantes con @Nombre.',
+    contentPlaceholder: 'Ej. El viernes tenemos evaluación de fracciones.',
     contentHelper:
-      'Se publica como texto plano seguro. Las menciones (@Nombre) se resuelven en el servidor.',
+      'Escribí el aviso como texto. Para mencionar a alguien del aula, usá @ y su nombre.',
     contentRequired: 'Ingresá el contenido del anuncio.',
     contentMaxLength: 'El contenido no puede superar los 5000 caracteres.',
     submitPublish: 'Publicar anuncio',

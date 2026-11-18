@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-18 — Review and fixes on PR #92 (#49, announcements notice board)
+
+- **Status:** in-progress
+- **Area / files:** `src/features/classrooms/announcements/`, `docs/threat-model.md`
+- **Change:** Reviewed TheKade's PR #92 and merged `develop` into it (threat model entries renumbered to TM-025..TM-027). Fixes on the PR branch: stale edit form on 404 and row actions locked during submit (0943560), duplicate guard after an uncertain create (ed1c105), delete 404 treated as already removed and focus restored after edit (53856c4), corrected threat model mitigations and friendlier content helper copy (this commit), mobile card header layout (pending, next commit).
+- **Reason:** Verified review findings against the code before applying them.
+- **Verification:** Per-task affected tests, lint, typecheck, build and `security:check`; RDD review of 0943560..53856c4 approved.
+- **Next step:** Mobile card header layout, then open the review for merge.
+
 ## 2026-11-18 — Local verification scope
 
 - **Status:** completed
