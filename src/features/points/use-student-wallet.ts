@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   useQuery,
   useQueryClient,
@@ -99,6 +99,27 @@ export type StudentWalletState =
 const PENDING = Object.freeze({ status: 'pending' as const });
 
 /**
+ * Removes cached wallet pages of one user and classroom that no mounted hook
+ * observes. Entries with active observers are kept: their hooks hide
+ * pre-revocation data through the revocation latch, and removing an active
+ * entry would make the next render rebuild a fresh query and refetch
+ * forever.
+ */
+function dropUnobservedWalletEntries(
+  queryClient: QueryClient,
+  userId: string,
+  classroomId: string,
+): void {
+  const walletCache = queryClient.getQueryCache();
+  const isScopeWallet = createStudentWalletPredicate(userId, classroomId);
+  for (const entry of walletCache.getAll()) {
+    if (!isScopeWallet({ queryKey: entry.queryKey })) continue;
+    if (entry.getObserversCount() > 0) continue;
+    walletCache.remove(entry);
+  }
+}
+
+/**
  * The signed-in student's server-computed points wallet and one page of
  * movements, as decided by `GET /classrooms/{id}/points`
  * (`PointsController_getOwnWallet`).
@@ -110,7 +131,8 @@ const PENDING = Object.freeze({ status: 'pending' as const });
  * - Responses are validated with jitless `studentWalletSchema` so malformed 2xx
  *   payloads surface as an error rather than `undefined puntos`.
  * - `403` (non-student / revoked role) and `404` (out-of-scope classroom)
- *   clear any cached balance/ledger immediately, surface `status: 'error'`, and
+ *   clear any cached balance/ledger immediately, surface `status: 'error'`,
+ *   drop every cached wallet page of that scope from the query cache, and
  *   invalidate `classroomDetailQueryKey` so the workspace reconciles access.
  * - Other failed background refreshes (`5xx`, network) keep the last confirmed
  *   data with `stale: true`, matching the roster precedent.
@@ -130,6 +152,14 @@ export function useStudentWallet(
   // page and page size combination is one cache entry.
   const normalized = normalizeStudentWalletQueryParams(params);
   const reconciledContextErrorRef = useRef<unknown>(null);
+  // Latched when revoked access (403/404) is observed: wallet data fetched
+  // before the latch is private data of a context the caller can no longer
+  // read, so it must never render again until a newer successful fetch proves
+  // the server restored access.
+  const [revokedAccess, setRevokedAccess] = useState<{
+    at: number;
+    error: ApiError;
+  } | null>(null);
 
   const query = useQuery({
     // Without a signed-in user or valid classroomId the query stays disabled;
@@ -162,6 +192,12 @@ export function useStudentWallet(
       return;
     }
     reconciledContextErrorRef.current = query.error;
+    setRevokedAccess({ at: Date.now(), error: toApiError(query.error) });
+    // Cached wallet pages of the revoked scope are private data the caller
+    // can no longer read: drop the entries nobody observes so no later failed
+    // refresh or remount can resurface them as stale data
+    // (`rules/points-and-shop.md`, `rules/state-management.md`).
+    dropUnobservedWalletEntries(queryClient, userId, trimmedClassroomId);
     void queryClient.invalidateQueries({
       queryKey: classroomDetailQueryKey(userId, trimmedClassroomId),
       exact: true,
@@ -176,9 +212,25 @@ export function useStudentWallet(
     userId,
   ]);
 
+  // When a hook that latched a revocation unmounts, its query entry becomes
+  // unobserved pre-revocation cache: drop it so a remount can never render it.
+  useEffect(() => {
+    if (revokedAccess === null || userId === null) return;
+    const scopeUserId = userId;
+    const scopeClassroomId = trimmedClassroomId;
+    return () => {
+      dropUnobservedWalletEntries(queryClient, scopeUserId, scopeClassroomId);
+    };
+  }, [queryClient, revokedAccess, trimmedClassroomId, userId]);
+
   if (!enabled) {
     return PENDING;
   }
+
+  // Data older than a revocation latch is pre-revocation cache; only a fetch
+  // newer than the latch may render again.
+  const cachedDataPredatesRevocation =
+    revokedAccess !== null && query.dataUpdatedAt <= revokedAccess.at;
 
   // Revoked access (403/404) must hide cached balance and private ledger
   // immediately rather than serving stale data.
@@ -192,7 +244,7 @@ export function useStudentWallet(
     };
   }
 
-  if (query.data !== undefined) {
+  if (query.data !== undefined && !cachedDataPredatesRevocation) {
     return {
       status: 'ready',
       wallet: query.data,
@@ -208,6 +260,18 @@ export function useStudentWallet(
     return {
       status: 'error',
       error: mappedError,
+      retry: () => void query.refetch(),
+      isFetching: query.isFetching,
+      isRefetching: query.isRefetching,
+    };
+  }
+
+  if (query.data !== undefined && revokedAccess !== null) {
+    // Cached pre-revocation data without a current error (an observer still
+    // holding a removed query): stay unavailable instead of resurfacing it.
+    return {
+      status: 'error',
+      error: revokedAccess.error,
       retry: () => void query.refetch(),
       isFetching: query.isFetching,
       isRefetching: query.isRefetching,

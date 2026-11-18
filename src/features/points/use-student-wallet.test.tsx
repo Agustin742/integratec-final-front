@@ -278,6 +278,112 @@ describe('useStudentWallet (#45)', () => {
     },
   );
 
+  test.each([403, 404] as const)(
+    'a %i revocation clears cached wallet data so a later failed refresh never resurfaces it',
+    async (status) => {
+      mswServer.use(createStudentWalletHandler(classroomId));
+      const { queryClient } = renderWallet();
+      await waitFor(() =>
+        expect(walletOutput()).toHaveTextContent('"status":"ready"'),
+      );
+
+      mswServer.use(createStudentWalletHandler(classroomId, { status }));
+      await act(async () => {
+        await invalidateStudentWallet(queryClient, {
+          userId: profile.id,
+          classroomId,
+        });
+      });
+      await waitFor(() =>
+        expect(walletOutput()).toHaveTextContent('"status":"error"'),
+      );
+
+      // Access is gone: a later failed refresh (5xx) must never resurface the
+      // revoked wallet's private balance as stale cached data.
+      mswServer.use(createStudentWalletHandler(classroomId, { status: 500 }));
+      await act(async () => {
+        await invalidateStudentWallet(queryClient, {
+          userId: profile.id,
+          classroomId,
+        });
+      });
+
+      const output = await waitFor(() => {
+        const node = walletOutput();
+        expect(node).toHaveTextContent('"status":"error"');
+        return node;
+      });
+      expect(output).not.toHaveTextContent('"status":"ready"');
+      expect(output).not.toHaveTextContent('"balance"');
+      expect(output).not.toHaveTextContent('"stale":true');
+    },
+  );
+
+  test.each([403, 404] as const)(
+    'a %i revocation clears every cached wallet page of that user and classroom',
+    async (status) => {
+      mswServer.use(createStudentWalletHandler(classroomId));
+      const session = fakeSession(
+        { status: 'authenticated', user: profile },
+        createApiClient({ baseUrl: TEST_API_BASE_URL }),
+      );
+      const queryClient = createAppQueryClient({
+        defaultOptions: { queries: { retry: false, retryDelay: 0 } },
+      });
+      render(
+        <SessionProvider service={session.service}>
+          <WalletProbe
+            classroomId={classroomId}
+            params={{ page: 1, pageSize: 2 }}
+          />
+          <WalletProbe
+            classroomId={classroomId}
+            params={{ page: 2, pageSize: 2 }}
+          />
+        </SessionProvider>,
+        { queryClient },
+      );
+      const outputs = () => screen.getAllByRole('status');
+      await waitFor(() =>
+        outputs().every((node) =>
+          node.textContent?.includes('"status":"ready"'),
+        ),
+      );
+
+      mswServer.use(createStudentWalletHandler(classroomId, { status }));
+      await act(async () => {
+        await invalidateStudentWallet(queryClient, {
+          userId: profile.id,
+          classroomId,
+        });
+      });
+      await waitFor(() =>
+        outputs().every((node) =>
+          node.textContent?.includes('"status":"error"'),
+        ),
+      );
+
+      // The sibling page's cached ledger is private data of the revoked
+      // context too; a later failed refresh must not revive it as stale.
+      mswServer.use(createStudentWalletHandler(classroomId, { status: 500 }));
+      await act(async () => {
+        await invalidateStudentWallet(queryClient, {
+          userId: profile.id,
+          classroomId,
+        });
+      });
+      await waitFor(() =>
+        outputs().every((node) =>
+          node.textContent?.includes('"status":"error"'),
+        ),
+      );
+      for (const node of outputs()) {
+        expect(node).not.toHaveTextContent('"balance"');
+        expect(node).not.toHaveTextContent('"stale":true');
+      }
+    },
+  );
+
   test('invalidation refetches the wallet and shows the new server balance', async () => {
     mswServer.use(createStudentWalletHandler(classroomId));
     const { queryClient } = renderWallet();

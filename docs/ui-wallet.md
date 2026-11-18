@@ -10,7 +10,8 @@ zero ([points and shop](../rules/points-and-shop.md)).
 ## Where it mounts
 
 `WalletIndicator` renders in the classroom workspace header when the server
-context resolves the caller as `STUDENT` for that classroom
+context resolves the caller as `STUDENT` for that classroom, in both 3D and
+classic 2D mode
 ([classroom workspace](./classroom-workspace.md)). The role decision comes only
 from `GET /classrooms/{id}`; the component itself performs no role gating. The
 indicator is deliberately **not** part of the panel registry: the backend
@@ -42,7 +43,9 @@ param fallback): the dialog content opened by the indicator.
 - `PaginationControls` with local page state; loading, empty (teaching: points
   appear when a teacher grades an activity or after a shop purchase), error
   with retry, and stale states use the shared feedback primitives. A failed
-  background refresh keeps the confirmed list and shows the stale notice.
+  background refresh keeps the confirmed list and shows the stale notice,
+  except that `403`/`404` immediately hide the private balance and movements.
+  An empty out-of-range page has distinct copy from a wallet with no movements.
 
 ## Data and lifecycle
 
@@ -55,7 +58,12 @@ query. Grading and purchase features call `invalidateStudentWallet` after
 their mutations so every movements page and the balance refresh together.
 A `403` (non-student) and a `404` (out-of-scope classroom) arrive as mapped
 `ApiError`s ([RN-04](../docs/functional-requirements.md)); the indicator and
-panel never disclose classroom existence.
+panel never disclose classroom existence. Revoked access also drops every cached wallet page of that user and
+classroom from the query cache and invalidates the classroom context for
+reconciliation, so a later failed refresh can never resurface the private
+balance or ledger as stale data. Dialog and pagination state reset when the
+user or classroom changes. Responses are validated by the jitless wallet schema
+before rendering; blank classroom IDs disable fetching.
 
 ## Screenshots
 
