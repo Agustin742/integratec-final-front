@@ -22,6 +22,7 @@ export interface MaterialUploadSectionProps {
   readonly classroomId: string;
   readonly onUploaded: (filename: string) => Promise<void> | void;
   readonly onReconcileRequired: () => Promise<void> | void;
+  readonly onInteraction?: () => void;
 }
 
 type UploadPhase =
@@ -52,6 +53,7 @@ export function MaterialUploadSection({
   classroomId,
   onUploaded,
   onReconcileRequired,
+  onInteraction,
 }: MaterialUploadSectionProps) {
   const inputId = useId();
   const hintId = useId();
@@ -65,6 +67,7 @@ export function MaterialUploadSection({
 
   function selectCandidateFile(file: File | undefined) {
     if (!file || phase.kind === 'uploading') return;
+    onInteraction?.();
     setPhase({ kind: 'idle' });
     const check = validateMaterialFile(file);
     if (!check.ok) {
@@ -102,6 +105,7 @@ export function MaterialUploadSection({
 
     const controller = new AbortController();
     abortRef.current = controller;
+    onInteraction?.();
     setClientError(null);
     setPhase({ kind: 'uploading', filename: selectedFile.name });
 
@@ -196,7 +200,8 @@ export function MaterialUploadSection({
           id={inputId}
           type="file"
           accept=".pdf,application/pdf,image/png,image/jpeg"
-          aria-describedby={hintId}
+          tabIndex={-1}
+          aria-hidden="true"
           disabled={isUploading}
           onChange={handleFileChange}
           className="sr-only"
@@ -206,6 +211,7 @@ export function MaterialUploadSection({
           type="button"
           variant="outline"
           size="sm"
+          aria-describedby={hintId}
           disabled={isUploading}
           onClick={() => inputRef.current?.click()}
           className="shrink-0"

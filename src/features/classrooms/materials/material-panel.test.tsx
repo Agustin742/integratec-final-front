@@ -337,4 +337,92 @@ describe('MaterialPanel', () => {
       expect(store.read()).toHaveLength(0);
     });
   });
+
+  it('keeps the hidden file input out of tab order and manages focus on remove cancel', async () => {
+    const initialItem: ClassroomMaterialItem = {
+      id: MATERIAL_ID,
+      classroomId: CLASSROOM_ID,
+      authorId: profile.id,
+      filename: 'foco-accesible.pdf',
+      contentType: 'application/pdf',
+      sizeBytes: 1024,
+      createdAt: '2026-11-18T03:00:00.000Z',
+    };
+    const store = createClassroomMaterialsStore({
+      classroomId: CLASSROOM_ID,
+      initialItems: [initialItem],
+    });
+    mswServer.use(...store.handlers);
+
+    renderMaterialPanel({ role: 'TEACHER' });
+    expect(await screen.findByText('foco-accesible.pdf')).toBeInTheDocument();
+
+    const fileInput = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
+    expect(fileInput).toHaveAttribute('tabindex', '-1');
+    expect(fileInput).toHaveAttribute('aria-hidden', 'true');
+
+    const removeButton = screen.getByRole('button', { name: 'Quitar' });
+    removeButton.focus();
+    fireEvent.click(removeButton);
+
+    const cancelButton = await screen.findByRole('button', {
+      name: 'Cancelar',
+    });
+    expect(cancelButton).toHaveFocus();
+
+    fireEvent.click(cancelButton);
+    expect(await screen.findByRole('button', { name: 'Quitar' })).toHaveFocus();
+  });
+
+  it('shows uncertain 503 upload alert, ErrorState on initial failure, and StaleDataNotice on refresh failure', async () => {
+    const store = createClassroomMaterialsStore({ classroomId: CLASSROOM_ID });
+    store.failNext('list', {
+      status: 500,
+      body: {
+        code: 'INTERNAL_ERROR',
+        message: 'Server error',
+        correlationId: 'req-list-500',
+      },
+    });
+    mswServer.use(...store.handlers);
+    renderMaterialPanel({ role: 'TEACHER' });
+
+    expect(
+      await screen.findByText('No pudimos cargar el material'),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(
+      await screen.findByText('Todavía no hay material publicado'),
+    ).toBeInTheDocument();
+
+    store.failNext('upload', {
+      status: 503,
+      body: {
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Timeout',
+        correlationId: 'req-upload-503',
+      },
+    });
+    const fileInput = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
+    fireEvent.change(fileInput, {
+      target: {
+        files: [
+          new File(['%PDF'], 'incierto.pdf', { type: 'application/pdf' }),
+        ],
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Subir archivo' }));
+
+    expect(
+      await screen.findByText('No pudimos confirmar si el archivo se guardó'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Actualizar lista' }),
+    ).toBeInTheDocument();
+  });
 });

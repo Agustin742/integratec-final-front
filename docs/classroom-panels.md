@@ -2,9 +2,9 @@
 
 The classroom workspace mounts the reusable panel provider with backend A's
 `availablePanels`, **not action authorization**. The default production catalog
-registers nine panel entries with centralized titles and a shared, honest
-“Funcionalidad pendiente” state. Their business functionality belongs to separate
-stories; opening an entry does not imply that functionality is delivered.
+registers nine panel entries with centralized titles: `material` renders
+`MaterialPanel` (`#40`), while the remaining eight entries keep a shared, honest
+“Funcionalidad pendiente” state until their respective stories land.
 
 ## Approved scope reconciliation
 
@@ -18,7 +18,7 @@ the issue; team acceptance of the reconciled criterion remains part of PR review
 | Registered key | Title                |
 | -------------- | -------------------- |
 | `activities`   | Actividades          |
-| `material`     | Material             | `MaterialPanel` (study material upload, signed download, removal; #40) |
+| `material`     | Material             |
 | `grades`       | Calificaciones       |
 | `chat`         | Chat                 |
 | `notices`      | Avisos               |

@@ -207,6 +207,7 @@ test('teacher uploads, captures responsive views, downloads via signed URL, and 
     ),
   ).toBe(true);
 
+  await dialog.evaluate((el) => el.scrollTo(0, 0));
   await page.screenshot({
     path: `docs/assets/classrooms/study-materials-${width}.png`,
     fullPage: true,

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatInstant } from '@/lib/dates';
@@ -37,6 +37,20 @@ export function MaterialList({
   onCancelRemove,
   renderItemSlot,
 }: MaterialListProps) {
+  const removeButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const cancelButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const previousConfirmId = useRef<string | null>(null);
+
+  useEffect(() => {
+    const prev = previousConfirmId.current;
+    previousConfirmId.current = pendingConfirmId;
+    if (pendingConfirmId && pendingConfirmId !== prev) {
+      cancelButtonRefs.current[pendingConfirmId]?.focus();
+    } else if (!pendingConfirmId && prev) {
+      removeButtonRefs.current[prev]?.focus();
+    }
+  }, [pendingConfirmId]);
+
   return (
     <ul
       aria-label={materialMessages.list.regionLabel}
@@ -108,6 +122,9 @@ export function MaterialList({
 
                 {canManage && !isConfirming && (
                   <Button
+                    ref={(node) => {
+                      removeButtonRefs.current[item.id] = node;
+                    }}
                     type="button"
                     variant="outline"
                     size="sm"
@@ -160,6 +177,9 @@ export function MaterialList({
                       : materialMessages.list.confirmRemoveSubmit}
                   </Button>
                   <Button
+                    ref={(node) => {
+                      cancelButtonRefs.current[item.id] = node;
+                    }}
                     type="button"
                     variant="outline"
                     size="sm"

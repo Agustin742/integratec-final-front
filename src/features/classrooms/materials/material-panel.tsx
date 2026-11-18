@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import { ApiError } from '@/api/errors';
@@ -78,6 +78,16 @@ function MaterialPanelContent({
     readonly title: string;
     readonly description: string;
   } | null>(null);
+  const unmountAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    unmountAbortRef.current = controller;
+    return () => {
+      controller.abort();
+      unmountAbortRef.current = null;
+    };
+  }, []);
 
   const userId = context.status === 'ready' ? context.userId : null;
   const canManage =
@@ -99,7 +109,10 @@ function MaterialPanelContent({
     enabled: userId !== null,
   });
 
-  async function reconcileMaterials() {
+  async function reconcileMaterials(resetPage = false) {
+    if (resetPage) {
+      setPage(1);
+    }
     if (userId === null) return;
     await queryClient.invalidateQueries({
       predicate: createClassroomMaterialsPredicate(userId, classroomId),
@@ -107,17 +120,18 @@ function MaterialPanelContent({
   }
 
   async function handleUploaded(filename: string) {
-    setPage(1);
     setActionNotice({
       kind: 'success',
       title: materialMessages.upload.confirmedTitle,
       description: materialMessages.upload.confirmedDescription(filename),
     });
-    await reconcileMaterials();
+    await reconcileMaterials(true);
   }
 
   async function handleDownload(material: MaterialDto) {
     if (downloadingId !== null) return;
+    const signal = unmountAbortRef.current?.signal;
+    if (signal?.aborted) return;
     setActionNotice(null);
     setDownloadingId(material.id);
     try {
@@ -125,10 +139,18 @@ function MaterialPanelContent({
         client,
         classroomId,
         material.id,
+        { signal },
       );
+      if (signal?.aborted) return;
       // Open server-issued short-lived signed URL without storing or logging it.
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (error) {
+      if (
+        (error instanceof Error || error instanceof DOMException) &&
+        error.name === 'AbortError'
+      ) {
+        return;
+      }
       const description =
         error instanceof ApiError
           ? error.userMessage
@@ -139,7 +161,9 @@ function MaterialPanelContent({
         description,
       });
     } finally {
-      setDownloadingId(null);
+      if (!signal?.aborted) {
+        setDownloadingId(null);
+      }
     }
   }
 
@@ -159,6 +183,7 @@ function MaterialPanelContent({
       });
       await reconcileMaterials();
     } catch (error) {
+      setPendingConfirmId(null);
       const description =
         error instanceof ApiError
           ? error.userMessage
@@ -168,9 +193,23 @@ function MaterialPanelContent({
         title: materialMessages.list.removeErrorTitle,
         description,
       });
+      if (error instanceof ApiError && error.kind === 'not-found') {
+        await reconcileMaterials();
+      }
     } finally {
       setRemovingId(null);
     }
+  }
+
+  if (context.status === 'error') {
+    return (
+      <ErrorState
+        headingLevel="h3"
+        title={materialMessages.errorTitle}
+        description={context.error.userMessage}
+        onRetry={context.retry}
+      />
+    );
   }
 
   if (context.status === 'pending' || query.isPending) {
@@ -214,7 +253,8 @@ function MaterialPanelContent({
           client={client}
           classroomId={classroomId}
           onUploaded={handleUploaded}
-          onReconcileRequired={reconcileMaterials}
+          onReconcileRequired={() => reconcileMaterials(true)}
+          onInteraction={() => setActionNotice(null)}
         />
       )}
 
