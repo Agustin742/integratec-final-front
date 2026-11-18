@@ -20,8 +20,8 @@
 - **Area / files (planned):** `src/features/classrooms/activities/` (schemas, services, panel, editor), `src/api/query-keys.ts`, `src/features/classrooms/panels/classroom-panel-catalog.tsx`, `src/test/msw/handlers.ts`, `e2e/`, `docs/`, `changelogs/tracker-mati.md`
 - **Change:** Implementing [issue #39](https://github.com/Agustin742/integratec-final-front/issues/39) (HU-ACT-001 part 1/2) on `feat/39-teacher-activity-editor` from `develop` (`c50d62b`): activity form (type/format/title/description/due date/late policy/max score/weight), accessible multiple-choice builder, publish flow with confirmation and pending/failed/uncertain states, teacher activity list with status, server-rule-compliant deactivation UX, 3D panel registry + 2D route entry, MSW handlers from the contract, unit tests and Playwright E2E.
 - **Reason:** Let teachers create, edit and publish TP and Exam activities including a multiple-choice question builder, per `rules/activities-and-grading.md`.
-- **Verification:** Pending — full local check suite will be recorded when complete.
-- **Next step:** T1 integration layer (schemas, service, query keys, MSW handlers).
+- **Verification:** T2 landed (activities panel + tests, uncommitted in worktree): focused vitest — `classroom-activities-panel.test.tsx` 10/10 passed; `panels/classroom-panels.test.tsx` 16/16 passed; `classroom-workspace-panels.test.tsx` 39/39 passed (activities placeholder case replaced by the real panel); `pnpm lint` and `pnpm typecheck` pass; prettier clean on all touched files. Full local check suite still pending for T5.
+- **Next step:** T3 activity editor (create/edit draft form, MCQ builder, publish flow). T1 landed in commit `e517705`.
 
 ## 2026-11-18 — Build the Colyseus realtime client wrapper with token join and reconnect handling (#23)
 

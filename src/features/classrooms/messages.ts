@@ -287,5 +287,76 @@ export const classroomMessages = {
       deactivateUnexpected:
         'No pudimos desactivar la actividad. Intentá nuevamente en unos segundos.',
     },
+    panel: {
+      heading: 'Actividades',
+      subtitle:
+        'Consultá los trabajos prácticos y exámenes del aula con su estado, fechas y puntajes.',
+      loading: 'Cargando las actividades del aula…',
+      errorTitle: 'No pudimos cargar las actividades',
+      staleTitle: 'Actividades pendientes de sincronización',
+      staleDescription:
+        'Mostramos la última lista confirmada. Falló la actualización en segundo plano.',
+      forbiddenTitle: 'Sin permisos para ver las actividades',
+      forbiddenDescription:
+        'Tu rol actual no tiene acceso a las actividades de esta aula.',
+      notFoundTitle: 'No encontramos el aula indicada',
+      notFoundDescription:
+        'El aula no existe o ya no tenés acceso para consultar sus actividades.',
+      emptyTitleStaff: 'Todavía no hay actividades en el aula',
+      emptyDescriptionStaff:
+        'Cuando crees un trabajo práctico o un examen, va a aparecer acá con su estado.',
+      emptyTitleStudent: 'Todavía no hay actividades publicadas',
+      emptyDescriptionStudent:
+        'Cuando tu docente publique una actividad, va a aparecer acá.',
+      emptyFilteredTitle: 'No encontramos actividades con ese filtro',
+      emptyFilteredDescription:
+        'Probá cambiando el filtro de estado de publicación.',
+      emptyPageTitle: 'No hay actividades en esta página',
+      emptyPageDescription: 'Volvé a una página anterior para ver el resto de las actividades.',
+      clearFiltersAction: 'Limpiar filtros',
+      stateFilterLabel: 'Estado de publicación',
+      stateOptions: {
+        ALL: 'Todas',
+        DRAFT: 'Borradores',
+        PUBLISHED: 'Publicadas',
+      },
+      types: {
+        TP: 'Trabajo práctico',
+        EXAM: 'Examen',
+      },
+      formats: {
+        FILE: 'Entrega de archivo',
+        MULTIPLE_CHOICE: 'Opción múltiple',
+      },
+      states: {
+        DRAFT: 'Borrador',
+        PUBLISHED: 'Publicada',
+      },
+      dueAtLabel: 'Fecha límite',
+      opensAtLabel: 'Apertura',
+      allowLateLabel: 'Acepta entregas tardías',
+      questionCountLabel: (count: number) =>
+        count === 1 ? '1 pregunta' : `${count} preguntas`,
+      maxScoreLabel: (score: number) =>
+        `Puntaje máximo: ${score.toLocaleString('es-AR')}`,
+      weightLabel: (weight: number) =>
+        `Ponderación: ×${weight.toLocaleString('es-AR', {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
+        })}`,
+      deactivateAction: 'Desactivar',
+      deactivateAriaLabel: (title: string) => `Desactivar «${title}»`,
+      deactivateConfirmTitle: (title: string) =>
+        `Confirmar desactivación de «${title}»`,
+      deactivateConfirmDescription:
+        'La actividad deja de aparecer para los estudiantes, pero su historial académico (entregas y calificaciones) se conserva en el servidor.',
+      deactivateConfirmSubmit: 'Confirmar desactivación',
+      deactivateConfirmPending: 'Desactivando…',
+      deactivateConfirmCancel: 'Cancelar',
+      deactivatedTitle: 'Actividad desactivada',
+      deactivatedDescription: (title: string) =>
+        `Confirmamos la desactivación de «${title}». El historial académico se conservó.`,
+      deactivateErrorTitle: 'No pudimos completar la desactivación',
+    },
   },
 } as const;

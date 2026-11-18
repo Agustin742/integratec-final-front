@@ -1,4 +1,10 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { expect, test } from 'vitest';
@@ -61,6 +67,14 @@ function setup(
           });
         const url = new URL(request.url);
         if (url.pathname.endsWith('/roster')) {
+          return Response.json({
+            items: [],
+            page: 1,
+            pageSize: 20,
+            total: 0,
+          });
+        }
+        if (url.pathname.endsWith('/activities')) {
           return Response.json({
             items: [],
             page: 1,
@@ -152,7 +166,6 @@ function setup(
   };
 }
 const pendingCatalogCases = [
-  ['activities', 'Actividades'],
   ['grades', 'Calificaciones'],
   ['chat', 'Chat'],
   ['notices', 'Avisos'],
@@ -160,6 +173,24 @@ const pendingCatalogCases = [
   ['bot', 'Asistente de estudio'],
   ['settings', 'Configuración'],
 ] as const;
+
+test('default catalog opens activities by URL with the activities panel and closes cleanly', async () => {
+  const view = setup(['activities'], '/classrooms/a/panels/activities', true);
+  const dialog = await screen.findByRole('dialog', { name: 'Actividades' });
+  expect(dialog).toHaveTextContent(
+    'Consultá los trabajos prácticos y exámenes',
+  );
+  expect(
+    await within(dialog).findByText('Todavía no hay actividades publicadas'),
+  ).toBeVisible();
+  expect(dialog).not.toHaveTextContent('Funcionalidad pendiente');
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+  await screen.findByRole('button', { name: 'Open grades' });
+  expect(view.router.state.location.pathname).toBe('/classrooms/a');
+  expect(view.router.state.historyAction).toBe('REPLACE');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(document.activeElement).toHaveTextContent('Classroom a');
+});
 
 test('default catalog opens members by URL with the roster panel and closes cleanly', async () => {
   const view = setup(['members'], '/classrooms/a/panels/members', true);
