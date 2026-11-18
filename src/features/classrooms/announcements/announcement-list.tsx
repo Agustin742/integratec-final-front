@@ -63,7 +63,7 @@ export function AnnouncementList({
           >
             <article className="min-w-0 space-y-2">
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0 flex-1 space-y-1">
+                <div className="min-w-0 grow basis-48 space-y-1">
                   <h4 className="break-words text-base font-semibold text-foreground">
                     {item.title}
                   </h4>

@@ -305,3 +305,85 @@ test('student reads announcements as plain text without edit or delete controls'
   expect(cspViolations).toEqual([]);
   expect(pageErrors).toEqual([]);
 });
+
+test('announcement card keeps a readable title and wraps actions on narrow screens', async ({
+  page,
+}, testInfo) => {
+  const isMobile = testInfo.project.name === 'mobile';
+  await page.setViewportSize({ width: isMobile ? 360 : 1280, height: 800 });
+  const { cspViolations, pageErrors } = await setupAuthSession(page);
+  const longTitle =
+    'Recordatorio importante sobre la evaluación de fracciones del viernes';
+
+  await page.route(`${apiOrigin}/classrooms/${classroomId}`, (route) =>
+    route.fulfill({
+      json: {
+        id: classroomId,
+        name: '3.º Año B - Matemática',
+        subject: null,
+        schoolId: null,
+        independentTeacherId: userId,
+        adultMode: false,
+        chatMuted: false,
+        collaborationLocked: false,
+        gamesDisabled: false,
+        myRole: 'TEACHER',
+        capabilities: teacherCapabilities,
+        availablePanels: ['notices'],
+        deskCount: 12,
+        pet: null,
+        createdAt: '2026-11-01T00:00:00.000Z',
+        updatedAt: '2026-11-01T00:00:00.000Z',
+      } satisfies components['schemas']['ClassroomContextResponseDto'],
+    }),
+  );
+  await page.route(
+    `${apiOrigin}/classrooms/${classroomId}/announcements**`,
+    (route) =>
+      route.fulfill({
+        json: {
+          items: [
+            {
+              id: initialAnnouncementId,
+              classroomId,
+              authorId: userId,
+              title: longTitle,
+              content: 'Traer la carpeta completa.',
+              mentionedUserIds: [],
+              createdAt: '2026-11-18T09:00:00.000Z',
+              updatedAt: '2026-11-18T10:00:00.000Z',
+            },
+          ],
+          page: 1,
+          pageSize: 10,
+          total: 1,
+        },
+      }),
+  );
+
+  await page.goto(`./classrooms/${classroomId}/panels/notices`);
+  const dialog = page.getByRole('dialog', { name: 'Avisos', exact: true });
+  const title = dialog.getByRole('heading', { name: longTitle });
+  await expect(title).toBeVisible();
+
+  const card = dialog.getByRole('listitem').filter({ hasText: longTitle });
+  const cardBox = await card.boundingBox();
+  const titleBox = await title.boundingBox();
+  const editBox = await dialog
+    .getByRole('button', { name: 'Editar' })
+    .first()
+    .boundingBox();
+  if (!cardBox || !titleBox || !editBox) {
+    throw new Error('Expected card, title and edit button to be laid out');
+  }
+
+  if (isMobile) {
+    expect(titleBox.width).toBeGreaterThanOrEqual(cardBox.width * 0.6);
+    expect(editBox.y).toBeGreaterThanOrEqual(titleBox.y + titleBox.height);
+  } else {
+    expect(editBox.y).toBeLessThan(titleBox.y + titleBox.height);
+  }
+
+  expect(cspViolations).toEqual([]);
+  expect(pageErrors).toEqual([]);
+});
