@@ -55,6 +55,8 @@ function usePrefersReducedMotion(): boolean {
 class BodyErrorBoundary extends Component<
   {
     readonly url: string;
+    /** Part files evicted with the body, because `LoadedAvatar` may never commit. */
+    readonly partUrls: readonly string[];
     readonly scopeKey?: string;
     readonly fallback: ReactNode;
     readonly onError?: (error: unknown) => void;
@@ -70,6 +72,9 @@ class BodyErrorBoundary extends Component<
 
   componentDidCatch(error: unknown) {
     evictRejectedGlbAsset(this.props.url, this.props.scopeKey);
+    for (const url of this.props.partUrls) {
+      evictRejectedGlbAsset(url, this.props.scopeKey);
+    }
     this.props.onError?.(error);
   }
 
@@ -205,11 +210,15 @@ export function AvatarModel({
   onBodyError,
   ...rest
 }: AvatarModelProps) {
-  const { bodyUrl } = resolveAvatarParts(rest.avatar);
+  const { bodyUrl, hairUrl, topUrl } = resolveAvatarParts(rest.avatar);
+  const partUrls = [hairUrl, topUrl].filter(
+    (url): url is string => url !== null,
+  );
   return (
     <BodyErrorBoundary
       key={`${rest.scopeKey ?? ''}:${bodyUrl}`}
       url={bodyUrl}
+      partUrls={partUrls}
       scopeKey={rest.scopeKey}
       fallback={errorFallback}
       onError={onBodyError}

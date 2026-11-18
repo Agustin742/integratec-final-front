@@ -171,6 +171,29 @@ describe('AvatarModel', () => {
     expect(getAssetCacheSize()).toBe(2);
   });
 
+  it('retries a failed part after remount when the body loads', async () => {
+    const loadAsync = useLoader([HAIR]);
+    const view = await mount(<AvatarModel avatar={avatar} />);
+    view.unmount();
+    await mount(<AvatarModel avatar={avatar} />);
+    expect(loadAsync.mock.calls.filter(([url]) => url === HAIR)).toHaveLength(
+      2,
+    );
+  });
+
+  it('retries a failed part after remount when the body also fails', async () => {
+    const loadAsync = useLoader([BODY, HAIR]);
+    const view = await mount(
+      <AvatarModel avatar={avatar} errorFallback={<span>no body</span>} />,
+    );
+    expect(screen.getByText('no body')).toBeInTheDocument();
+    view.unmount();
+    await mount(<AvatarModel avatar={avatar} />);
+    expect(loadAsync.mock.calls.filter(([url]) => url === HAIR)).toHaveLength(
+      2,
+    );
+  });
+
   it('disposes the composed avatar on unmount', async () => {
     useLoader();
     const view = await mount(<AvatarModel avatar={avatar} />);
