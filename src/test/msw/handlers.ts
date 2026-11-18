@@ -1773,6 +1773,7 @@ export interface ActivityStoreItem {
   readonly questionCount: number;
   readonly createdAt: string;
   readonly updatedAt: string;
+  readonly createdById?: string;
   readonly questions?: readonly ActivityStoreQuestion[];
 }
 
@@ -1782,7 +1783,7 @@ export type ActivityStoreFailure = MswErrorResponseSpec | 'network';
 export interface ClassroomActivitiesStoreOptions {
   readonly baseUrl?: string;
   readonly classroomId?: string;
-  readonly role?: 'TEACHER' | 'STUDENT' | 'PARENT';
+  readonly role?: 'TEACHER' | 'SCHOOL_OWNER' | 'STUDENT' | 'PARENT';
   readonly initialItems?: readonly ActivityStoreItem[];
 }
 
@@ -1790,6 +1791,8 @@ export interface ClassroomActivitiesStore {
   readonly handlers: readonly HttpHandler[];
   failNext: (op: ActivityStoreOp, failure: ActivityStoreFailure) => void;
 }
+
+const DEFAULT_ACTIVITY_CREATOR_ID = '00000000-0000-4000-8000-000000000099';
 
 /**
  * Stateful contract-faithful MSW store for classroom activities
@@ -1800,6 +1803,7 @@ export function createClassroomActivitiesStore(
 ): ClassroomActivitiesStore {
   const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
   const role = options.role ?? 'STUDENT';
+  const isStaff = role === 'TEACHER' || role === 'SCHOOL_OWNER';
   const items: ActivityStoreItem[] = [...(options.initialItems ?? [])];
   const pending: Partial<Record<ActivityStoreOp, ActivityStoreFailure>> = {};
 
@@ -1830,6 +1834,14 @@ export function createClassroomActivitiesStore(
             });
           }
 
+          if (role === 'PARENT') {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Parents cannot view classroom activities.',
+              correlationId: 'req-activities-list-403',
+            });
+          }
+
           const url = new URL(request.url);
           const page = Math.max(1, Number(url.searchParams.get('page') ?? 1));
           const pageSize = Math.min(
@@ -1840,10 +1852,10 @@ export function createClassroomActivitiesStore(
           const stateFilter = url.searchParams.get('state');
 
           let visible = items.filter((item) =>
-            role === 'TEACHER' ? true : item.state === 'PUBLISHED',
+            isStaff ? true : item.state === 'PUBLISHED',
           );
           if (
-            role === 'TEACHER' &&
+            isStaff &&
             (stateFilter === 'DRAFT' || stateFilter === 'PUBLISHED')
           ) {
             visible = visible.filter((item) => item.state === stateFilter);
@@ -1862,8 +1874,13 @@ export function createClassroomActivitiesStore(
           const summaries = sorted
             .slice(start, start + pageSize)
             .map((item) => {
-              const { questions: omittedQuestions, ...summary } = item;
+              const {
+                questions: omittedQuestions,
+                createdById: omittedCreatedById,
+                ...summary
+              } = item;
               void omittedQuestions;
+              void omittedCreatedById;
               return summary;
             });
 
@@ -1901,7 +1918,7 @@ export function createClassroomActivitiesStore(
           }
 
           const found = items.find((item) => item.id === params.activityId);
-          if (!found || (role !== 'TEACHER' && found.state !== 'PUBLISHED')) {
+          if (!found || (!isStaff && found.state !== 'PUBLISHED')) {
             return createErrorEnvelopeResponse(404, {
               code: 'NOT_FOUND',
               message: 'Activity not found.',
@@ -1909,24 +1926,27 @@ export function createClassroomActivitiesStore(
             });
           }
 
-          const { questions = [], ...summary } = found;
-          const shapedQuestions =
-            role === 'TEACHER'
-              ? questions
-              : questions.map((q) => ({
-                  id: q.id,
-                  position: q.position,
-                  prompt: q.prompt,
-                  options: q.options.map(({ id, position, label }) => ({
-                    id,
-                    position,
-                    label,
-                  })),
-                }));
+          const { questions = [], createdById, ...summary } = found;
+          if (isStaff) {
+            return HttpResponse.json({
+              ...summary,
+              createdById: createdById ?? DEFAULT_ACTIVITY_CREATOR_ID,
+              questions,
+            });
+          }
 
           return HttpResponse.json({
             ...summary,
-            questions: shapedQuestions,
+            questions: questions.map((q) => ({
+              id: q.id,
+              position: q.position,
+              prompt: q.prompt,
+              options: q.options.map(({ id, position, label }) => ({
+                id,
+                position,
+                label,
+              })),
+            })),
           });
         },
       ),

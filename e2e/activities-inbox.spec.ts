@@ -179,7 +179,9 @@ test('student views activities inbox in school timeZone, captures responsive vie
     page.getByRole('heading', { name: 'TP 1: Sistemas de ecuaciones' }),
   ).toBeVisible();
   await page.getByRole('tab', { name: 'Entrega' }).click();
-  await expect(page.getByText(/HU-ACT-003/)).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Sección disponible próximamente' }),
+  ).toBeVisible();
 
   expect(cspViolations).toEqual([]);
   expect(pageErrors).toEqual([]);

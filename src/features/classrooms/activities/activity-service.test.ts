@@ -109,12 +109,102 @@ describe('activity-service', () => {
       CLASSROOM_ID,
       publishedMc.id,
     );
+    expect('createdById' in detail).toBe(false);
     expect('isCorrect' in detail.questions[0]!.options[0]!).toBe(false);
 
     await expect(
       getClassroomActivity(client, CLASSROOM_ID, draft.id),
     ).rejects.toSatisfy(
       (err: unknown) => err instanceof ApiError && err.status === 404,
+    );
+  });
+
+  it('preserves createdById and isCorrect for teacher and school owner detail responses and denies parents', async () => {
+    const creatorId = '00000000-0000-4000-8000-000000000077';
+    const mcDraft = makeActivity({
+      id: '00000000-0000-4000-8000-000000005010',
+      type: 'EXAM',
+      format: 'MULTIPLE_CHOICE',
+      state: 'DRAFT',
+      title: 'Parcial borrador',
+      createdById: creatorId,
+      questionCount: 1,
+      questions: [
+        {
+          id: '00000000-0000-4000-8000-000000006010',
+          position: 1,
+          prompt: '¿Cuál es el resultado de 3 × 3?',
+          options: [
+            {
+              id: '00000000-0000-4000-8000-000000007010',
+              position: 1,
+              label: '9',
+              isCorrect: true,
+            },
+          ],
+        },
+      ],
+    });
+    const filePublished = makeActivity({
+      id: '00000000-0000-4000-8000-000000005011',
+      title: 'TP 2: Matrices',
+    });
+
+    const client = makeClient();
+
+    const teacherStore = createClassroomActivitiesStore({
+      classroomId: CLASSROOM_ID,
+      role: 'TEACHER',
+      initialItems: [mcDraft, filePublished],
+    });
+    mswServer.use(...teacherStore.handlers);
+
+    const teacherDetail = await getClassroomActivity(
+      client,
+      CLASSROOM_ID,
+      mcDraft.id,
+    );
+    expect('createdById' in teacherDetail).toBe(true);
+    if ('createdById' in teacherDetail) {
+      expect(teacherDetail.createdById).toBe(creatorId);
+      expect(teacherDetail.questions[0]?.options[0]?.isCorrect).toBe(true);
+    }
+
+    const ownerStore = createClassroomActivitiesStore({
+      classroomId: CLASSROOM_ID,
+      role: 'SCHOOL_OWNER',
+      initialItems: [filePublished],
+    });
+    mswServer.use(...ownerStore.handlers);
+
+    const ownerDetail = await getClassroomActivity(
+      client,
+      CLASSROOM_ID,
+      filePublished.id,
+    );
+    expect('createdById' in ownerDetail).toBe(true);
+    if ('createdById' in ownerDetail) {
+      expect(ownerDetail.createdById).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      );
+    }
+
+    const parentStore = createClassroomActivitiesStore({
+      classroomId: CLASSROOM_ID,
+      role: 'PARENT',
+      initialItems: [filePublished],
+    });
+    mswServer.use(...parentStore.handlers);
+
+    await expect(
+      listClassroomActivities(client, CLASSROOM_ID),
+    ).rejects.toSatisfy(
+      (err: unknown) => err instanceof ApiError && err.status === 403,
+    );
+    await expect(
+      getClassroomActivity(client, CLASSROOM_ID, filePublished.id),
+    ).rejects.toSatisfy(
+      (err: unknown) => err instanceof ApiError && err.status === 403,
     );
   });
 
