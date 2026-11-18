@@ -1,4 +1,5 @@
 """Deterministic public-check regressions; fixtures stay inside the project."""
+import json
 import os
 import sys
 import tempfile
@@ -115,20 +116,77 @@ class DocumentationTests(unittest.TestCase):
                                      (0, 'Documentation checks passed (1 files).\n', ''))
 
 
+def amplify_lines(spec):
+    """Spec lines with full-line and trailing ` #` comments and blanks removed."""
+    lines = []
+    for raw in spec.splitlines():
+        line = raw.split(' #', 1)[0].rstrip()
+        if line.strip() and not line.strip().startswith('#'):
+            lines.append(line)
+    return lines
+
+
+def amplify_commands(spec, phase):
+    """Commands under frontend.phases.<phase>.commands, in file order."""
+    lines = amplify_lines(spec)
+    header = f'    {phase}:'
+    if header not in lines:
+        return []
+    rest = lines[lines.index(header) + 1:]
+    if not rest or rest[0].strip() != 'commands:':
+        return []
+    commands = []
+    for line in rest[1:]:
+        if not line.startswith('        - '):
+            break
+        commands.append(line.strip()[2:].strip())
+    return commands
+
+
+def amplify_contract_errors(spec, pinned):
+    errors = []
+    lines = amplify_lines(spec)
+    pre = amplify_commands(spec, 'preBuild')
+    if 'version: 1' not in lines:
+        errors.append('version')
+    if f'npm install -g pnpm@{pinned}' not in pre:
+        errors.append('pinned pnpm')
+    if 'nvm use' not in pre:
+        errors.append('nvm use')
+    if 'pnpm install --frozen-lockfile' not in pre:
+        errors.append('frozen install')
+    if amplify_commands(spec, 'build') != [
+            'pnpm security:sync', 'pnpm build',
+            'pnpm security:check --require-root-match']:
+        errors.append('build commands')
+    if '    baseDirectory: dist' not in lines:
+        errors.append('baseDirectory')
+    if any(line.strip().startswith('customHeaders') for line in lines):
+        errors.append('customHeaders')
+    return errors
+
+
 class AmplifyBuildSpecTests(unittest.TestCase):
+    def setUp(self):
+        package = json.loads((ROOT / 'package.json').read_text(encoding='utf-8'))
+        self.pinned = package['packageManager'].removeprefix('pnpm@').split('+', 1)[0]
+        self.spec = (ROOT / 'amplify.yml').read_text(encoding='utf-8')
+
     def test_build_spec_contract(self):
-        spec = (ROOT / 'amplify.yml').read_text(encoding='utf-8')
-        package = (ROOT / 'package.json').read_text(encoding='utf-8')
-        pinned = package.split('"packageManager": "pnpm@', 1)[1].split('"', 1)[0]
-        self.assertIn('version: 1', spec)
-        self.assertIn(f'pnpm@{pinned}', spec)
-        self.assertIn('nvm use', spec)
-        self.assertIn('pnpm install --frozen-lockfile', spec)
-        self.assertIn('baseDirectory: dist', spec)
-        steps = ['pnpm security:sync', 'pnpm build', 'pnpm security:check --require-root-match']
-        positions = [spec.index(step) for step in steps]
-        self.assertEqual(positions, sorted(positions))
-        self.assertNotIn('customHeaders', spec)
+        self.assertEqual(amplify_contract_errors(self.spec, self.pinned), [])
+
+    def test_detects_broken_specs(self):
+        sync = '        - pnpm security:sync\n'
+        build = '        - pnpm build\n'
+        for name, broken, error in [
+            ('sync_after_build', self.spec.replace(sync + build, build + sync), 'build commands'),
+            ('sync_removed', self.spec.replace(sync, ''), 'build commands'),
+            ('wrong_pnpm', self.spec.replace(f'pnpm@{self.pinned}', 'pnpm@1.0.0'), 'pinned pnpm'),
+            ('headers', self.spec + 'customHeaders: []\n','customHeaders'),
+        ]:
+            with self.subTest(name=name):
+                self.assertNotEqual(broken, self.spec)
+                self.assertIn(error, amplify_contract_errors(broken, self.pinned))
 
 
 if __name__ == '__main__':
