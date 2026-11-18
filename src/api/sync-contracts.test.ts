@@ -185,11 +185,15 @@ describe('sync-contracts', () => {
         FRONTEND_OUTPUT_PATHS.openapi,
         FRONTEND_OUTPUT_PATHS.contracts,
       ]);
-      expect(firstResult.warnings).toHaveLength(1);
+      expect(firstResult.warnings).toHaveLength(2);
       expect(firstResult.warnings[0]).toContain(
         BACKEND_ARTIFACT_PATHS.realtimeState,
       );
       expect(firstResult.warnings[0]).toContain('not yet published');
+      expect(firstResult.warnings[1]).toContain(
+        BACKEND_ARTIFACT_PATHS.realtimeAvatar,
+      );
+      expect(firstResult.warnings[1]).toContain('not yet published');
       expect(warningsFirstRun).toEqual(firstResult.warnings);
 
       const generatedOpenApiFirst = await readFile(
@@ -229,13 +233,19 @@ describe('sync-contracts', () => {
       expect(generatedContractsSecond).toBe(generatedContractsFirst);
     });
 
-    it('reads the Colyseus room state from the path published by the backend (#24)', () => {
+    it('reads the Colyseus room state and avatar from the paths published by the backend (#24, #25)', () => {
       expect(BACKEND_ARTIFACT_PATHS.realtimeState).toBe(
         'packages/contracts/src/realtime/generated/ClassroomState.ts',
       );
+      expect(BACKEND_ARTIFACT_PATHS.realtimeAvatar).toBe(
+        'packages/contracts/src/realtime/generated/Avatar.ts',
+      );
+      expect(FRONTEND_OUTPUT_PATHS.realtimeAvatar).toBe(
+        'src/realtime/avatar.generated.ts',
+      );
     });
 
-    it('syncs Colyseus room-state artifacts when published in the backend checkout', async () => {
+    it('syncs Colyseus room-state and avatar artifacts and rewrites relative ./Avatar import', async () => {
       const backendDir = await createTempDir('backend-with-realtime-');
       const frontendDir = await createTempDir('frontend-with-realtime-');
 
@@ -248,16 +258,25 @@ describe('sync-contracts', () => {
         backendDir,
         BACKEND_ARTIFACT_PATHS.realtimeState,
       );
+      const realtimeAvatarFile = path.join(
+        backendDir,
+        BACKEND_ARTIFACT_PATHS.realtimeAvatar,
+      );
 
       await mkdir(path.dirname(openApiFile), { recursive: true });
       await mkdir(path.dirname(contractsFile), { recursive: true });
       await mkdir(path.dirname(realtimeStateFile), { recursive: true });
+      await mkdir(path.dirname(realtimeAvatarFile), { recursive: true });
 
       await writeFile(openApiFile, JSON.stringify(SAMPLE_OPENAPI));
       await writeFile(contractsFile, SAMPLE_CONTRACTS_TS);
       await writeFile(
         realtimeStateFile,
-        'export interface ClassroomRoomState {\n  roomId: string;\n}\n',
+        "import { Schema, type, DataChange } from '@colyseus/schema';\nimport { Avatar } from './Avatar';\nexport interface ClassroomRoomState {\n  roomId: string;\n  avatar: Avatar;\n}\n",
+      );
+      await writeFile(
+        realtimeAvatarFile,
+        "import { Schema, type, DataChange } from '@colyseus/schema';\nexport interface Avatar {\n  userId: string;\n}\n",
       );
 
       const result = await syncContracts({
@@ -271,6 +290,7 @@ describe('sync-contracts', () => {
           FRONTEND_OUTPUT_PATHS.openapi,
           FRONTEND_OUTPUT_PATHS.contracts,
           FRONTEND_OUTPUT_PATHS.realtimeState,
+          FRONTEND_OUTPUT_PATHS.realtimeAvatar,
         ],
       );
 
@@ -279,7 +299,23 @@ describe('sync-contracts', () => {
         'utf8',
       );
       expect(syncedRoomState.startsWith(GENERATED_HEADER)).toBe(true);
+      expect(syncedRoomState).toContain(
+        "import { Schema, type, type DataChange } from '@colyseus/schema';",
+      );
+      expect(syncedRoomState).toContain(
+        "import { Avatar } from './avatar.generated';",
+      );
       expect(syncedRoomState).toContain('export interface ClassroomRoomState');
+
+      const syncedAvatar = await readFile(
+        path.join(frontendDir, FRONTEND_OUTPUT_PATHS.realtimeAvatar),
+        'utf8',
+      );
+      expect(syncedAvatar.startsWith(GENERATED_HEADER)).toBe(true);
+      expect(syncedAvatar).toContain(
+        "import { Schema, type, type DataChange } from '@colyseus/schema';",
+      );
+      expect(syncedAvatar).toContain('export interface Avatar');
     });
   });
 

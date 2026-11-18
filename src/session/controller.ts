@@ -74,6 +74,8 @@ export interface SessionController {
    * session is authenticated (a late response must not restore private data).
    */
   applyConfirmedProfile(profile: OwnProfile): void;
+  getAccessToken(): string | undefined;
+  refreshAccessToken(): Promise<string | undefined>;
   initialize(): Promise<void>;
   login(input: LoginInput): Promise<LoginResult>;
   logout(): Promise<{ serverConfirmed: boolean; cleanupFailed: boolean }>;
@@ -290,6 +292,25 @@ export function createSession(options: SessionOptions = {}): SessionService {
       return () => {
         cleanups.delete(owned);
       };
+    },
+    getAccessToken() {
+      return snapshot.status === 'authenticated'
+        ? credentials?.accessToken
+        : undefined;
+    },
+    async refreshAccessToken() {
+      if (snapshot.status !== 'authenticated' || !credentials?.refreshToken) {
+        return undefined;
+      }
+      const expectedEpoch = epoch;
+      try {
+        await renew(expectedEpoch, revision, 'expiry');
+        return epoch === expectedEpoch && snapshot.status === 'authenticated'
+          ? credentials?.accessToken
+          : undefined;
+      } catch {
+        return undefined;
+      }
     },
     initialize() {
       if (initializing) return initializing;

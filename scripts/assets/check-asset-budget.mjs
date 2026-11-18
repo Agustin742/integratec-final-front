@@ -5,6 +5,29 @@ import { pathToFileURL } from 'node:url';
 export const AVATAR_GLB_MAX_BYTES = 1024 * 1024; // 1 MiB (FD8)
 export const SCENE_GLB_MAX_BYTES = 8 * 1024 * 1024; // 8 MiB (FD8)
 
+/**
+ * Recorded FD8 budget exceptions for pre-existing uncompressed avatar GLBs
+ * committed before the asset pipeline (#25). Ceilings match committed sizes
+ * with zero slack so any growth still fails CI until compressed in #91.
+ */
+export const BUDGET_EXCEPTIONS = Object.freeze({
+  'avatars/female/body.glb': Object.freeze({
+    path: 'avatars/female/body.glb',
+    issue: '#91',
+    maxBytes: 3_804_416,
+  }),
+  'avatars/male/body.glb': Object.freeze({
+    path: 'avatars/male/body.glb',
+    issue: '#91',
+    maxBytes: 2_740_644,
+  }),
+  'character.glb': Object.freeze({
+    path: 'character.glb',
+    issue: '#91',
+    maxBytes: 2_707_884,
+  }),
+});
+
 function isGlbFile(filename) {
   return filename.toLowerCase().endsWith('.glb');
 }
@@ -61,6 +84,17 @@ export function checkAssetBudgets(options = {}) {
 
   const avatarMaxBytes = options.avatarMaxBytes ?? AVATAR_GLB_MAX_BYTES;
   const sceneMaxBytes = options.sceneMaxBytes ?? SCENE_GLB_MAX_BYTES;
+  const defaultModelsDir = resolve('public/models');
+  const isDefaultModelsDir =
+    process.platform === 'win32'
+      ? modelsDir.toLowerCase() === defaultModelsDir.toLowerCase()
+      : modelsDir === defaultModelsDir;
+  const exceptions =
+    options.exceptions !== undefined
+      ? (options.exceptions ?? {})
+      : isDefaultModelsDir
+        ? BUDGET_EXCEPTIONS
+        : {};
 
   const files = collectGlbFiles(modelsDir);
   const items = [];
@@ -74,12 +108,34 @@ export function checkAssetBudgets(options = {}) {
     if (category === 'scene') {
       sceneTotalBytes += sizeBytes;
     }
+
+    const exception = Object.hasOwn(exceptions, relPath)
+      ? exceptions[relPath]
+      : undefined;
+    let status = 'PASS';
+    let ok = sizeBytes <= limitBytes;
+    if (!ok) {
+      if (exception && sizeBytes <= exception.maxBytes) {
+        status = 'EXCEPTION';
+        ok = true;
+      } else {
+        status = 'FAIL';
+      }
+    }
+
     items.push({
       path: relPath,
       category,
       sizeBytes,
       limitBytes,
-      ok: sizeBytes <= limitBytes,
+      status,
+      ok,
+      ...(exception
+        ? {
+            exceptionIssue: exception.issue,
+            exceptionMaxBytes: exception.maxBytes,
+          }
+        : {}),
     });
   }
 
@@ -104,9 +160,19 @@ export function formatAssetBudgetReport(result) {
   }
 
   for (const item of result.items) {
+    if (item.status === 'EXCEPTION') {
+      lines.push(
+        `[assets:check] EXCEPTION (${item.category}) ${item.path}: ${formatSize(item.sizeBytes)} / ${formatSize(item.limitBytes)} (tracked in ${item.exceptionIssue})`,
+      );
+      continue;
+    }
     const status = item.ok ? 'PASS' : 'FAIL';
+    const exceptionSuffix =
+      !item.ok && item.exceptionMaxBytes !== undefined
+        ? ` (exceeded ${item.exceptionIssue} ceiling ${formatSize(item.exceptionMaxBytes)})`
+        : '';
     lines.push(
-      `[assets:check] ${status} (${item.category}) ${item.path}: ${formatSize(item.sizeBytes)} / ${formatSize(item.limitBytes)}`,
+      `[assets:check] ${status} (${item.category}) ${item.path}: ${formatSize(item.sizeBytes)} / ${formatSize(item.limitBytes)}${exceptionSuffix}`,
     );
   }
 
@@ -125,9 +191,18 @@ export function formatAssetBudgetReport(result) {
       `[assets:check] Failed: ${failedCount} asset budget check(s) exceeded FD8 limits.`,
     );
   } else {
-    lines.push(
-      `[assets:check] Passed: all ${result.items.length} model(s) within FD8 limits.`,
-    );
+    const exceptionCount = result.items.filter(
+      (item) => item.status === 'EXCEPTION',
+    ).length;
+    if (exceptionCount > 0) {
+      lines.push(
+        `[assets:check] Passed: ${result.items.length - exceptionCount} model(s) within FD8 limits, ${exceptionCount} recorded exception(s).`,
+      );
+    } else {
+      lines.push(
+        `[assets:check] Passed: all ${result.items.length} model(s) within FD8 limits.`,
+      );
+    }
   }
 
   return lines.join('\n');

@@ -9,12 +9,14 @@ export const BACKEND_ARTIFACT_PATHS = Object.freeze({
   openapi: 'apps/api/openapi.json',
   contracts: 'packages/contracts/src/index.ts',
   realtimeState: 'packages/contracts/src/realtime/generated/ClassroomState.ts',
+  realtimeAvatar: 'packages/contracts/src/realtime/generated/Avatar.ts',
 });
 
 export const FRONTEND_OUTPUT_PATHS = Object.freeze({
   openapi: 'src/api/schema.generated.ts',
   contracts: 'src/realtime/contracts.generated.ts',
   realtimeState: 'src/realtime/room-state.generated.ts',
+  realtimeAvatar: 'src/realtime/avatar.generated.ts',
 });
 
 export const GENERATED_HEADER = [
@@ -347,7 +349,12 @@ export function formatPulledTypeArtifact(rawSource, artifactPath) {
     .replace(
       /^\/\* eslint-disable \*\/\n\/\/ AUTO-GENERATED[^\n]*\n(?:\/\/ Source:[^\n]*\n)?\n*/,
       '',
-    );
+    )
+    .replace(
+      /(?<!type\s)\bDataChange\b(?=\s*\}\s*from\s*['"]@colyseus\/schema['"])/g,
+      'type DataChange',
+    )
+    .replace(/from (['"])\.\/Avatar\1/g, 'from $1./avatar.generated$1');
   return normalizeLineEndings(
     `${buildGeneratedFileBanner(artifactPath)}${stripped}`,
   );
@@ -441,6 +448,12 @@ export async function syncContracts(options = {}) {
       label: 'Realtime Colyseus room-state schema types',
       artifactPath: artifactPaths.realtimeState,
       relativeOutputPath: outputPaths.realtimeState,
+    },
+    {
+      kind: 'realtimeAvatar',
+      label: 'Realtime Colyseus avatar schema types',
+      artifactPath: artifactPaths.realtimeAvatar,
+      relativeOutputPath: outputPaths.realtimeAvatar,
     },
   ];
 

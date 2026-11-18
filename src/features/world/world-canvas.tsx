@@ -15,7 +15,11 @@ import {
   WebGLRenderer,
 } from 'three';
 import { frameCamera } from './camera';
-import { clearAssetCache, configureKtx2RendererSupport } from './asset-cache';
+import {
+  DEFAULT_SCOPE,
+  clearAssetCache,
+  configureKtx2RendererSupport,
+} from './asset-cache';
 import { worldMessages as copy } from './messages';
 import { WorldFallback } from './world-fallback';
 
@@ -65,9 +69,7 @@ export function WorldCanvas({ children, label, scopeKey }: WorldCanvasProps) {
 
   useEffect(() => {
     return () => {
-      clearAssetCache(
-        scopeKey === undefined ? { disposeDecoders: true } : { scopeKey },
-      );
+      clearAssetCache({ scopeKey: scopeKey ?? DEFAULT_SCOPE });
     };
   }, [scopeKey]);
 
@@ -141,6 +143,7 @@ export function WorldCanvas({ children, label, scopeKey }: WorldCanvasProps) {
       renderer.outputColorSpace = SRGBColorSpace;
       renderer.toneMapping = ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1;
+      configureKtx2RendererSupport(renderer);
       return renderer;
     } catch (error) {
       creationErrors.current.add(error);

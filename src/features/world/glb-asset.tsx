@@ -1,6 +1,7 @@
-import { Component, Suspense, useMemo, type ReactNode } from 'react';
+import { Component, Suspense, useEffect, useMemo, type ReactNode } from 'react';
+import { SkinnedMesh } from 'three';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { readCachedGlbAsset } from './asset-cache';
+import { evictRejectedGlbAsset, readCachedGlbAsset } from './asset-cache';
 
 export interface GlbAssetProps {
   readonly url: string;
@@ -15,6 +16,8 @@ export interface GlbAssetProps {
 
 class AssetErrorBoundary extends Component<
   {
+    readonly url: string;
+    readonly scopeKey?: string;
     readonly fallback: ReactNode;
     readonly onError?: (error: unknown) => void;
     readonly children: ReactNode;
@@ -28,6 +31,7 @@ class AssetErrorBoundary extends Component<
   }
 
   componentDidCatch(error: unknown) {
+    evictRejectedGlbAsset(this.props.url, this.props.scopeKey);
     this.props.onError?.(error);
   }
 
@@ -65,6 +69,15 @@ function LoadedGlbModel({
   // Use SkeletonUtils.clone so SkinnedMesh bones rebind per instance while
   // sharing cached geometries and materials.
   const instance = useMemo(() => cloneSkeleton(gltf.scene), [gltf]);
+  useEffect(() => {
+    return () => {
+      instance.traverse((node) => {
+        if (node instanceof SkinnedMesh && node.skeleton) {
+          node.skeleton.dispose();
+        }
+      });
+    };
+  }, [instance]);
   return (
     <primitive
       object={instance}
@@ -101,6 +114,8 @@ export function GlbAsset({
   return (
     <AssetErrorBoundary
       key={`${scopeKey ?? ''}:${url}`}
+      url={url}
+      scopeKey={scopeKey}
       fallback={resolvedErrorFallback}
       onError={onError}
     >

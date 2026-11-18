@@ -58,6 +58,6 @@ Synthetic component tests cover loading, server name/parent metadata, exact Outl
 
 ## Deferred
 
-Panel business content, 2D/3D navigation/layout/objects, and parent tools are not delivered. Panel registration and nested URL opening are provided; the human-approved minimum entries explicitly identify their content as pending. B/SSE invalidation is consumed, but this slice promises no globally instantaneous propagation. Login return destinations remain restricted to `/`.
+Panel business content beyond the delivered `members` staff roster (`#33`), 2D/3D navigation/layout/objects, and parent tools are not delivered. Panel registration and nested URL opening are provided; the remaining eight minimum entries explicitly identify their content as pending. B/SSE invalidation is consumed, but this slice promises no globally instantaneous propagation. Login return destinations remain restricted to `/`.
 
 See [routing](./routing.md), [state ownership](../rules/state-management.md), and [classroom authority](../rules/classrooms-and-roles.md).

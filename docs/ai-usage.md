@@ -39,6 +39,12 @@ Course declaration of AI use in the development process (see [course requirement
 - **Observed checks:** Parent full suite 477/477 and independent focused 55/55 passed before the height-only correction; desktop/mobile zoom checks then passed 2/2. Final check results and historical failures are recorded in the contributor tracker. Mock API checks are not live-backend proof.
 - **Human responsibility:** The scope decision is approved; code explanation, team review, PR approval and merge remain human responsibilities. Agent verification is not human approval.
 
+## Classroom join review corrections (#31)
+
+- **Human scope decision:** The contributor authorized corrections to invitation recovery after session loss, misleading network-outcome copy, and explicit rejection tests; no onboarding redesign or backend contract change.
+- **Assistance and correction:** Pi helped reproduce the lost approved return target after URL scrubbing and replace a false no-account-change guarantee with uncertain-outcome feedback. Initial tests observed the wrong login return and the old rollback claim for both join endpoints before source edits.
+- **Evidence boundary:** Tests use existing session middleware/controller and MSW/public API calls. They check rejection privacy and current-account confirmation, not live-backend enrollment. Final automated results belong in the contributor tracker; team review and human acceptance remain pending.
+
 ## Profile preview refinement (#29, PR #82)
 
 - **Human scope decision:** The contributor approved a bounded refinement of the existing 2D preview, correction of the unsupported skin-tone claim and explicit mock-vs-integration evidence. No 3D renderer, avatar contract or persistence behavior is added.

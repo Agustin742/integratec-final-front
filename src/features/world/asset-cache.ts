@@ -16,7 +16,7 @@ import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 
 export const DRACO_DECODER_PATH = '/decoders/draco/';
 export const KTX2_TRANSCODER_PATH = '/decoders/basis/';
-const DEFAULT_SCOPE = '__default__';
+export const DEFAULT_SCOPE = '__default__';
 
 export interface GlbLoaderLike {
   loadAsync(url: string): Promise<GLTF>;
@@ -117,6 +117,7 @@ export function createConfiguredGltfLoader(
 ): GLTFLoader {
   const draco = new DRACOLoader();
   draco.setDecoderPath(DRACO_DECODER_PATH);
+  sharedDracoLoader?.dispose();
   sharedDracoLoader = draco;
 
   const ktx2 = new KTX2Loader();
@@ -125,6 +126,7 @@ export function createConfiguredGltfLoader(
   if (effectiveRenderer) {
     ktx2.detectSupport(effectiveRenderer);
   }
+  sharedKtx2Loader?.dispose();
   sharedKtx2Loader = ktx2;
 
   const loader = new GLTFLoader();
@@ -156,8 +158,9 @@ function getLoader(): GlbLoaderLike {
 
 /**
  * Fetches and parses a GLB asset at most once per `scopeKey`. Concurrent
- * callers share the same in-flight promise; transient rejections evict the
- * entry so a subsequent mount or retry can recover.
+ * callers share the same in-flight promise; rejected entries remain cached
+ * until evicted via `evictRejectedGlbAsset`, retried with `forceRetry: true`,
+ * or cleared via `clearAssetCache`.
  */
 export function loadGlbAsset(
   url: string,
@@ -224,6 +227,23 @@ export function readCachedGlbAsset(
     throw existing.error;
   }
   return existing.gltf;
+}
+
+/**
+ * Evicts a cached entry only when its status is `'rejected'` so unmounting and
+ * remounting `<GlbAsset />` performs a fresh fetch after transient failures.
+ */
+export function evictRejectedGlbAsset(
+  url: string,
+  scopeKey = DEFAULT_SCOPE,
+): boolean {
+  const cacheKey = toCacheKey(url, scopeKey);
+  const existing = assetCache.get(cacheKey);
+  if (existing?.status !== 'rejected') {
+    return false;
+  }
+  assetCache.delete(cacheKey);
+  return true;
 }
 
 /**

@@ -38,10 +38,10 @@ Target conventions (`rules/3d-world-and-camera.md`):
 
 `pnpm assets:check` runs `scripts/assets/check-asset-budget.mjs` against `public/models/` and is wired into `.github/workflows/ci.yml`:
 
-| Category             | Limit (FD8)                   | Scope                                                                                 |
-| -------------------- | ----------------------------- | ------------------------------------------------------------------------------------- |
-| Avatar GLB           | `<= 1 MB` (`1,048,576` bytes) | Individual avatar/character `.glb`/`.gltf` files                                      |
-| Full classroom scene | `<= 8 MB` (`8,388,608` bytes) | Scene `.glb`/`.gltf` files (`scenes/`, `*classroom*`, `*scene*`) and total scene size |
+| Category             | Limit (FD8)                   | Scope                                                                                               |
+| -------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------- |
+| Avatar GLB           | `<= 1 MB` (`1,048,576` bytes) | Individual avatar/character `.glb` files (excluding scene files)                                    |
+| Full classroom scene | `<= 8 MB` (`8,388,608` bytes) | Scene `.glb` files (`scenes/` path or `classroom*` / `scene*` filename prefix) and total scene size |
 
 The script prints a per-file report and exits with code `1` if any file exceeds its limit.
 
@@ -53,3 +53,11 @@ Per `rules/documentation-and-decisions.md` and `rules/3d-world-and-camera.md`, a
 2. **Reason**: why compression/simplification cannot meet the limit without breaking functionality or readability.
 3. **Approving team decision**: PR/issue link with explicit team sign-off.
 4. **Review condition**: milestone or condition under which the exception will be re-evaluated or removed.
+
+### Recorded Exceptions
+
+| Asset path                              | Size vs. FD8 budget                 | Reason                                                     | Approving team decision                                                                | Review condition                                                                                      |
+| --------------------------------------- | ----------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `public/models/avatars/female/body.glb` | `3.63 MB` (`3,804,416` B) vs `1 MB` | Pre-existing uncompressed avatar GLB predating issue `#25` | Issue `#25` / PR `#90` (exact byte ceiling in `scripts/assets/check-asset-budget.mjs`) | Issue `#91` — compress below `1 MB` and remove this entry and `BUDGET_EXCEPTIONS` entry once resolved |
+| `public/models/avatars/male/body.glb`   | `2.61 MB` (`2,740,644` B) vs `1 MB` | Pre-existing uncompressed avatar GLB predating issue `#25` | Issue `#25` / PR `#90` (exact byte ceiling in `scripts/assets/check-asset-budget.mjs`) | Issue `#91` — compress below `1 MB` and remove this entry and `BUDGET_EXCEPTIONS` entry once resolved |
+| `public/models/character.glb`           | `2.58 MB` (`2,707,884` B) vs `1 MB` | Pre-existing uncompressed avatar GLB predating issue `#25` | Issue `#25` / PR `#90` (exact byte ceiling in `scripts/assets/check-asset-budget.mjs`) | Issue `#91` — compress below `1 MB` and remove this entry and `BUDGET_EXCEPTIONS` entry once resolved |

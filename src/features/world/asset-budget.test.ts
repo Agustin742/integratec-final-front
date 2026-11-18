@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   AVATAR_GLB_MAX_BYTES,
+  BUDGET_EXCEPTIONS,
   SCENE_GLB_MAX_BYTES,
   checkAssetBudgets,
   formatAssetBudgetReport,
@@ -80,5 +81,58 @@ describe('checkAssetBudgets', () => {
     expect(parseCliArgs(['--dir=custom/models'])).toEqual({
       modelsDir: 'custom/models',
     });
+  });
+
+  it('passes public/models with recorded #91 exceptions and zero unexempted failures', () => {
+    const result = checkAssetBudgets();
+    expect(result.ok).toBe(true);
+    const exceptionItems = result.items.filter(
+      (item) => item.status === 'EXCEPTION',
+    );
+    expect(exceptionItems.map((item) => item.path).sort()).toEqual(
+      Object.keys(BUDGET_EXCEPTIONS).sort(),
+    );
+
+    const report = formatAssetBudgetReport(result);
+    for (const exceptionPath of Object.keys(BUDGET_EXCEPTIONS)) {
+      expect(report).toContain(
+        `[assets:check] EXCEPTION (avatar) ${exceptionPath}:`,
+      );
+      expect(report).toContain('(tracked in #91)');
+    }
+  });
+
+  it('fails if an exempted file grows past its recorded ceiling or exceptions are disabled', () => {
+    const dir = makeTempModelsDir();
+    mkdirSync(join(dir, 'avatars', 'female'), { recursive: true });
+    writeFileSync(
+      join(dir, 'avatars', 'female', 'body.glb'),
+      Buffer.alloc(BUDGET_EXCEPTIONS['avatars/female/body.glb'].maxBytes + 1),
+    );
+
+    const bloatedResult = checkAssetBudgets({
+      modelsDir: dir,
+      exceptions: BUDGET_EXCEPTIONS,
+    });
+    expect(bloatedResult.ok).toBe(false);
+    expect(bloatedResult.items[0]?.status).toBe('FAIL');
+    expect(formatAssetBudgetReport(bloatedResult)).toContain(
+      'FAIL (avatar) avatars/female/body.glb',
+    );
+
+    const unexemptedDefault = checkAssetBudgets({ exceptions: {} });
+    expect(unexemptedDefault.ok).toBe(false);
+
+    const customDirWithoutExceptions = makeTempModelsDir();
+    mkdirSync(join(customDirWithoutExceptions, 'avatars', 'female'), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(customDirWithoutExceptions, 'avatars', 'female', 'body.glb'),
+      Buffer.alloc(AVATAR_GLB_MAX_BYTES + 1),
+    );
+    expect(
+      checkAssetBudgets({ modelsDir: customDirWithoutExceptions }).ok,
+    ).toBe(false);
   });
 });
