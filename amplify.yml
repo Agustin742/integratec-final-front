@@ -1,0 +1,28 @@
+# AWS Amplify Hosting build specification (issue #22).
+# Response headers are not defined here: Amplify reads the repository-root
+# customHttp.yml, which `pnpm security:sync` rewrites below (docs/security.md).
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        # Node version pinned in .nvmrc (installed first if the image lacks it).
+        - nvm install
+        - nvm use
+        # pnpm is not in the Amplify image; match package.json `packageManager`.
+        - npm install -g pnpm@10.34.9
+        # Keep the pnpm store inside the project so Amplify can cache it.
+        - pnpm config set store-dir .pnpm-store
+        - pnpm install --frozen-lockfile
+    build:
+      commands:
+        - pnpm security:sync
+        - pnpm build
+        - pnpm security:check --require-root-match
+  artifacts:
+    baseDirectory: dist
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - .pnpm-store/**/*

@@ -67,7 +67,7 @@ Work branches enter `develop` through reviewed pull requests. Changes are promot
 
 The `checks` job preserves promotion, Python regression, documentation-link, proposed-diff whitespace and actionlint **1.7.7** gates. With an application present, it installs frozen dependencies on Node **22** and independently runs lint, formatting, types, tests and build. Documentation-only PRs do not bypass these checks; missing scripts are reported as skipped, not passed.
 
-See the [CI guide](docs/ci.md) for triggers, Corepack/cache ordering, skip/failure behavior, summaries, diagnosis and observed evidence. Optional local Playwright checks remain in the [testing guide](docs/testing.md); deployment and branch-protection settings are outside this workflow change.
+See the [CI guide](docs/ci.md) for triggers, Corepack/cache ordering, skip/failure behavior, summaries, diagnosis and observed evidence. Optional local Playwright checks remain in the [testing guide](docs/testing.md); deployment and branch-protection settings are outside this workflow change. Hosting is AWS Amplify Hosting in `us-east-2`, built from [`amplify.yml`](amplify.yml) on push to `develop` through the Amplify GitHub App (no AWS keys in GitHub); see [Security](docs/security.md).
 
 Run locally from the repository root (Python 3, Git, and Bash required):
 

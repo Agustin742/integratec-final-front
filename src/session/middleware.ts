@@ -92,6 +92,72 @@ export function createSessionMiddleware(
           }
         }
       }
+      if (
+        options.parseAs === 'stream' &&
+        result.ok &&
+        result.body &&
+        result.headers
+          .get('content-type')
+          ?.split(';')[0]
+          .trim()
+          .toLowerCase() === 'text/event-stream'
+      ) {
+        // Unlike JSON, SSE never completes while connected. Fence every chunk
+        // and cancel the upstream reader on either caller or session abort.
+        const reader = result.body.getReader();
+        let finished = false;
+        let abort: () => void;
+        const body = new ReadableStream<Uint8Array>({
+          start(stream) {
+            abort = () => {
+              if (finished) return;
+              finished = true;
+              request.signal.removeEventListener('abort', abort);
+              stream.error(
+                new DOMException('Session or request changed', 'AbortError'),
+              );
+              void reader
+                .cancel()
+                .catch(() => undefined)
+                .finally(() => reader.releaseLock());
+            };
+            request.signal.addEventListener('abort', abort, { once: true });
+            if (request.signal.aborted) abort();
+          },
+          async pull(stream) {
+            try {
+              const chunk = await reader.read();
+              if (finished) return;
+              assertSessionEpoch(port, context.epoch);
+              if (chunk.done) {
+                finished = true;
+                request.signal.removeEventListener('abort', abort);
+                reader.releaseLock();
+                stream.close();
+              } else stream.enqueue(chunk.value);
+            } catch (error) {
+              if (!finished) {
+                finished = true;
+                request.signal.removeEventListener('abort', abort);
+                stream.error(error);
+                await reader.cancel().catch(() => undefined);
+                reader.releaseLock();
+              }
+            }
+          },
+          async cancel() {
+            if (finished) return;
+            finished = true;
+            request.signal.removeEventListener('abort', abort);
+            await reader.cancel().catch(() => undefined);
+            reader.releaseLock();
+          },
+        });
+        return new Response(body, {
+          status: result.status,
+          headers: result.headers,
+        });
+      }
       // Buffer BEFORE the last epoch check: headers alone do not fence a slow body.
       const body = result.body === null ? null : await result.arrayBuffer();
       assertSessionEpoch(port, context.epoch);

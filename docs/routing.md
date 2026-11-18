@@ -4,16 +4,18 @@ React Router (FD4) runs in data mode: `createBrowserRouter` with `RouterProvider
 
 ## Route table
 
-| Path                  | Guard                   | Module                                 |
-| --------------------- | ----------------------- | -------------------------------------- |
-| `/login`              | `PublicOnly`            | `src/app/pages/login-page`             |
-| `/register`           | `PublicOnly`            | `src/app/pages/register-page`          |
-| `/password-reset`     | none (signed in or out) | `src/app/pages/password-reset-page`    |
-| `/invitations/accept` | none (signed in or out) | `src/app/pages/invitation-accept-page` |
-| `/`                   | `RequireAuth`           | `src/app/pages/home-page`              |
-| `/profile`            | `RequireAuth`           | `src/app/pages/profile-page`           |
-| `/dev/ui`             | none, dev/showcase only | `src/app/ui-foundations`               |
-| `*`                   | none                    | `NotFoundPage` (static import)         |
+| Path                                        | Guard                   | Module                                          |
+| ------------------------------------------- | ----------------------- | ----------------------------------------------- |
+| `/login`                                    | `PublicOnly`            | `src/app/pages/login-page`                      |
+| `/register`                                 | `PublicOnly`            | `src/app/pages/register-page`                   |
+| `/password-reset`                           | none (signed in or out) | `src/app/pages/password-reset-page`             |
+| `/invitations/accept`                       | none (signed in or out) | `src/app/pages/invitation-accept-page`          |
+| `/`                                         | `RequireAuth`           | `src/app/pages/home-page`                       |
+| `/profile`                                  | `RequireAuth`           | `src/app/pages/profile-page`                    |
+| `/classrooms/:classroomId`                  | `RequireAuth`           | `src/features/classrooms/classroom-workspace`   |
+| `/classrooms/:classroomId/panels/:panelKey` | `RequireAuth`           | `src/features/classrooms/classroom-panel-route` |
+| `/dev/ui`                                   | none, dev/showcase only | `src/app/ui-foundations`                        |
+| `*`                                         | none                    | `NotFoundPage` (static import)                  |
 
 Every page is a lazy route module (`lazy: { Component }`), so its chunk loads when it is first matched. The `/dev/ui` route exists only when `__UI_SHOWCASE__` is true (dev server and the `showcase` build used by the browser suite); a production build drops it and its chunk.
 
@@ -26,7 +28,7 @@ Two pathless layout routes sit under the root route. Both mount the single toast
 
 Pages use `h2` for their title. The not found, forbidden and error views share `StatusView` (a decorative scene from `src/components/illustrations/scenes.tsx`, title, explanation, actions) and take the width of whichever layout hosts them.
 
-The table leaves room for the parent area (extended scope): it mounts as its own branch next to the protected one, with its own guard. It is not implemented.
+The table leaves room for the parent area (extended scope): it mounts as its own branch next to the protected one, with its own guard. It is not implemented. The [classroom foundation](./classroom-workspace.md) is context-only: a returned parent role grants no tools or panel navigation.
 
 ## Account registration (`/register`)
 
@@ -116,7 +118,7 @@ It shows loading while pending, forbidden when the server did not grant the capa
 
 1. Add the route to the `protected` branch in `createAppRoutes` (or use `protectedRoutes` in tests) as a lazy module, and render a heading with `PlaceholderPage` or call `useDocumentTitle` yourself.
 2. If it needs a capability, nest it under `RequireCapability`.
-3. To let login return the user to it, add its exact path to `APPROVED_DESTINATIONS` in `src/session/redirect.ts`. Today only `/` is approved and matching is exact, so any other path falls back to `/`. A dynamic path such as `/classrooms/:id` needs pattern matching in `safeSessionRedirect`, which the first classroom route story must add. `safeSessionRedirect` takes an optional allowlist only so tests can prove forwarding; application code never passes it.
+3. To let login return the user to it, add its exact path to `APPROVED_DESTINATIONS` in `src/session/redirect.ts`. Today only `/` is approved and matching is exact, so any other path falls back to `/`. Dynamic classroom paths are deliberately not approved in this foundation; opening one while signed out leads to login with `/` as the safe return destination. Expanding that allowlist needs a separate scoped change. `safeSessionRedirect` takes an optional allowlist only so tests can prove forwarding; application code never passes it.
 4. Add tests with `createMemoryRouter(createAppRoutes({ protectedRoutes }))`.
 
 ## Hosting requirement for deep links
@@ -127,4 +129,4 @@ The app is served at the domain root (no `basename`) and uses browser history, s
 - Target: `/index.html`
 - Type: `200 (Rewrite)`
 
-The rule is not in `customHttp.yml` (that file only holds response headers); it is configured on the hosting side and is owned by issue #22. Until it is in place, a hard load of any route other than `/` returns the host's 404.
+The rule is not in `customHttp.yml` (that file only holds response headers); it is configured on the hosting side: the Amplify app's rewrite rule is managed in the backend repository's Terraform (issue #22), so keep this expression and that configuration identical. Until it is in place, a hard load of any route other than `/` returns the host's 404.

@@ -135,6 +135,26 @@ export function createAppRoutes({
                       },
                     },
                     ...protectedRoutes,
+                    {
+                      path: 'classrooms/:classroomId',
+                      lazy: {
+                        Component: async () =>
+                          (
+                            await import('@/features/classrooms/classroom-workspace')
+                          ).ClassroomWorkspace,
+                      },
+                      children: [
+                        {
+                          path: 'panels/:panelKey',
+                          lazy: {
+                            Component: async () =>
+                              (
+                                await import('@/features/classrooms/classroom-panel-route')
+                              ).ClassroomPanelRoute,
+                          },
+                        },
+                      ],
+                    },
                   ],
                 },
                 // Reserved: a separate minimal area for parent users (extended scope)
