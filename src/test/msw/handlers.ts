@@ -2542,4 +2542,217 @@ export function createJoinClassroomByCodeHandler(
   });
 }
 
+export interface ActivityStoreQuestionOption {
+  readonly id: string;
+  readonly position: number;
+  readonly label: string;
+  readonly isCorrect: boolean;
+}
+
+export interface ActivityStoreQuestion {
+  readonly id: string;
+  readonly position: number;
+  readonly prompt: string;
+  readonly options: readonly ActivityStoreQuestionOption[];
+}
+
+export interface ActivityStoreItem {
+  readonly id: string;
+  readonly classroomId: string;
+  readonly type: 'TP' | 'EXAM';
+  readonly format: 'FILE' | 'MULTIPLE_CHOICE';
+  readonly state: 'DRAFT' | 'PUBLISHED';
+  readonly title: string;
+  readonly description: string;
+  readonly opensAt: string | null;
+  readonly dueAt: string;
+  readonly allowLate: boolean;
+  readonly maxScore: number;
+  readonly weightMultiplier: number;
+  readonly publishedAt: string | null;
+  readonly timeZone: string;
+  readonly questionCount: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly createdById?: string;
+  readonly questions?: readonly ActivityStoreQuestion[];
+}
+
+export type ActivityStoreOp = 'list' | 'get';
+export type ActivityStoreFailure = MswErrorResponseSpec | 'network';
+
+export interface ClassroomActivitiesStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly role?: 'TEACHER' | 'SCHOOL_OWNER' | 'STUDENT' | 'PARENT';
+  readonly initialItems?: readonly ActivityStoreItem[];
+}
+
+export interface ClassroomActivitiesStore {
+  readonly handlers: readonly HttpHandler[];
+  failNext: (op: ActivityStoreOp, failure: ActivityStoreFailure) => void;
+}
+
+const DEFAULT_ACTIVITY_CREATOR_ID = '00000000-0000-4000-8000-000000000099';
+
+/**
+ * Stateful contract-faithful MSW store for classroom activities
+ * (`ActivitiesController_list` and `ActivitiesController_get`).
+ */
+export function createClassroomActivitiesStore(
+  options: ClassroomActivitiesStoreOptions = {},
+): ClassroomActivitiesStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const role = options.role ?? 'STUDENT';
+  const isStaff = role === 'TEACHER' || role === 'SCHOOL_OWNER';
+  const items: ActivityStoreItem[] = [...(options.initialItems ?? [])];
+  const pending: Partial<Record<ActivityStoreOp, ActivityStoreFailure>> = {};
+
+  const fail = (failure: ActivityStoreFailure): Response =>
+    failure === 'network'
+      ? HttpResponse.error()
+      : createErrorEnvelopeResponse(failure.status, failure.body);
+
+  return {
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    handlers: [
+      http.get(
+        `${baseUrl}/classrooms/:id/activities`,
+        ({ params, request }) => {
+          const failure = pending.list;
+          pending.list = undefined;
+          if (failure !== undefined) {
+            return fail(failure);
+          }
+
+          if (options.classroomId && params.id !== options.classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-activities-list-404',
+            });
+          }
+
+          if (role === 'PARENT') {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Parents cannot view classroom activities.',
+              correlationId: 'req-activities-list-403',
+            });
+          }
+
+          const url = new URL(request.url);
+          const page = Math.max(1, Number(url.searchParams.get('page') ?? 1));
+          const pageSize = Math.min(
+            100,
+            Math.max(1, Number(url.searchParams.get('pageSize') ?? 20)),
+          );
+          const sort = url.searchParams.get('sort') ?? 'dueAt';
+          const stateFilter = url.searchParams.get('state');
+
+          let visible = items.filter((item) =>
+            isStaff ? true : item.state === 'PUBLISHED',
+          );
+          if (
+            isStaff &&
+            (stateFilter === 'DRAFT' || stateFilter === 'PUBLISHED')
+          ) {
+            visible = visible.filter((item) => item.state === stateFilter);
+          }
+
+          const sorted = [...visible].sort((a, b) => {
+            if (sort === '-dueAt') return b.dueAt.localeCompare(a.dueAt);
+            if (sort === 'createdAt')
+              return a.createdAt.localeCompare(b.createdAt);
+            if (sort === '-createdAt')
+              return b.createdAt.localeCompare(a.createdAt);
+            return a.dueAt.localeCompare(b.dueAt);
+          });
+
+          const start = (page - 1) * pageSize;
+          const summaries = sorted
+            .slice(start, start + pageSize)
+            .map((item) => {
+              const {
+                questions: omittedQuestions,
+                createdById: omittedCreatedById,
+                ...summary
+              } = item;
+              void omittedQuestions;
+              void omittedCreatedById;
+              return summary;
+            });
+
+          return HttpResponse.json({
+            items: summaries,
+            page,
+            pageSize,
+            total: sorted.length,
+          });
+        },
+      ),
+      http.get(
+        `${baseUrl}/classrooms/:id/activities/:activityId`,
+        ({ params }) => {
+          const failure = pending.get;
+          pending.get = undefined;
+          if (failure !== undefined) {
+            return fail(failure);
+          }
+
+          if (options.classroomId && params.id !== options.classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-activities-get-404',
+            });
+          }
+
+          if (role === 'PARENT') {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Parents cannot view activity detail.',
+              correlationId: 'req-activities-get-403',
+            });
+          }
+
+          const found = items.find((item) => item.id === params.activityId);
+          if (!found || (!isStaff && found.state !== 'PUBLISHED')) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Activity not found.',
+              correlationId: 'req-activities-get-404',
+            });
+          }
+
+          const { questions = [], createdById, ...summary } = found;
+          if (isStaff) {
+            return HttpResponse.json({
+              ...summary,
+              createdById: createdById ?? DEFAULT_ACTIVITY_CREATOR_ID,
+              questions,
+            });
+          }
+
+          return HttpResponse.json({
+            ...summary,
+            questions: questions.map((q) => ({
+              id: q.id,
+              position: q.position,
+              prompt: q.prompt,
+              options: q.options.map(({ id, position, label }) => ({
+                id,
+                position,
+                label,
+              })),
+            })),
+          });
+        },
+      ),
+    ],
+  };
+}
+
 export const defaultHandlers: readonly HttpHandler[] = [createHealthHandler()];
