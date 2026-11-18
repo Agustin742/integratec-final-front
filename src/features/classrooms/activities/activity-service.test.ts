@@ -217,8 +217,7 @@ describe('listClassroomActivities', () => {
   test('maps a malformed 200 payload to an unexpected ApiError', async () => {
     mswServer.use(
       createClassroomActivitiesListHandler({
-        resolveResponse: () =>
-          Response.json({ items: [{ id: 42 }], page: 1 }),
+        resolveResponse: () => Response.json({ items: [{ id: 42 }], page: 1 }),
       }),
     );
 
@@ -308,26 +307,30 @@ describe('createClassroomActivity', () => {
       }),
     );
 
-    const result = await createClassroomActivity(createApiClient(), classroomId, {
-      type: 'EXAM',
-      format: 'MULTIPLE_CHOICE',
-      title: 'Examen parcial',
-      description: 'Evaluación de la unidad 3.',
-      opensAt: '2026-11-25T12:00:00.000Z',
-      dueAt: '2026-12-01T23:59:59.000Z',
-      allowLate: false,
-      maxScore: 50,
-      weightMultiplier: 1.5,
-      questions: [
-        {
-          prompt: '¿Cuál es la capital de Francia?',
-          options: [
-            { label: 'París', isCorrect: true },
-            { label: 'Londres', isCorrect: false },
-          ],
-        },
-      ],
-    });
+    const result = await createClassroomActivity(
+      createApiClient(),
+      classroomId,
+      {
+        type: 'EXAM',
+        format: 'MULTIPLE_CHOICE',
+        title: 'Examen parcial',
+        description: 'Evaluación de la unidad 3.',
+        opensAt: '2026-11-25T12:00:00.000Z',
+        dueAt: '2026-12-01T23:59:59.000Z',
+        allowLate: false,
+        maxScore: 50,
+        weightMultiplier: 1.5,
+        questions: [
+          {
+            prompt: '¿Cuál es la capital de Francia?',
+            options: [
+              { label: 'París', isCorrect: true },
+              { label: 'Londres', isCorrect: false },
+            ],
+          },
+        ],
+      },
+    );
 
     expect(result.state).toBe('DRAFT');
   });
@@ -533,8 +536,7 @@ describe('deactivateClassroomActivity', () => {
       deactivateClassroomActivity(createApiClient(), classroomId, activityId),
     ).rejects.toMatchObject({
       status: 409,
-      userMessage:
-        classroomMessages.activities.write.deactivateHasSubmissions,
+      userMessage: classroomMessages.activities.write.deactivateHasSubmissions,
     });
   });
 
@@ -561,9 +563,7 @@ describe('deactivateClassroomActivity', () => {
   });
 });
 
-async function listAndCapture(
-  run: () => Promise<unknown>,
-): Promise<unknown> {
+async function listAndCapture(run: () => Promise<unknown>): Promise<unknown> {
   try {
     await run();
     throw new Error('Expected the call to reject');

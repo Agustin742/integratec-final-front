@@ -238,6 +238,19 @@ describe('ClassroomActivitiesPanel (#39)', () => {
         name: copy.deactivateAriaLabel(publishedExam.title),
       }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: copy.createAction }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', {
+        name: copy.editAriaLabel(publishedExam.title),
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', {
+        name: copy.publishAriaLabel(publishedExam.title),
+      }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(copy.stateFilterLabel)).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: copy.stateOptions.DRAFT }),
@@ -438,6 +451,83 @@ describe('ClassroomActivitiesPanel (#39)', () => {
         exact: true,
       });
     });
+  });
+
+  test('staff without publish_content see the list but no management actions', async () => {
+    mswServer.use(
+      createClassroomDetailHandler(classroomId, {
+        myRole: 'TEACHER',
+        capabilities: [],
+      }),
+      createClassroomActivitiesListHandler({
+        classroomId,
+        items: [draftFileTp],
+      }),
+    );
+
+    renderActivitiesPanel();
+
+    expect(await screen.findByText(draftFileTp.title)).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: copy.createAction }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', {
+        name: copy.editAriaLabel(draftFileTp.title),
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', {
+        name: copy.publishAriaLabel(draftFileTp.title),
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', {
+        name: copy.deactivateAriaLabel(draftFileTp.title),
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  test('staff actions: create in the header, edit for every item, publish only for drafts', async () => {
+    mswServer.use(
+      createClassroomDetailHandler(classroomId, {
+        myRole: 'TEACHER',
+        capabilities: ['publish_content'],
+      }),
+      createClassroomActivitiesListHandler({
+        classroomId,
+        items: [draftFileTp, publishedExam],
+      }),
+    );
+
+    const { container } = renderActivitiesPanel();
+
+    expect(
+      await screen.findByRole('button', { name: copy.createAction }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole('button', {
+        name: copy.editAriaLabel(draftFileTp.title),
+      }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole('button', {
+        name: copy.editAriaLabel(publishedExam.title),
+      }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole('button', {
+        name: copy.publishAriaLabel(draftFileTp.title),
+      }),
+    ).toBeEnabled();
+    // Already-published activities cannot be published again.
+    expect(
+      screen.queryByRole('button', {
+        name: copy.publishAriaLabel(publishedExam.title),
+      }),
+    ).not.toBeInTheDocument();
+
+    await expectAccessible(container);
   });
 
   test('deactivation confirms with focus management, cancels back to the trigger, and reconciles on 204', async () => {

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useParams } from 'react-router';
 import { ApiError } from '@/api/errors';
 import {
@@ -31,7 +31,18 @@ import {
   listClassroomActivities,
   deactivateClassroomActivity,
 } from './activity-service';
-import type { ActivitySummaryDto } from './activity-schema';
+import type {
+  ActivitySummaryDto,
+  TeacherActivityResponseDto,
+} from './activity-schema';
+import {
+  ActivityEditorDialog,
+  type ActivityEditorMode,
+} from './activity-editor-dialog';
+import {
+  PublishActivityDialog,
+  type PublishActivityTarget,
+} from './publish-activity-dialog';
 
 type ActivityStateSelection = 'ALL' | ClassroomActivitiesStateFilter;
 
@@ -106,9 +117,18 @@ export function ClassroomActivitiesPanel({
   const [isDeactivating, setIsDeactivating] = useState(false);
   const [deactivateError, setDeactivateError] = useState<string | null>(null);
   const [liveAnnouncement, setLiveAnnouncement] = useState('');
+  const [editorMode, setEditorMode] = useState<ActivityEditorMode | null>(null);
+  const [editorFormKey, setEditorFormKey] = useState(0);
+  const [publishTarget, setPublishTarget] =
+    useState<PublishActivityTarget | null>(null);
 
   const activitiesHeadingRef = useRef<HTMLHeadingElement>(null);
   const confirmHeadingRef = useRef<HTMLHeadingElement>(null);
+  const createActionRef = useRef<HTMLButtonElement>(null);
+  const editButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const publishButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const editorTriggerRef = useRef<HTMLElement | null>(null);
+  const publishTriggerRef = useRef<HTMLElement | null>(null);
   const deactivateButtonRefs = useRef<Map<string, HTMLButtonElement>>(
     new Map(),
   );
@@ -187,6 +207,86 @@ export function ClassroomActivitiesPanel({
   ]);
 
   const messages = classroomMessages.activities.panel;
+  const editorCopy = classroomMessages.activities.editor;
+
+  const reconcileActivities = useCallback((): void => {
+    if (userId === null || resolvedClassroomId.trim() === '') {
+      return;
+    }
+    void queryClient.invalidateQueries({
+      predicate: createClassroomActivitiesPredicate(
+        userId,
+        resolvedClassroomId,
+      ),
+    });
+  }, [queryClient, userId, resolvedClassroomId]);
+
+  const handleOpenCreateEditor = (): void => {
+    editorTriggerRef.current = createActionRef.current;
+    setEditorFormKey((key) => key + 1);
+    setEditorMode({ kind: 'create' });
+  };
+
+  const handleOpenEditEditor = (
+    activity: ActivitySummaryDto,
+    trigger: HTMLButtonElement | null,
+  ): void => {
+    editorTriggerRef.current = trigger;
+    setEditorFormKey((key) => key + 1);
+    setEditorMode({ kind: 'edit', activityId: activity.id });
+  };
+
+  const handleOpenPublishConfirmation = (
+    activity: PublishActivityTarget,
+    trigger: HTMLButtonElement | null,
+  ): void => {
+    publishTriggerRef.current = trigger;
+    setPublishTarget(activity);
+  };
+
+  const handleEditorSaved = (
+    saved: TeacherActivityResponseDto,
+    modeKind: 'create' | 'edit',
+  ): void => {
+    setEditorMode(null);
+    reconcileActivities();
+
+    const confirmationTitle =
+      modeKind === 'create' ? editorCopy.createdTitle : editorCopy.updatedTitle;
+    const confirmationDescription =
+      modeKind === 'create'
+        ? editorCopy.createdDescription(saved.title)
+        : editorCopy.updatedDescription(saved.title);
+    setLiveAnnouncement(`${confirmationTitle}: ${confirmationDescription}`);
+    toast.success(confirmationTitle, {
+      description: confirmationDescription,
+    });
+
+    if (saved.state === 'DRAFT') {
+      // Publishing is offered right after a confirmed save; the confirmation
+      // dialog states the one-way DRAFT -> PUBLISHED change and can be
+      // declined to keep the draft.
+      publishTriggerRef.current = editorTriggerRef.current;
+      setPublishTarget(saved);
+    } else {
+      activitiesHeadingRef.current?.focus();
+    }
+  };
+
+  const handlePublished = (published: TeacherActivityResponseDto): void => {
+    setPublishTarget(null);
+    reconcileActivities();
+
+    const confirmationDescription = editorCopy.publishedDescription(
+      published.title,
+    );
+    setLiveAnnouncement(
+      `${editorCopy.publishedTitle}: ${confirmationDescription}`,
+    );
+    toast.success(editorCopy.publishedTitle, {
+      description: confirmationDescription,
+    });
+  };
 
   const setDeactivateButtonRef =
     (activityId: string) =>
@@ -348,18 +448,33 @@ export function ClassroomActivitiesPanel({
       aria-labelledby={activitiesHeadingId}
       className="min-w-0 space-y-5 pt-2"
     >
-      <div className="min-w-0 space-y-1">
-        <h3
-          id={activitiesHeadingId}
-          ref={activitiesHeadingRef}
-          tabIndex={-1}
-          className="font-display text-lg font-semibold text-foreground outline-none"
-        >
-          {messages.heading}
-        </h3>
-        <p className="text-sm text-pretty text-muted-foreground">
-          {messages.subtitle}
-        </p>
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <h3
+            id={activitiesHeadingId}
+            ref={activitiesHeadingRef}
+            tabIndex={-1}
+            className="font-display text-lg font-semibold text-foreground outline-none"
+          >
+            {messages.heading}
+          </h3>
+          <p className="text-sm text-pretty text-muted-foreground">
+            {messages.subtitle}
+          </p>
+        </div>
+        {canPublish && !isRevokedAccess && (
+          <Button
+            ref={createActionRef}
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={isDeactivating}
+            onClick={handleOpenCreateEditor}
+            className="min-h-11 shrink-0"
+          >
+            {messages.createAction}
+          </Button>
+        )}
       </div>
 
       <LiveRegion message={liveAnnouncement} visuallyHidden />
@@ -511,19 +626,68 @@ export function ClassroomActivitiesPanel({
                   </div>
 
                   {canPublish && (
-                    <Button
-                      ref={setDeactivateButtonRef(activity.id)}
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      aria-label={messages.deactivateAriaLabel(activity.title)}
-                      aria-expanded={isConfirmingThis}
-                      disabled={isDeactivating || isConfirmingThis}
-                      onClick={() => handleOpenConfirmation(activity)}
-                      className="min-h-11 shrink-0"
-                    >
-                      {messages.deactivateAction}
-                    </Button>
+                    <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+                      <Button
+                        ref={(node) => {
+                          if (node) {
+                            editButtonRefs.current.set(activity.id, node);
+                          } else {
+                            editButtonRefs.current.delete(activity.id);
+                          }
+                        }}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        aria-label={messages.editAriaLabel(activity.title)}
+                        disabled={isDeactivating || isConfirmingThis}
+                        onClick={(event) =>
+                          handleOpenEditEditor(activity, event.currentTarget)
+                        }
+                        className="min-h-11"
+                      >
+                        {messages.editAction}
+                      </Button>
+                      {activity.state === 'DRAFT' && (
+                        <Button
+                          ref={(node) => {
+                            if (node) {
+                              publishButtonRefs.current.set(activity.id, node);
+                            } else {
+                              publishButtonRefs.current.delete(activity.id);
+                            }
+                          }}
+                          type="button"
+                          variant="default"
+                          size="sm"
+                          aria-label={messages.publishAriaLabel(activity.title)}
+                          disabled={isDeactivating || isConfirmingThis}
+                          onClick={(event) =>
+                            handleOpenPublishConfirmation(
+                              activity,
+                              event.currentTarget,
+                            )
+                          }
+                          className="min-h-11"
+                        >
+                          {messages.publishAction}
+                        </Button>
+                      )}
+                      <Button
+                        ref={setDeactivateButtonRef(activity.id)}
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        aria-label={messages.deactivateAriaLabel(
+                          activity.title,
+                        )}
+                        aria-expanded={isConfirmingThis}
+                        disabled={isDeactivating || isConfirmingThis}
+                        onClick={() => handleOpenConfirmation(activity)}
+                        className="min-h-11"
+                      >
+                        {messages.deactivateAction}
+                      </Button>
+                    </div>
                   )}
                 </div>
 
@@ -633,6 +797,41 @@ export function ClassroomActivitiesPanel({
           busy={activitiesQuery.isFetching}
           disabled={isDeactivating}
         />
+      )}
+
+      {resolvedClassroomId.trim() !== '' && (
+        <>
+          <ActivityEditorDialog
+            open={editorMode !== null}
+            formKey={`activity-editor-${editorFormKey}`}
+            classroomId={resolvedClassroomId}
+            mode={editorMode}
+            onOpenChange={(nextOpen) => {
+              if (!nextOpen) {
+                setEditorMode(null);
+              }
+            }}
+            onSaved={handleEditorSaved}
+            onReconcileRequired={reconcileActivities}
+            getTriggerElement={() => editorTriggerRef.current}
+            fallbackFocus={() => activitiesHeadingRef.current}
+          />
+          <PublishActivityDialog
+            key={`publish-${publishTarget?.id ?? 'closed'}`}
+            open={publishTarget !== null}
+            classroomId={resolvedClassroomId}
+            target={publishTarget}
+            onOpenChange={(nextOpen) => {
+              if (!nextOpen) {
+                setPublishTarget(null);
+              }
+            }}
+            onPublished={handlePublished}
+            onReconcileRequired={reconcileActivities}
+            getTriggerElement={() => publishTriggerRef.current}
+            fallbackFocus={() => activitiesHeadingRef.current}
+          />
+        </>
       )}
     </section>
   );

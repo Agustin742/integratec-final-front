@@ -62,6 +62,8 @@ const activityTitleSchema = z
   })
   .transform((raw) => raw.trim());
 
+export { activityTitleSchema };
+
 const questionPromptSchema = z
   .string()
   .superRefine((raw, ctx) => {
@@ -104,27 +106,28 @@ const optionLabelSchema = z
  * Contract rule: "Exactly one option per question must be correct"
  * (`QuestionInputDto` in `schema.generated.ts`), validated per question.
  */
-const questionInputSchema: z.ZodType<QuestionInputDto> = z
-  .object({
-    prompt: questionPromptSchema,
-    options: z
-      .array(
-        z.object({
-          label: optionLabelSchema,
-          isCorrect: z.boolean(),
-        }),
-      )
-      .superRefine((options, ctx) => {
-        const correctCount = options.filter((option) => option.isCorrect).length;
-        if (correctCount !== 1) {
-          ctx.addIssue({
-            code: 'custom',
-            message:
-              classroomMessages.activities.validation.exactlyOneCorrectOption,
-          });
-        }
+const questionInputSchema: z.ZodType<QuestionInputDto> = z.object({
+  prompt: questionPromptSchema,
+  options: z
+    .array(
+      z.object({
+        label: optionLabelSchema,
+        isCorrect: z.boolean(),
       }),
-  });
+    )
+    .superRefine((options, ctx) => {
+      const correctCount = options.filter((option) => option.isCorrect).length;
+      if (correctCount !== 1) {
+        ctx.addIssue({
+          code: 'custom',
+          message:
+            classroomMessages.activities.validation.exactlyOneCorrectOption,
+        });
+      }
+    }),
+});
+
+export { questionInputSchema };
 
 const positiveScoreSchema = z
   .number()
@@ -210,14 +213,16 @@ export const createActivityPayloadSchema = z
     if (value.format === 'FILE' && value.questions !== undefined) {
       ctx.addIssue({
         code: 'custom',
-        message: classroomMessages.activities.validation
-          .questionsForbiddenForFile,
+        message:
+          classroomMessages.activities.validation.questionsForbiddenForFile,
         path: ['questions'],
       });
     }
   });
 
-export type CreateActivityPayload = z.output<typeof createActivityPayloadSchema>;
+export type CreateActivityPayload = z.output<
+  typeof createActivityPayloadSchema
+>;
 
 /** Maps validated payload output into the generated `CreateActivityDto`. */
 export function toCreateActivityDto(
