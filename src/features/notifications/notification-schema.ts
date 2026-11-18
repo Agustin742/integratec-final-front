@@ -69,9 +69,14 @@ export function dedupeAndSortNotifications(
       byId.set(item.id, item);
     }
   }
-  return [...byId.values()].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
-  );
+  return [...byId.values()].sort((a, b) => {
+    const timeDiff = Date.parse(b.createdAt) - Date.parse(a.createdAt);
+    if (Number.isFinite(timeDiff) && timeDiff !== 0) {
+      return timeDiff;
+    }
+    const isoDiff = b.createdAt.localeCompare(a.createdAt);
+    return isoDiff !== 0 ? isoDiff : b.id.localeCompare(a.id);
+  });
 }
 
 /**

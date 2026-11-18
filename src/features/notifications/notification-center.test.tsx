@@ -19,6 +19,7 @@ import {
   TEST_API_BASE_URL,
   type NotificationStoreItem,
 } from '@/test/msw/handlers';
+import { expectAccessible } from '@/test/accessibility';
 import { mswServer } from '@/test/msw/server';
 import { render } from '@/test/render';
 import { NotificationCenter } from './notification-center';
@@ -265,6 +266,73 @@ describe('NotificationCenter', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Marcar como leída' }));
     expect(
       await screen.findByText('No pudimos actualizar el estado de lectura'),
+    ).toBeInTheDocument();
+  });
+
+  it('verifies loading, empty, stale-data, pagination, Escape close, and accessibility', async () => {
+    const emptyStore = createNotificationsStore({ initialItems: [] });
+    mswServer.use(...emptyStore.handlers);
+
+    const first = renderNotificationCenter();
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Notificaciones' }),
+    );
+    expect(
+      await screen.findByRole('heading', { name: 'No tenés notificaciones' }),
+    ).toBeInTheDocument();
+    await expectAccessible(document.body);
+    fireEvent.keyDown(document.activeElement ?? document.body, {
+      key: 'Escape',
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    first.unmount();
+
+    // Pagination (>20 items) + stale-data notice on failed refresh + markAllRead with older unread items
+    const items = Array.from({ length: 21 }, (_, idx) =>
+      makeItem({
+        id: `00000000-0000-4000-8000-${String(4000 + idx).padStart(12, '0')}`,
+        readAt: idx === 0 ? null : '2026-11-18T12:00:00.000Z',
+        createdAt: `2026-11-18T${String(Math.floor(idx / 2)).padStart(2, '0')}:${idx % 2 === 0 ? '00' : '30'}:00.000Z`,
+      }),
+    );
+    const pagedStore = createNotificationsStore({ initialItems: items });
+    mswServer.use(...pagedStore.handlers);
+
+    renderNotificationCenter({ pollIntervalMs: 80 });
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Notificaciones' }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Notificaciones',
+    });
+
+    // Even when page 1 items are all read, mark-all-read stays enabled because total > 0
+    expect(
+      within(dialog).getByRole('button', { name: 'Marcar todas como leídas' }),
+    ).toBeEnabled();
+
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Página siguiente' }),
+    );
+    await waitFor(() => {
+      expect(
+        within(dialog).getByRole('button', { name: 'Marcar como leída' }),
+      ).toBeInTheDocument();
+    });
+
+    // Trigger failed poll -> StaleDataNotice renders while keeping confirmed items
+    pagedStore.failNext('list', {
+      status: 403,
+      body: {
+        code: 'FORBIDDEN',
+        message: 'Forbidden',
+        correlationId: 'req-403',
+      },
+    });
+    expect(
+      await within(dialog).findByText('Mostrando la última lista confirmada'),
     ).toBeInTheDocument();
   });
 });

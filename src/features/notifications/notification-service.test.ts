@@ -1,3 +1,4 @@
+import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createApiClient } from '@/api/client';
 import { ApiError } from '@/api/errors';
@@ -119,6 +120,46 @@ describe('notification-service', () => {
     const deduped = dedupeAndSortNotifications([unread, read, unread]);
     expect(deduped).toHaveLength(1);
     expect(deduped[0]?.readAt).toBe('2026-11-18T12:00:00.000Z');
+
+    // Sorts by instant (Date.parse) rather than raw string comparison
+    const wholeSecond = makeNotification({
+      id: '00000000-0000-4000-8000-000000003011',
+      createdAt: '2026-11-18T10:00:00Z',
+    });
+    const fractionalSecond = makeNotification({
+      id: '00000000-0000-4000-8000-000000003012',
+      createdAt: '2026-11-18T10:00:00.500Z',
+    });
+    expect(
+      dedupeAndSortNotifications([wholeSecond, fractionalSecond]).map(
+        (item) => item.id,
+      ),
+    ).toEqual([fractionalSecond.id, wholeSecond.id]);
+  });
+
+  it('rejects malformed 200 payloads and marks malformed mutations as uncertain', async () => {
+    const client = makeClient();
+    mswServer.use(
+      http.get(`${TEST_API_BASE_URL}/notifications`, () =>
+        HttpResponse.json({ items: [{ invalid: true }], page: 1 }),
+      ),
+      http.patch(`${TEST_API_BASE_URL}/notifications/:id/read`, () =>
+        HttpResponse.json({ id: 'bad' }),
+      ),
+      http.patch(`${TEST_API_BASE_URL}/notifications/read-all`, () =>
+        HttpResponse.json({ updated: 'not-a-number' }),
+      ),
+    );
+
+    await expect(listNotifications(client)).rejects.toSatisfy(
+      (err: unknown) => err instanceof ApiError && err.kind === 'unexpected',
+    );
+    await expect(
+      markNotificationRead(client, '00000000-0000-4000-8000-000000003001'),
+    ).rejects.toSatisfy((err: unknown) => isUncertainNotificationError(err));
+    await expect(markAllNotificationsRead(client)).rejects.toSatisfy(
+      (err: unknown) => isUncertainNotificationError(err),
+    );
   });
 
   it('isolates query keys per user and maps safe deep-link paths', () => {

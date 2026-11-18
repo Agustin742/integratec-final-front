@@ -129,6 +129,11 @@ test('notification center shows unread count, persists mark-read/mark-all across
   });
 
   await page.goto('./');
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
   const bell = page.getByRole('button', { name: 'Notificaciones, 2 sin leer' });
   await expect(bell).toBeVisible();
   await bell.click();

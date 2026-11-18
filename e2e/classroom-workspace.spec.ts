@@ -91,6 +91,15 @@ test.beforeEach(async ({ page, baseURL }) => {
       expect(request.headers().authorization).toBe('Bearer synthetic-access');
       return route.fulfill({ json: profile });
     }
+    if (
+      url.origin === apiOrigin &&
+      url.pathname === '/notifications' &&
+      request.method() === 'GET'
+    ) {
+      return route.fulfill({
+        json: { items: [], page: 1, pageSize: 20, total: 0 },
+      });
+    }
     if (request.url() === `${classroomURL}/context-events`) {
       expect(request.method()).toBe('GET');
       expect(request.headers().authorization).toBe('Bearer synthetic-access');

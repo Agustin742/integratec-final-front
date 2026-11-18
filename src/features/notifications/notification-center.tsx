@@ -16,6 +16,7 @@ import {
   LoadingState,
   StaleDataNotice,
 } from '@/components/feedback/states';
+import { PaginationControls } from '@/components/pagination/pagination-controls';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,7 @@ import { notificationMessages } from './messages';
 import {
   getNotificationTargetPath,
   type NotificationDto,
+  type PaginatedNotificationListDto,
 } from './notification-schema';
 import {
   isAbortError,
@@ -47,6 +49,14 @@ const NOTIFICATION_PAGE_SIZE = 20;
 export interface NotificationCenterProps {
   /** Polling interval in ms; defaults to 30s. Pass `false` to disable polling. */
   readonly pollIntervalMs?: number | false;
+}
+
+function formatNotificationTime(iso: string): string {
+  try {
+    return formatInstant(iso);
+  } catch {
+    return iso;
+  }
 }
 
 function BellIcon() {
@@ -98,6 +108,7 @@ function NotificationCenterContent({
   const queryClient = useQueryClient();
 
   const [open, setOpen] = useState(false);
+  const [page, setPage] = useState(1);
   const [markingIds, setMarkingIds] = useState<readonly string[]>([]);
   const [isMarkingAll, setIsMarkingAll] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -105,6 +116,7 @@ function NotificationCenterContent({
 
   const markingIdsRef = useRef<Set<string>>(new Set());
   const markingAllRef = useRef(false);
+  const skipCloseAutoFocusRef = useRef(false);
   const previousIdsRef = useRef<Set<string> | null>(null);
   const previousUnreadRef = useRef<number | null>(null);
   const unmountAbortRef = useRef<AbortController | null>(null);
@@ -118,15 +130,17 @@ function NotificationCenterContent({
     };
   }, []);
 
+  const queryKey = notificationsListQueryKey(userId, {
+    page,
+    pageSize: NOTIFICATION_PAGE_SIZE,
+  });
+
   const query = useQuery({
-    queryKey: notificationsListQueryKey(userId, {
-      page: 1,
-      pageSize: NOTIFICATION_PAGE_SIZE,
-    }),
+    queryKey,
     queryFn: ({ signal }) =>
       listNotifications(
         client,
-        { page: 1, pageSize: NOTIFICATION_PAGE_SIZE },
+        { page, pageSize: NOTIFICATION_PAGE_SIZE },
         { signal },
       ),
     refetchInterval: pollIntervalMs,
@@ -134,6 +148,7 @@ function NotificationCenterContent({
   });
 
   const items = query.data?.items ?? [];
+  const total = query.data?.total ?? 0;
   const unreadCount = items.filter((item) => item.readAt === null).length;
 
   useEffect(() => {
@@ -154,6 +169,8 @@ function NotificationCenterContent({
         setLiveAnnouncement(
           notificationMessages.liveUnreadAnnouncement(unreadCount),
         );
+      } else if (unreadCount < prevUnread) {
+        setLiveAnnouncement('');
       }
     }
 
@@ -170,6 +187,7 @@ function NotificationCenterContent({
   async function handleMarkRead(notification: NotificationDto) {
     if (
       notification.readAt !== null ||
+      markingAllRef.current ||
       markingIdsRef.current.has(notification.id)
     ) {
       return;
@@ -179,9 +197,21 @@ function NotificationCenterContent({
     setActionError(null);
 
     try {
-      await markNotificationRead(client, notification.id, {
+      const updated = await markNotificationRead(client, notification.id, {
         signal: unmountAbortRef.current?.signal,
       });
+      queryClient.setQueryData<PaginatedNotificationListDto>(
+        queryKey,
+        (current) =>
+          current
+            ? {
+                ...current,
+                items: current.items.map((entry) =>
+                  entry.id === updated.id ? updated : entry,
+                ),
+              }
+            : current,
+      );
       await reconcileNotifications();
     } catch (error) {
       if (isAbortError(error)) {
@@ -205,7 +235,7 @@ function NotificationCenterContent({
   }
 
   async function handleMarkAllRead() {
-    if (unreadCount === 0 || markingAllRef.current) {
+    if (total === 0 || markingAllRef.current) {
       return;
     }
     markingAllRef.current = true;
@@ -235,10 +265,7 @@ function NotificationCenterContent({
     }
   }
 
-  const badgeText =
-    unreadCount > 99
-      ? notificationMessages.unreadBadgeCap
-      : String(unreadCount);
+  const badgeText = String(unreadCount);
 
   return (
     <>
@@ -246,7 +273,13 @@ function NotificationCenterContent({
         {liveAnnouncement}
       </div>
 
-      <Sheet open={open} onOpenChange={setOpen}>
+      <Sheet
+        open={open}
+        onOpenChange={(nextOpen) => {
+          setActionError(null);
+          setOpen(nextOpen);
+        }}
+      >
         <SheetTrigger asChild>
           <Button
             type="button"
@@ -269,6 +302,12 @@ function NotificationCenterContent({
 
         <SheetContent
           side="right"
+          onCloseAutoFocus={(event) => {
+            if (skipCloseAutoFocusRef.current) {
+              event.preventDefault();
+              skipCloseAutoFocusRef.current = false;
+            }
+          }}
           className="flex flex-col gap-4 overflow-y-auto p-6"
         >
           <div className="space-y-1 pr-10">
@@ -285,7 +324,7 @@ function NotificationCenterContent({
               type="button"
               variant="secondary"
               size="sm"
-              disabled={unreadCount === 0 || isMarkingAll}
+              disabled={total === 0 || isMarkingAll}
               onClick={() => void handleMarkAllRead()}
             >
               {isMarkingAll
@@ -315,6 +354,7 @@ function NotificationCenterContent({
               onRetry={() => {
                 void query.refetch();
               }}
+              isRetrying={query.isRefetching}
               retryLabel={notificationMessages.retryLabel}
             />
           ) : query.data ? (
@@ -326,6 +366,7 @@ function NotificationCenterContent({
                   onRetry={() => {
                     void query.refetch();
                   }}
+                  isRetrying={query.isRefetching}
                   retryLabel={notificationMessages.retryLabel}
                 />
               ) : null}
@@ -337,80 +378,94 @@ function NotificationCenterContent({
                   description={notificationMessages.emptyDescription}
                 />
               ) : (
-                <ul
-                  aria-label={notificationMessages.trayTitle}
-                  className="min-w-0 space-y-3"
-                >
-                  {items.map((item) => {
-                    const isUnread = item.readAt === null;
-                    const isMarking = markingIds.includes(item.id);
-                    const targetPath = getNotificationTargetPath(item);
+                <>
+                  <ul
+                    aria-label={notificationMessages.trayTitle}
+                    className="min-w-0 space-y-3"
+                  >
+                    {items.map((item) => {
+                      const isUnread = item.readAt === null;
+                      const isMarking = markingIds.includes(item.id);
+                      const targetPath = getNotificationTargetPath(item);
 
-                    return (
-                      <li
-                        key={item.id}
-                        className="min-w-0 rounded-xl border border-edge bg-card p-3.5 shadow-xs"
-                      >
-                        <div className="space-y-2">
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <p className="text-sm font-semibold text-foreground">
-                              {notificationMessages.kindTitles[item.kind]}
-                            </p>
-                            <Badge variant={isUnread ? 'default' : 'secondary'}>
-                              {isUnread
-                                ? notificationMessages.unreadBadge
-                                : notificationMessages.readBadge}
-                            </Badge>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                            <time dateTime={item.createdAt}>
-                              {formatInstant(item.createdAt)}
-                            </time>
-                            {item.studentId ? (
-                              <span>
-                                {notificationMessages.studentContextLabel(
-                                  item.studentId,
-                                )}
-                              </span>
-                            ) : null}
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-2 pt-1">
-                            {targetPath ? (
-                              <Link
-                                to={targetPath}
-                                onClick={() => {
-                                  setOpen(false);
-                                  if (isUnread) {
-                                    void handleMarkRead(item);
-                                  }
-                                }}
-                                className="inline-flex min-h-9 items-center rounded-md px-2 text-xs font-semibold text-primary underline underline-offset-4 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
+                      return (
+                        <li
+                          key={item.id}
+                          className="min-w-0 rounded-xl border border-edge bg-card p-3.5 shadow-xs"
+                        >
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <p className="text-sm font-semibold text-foreground">
+                                {notificationMessages.kindTitles[item.kind]}
+                              </p>
+                              <Badge
+                                variant={isUnread ? 'default' : 'secondary'}
                               >
-                                {notificationMessages.openTargetLabel}
-                              </Link>
-                            ) : null}
+                                {isUnread
+                                  ? notificationMessages.unreadBadge
+                                  : notificationMessages.readBadge}
+                              </Badge>
+                            </div>
 
-                            {isUnread ? (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={isMarking || isMarkingAll}
-                                onClick={() => void handleMarkRead(item)}
-                              >
-                                {isMarking
-                                  ? notificationMessages.markingReadLabel
-                                  : notificationMessages.markReadLabel}
-                              </Button>
-                            ) : null}
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                              <time dateTime={item.createdAt}>
+                                {formatNotificationTime(item.createdAt)}
+                              </time>
+                              {item.studentId ? (
+                                <span>
+                                  {notificationMessages.studentContextLabel(
+                                    item.studentId,
+                                  )}
+                                </span>
+                              ) : null}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 pt-1">
+                              {targetPath ? (
+                                <Link
+                                  to={targetPath}
+                                  onClick={() => {
+                                    skipCloseAutoFocusRef.current = true;
+                                    setOpen(false);
+                                    if (isUnread) {
+                                      void handleMarkRead(item);
+                                    }
+                                  }}
+                                  className="inline-flex min-h-9 items-center rounded-md px-2 text-xs font-semibold text-primary underline underline-offset-4 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
+                                >
+                                  {notificationMessages.openTargetLabel}
+                                </Link>
+                              ) : null}
+
+                              {isUnread ? (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={isMarking || isMarkingAll}
+                                  onClick={() => void handleMarkRead(item)}
+                                >
+                                  {isMarking
+                                    ? notificationMessages.markingReadLabel
+                                    : notificationMessages.markReadLabel}
+                                </Button>
+                              ) : null}
+                            </div>
                           </div>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
+                        </li>
+                      );
+                    })}
+                  </ul>
+
+                  {query.data.total > query.data.pageSize ? (
+                    <PaginationControls
+                      page={query.data.page}
+                      pageSize={query.data.pageSize}
+                      total={query.data.total}
+                      onPageChange={(nextPage) => setPage(nextPage)}
+                    />
+                  ) : null}
+                </>
               )}
             </div>
           ) : null}

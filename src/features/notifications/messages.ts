@@ -9,7 +9,6 @@ export const notificationMessages = {
   trayTitle: 'Notificaciones',
   trayDescription:
     'Avisos recientes de tus aulas. Al abrir o marcar como leída se sincroniza con el servidor.',
-  closeLabel: 'Cerrar',
   loadingLabel: 'Cargando notificaciones',
   emptyTitle: 'No tenés notificaciones',
   emptyDescription: 'Cuando haya novedades en tus aulas, van a aparecer acá.',
