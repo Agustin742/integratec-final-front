@@ -286,3 +286,145 @@ test('recovers through the actual retry control', async ({ page }) => {
   await expect(heading(page, classroomMessages.errorTitle)).toHaveCount(0);
   expect(requests).toBe(2);
 });
+
+test('switches 3D to accessible 2D Classic Mode via button and Alt+M, opens panel without canvas, and passes responsive/zoom checks', async ({
+  page,
+}, testInfo) => {
+  const width = testInfo.project.name === 'mobile' ? 360 : 1280;
+  const cspViolations: string[] = [];
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('console', (msg) => {
+    if (
+      msg.type() === 'error' &&
+      /Content Security Policy|CSP/i.test(msg.text())
+    ) {
+      cspViolations.push(msg.text());
+    }
+  });
+
+  await page.setViewportSize({ width, height: 800 });
+  await page.route(classroomURL, (route) => route.fulfill({ json: classroom }));
+
+  await page.goto(entry);
+  await expect(
+    page.getByRole('heading', {
+      level: 3,
+      name: classroomMessages.viewMode.stage3dHeading,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: classroomMessages.viewMode.canvasLabel }),
+  ).toBeVisible();
+
+  await page
+    .getByRole('button', { name: classroomMessages.viewMode.switchTo2d })
+    .click();
+
+  const mode2dHeading = page.getByRole('heading', {
+    level: 3,
+    name: classroomMessages.viewMode.mode2dHeading,
+  });
+  await expect(mode2dHeading).toBeVisible();
+  await expect(mode2dHeading).toBeFocused();
+  await expect(page.locator('canvas')).toHaveCount(0);
+
+  const nav = page.getByRole('navigation', {
+    name: classroomMessages.viewMode.mode2dNavLabel,
+  });
+  await expect(nav).toBeVisible();
+  const gradesBtn = nav.getByRole('button', { name: /Calificaciones/ });
+  await expect(gradesBtn).toBeVisible();
+  await expect(nav.getByRole('button', { name: /Actividades/ })).toBeVisible();
+  await expect(nav.getByRole('button', { name: /Configuración/ })).toHaveCount(
+    0,
+  );
+
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+
+  await page.screenshot({
+    path: `docs/assets/classroom-workspace/mode-2d-${width}.png`,
+    fullPage: true,
+  });
+
+  await gradesBtn.click();
+  const dialog = page.getByRole('dialog', {
+    name: classroomMessages.panels.grades,
+    exact: true,
+  });
+  await expect(dialog).toBeVisible();
+  await expect(
+    dialog.getByText(classroomMessages.pendingPanelTitle, { exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(gradesBtn).toBeFocused();
+
+  await page.keyboard.press('Alt+m');
+  await expect(
+    page.getByRole('heading', {
+      level: 3,
+      name: classroomMessages.viewMode.stage3dHeading,
+    }),
+  ).toBeFocused();
+
+  await page.keyboard.press('Alt+m');
+  await expect(mode2dHeading).toBeFocused();
+  await page.evaluate(() => {
+    document.documentElement.style.zoom = '2';
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await gradesBtn.scrollIntoViewIfNeeded();
+  await expect(gradesBtn).toBeInViewport();
+  expect(cspViolations).toEqual([]);
+  expect(pageErrors).toEqual([]);
+});
+
+test('never offers 3D stage or 2D Classic Mode switch to PARENT accounts', async ({
+  page,
+}) => {
+  await page.route(classroomURL, (route) =>
+    route.fulfill({
+      json: {
+        ...classroom,
+        myRole: 'PARENT',
+        capabilities: ['message_teacher'],
+        availablePanels: ['grades', 'notices'],
+      },
+    }),
+  );
+
+  await page.goto(entry);
+  await expect(heading(page, classroom.name)).toBeVisible();
+  await expect(
+    page.getByText(
+      `${classroomMessages.role}: ${classroomMessages.roles.PARENT}`,
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(page.locator('canvas')).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: classroomMessages.viewMode.switchTo2d }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('navigation', {
+      name: classroomMessages.viewMode.mode2dNavLabel,
+    }),
+  ).toHaveCount(0);
+
+  await page.keyboard.press('Alt+m');
+  await expect(
+    page.getByRole('heading', {
+      level: 3,
+      name: classroomMessages.viewMode.mode2dHeading,
+    }),
+  ).toHaveCount(0);
+});

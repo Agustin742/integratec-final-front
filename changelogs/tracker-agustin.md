@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-18 — Review and fixes on PR #86 (#34, 3D / 2D Classic Mode switch)
+
+- **Status:** completed (pending merge of PR #86)
+- **Area / files:** `src/features/classrooms/classroom-workspace.tsx`, `src/features/classrooms/classroom-2d-layout.tsx`, `src/features/classrooms/classroom-list-page.tsx`, `src/components/ui/button.tsx`, `src/components/ui/dialog.tsx`, `src/styles/tokens.css`, `src/styles/index.css`, docs
+- **Change:** Reviewed Mati's PR #86 and merged `develop` into it (threat model entries renumbered to TM-023/TM-024). Added a back-to-list arrow in the classroom header (route `/`), a single join-by-code action on the empty classroom list, themed scrollbars with design tokens, and a dialog layout whose scroll area stays clear of the rounded corners and the close button. Polished the mode switch: panel buttons named by their title, visible `Alt+M` hint, mode badge removed, toggle as `outline`, duplicate session cleanup removed.
+- **Reason:** Verified review findings plus visual issues found while testing the merged branch locally.
+- **Open points:** Opening panels from the 3D view belongs to #38; classroom deletion has no defined path yet (`back/rules/data.md`, open decision).
+- **Next step:** Merge PR #86 once CI passes and close #34.
+
 ## 2026-11-17 — Amplify Hosting live (#22, tasks T2 to T5)
 
 - **Status:** in-progress (pending pull request)

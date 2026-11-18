@@ -1,5 +1,20 @@
 # Tracker — Mati
 
+## 2026-11-18 — One-click switch between 3D classroom and accessible 2D Classic Mode (#34)
+
+- **Status:** completed
+- **Area / files:** `package.json`, `pnpm-lock.yaml`, `docs/threat-model.md`, `src/features/classrooms/`, `src/app/router/app-shell.tsx`, `e2e/classroom-workspace.spec.ts`, `docs/classroom-workspace.md`, `docs/classroom-panels.md`, `docs/assets/classroom-workspace/`, `changelogs/tracker-mati.md`
+- **Change:** Implemented [issue #34](https://github.com/Agustin742/integratec-final-front/issues/34) (`HU-ESP-003`) on `feat/34-classroom-2d-3d-mode-switch` from `develop` (`1a4c9af`):
+  1. Installed `zustand@5.1.0`, added per-user in-memory `useClassroomModeStore` (`classroom-mode-store.ts`, resetting cleanly on logout and account switches while documenting client-vs-server persistence as an open decision), centralized `es-AR` view-mode strings (`messages.ts`), added `TM-023`–`TM-024` to `docs/threat-model.md`, and verified 5 unit tests (`982727f`).
+  2. Implemented lazy `Classroom3DStage`, accessible `Classroom2DLayout` backed by `canOpenPanel(key)`, and `WorkspaceContext` header toggle + `Alt+M` shortcut arbitration + `PARENT` exclusion in `classroom-workspace.tsx` with 6 RTL tests (`25b47d3`).
+  3. Extended `e2e/classroom-workspace.spec.ts` with desktop (`1280px`) and mobile (`360px`) 3D ↔ 2D switching, `<canvas>` disposal, keyboard/Escape focus return, `200%` CSS zoom, parent exclusion, and responsive captures under `docs/assets/classroom-workspace/`, and updated `docs/classroom-workspace.md` and `docs/classroom-panels.md`.
+  4. Applied blind audit fixes (`885d502`): registered the mode store reset in `src/app/router/app-shell.tsx` so logout from any protected route clears it (new RTL test, observed RED without it), wrapped the lazy 3D stage in a local error boundary with a loading status so the 2D switch survives a failed chunk, and pinned `zustand` to `5.1.0`.
+- **Reason:** Provide a per-user `3D` / `2D Classic Mode` switch with keyboard shortcut (`Alt+M`), accessible panel navigation gated strictly by server `availablePanels`, complete 3D canvas disposal in 2D mode, and parent exclusion from 3D classrooms (`rules/classrooms-and-roles.md`, `rules/state-management.md`, `rules/ui-and-accessibility.md`, `rules/3d-world-and-camera.md`, `rules/movement-and-interactions.md`).
+- **Verification:** `pnpm lint`, `pnpm typecheck`, `pnpm test` (53 files), `pnpm format:check`, `pnpm build`, and `pnpm security:check` passed on Windows. Playwright: `e2e/classroom-workspace.spec.ts` and `e2e/auth-session.spec.ts` passed `34/34` (desktop and mobile) after the fixes. The full suite passed `73/74`; the one failure, `[desktop] e2e/ui-foundations.spec.ts:65`, is in `/dev/ui` code this branch does not touch: the lazy `WorldReference` mounts above the tabs and pushes the toast button below the 800px viewport. Python CI checks were not run because `python3` is unavailable locally, so they are left to Ubuntu CI. A Node replica of the `check_docs.py` link/anchor check reported 0 errors. `git diff --check origin/develop..HEAD --` is clean.
+- **Audit:** APPROVED · `885d502` · lenses: risk, resilience, readability, reliability · blockers fixed: 0 (3 warnings A1–A3 fixed in `885d502`) · follow-ups: A4 (replace the JSDOM-only decorative canvas with `WorldFallback`), A5 (narrow the `Alt+M` dialog guard to modal dialogs)
+- **Status note:** completed locally; push and PR pending reviewer approval.
+- **Next step:** Push `feat/34-classroom-2d-3d-mode-switch` and open the PR to `develop` once approved.
+
 ## 2026-11-18 — Study material manager with upload progress and signed downloads (#40)
 
 - **Status:** completed
