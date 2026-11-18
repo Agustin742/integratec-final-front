@@ -1,4 +1,10 @@
-import { useLayoutEffect, useRef, type RefObject } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import type { components } from '@/api/schema.generated';
 import { NotFoundPage } from '@/app/pages/not-found-page';
@@ -69,6 +75,42 @@ function WorkspaceContext({
         replace: true,
       });
   };
+  // One-shot join banner: latch the outcome from router state, then clear the
+  // state (replace) so reloads and back/forward never replay it or retain ids.
+  const incomingOutcome = readClassroomJoinOutcome(location.state, classroomId);
+  const [latched, setLatched] = useState(() => ({
+    classroomId,
+    stateKey: location.key,
+    outcome: incomingOutcome,
+  }));
+  if (
+    incomingOutcome &&
+    (latched.stateKey !== location.key || latched.classroomId !== classroomId)
+  ) {
+    setLatched({
+      classroomId,
+      stateKey: location.key,
+      outcome: incomingOutcome,
+    });
+  } else if (latched.classroomId !== classroomId) {
+    setLatched({ classroomId, stateKey: location.key, outcome: null });
+  }
+  const joinOutcome =
+    latched.classroomId === classroomId ? latched.outcome : null;
+  const clearedState = useRef<string | null>(null);
+  const hasIncomingOutcome = incomingOutcome !== null;
+  useEffect(() => {
+    if (!hasIncomingOutcome || clearedState.current === location.key) return;
+    clearedState.current = location.key;
+    void navigate(
+      {
+        pathname: location.pathname,
+        search: location.search,
+        hash: location.hash,
+      },
+      { replace: true, state: null },
+    );
+  }, [hasIncomingOutcome, location, navigate]);
   const context = useClassroomContext(classroomId);
   useClassroomContextEvents(classroomId);
   useDocumentTitle(
@@ -95,7 +137,6 @@ function WorkspaceContext({
     );
   }
   const { classroom, userId } = context;
-  const joinOutcome = readClassroomJoinOutcome(location.state, classroomId);
   // Types describe the published contract, not validation of network bytes.
   // Missing or malformed availability never falls back to role/capabilities.
   const keys: unknown = classroom.availablePanels;

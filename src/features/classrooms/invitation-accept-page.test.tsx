@@ -236,6 +236,19 @@ describe('InvitationAcceptPage (/invitations/accept)', () => {
     expect(capturedAcceptBodies).toEqual([
       { token: 'inv-valid-student-token' },
     ]);
+    // The banner is one-shot: router/history state is cleared, banner stays.
+    await waitFor(() => {
+      expect(JSON.stringify(router.state.location.state)).not.toContain(
+        'joinOutcome',
+      );
+    });
+    expect(router.state.location.pathname).toBe('/classrooms/classroom-demo-1');
+    expect(screen.getByTestId('classroom-join-outcome')).toHaveTextContent(
+      joinMessages.outcome.joinedBody,
+    );
+    expect(
+      screen.getByRole('heading', { level: 2, name: '3° Año B - Matemática' }),
+    ).toBeVisible();
   });
 
   test.each(['', '?token=a&token=b'])(
