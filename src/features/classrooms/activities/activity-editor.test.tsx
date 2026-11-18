@@ -1190,10 +1190,14 @@ describe('ActivityEditorDialog (#39 T3)', () => {
       ).not.toBeInTheDocument();
     });
     expect(publishCalls).toBe(1);
-    expect(screen.getByText(editorCopy.publishedTitle)).toBeVisible();
-    expect(
-      screen.getByText(editorCopy.publishedDescription(draftFileTp.title)),
-    ).toBeVisible();
+    await waitFor(() => {
+      expect(screen.getByText(editorCopy.publishedTitle)).toBeVisible();
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByText(editorCopy.publishedDescription(draftFileTp.title)),
+      ).toBeVisible();
+    });
     expect(await screen.findByText(copy.states.PUBLISHED)).toBeVisible();
     expect(listCalls).toBeGreaterThanOrEqual(2);
     // After a confirmed publish the per-item trigger disappears, so focus
