@@ -68,7 +68,7 @@ export const joinMessages = {
     unauthenticated:
       'Tu sesión expiró. Iniciá sesión nuevamente para completar el ingreso al aula.',
     network:
-      'No pudimos conectarnos con el servidor para confirmar tu inscripción. Tu cuenta no fue modificada; verificá tu conexión e intentá de nuevo.',
+      'Se perdió la conexión y no pudimos confirmar si te uniste al aula. Revisá tus aulas antes de volver a intentarlo.',
     unexpected:
       'Ocurrió un problema inesperado al procesar tu solicitud. Intentá de nuevo en unos instantes.',
   },

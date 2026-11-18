@@ -100,14 +100,21 @@ function PageHeader({ subtitle }: { readonly subtitle?: string }) {
 }
 
 function UnauthenticatedGate({
-  searchParams,
+  tokenState,
 }: {
-  readonly searchParams: URLSearchParams;
+  readonly tokenState: InvitationQueryTokenState;
 }) {
-  const location = useLocation();
   const invalidTokenAlertId = useId();
-  const tokenState = validateInvitationQueryToken(searchParams);
-  const loginHref = buildLoginRedirect(location);
+  // Rebuild only the approved destination, including a validated in-memory token
+  // after authenticated URL scrubbing. Never forward arbitrary query parameters.
+  const loginHref = buildLoginRedirect({
+    pathname: '/invitations/accept',
+    search:
+      tokenState.status === 'valid'
+        ? `?${new URLSearchParams({ token: tokenState.token }).toString()}`
+        : '',
+    hash: '',
+  });
   const queryStart = loginHref.indexOf('?');
   const loginSearchParams = new URLSearchParams(
     queryStart >= 0 ? loginHref.slice(queryStart + 1) : '',
@@ -520,7 +527,7 @@ export function InvitationAcceptView() {
       );
     }
 
-    return <UnauthenticatedGate searchParams={searchParams} />;
+    return <UnauthenticatedGate tokenState={tokenState} />;
   }
 
   if (activeMode === 'invitation' && tokenState.status !== 'absent') {

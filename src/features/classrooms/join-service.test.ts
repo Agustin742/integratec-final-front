@@ -162,9 +162,45 @@ describe('join-service', () => {
     expect(second.membershipId).toBe(first.membershipId);
   });
 
+  test.each(['invitations/accept', 'classrooms/join'] as const)(
+    'reports uncertainty and recovery without automatically retrying %s after a transport failure',
+    async (endpoint) => {
+      let requests = 0;
+      mswServer.use(
+        http.post(`${TEST_API_BASE_URL}/${endpoint}`, () => {
+          requests += 1;
+          return HttpResponse.error();
+        }),
+      );
+      const client = createSignedInTestClient();
+      const operation =
+        endpoint === 'invitations/accept'
+          ? acceptClassroomInvitation(client, {
+              token: 'inv-valid-student-token',
+            })
+          : joinClassroomWithCode(client, { code: 'K7P9X2M' });
+      await expect(operation).rejects.toMatchObject({
+        kind: 'network',
+        userMessage:
+          'Se perdió la conexión y no pudimos confirmar si te uniste al aula. Revisá tus aulas antes de volver a intentarlo.',
+      });
+      expect(requests).toBe(1);
+    },
+  );
+
   test('maps invitation error statuses to privacy-safe es-AR messages without leaking server details', async () => {
     mswServer.use(createAcceptInvitationHandler());
     const client = createSignedInTestClient();
+
+    for (const token of ['inv-revoked-token', 'inv-used-token']) {
+      await expect(
+        acceptClassroomInvitation(client, { token }),
+      ).rejects.toMatchObject({
+        status: 400,
+        userMessage: joinMessages.errors.invitationInvalidOrExpired,
+        fieldErrors: {},
+      });
+    }
 
     await expect(
       acceptClassroomInvitation(client, { token: 'inv-expired-token' }),
@@ -249,6 +285,7 @@ describe('join-service', () => {
     const client = createSignedInTestClient();
 
     for (const [code, status, expectedMessage] of [
+      ['REVOKED1', 400, joinMessages.errors.codeInvalidOrExpired],
       ['EXPIRED1', 400, joinMessages.errors.codeInvalidOrExpired],
       ['UNKNOWN1', 404, joinMessages.errors.codeInvalidOrExpired],
       ['FULLCODE', 409, joinMessages.errors.codeExhaustedOrConflict],

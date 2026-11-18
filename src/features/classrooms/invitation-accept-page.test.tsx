@@ -1,5 +1,12 @@
 import { QueryClient } from '@tanstack/react-query';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import { createApiClient } from '@/api/client';
 import { http, HttpResponse } from 'msw';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
@@ -35,6 +42,7 @@ import '@/app/pages/login-page';
 import '@/app/pages/register-page';
 import '@/features/classrooms/classroom-workspace';
 import { joinMessages } from './join-messages';
+import { acceptClassroomInvitation } from './join-service';
 
 beforeAll(() => {
   mswServer.listen({ onUnhandledFrame: 'error' });
@@ -230,7 +238,163 @@ describe('InvitationAcceptPage (/invitations/accept)', () => {
     ]);
   });
 
+  test.each(['', '?token=a&token=b'])(
+    'keeps the unauthenticated code gate and rejects malformed tokens for %s',
+    async (query) => {
+      renderInvitationRoute(`/invitations/accept${query}`);
+      expect(
+        await screen.findByRole('link', { name: joinMessages.gate.loginCta }),
+      ).toHaveAttribute('href', '/login?next=%2Finvitations%2Faccept');
+      expect(
+        screen.getByRole('link', { name: joinMessages.gate.registerCta }),
+      ).toHaveAttribute('href', '/register?next=%2Finvitations%2Faccept');
+      expect(
+        screen.queryByLabelText(joinMessages.code.fieldLabel),
+      ).not.toBeInTheDocument();
+      if (query) {
+        expect(screen.getByRole('alert')).toHaveTextContent(
+          joinMessages.invitation.invalidTokenDescription,
+        );
+      }
+    },
+  );
+
+  test('recovers the scrubbed invitation after definitive session expiration and reauthentication as another account', async () => {
+    const capturedBodies: unknown[] = [];
+    mswServer.use(
+      createAcceptInvitationHandler({
+        onRequest: (_request, body) => {
+          capturedBodies.push(body);
+        },
+      }),
+    );
+    const { router, session } = renderInvitationRoute(
+      '/invitations/accept?token=inv-valid-student-token&next=https://evil.example',
+      { signedIn: true },
+    );
+    await screen.findByRole('button', {
+      name: joinMessages.invitation.acceptAction,
+    });
+    await waitFor(() => {
+      expect(router.state.location.search).not.toContain('token=');
+    });
+    mswServer.use(
+      http.get(`${TEST_API_BASE_URL}/users/me`, () =>
+        HttpResponse.json({}, { status: 401 }),
+      ),
+      http.post(`${TEST_API_BASE_URL}/auth/refresh`, () =>
+        HttpResponse.json({}, { status: 401 }),
+      ),
+    );
+    await act(async () => {
+      await session.client.GET('/users/me').catch(() => undefined);
+    });
+    expect(session.controller.getSnapshot().status).toBe('unauthenticated');
+    const loginLink = await screen.findByRole('link', {
+      name: joinMessages.gate.loginCta,
+    });
+    const expectedReturn =
+      '%2Finvitations%2Faccept%3Ftoken%3Dinv-valid-student-token';
+    expect(loginLink).toHaveAttribute('href', `/login?next=${expectedReturn}`);
+    expect(
+      screen.getByRole('link', { name: joinMessages.gate.registerCta }),
+    ).toHaveAttribute('href', `/register?next=${expectedReturn}`);
+    expect(
+      screen.queryByText('estudiante@ejemplo.com'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText(joinMessages.code.fieldLabel),
+    ).not.toBeInTheDocument();
+    expect(window.sessionStorage.length).toBe(0);
+    expect(window.localStorage.length).toBe(0);
+    expect(JSON.stringify(router.state.location.state)).not.toContain(
+      'inv-valid',
+    );
+
+    mswServer.use(
+      createLoginHandler(),
+      createOwnProfileHandler({
+        response: {
+          id: 'another-student',
+          email: 'otra@ejemplo.com',
+          displayName: 'Otra Estudiante',
+        },
+      }),
+    );
+    fireEvent.click(loginLink);
+    fireEvent.change(
+      await screen.findByLabelText(authMessages.login.fields.email.label),
+      { target: { value: 'otra@ejemplo.com' } },
+    );
+    fireEvent.change(
+      screen.getByLabelText(authMessages.login.fields.password.label),
+      { target: { value: 'ClaveSegura123' } },
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: authMessages.login.actions.submit }),
+    );
+    const acceptButton = await screen.findByRole('button', {
+      name: joinMessages.invitation.acceptAction,
+    });
+    await waitFor(() => expect(router.state.location.search).toBe(''));
+    expect(screen.getByText('otra@ejemplo.com')).toBeVisible();
+    expect(
+      screen.queryByText('estudiante@ejemplo.com'),
+    ).not.toBeInTheDocument();
+    expect(capturedBodies).toEqual([]);
+    mswServer.use(
+      http.post(
+        `${TEST_API_BASE_URL}/invitations/accept`,
+        async ({ request }) => {
+          capturedBodies.push(await request.json());
+          return HttpResponse.json({}, { status: 400 });
+        },
+      ),
+    );
+    fireEvent.click(acceptButton);
+    await screen.findByRole('alert');
+    expect(capturedBodies).toEqual([{ token: 'inv-valid-student-token' }]);
+    expect(
+      screen.queryByTestId('classroom-join-outcome'),
+    ).not.toBeInTheDocument();
+  });
+
+  test('rejects an invitation consumed by another account without showing private classroom data', async () => {
+    mswServer.use(createAcceptInvitationHandler());
+    const otherClient = createApiClient({
+      baseUrl: TEST_API_BASE_URL,
+      headers: { Authorization: 'Bearer another-account-token' },
+    });
+    await acceptClassroomInvitation(otherClient, {
+      token: 'inv-valid-student-token',
+    });
+    const { router } = renderInvitationRoute(
+      '/invitations/accept?token=inv-valid-student-token',
+      { signedIn: true },
+    );
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: joinMessages.invitation.acceptAction,
+      }),
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      joinMessages.errors.invitationInvalidOrExpired,
+    );
+    expect(router.state.location.pathname).toBe('/invitations/accept');
+    expect(
+      screen.queryByTestId('classroom-join-outcome'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('3° Año B - Matemática')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        /membership-student|classroom-demo|another-account-token/,
+      ),
+    ).not.toBeInTheDocument();
+  });
+
   test.each([
+    ['inv-revoked-token', joinMessages.errors.invitationInvalidOrExpired],
+    ['inv-used-token', joinMessages.errors.invitationInvalidOrExpired],
     ['inv-expired-token', joinMessages.errors.invitationInvalidOrExpired],
     ['inv-unknown-token', joinMessages.errors.invitationInvalidOrExpired],
     ['inv-conflict-token', joinMessages.errors.invitationConflict],
@@ -257,10 +421,19 @@ describe('InvitationAcceptPage (/invitations/accept)', () => {
       const alert = await screen.findByRole('alert');
       expect(alert).toHaveTextContent(expectedError);
       expect(router.state.location.pathname).toBe('/invitations/accept');
+      expect(
+        screen.queryByTestId('classroom-join-outcome'),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('3° Año B - Matemática'),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/membership-student|classroom-demo/),
+      ).not.toBeInTheDocument();
     },
   );
 
-  test('shows privacy-safe invitation error on network failure without creating membership', async () => {
+  test('shows an uncertain invitation outcome on network failure without announcing success', async () => {
     mswServer.use(
       http.post(`${TEST_API_BASE_URL}/invitations/accept`, () =>
         HttpResponse.error(),
@@ -406,6 +579,7 @@ describe('InvitationAcceptPage (/invitations/accept)', () => {
     });
 
     for (const [code, expectedError] of [
+      ['REVOKED1', joinMessages.errors.codeInvalidOrExpired],
       ['EXPIRED1', joinMessages.errors.codeInvalidOrExpired],
       ['UNKNOWN1', joinMessages.errors.codeInvalidOrExpired],
       ['FULLCODE', joinMessages.errors.codeExhaustedOrConflict],
@@ -418,6 +592,15 @@ describe('InvitationAcceptPage (/invitations/accept)', () => {
       expect(alert).toHaveTextContent(expectedError);
       expect(codeInput.value).toBe(code);
       expect(router.state.location.pathname).toBe('/invitations/accept');
+      expect(
+        screen.queryByTestId('classroom-join-outcome'),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('3° Año B - Matemática'),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/membership-student|classroom-demo/),
+      ).not.toBeInTheDocument();
     }
 
     mswServer.use(
