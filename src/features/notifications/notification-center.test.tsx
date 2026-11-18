@@ -206,6 +206,37 @@ describe('NotificationCenter', () => {
     });
   });
 
+  it('does not announce new arrivals when switching pages', async () => {
+    const items = Array.from({ length: 21 }, (_, idx) =>
+      makeItem({
+        id: `00000000-0000-4000-8000-${String(5000 + idx).padStart(12, '0')}`,
+        kind: idx === 0 ? 'mention' : 'announcement',
+        createdAt: `2026-11-18T13:${String(idx % 60).padStart(2, '0')}:00.000Z`,
+      }),
+    );
+    const store = createNotificationsStore({ initialItems: items });
+    mswServer.use(...store.handlers);
+
+    renderNotificationCenter();
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Notificaciones/ }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Notificaciones',
+    });
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Página siguiente' }),
+    );
+    // Page 2 renders its only item (the mention) without reading the page
+    // switch as a new arrival for assistive technology.
+    expect(
+      await within(dialog).findByText('Te mencionaron en el aula'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Llegó una nueva notificación/),
+    ).not.toBeInTheDocument();
+  });
+
   it('clears all notification UI and data immediately on logout', async () => {
     const store = createNotificationsStore({ initialItems: [makeItem()] });
     mswServer.use(...store.handlers, createLogoutHandler());

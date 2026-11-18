@@ -117,6 +117,7 @@ function NotificationCenterContent({
   const markingIdsRef = useRef<Set<string>>(new Set());
   const markingAllRef = useRef(false);
   const skipCloseAutoFocusRef = useRef(false);
+  const previousPageRef = useRef<number | null>(null);
   const previousIdsRef = useRef<Set<string> | null>(null);
   const previousUnreadRef = useRef<number | null>(null);
   const unmountAbortRef = useRef<AbortController | null>(null);
@@ -158,6 +159,17 @@ function NotificationCenterContent({
     const currentIds = new Set(query.data.items.map((item) => item.id));
     const prevIds = previousIdsRef.current;
     const prevUnread = previousUnreadRef.current;
+    const prevPage = previousPageRef.current;
+
+    // A page switch replaces the whole list slice; the page's items are not
+    // new arrivals, so sync the announcement baseline silently.
+    if (prevPage !== null && prevPage !== page) {
+      previousPageRef.current = page;
+      previousIdsRef.current = currentIds;
+      previousUnreadRef.current = unreadCount;
+      return;
+    }
+    previousPageRef.current = page;
 
     if (prevIds !== null && prevUnread !== null) {
       const hasNewItem = query.data.items.some((item) => !prevIds.has(item.id));
@@ -176,7 +188,7 @@ function NotificationCenterContent({
 
     previousIdsRef.current = currentIds;
     previousUnreadRef.current = unreadCount;
-  }, [query.data, unreadCount]);
+  }, [page, query.data, unreadCount]);
 
   async function reconcileNotifications() {
     await queryClient.invalidateQueries({
