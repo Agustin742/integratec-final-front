@@ -1,5 +1,18 @@
 # Tracker — Mati
 
+## 2026-11-18 — Study material manager with upload progress and signed downloads (#40)
+
+- **Status:** in-progress (ready for blind RDD audit and PR approval)
+- **Area / files:** `src/api/schema.generated.ts`, `docs/threat-model.md`, `src/api/query-keys.ts`, `src/features/classrooms/materials/`, `src/features/classrooms/panels/classroom-panel-catalog.tsx`, `src/features/classrooms/classroom-workspace-panels.test.tsx`, `src/test/msw/handlers.ts`, `e2e/study-materials.spec.ts`, `docs/classroom-panels.md`, `docs/assets/classrooms/study-materials-*.png`, `changelogs/tracker-mati.md`
+- **Change:** Implemented [issue #40](https://github.com/Agustin742/integratec-final-front/issues/40) (`HU-ACT-001` part 2/2) on `feat/40-study-material-manager`:
+  1. Synced OpenAPI contracts (`src/api/schema.generated.ts`) including `MaterialsController_*`, `MaterialDto`, and `MaterialDownloadDto`.
+  2. Added `TM-015`–`TM-017` to `docs/threat-model.md`, user/classroom-scoped `classroomMaterialsQueryKey` / `createClassroomMaterialsPredicate` (`src/api/query-keys.ts`), jitless Zod schemas + client-side pre-checks (`src/features/classrooms/materials/material-schema.ts`), typed REST service with `503`/network uncertainty classification (`src/features/classrooms/materials/material-service.ts`), centralized `es-AR` copy (`src/features/classrooms/materials/messages.ts`), stateful contract-faithful MSW store (`src/test/msw/handlers.ts`), and 8 unit/service tests (`material-service.test.ts`).
+  3. Implemented `MaterialUploadSection` (drag-and-drop + accessible file picker, client pre-check, progress indicator, `AbortController` cancel & retry, `400`/`413`/`403`/`503` feedback), `MaterialList` (metadata, signed-URL download without persisting/logging URLs, teacher-only inline removal confirmation, and `renderItemSlot` extension point for `HU-BOT-001`), and `MaterialPanel` wired into `classroomPanelCatalog`, with 6 RTL integration tests (`material-panel.test.tsx`) and updated `classroom-workspace-panels.test.tsx`.
+  4. Added Playwright E2E coverage (`e2e/study-materials.spec.ts`), captured `1280px` and `360px` screenshots under `docs/assets/classrooms/`, and updated `docs/classroom-panels.md`.
+- **Reason:** Allow teachers/staff to upload and remove classroom study materials and members to download them via server-issued short-lived signed URLs (`rules/activities-and-grading.md`, `rules/security.md`, `rules/error-handling-and-feedback.md`, `rules/ui-and-accessibility.md`, `rules/forms-and-validation.md`).
+- **Verification:** On Node `22.23.4` and pnpm `10.34.9`: `pnpm lint`, `pnpm typecheck`, `pnpm test` (59 files, 664 tests passed), `pnpm build` (`442` modules), `pnpm security:check`, `pnpm format:check`, Playwright `e2e/study-materials.spec.ts` (`4/4` desktop and mobile passed with zero CSP violations and zero horizontal overflow), and `git diff --check origin/develop..HEAD --` passed.
+- **Next step:** Run blind RDD audit and await explicit user approval before pushing or opening the PR against `develop`.
+
 ## 2026-11-18 — PR #84 review fixes (unmount submitting reset and 403 create reconciliation) (#30)
 
 - **Status:** completed (pushed to `feat/30-classrooms-list-and-create` on [PR #84](https://github.com/Agustin742/integratec-final-front/pull/84)).
