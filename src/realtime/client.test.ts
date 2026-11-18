@@ -514,6 +514,29 @@ describe('createClassroomRealtimeClient (#23)', () => {
       presenceUncertain: true,
     });
 
+    // D14: Colyseus 4001 ('server shutdown') and 4002 ('protocol error') without domain reasons are outages, not revoked/too-many-connections.
+    const fourthRoom = new FakeRoom({ classroomId: CLASSROOM_A });
+    sdk.setJoinHandler(async () => fourthRoom);
+    await client.connect(CLASSROOM_A);
+    fourthRoom.emitLeave(CLOSE_CODE_ACCESS_REVOKED, 'server shutdown');
+    expect(client.getSnapshot()).toMatchObject({
+      status: 'disconnected',
+      reason: 'connection-error',
+      message: realtimeMessages.connectionFailed,
+      presenceUncertain: true,
+    });
+
+    const fifthRoom = new FakeRoom({ classroomId: CLASSROOM_A });
+    sdk.setJoinHandler(async () => fifthRoom);
+    await client.connect(CLASSROOM_A);
+    fifthRoom.emitLeave(CLOSE_CODE_TOO_MANY_CONNECTIONS, 'protocol error');
+    expect(client.getSnapshot()).toMatchObject({
+      status: 'disconnected',
+      reason: 'connection-error',
+      message: realtimeMessages.connectionFailed,
+      presenceUncertain: true,
+    });
+
     client.dispose();
   });
 
@@ -565,9 +588,14 @@ describe('createClassroomRealtimeClient (#23)', () => {
       room.emitMessage('unknown:event', { anything: true }),
     ).not.toThrow();
 
-    // 2. Malformed payload for registered type is ignored safely
+    // 2. Malformed payload (even with a high seq/eventId) is ignored and never poisons sequence guards
     expect(() =>
-      room.emitMessage('classroom:announcement', { wrongShape: 123 }),
+      room.emitMessage('classroom:announcement', {
+        eventId: 'bad-evt-100',
+        seq: 100,
+        classroomId: CLASSROOM_A,
+        wrongShape: 123,
+      }),
     ).not.toThrow();
     expect(received).toEqual([]);
 

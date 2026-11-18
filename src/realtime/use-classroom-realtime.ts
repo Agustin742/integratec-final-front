@@ -53,13 +53,14 @@ export function useClassroomRealtime({
   const activeClassroomId =
     enabled && sessionUserId !== null ? trimmedClassroomId : null;
 
-  const [snapshot, setSnapshot] = useState<RealtimeSnapshot>(
-    DISCONNECTED_SNAPSHOT,
-  );
+  const [ownedSnapshot, setOwnedSnapshot] = useState<{
+    readonly ownerUserId: string;
+    readonly snapshot: RealtimeSnapshot;
+  } | null>(null);
   const clientRef = useRef<ClassroomRealtimeClient | null>(null);
 
   useEffect(() => {
-    if (activeClassroomId === null) {
+    if (activeClassroomId === null || sessionUserId === null) {
       return undefined;
     }
 
@@ -71,7 +72,10 @@ export function useClassroomRealtime({
     clientRef.current = client;
 
     const unsubscribe = client.subscribe(() => {
-      setSnapshot(client.getSnapshot());
+      setOwnedSnapshot({
+        ownerUserId: sessionUserId,
+        snapshot: client.getSnapshot(),
+      });
     });
     void client.connect(activeClassroomId);
 
@@ -108,9 +112,13 @@ export function useClassroomRealtime({
   );
 
   const visibleSnapshot =
-    activeClassroomId === null || snapshot.classroomId !== activeClassroomId
+    activeClassroomId === null ||
+    sessionUserId === null ||
+    ownedSnapshot === null ||
+    ownedSnapshot.ownerUserId !== sessionUserId ||
+    ownedSnapshot.snapshot.classroomId !== activeClassroomId
       ? DISCONNECTED_SNAPSHOT
-      : snapshot;
+      : ownedSnapshot.snapshot;
 
   return {
     ...visibleSnapshot,

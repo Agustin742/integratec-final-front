@@ -186,6 +186,15 @@ function extractErrorReason(error: unknown): string {
   if (error instanceof Error) {
     return error.message.toLowerCase();
   }
+  if (typeof error === 'object' && error !== null) {
+    const candidate = error as { message?: unknown; reason?: unknown };
+    if (typeof candidate.message === 'string') {
+      return candidate.message.toLowerCase();
+    }
+    if (typeof candidate.reason === 'string') {
+      return candidate.reason.toLowerCase();
+    }
+  }
   if (typeof error === 'string') {
     return error.toLowerCase();
   }
@@ -202,11 +211,14 @@ function classifyFailure(
 } {
   const code = extractErrorCode(error);
   const text = extractErrorReason(error);
+  const hasAccessRevokedReason = text.includes(CLOSE_REASON_ACCESS_REVOKED);
+  const hasTooManyReason = text.includes(CLOSE_REASON_TOO_MANY_CONNECTIONS);
 
+  // D14: Colyseus shares 4001 (server shutdown) and 4002 (protocol error), so require the reason text.
   if (
-    code === CLOSE_CODE_ACCESS_REVOKED ||
-    text.includes(CLOSE_REASON_ACCESS_REVOKED) ||
-    code === 403
+    code === 403 ||
+    (code === CLOSE_CODE_ACCESS_REVOKED && hasAccessRevokedReason) ||
+    (code === undefined && hasAccessRevokedReason)
   ) {
     return {
       status: forLiveClose ? 'lost-access' : 'rejected',
@@ -218,8 +230,8 @@ function classifyFailure(
   }
 
   if (
-    code === CLOSE_CODE_TOO_MANY_CONNECTIONS ||
-    text.includes(CLOSE_REASON_TOO_MANY_CONNECTIONS)
+    (code === CLOSE_CODE_TOO_MANY_CONNECTIONS && hasTooManyReason) ||
+    (code === undefined && hasTooManyReason)
   ) {
     return {
       status: 'rejected',
@@ -349,7 +361,7 @@ export function createClassroomRealtimeClient(
     }
   }
 
-  function recordEventIfFresh(type: string, payload: unknown): boolean {
+  function isEventFresh(type: string, payload: unknown): boolean {
     if (typeof payload === 'object' && payload !== null) {
       const record = payload as Record<string, unknown>;
       if (
@@ -358,28 +370,48 @@ export function createClassroomRealtimeClient(
       ) {
         return false;
       }
-      if (typeof record.eventId === 'string' && record.eventId !== '') {
-        if (seenEventIdSet.has(record.eventId)) {
-          return false;
-        }
-        seenEventIdSet.add(record.eventId);
-        seenEventIds.push(record.eventId);
-        if (seenEventIds.length > MAX_SEEN_EVENT_IDS) {
-          const evicted = seenEventIds.shift();
-          if (evicted !== undefined) {
-            seenEventIdSet.delete(evicted);
-          }
-        }
+      if (
+        typeof record.eventId === 'string' &&
+        record.eventId !== '' &&
+        seenEventIdSet.has(record.eventId)
+      ) {
+        return false;
       }
       if (typeof record.seq === 'number' && Number.isInteger(record.seq)) {
         const previous = lastSeqByType.get(type);
         if (previous !== undefined && record.seq <= previous) {
           return false;
         }
-        lastSeqByType.set(type, record.seq);
       }
     }
     return true;
+  }
+
+  function commitEventGuards(type: string, payload: unknown): void {
+    if (typeof payload !== 'object' || payload === null) {
+      return;
+    }
+    const record = payload as Record<string, unknown>;
+    if (
+      typeof record.eventId === 'string' &&
+      record.eventId !== '' &&
+      !seenEventIdSet.has(record.eventId)
+    ) {
+      seenEventIdSet.add(record.eventId);
+      seenEventIds.push(record.eventId);
+      if (seenEventIds.length > MAX_SEEN_EVENT_IDS) {
+        const evicted = seenEventIds.shift();
+        if (evicted !== undefined) {
+          seenEventIdSet.delete(evicted);
+        }
+      }
+    }
+    if (typeof record.seq === 'number' && Number.isInteger(record.seq)) {
+      const previous = lastSeqByType.get(type);
+      if (previous === undefined || record.seq > previous) {
+        lastSeqByType.set(type, record.seq);
+      }
+    }
   }
 
   function attachRoom(
@@ -421,14 +453,19 @@ export function createClassroomRealtimeClient(
       if (!handlers || handlers.size === 0) {
         return;
       }
-      if (!recordEventIfFresh(type, payload)) {
+      if (!isEventFresh(type, payload)) {
         return;
       }
+      let accepted = false;
       for (const entry of [...handlers]) {
         const parsed = entry.schema.safeParse(payload);
         if (parsed.success) {
+          accepted = true;
           entry.handler(parsed.data);
         }
+      }
+      if (accepted) {
+        commitEventGuards(type, payload);
       }
     });
 

@@ -224,4 +224,62 @@ describe('useClassroomRealtime (#23)', () => {
     expect(result.current.participants.size).toBe(0);
     expect(roomsByClassroom.get(CLASSROOM_B)?.leave).toHaveBeenCalledTimes(1);
   });
+
+  it('isolates snapshot immediately when switching authenticated users on the same classroomId', async () => {
+    const roomsByUser = new Map<
+      string,
+      ReturnType<typeof createHookTestRoom>
+    >();
+    let currentToken = 'user-1-token';
+
+    const createSdkClient = (): RealtimeSdkClientLike => ({
+      auth: { token: undefined },
+      joinOrCreate: async (_name, options) => {
+        const created = createHookTestRoom(options?.classroomId ?? CLASSROOM_A);
+        roomsByUser.set(currentToken, created);
+        return created.room;
+      },
+      reconnect: async () => createHookTestRoom(CLASSROOM_A).room,
+    });
+
+    const session = fakeSession({ status: 'authenticated', user: profile });
+    session.service.controller.getAccessToken = () => currentToken;
+    session.service.controller.refreshAccessToken = async () => currentToken;
+    session.service.controller.registerCleanup = () => () => {};
+
+    const queryClient = createAppQueryClient();
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <ApiQueryProvider client={queryClient}>
+        <SessionProvider service={session.service}>{children}</SessionProvider>
+      </ApiQueryProvider>
+    );
+
+    const { result } = renderHook(
+      () =>
+        useClassroomRealtime({
+          classroomId: CLASSROOM_A,
+          realtimeUrl: 'wss://realtime.example.invalid',
+          createSdkClient,
+        }),
+      { wrapper },
+    );
+
+    await vi.waitFor(() => {
+      expect(result.current.status).toBe('connected');
+    });
+
+    // Switch directly to user-2 on the exact same classroomId without an intermediate unauthenticated frame.
+    act(() => {
+      currentToken = 'user-2-token';
+      session.set({
+        status: 'authenticated',
+        user: { ...profile, id: 'user-2', displayName: 'User Two' },
+      });
+    });
+
+    expect(roomsByUser.get('user-1-token')?.leave).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => {
+      expect(result.current.status).toBe('connected');
+    });
+  });
 });
