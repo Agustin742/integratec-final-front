@@ -101,6 +101,20 @@ describe.each(variants)(
       expect(document.body.style.pointerEvents).toBe('');
     });
 
+    it('keeps the close control outside the scroll container', async () => {
+      render(<Example />);
+      fireEvent.click(screen.getByRole('button', { name: 'Open panel' }));
+      const panel = await screen.findByRole('dialog');
+      const close = screen.getByRole('button', { name: 'Cerrar' });
+      const scroller = screen
+        .getByRole('button', { name: 'First action' })
+        .closest('[data-dialog-scroll]');
+      expect(scroller).toHaveClass('overflow-y-auto');
+      expect(panel).toHaveClass('overflow-hidden');
+      expect(panel).not.toHaveClass('overflow-y-auto');
+      expect(scroller).not.toContainElement(close);
+    });
+
     it('closes using its localized native close control', async () => {
       render(<Example />);
       const trigger = screen.getByRole('button', { name: 'Open panel' });

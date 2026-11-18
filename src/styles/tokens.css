@@ -38,6 +38,10 @@
   --row-hover: var(--palette-cream);
   --field-border: #a9835f;
   --input: #806348;
+  /* Scrollbars: sand-brown thumb (3:1 on cream), darker on hover, no track fill. */
+  --scrollbar-thumb: var(--field-border);
+  --scrollbar-thumb-hover: var(--input);
+  --scrollbar-track: transparent;
   /* Soft semantic tints: dark ink on a light tint, bevel one step darker. */
   --success: #e0f1cc;
   --success-foreground: #24542f;
