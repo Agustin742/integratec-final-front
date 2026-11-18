@@ -335,3 +335,58 @@ export function createClassroomMaterialsPredicate(
     );
   };
 }
+
+export interface NotificationListQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+}
+
+export interface NormalizedNotificationListQueryParams {
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+/**
+ * Key of `GET /notifications`: paginated list of in-app notifications for one
+ * authenticated user (`rules/state-management.md`).
+ */
+export function notificationsListQueryKey(
+  userId: string,
+  params: NotificationListQueryParams = {},
+): ScopedQueryKey<NormalizedNotificationListQueryParams> {
+  const normalizedParams = Object.freeze({
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+  });
+  return createScopedQueryKey(
+    { userId },
+    'notifications',
+    'list',
+    normalizedParams,
+  );
+}
+
+/**
+ * Predicate matching every notification list query entry owned by `userId`.
+ */
+export function createNotificationsPredicate(
+  userId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.domain === 'notifications' &&
+      segment.resource === 'list'
+    );
+  };
+}
