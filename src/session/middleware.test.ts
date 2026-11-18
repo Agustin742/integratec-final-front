@@ -18,6 +18,85 @@ import {
 const isRefresh = (r: Request) => r.url.endsWith('/auth/refresh');
 
 describe('session middleware bounded recovery', () => {
+  test('explicit SSE streaming returns before EOF and cancels immediately on session release', async () => {
+    let source!: ReadableStreamDefaultController<Uint8Array>;
+    const cancel = vi.fn();
+    const h = harness(
+      (request) =>
+        request.url.endsWith('/users/me')
+          ? json(profile)
+          : request.url.endsWith('/auth/logout')
+            ? new Response(null, { status: 204 })
+            : new Response(
+                new ReadableStream<Uint8Array>({
+                  start(controller) {
+                    source = controller;
+                  },
+                  cancel,
+                }),
+                { headers: { 'content-type': 'text/event-stream' } },
+              ),
+      saved(),
+    );
+    const { client, controller } = createSession(h);
+    await controller.initialize();
+    let opened = false;
+    const result = client
+      .GET('/classrooms/{id}/context-events', {
+        params: { path: { id: 'a' } },
+        parseAs: 'stream',
+      })
+      .then((response) => {
+        opened = true;
+        return response;
+      });
+    await vi.waitFor(() => expect(opened).toBe(true));
+    const stream = (await result).data!;
+    const reader = stream.getReader();
+    source.enqueue(new TextEncoder().encode(': heartbeat\n\n'));
+    expect(new TextDecoder().decode((await reader.read()).value)).toBe(
+      ': heartbeat\n\n',
+    );
+    const pending = reader.read();
+    const rejected = expect(pending).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+    await controller.logout();
+    await rejected;
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  test('explicit SSE caller cancellation releases an open upstream body', async () => {
+    const cancel = vi.fn();
+    const h = harness(
+      () =>
+        new Response(new ReadableStream({ cancel }), {
+          headers: { 'content-type': 'text/event-stream' },
+        }),
+      saved(),
+    );
+    const { client } = createSession(h);
+    const abort = new AbortController();
+    let opened = false;
+    const pending = client
+      .GET('/classrooms/{id}/context-events', {
+        params: { path: { id: 'a' } },
+        parseAs: 'stream',
+        signal: abort.signal,
+      })
+      .then((result) => {
+        opened = true;
+        return result;
+      });
+    await vi.waitFor(() => expect(opened).toBe(true));
+    const reader = (await pending).data!.getReader();
+    const read = expect(reader.read()).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+    abort.abort();
+    await read;
+    expect(cancel).toHaveBeenCalledOnce();
+  });
   test('expired access renews once before a read and rotates both credentials', async () => {
     const h = harness((r) => json(isRefresh(r) ? rotated : profile), saved(0));
     const { controller } = createSession(h);

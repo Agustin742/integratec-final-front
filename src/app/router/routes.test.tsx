@@ -190,17 +190,20 @@ test.each(pages)('sets the document title on %s', async (path, title) => {
   );
 });
 
-test('protects the classroom workspace instead of treating it as an unknown path', async () => {
-  const { router } = await renderAt('/classrooms/synthetic');
+test.each(['/classrooms/synthetic', '/classrooms/synthetic/panels/grades'])(
+  'protects the classroom workspace URL %s instead of treating it as unknown',
+  async (path) => {
+    const { router } = await renderAt(path);
 
-  expect(router.state.location.pathname).toBe('/login');
-  expect(
-    await screen.findByRole('heading', {
-      level: 2,
-      name: messages.pages.login.title,
-    }),
-  ).toBeVisible();
-});
+    expect(router.state.location.pathname).toBe('/login');
+    expect(
+      await screen.findByRole('heading', {
+        level: 2,
+        name: messages.pages.login.title,
+      }),
+    ).toBeVisible();
+  },
+);
 
 test('renders the not found page for an unknown path', async () => {
   const { container } = await renderAt('/no-such-page');

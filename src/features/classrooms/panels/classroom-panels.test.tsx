@@ -104,12 +104,14 @@ describe('standalone classroom panels', () => {
   });
 
   it('opens a named modal, traps keyboard focus, closes and returns to the invoker', async () => {
-    render(<Example />);
+    const view = render(<Example />);
     const outside = screen.getByRole('button', { name: 'Workspace' });
     const trigger = open();
     const dialog = screen.getByRole('dialog', { name: 'Synthetic panel' });
     expect(dialog).toHaveAccessibleDescription('Synthetic instructions');
     const input = screen.getByRole('textbox');
+    view.rerender(<Example routeOwner="new-location" />);
+    expect(screen.getByRole('textbox')).toBe(input);
     const close = screen.getByRole('button', { name: 'Cerrar' });
     input.focus();
     fireEvent.keyDown(input, { key: 'Tab', shiftKey: true });

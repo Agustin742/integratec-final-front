@@ -1,5 +1,15 @@
 # Tracker — Mati
 
+## 2026-11-16 — Complete the classroom panel entry catalog (#26)
+
+- **Status:** completed (approved implementation published in PR #80; integration remains In review)
+- **Area / files:** `src/features/classrooms/`, `docs/classroom-panels.md`, `docs/classroom-workspace.md`, panel route/browser tests.
+- **Change:** Complete the production panel entry catalog with explicitly pending content, server-confirmed availability and reserved pet exclusion, following the human-approved scope reconciliation.
+- **Reason:** Existing PRs #78–#80 implement the infrastructure but leave the production catalog empty; opening a PR did not establish full acceptance.
+- **Verification:** Initial RED 11 failures/28 passes; corrected focused 39/39 and final full suite 477/477 pass. Final lint/types/build/security/format/docs/whitespace pass; Python CI 8/8 pass after fixing HEAD-identical CRLF checkout noise (152 normalized files; unchanged logical diff). Independent review 55/55 passes; focused structural recheck accepts the subsequent one-class height correction. Correct-worktree browser run had 51/52 passes; the sole mobile 200% zoom failure is corrected, with desktop/mobile 2/2 passing on the final UI (across runs, not a single final 52/52 run). Captures at 1280/360 are linked in `docs/classroom-panels.md`. Earlier asynchronous-test, CRLF, wrong-preview/undefined-pnpm setup, missing-capture and zoom failures are retained in local evidence. Native assessment: medium/under-budget/review not due; item-2 independent verification fulfilled, no native review approval claimed. Mock evidence is not live-backend or distributed SSE proof.
+- **Publication:** Catalog source `f38617f` and tracking were pushed to PR #80 after human authorization. PR #80 and issue #26 now document the approved scope, exact verification counts, desktop/mobile captures and ordered integration; remote bodies/head were read back successfully. All three PRs remain open with no submitted team reviews; #78 CI passes, #79/#80 CI is absent until retargeting. Issue #26 stays In review, not prematurely Done.
+- **Next step:** Obtain current-head team acceptance, merge #78, then retarget #79 and #80 to develop in turn and wait for CI/approval before each merge. No PR merge, issue closure or deployment performed.
+
 ## 2026-11-15 — Implement login, password reset, and logout screens (#28)
 
 - **Status:** completed (ready to push PR #77 follow-up fixes and E2E verification)

@@ -24,6 +24,7 @@ export type PanelAvailability =
 export type ClassroomPanelsProps = {
   userId: string;
   classroomId: string;
+  routeOwner?: string;
   registry: readonly PanelDescriptor[];
   availability?: PanelAvailability;
   description: string;
@@ -31,7 +32,13 @@ export type ClassroomPanelsProps = {
   children: ReactNode;
 };
 export type ClassroomPanelsController = {
-  openPanel: (key: string, invoker?: HTMLElement) => boolean;
+  canOpenPanel: (key: string) => boolean;
+  openPanel: (
+    key: string,
+    invoker?: HTMLElement,
+    onClose?: () => void,
+    routeOwner?: string,
+  ) => boolean;
 };
 const PanelsContext = createContext<ClassroomPanelsController | null>(null);
 
@@ -86,6 +93,8 @@ function ScopedPanels(props: ClassroomPanelsProps) {
   const [active, setActive] = useState<{
     key: string;
     invoker?: HTMLElement;
+    onClose?: () => void;
+    routeOwner?: string;
   } | null>(null);
   const current = useRef<ClassroomPanelsProps | null>(null);
   useLayoutEffect(() => {
@@ -97,16 +106,32 @@ function ScopedPanels(props: ClassroomPanelsProps) {
   const descriptor = active ? findPanel(props, active.key) : undefined;
   // Reset during render: no protected subtree or retained draft gets a frame
   // after revocation, and restoring availability cannot resurrect this intent.
-  if (active && !descriptor) setActive(null);
+  if (
+    active &&
+    (!descriptor ||
+      (active.routeOwner !== undefined &&
+        active.routeOwner !== props.routeOwner))
+  )
+    setActive(null);
 
-  function openPanel(key: string, invoker?: HTMLElement): boolean {
+  function openPanel(
+    key: string,
+    invoker?: HTMLElement,
+    onClose?: () => void,
+    routeOwner?: string,
+  ): boolean {
     if (!current.current || !findPanel(current.current, key)) return false;
-    setActive({ key, invoker });
+    setActive({ key, invoker, onClose, routeOwner });
     return true;
   }
   const Panel = descriptor?.component;
   return (
-    <PanelsContext.Provider value={{ openPanel }}>
+    <PanelsContext.Provider
+      value={{
+        openPanel,
+        canOpenPanel: (key) => Boolean(findPanel(props, key)),
+      }}
+    >
       {props.children}
       {active && descriptor && Panel && (
         <Dialog
@@ -117,11 +142,12 @@ function ScopedPanels(props: ClassroomPanelsProps) {
         >
           <DialogContent
             key={descriptor.key}
-            className="[overflow-wrap:anywhere]"
+            className="max-h-[calc(100%-2rem)] [overflow-wrap:anywhere]"
             onCloseAutoFocus={(event) => {
               event.preventDefault();
               if (!focusIfUsable(active.invoker))
                 focusIfUsable(props.fallbackFocus());
+              active.onClose?.();
             }}
           >
             <DialogTitle>{descriptor.title}</DialogTitle>

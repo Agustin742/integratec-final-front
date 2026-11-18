@@ -4,16 +4,17 @@ React Router (FD4) runs in data mode: `createBrowserRouter` with `RouterProvider
 
 ## Route table
 
-| Path                       | Guard                   | Module                                        |
-| -------------------------- | ----------------------- | --------------------------------------------- |
-| `/login`                   | `PublicOnly`            | `src/app/pages/login-page`                    |
-| `/register`                | `PublicOnly`            | `src/app/pages/register-page`                 |
-| `/password-reset`          | none (signed in or out) | `src/app/pages/password-reset-page`           |
-| `/invitations/accept`      | none (signed in or out) | `src/app/pages/invitation-accept-page`        |
-| `/`                        | `RequireAuth`           | `src/app/pages/home-page`                     |
-| `/classrooms/:classroomId` | `RequireAuth`           | `src/features/classrooms/classroom-workspace` |
-| `/dev/ui`                  | none, dev/showcase only | `src/app/ui-foundations`                      |
-| `*`                        | none                    | `NotFoundPage` (static import)                |
+| Path                                        | Guard                   | Module                                          |
+| ------------------------------------------- | ----------------------- | ----------------------------------------------- |
+| `/login`                                    | `PublicOnly`            | `src/app/pages/login-page`                      |
+| `/register`                                 | `PublicOnly`            | `src/app/pages/register-page`                   |
+| `/password-reset`                           | none (signed in or out) | `src/app/pages/password-reset-page`             |
+| `/invitations/accept`                       | none (signed in or out) | `src/app/pages/invitation-accept-page`          |
+| `/`                                         | `RequireAuth`           | `src/app/pages/home-page`                       |
+| `/classrooms/:classroomId`                  | `RequireAuth`           | `src/features/classrooms/classroom-workspace`   |
+| `/classrooms/:classroomId/panels/:panelKey` | `RequireAuth`           | `src/features/classrooms/classroom-panel-route` |
+| `/dev/ui`                                   | none, dev/showcase only | `src/app/ui-foundations`                        |
+| `*`                                         | none                    | `NotFoundPage` (static import)                  |
 
 Every page is a lazy route module (`lazy: { Component }`), so its chunk loads when it is first matched. The `/dev/ui` route exists only when `__UI_SHOWCASE__` is true (dev server and the `showcase` build used by the browser suite); a production build drops it and its chunk.
 

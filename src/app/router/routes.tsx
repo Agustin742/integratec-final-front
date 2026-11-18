@@ -136,6 +136,17 @@ export function createAppRoutes({
                             await import('@/features/classrooms/classroom-workspace')
                           ).ClassroomWorkspace,
                       },
+                      children: [
+                        {
+                          path: 'panels/:panelKey',
+                          lazy: {
+                            Component: async () =>
+                              (
+                                await import('@/features/classrooms/classroom-panel-route')
+                              ).ClassroomPanelRoute,
+                          },
+                        },
+                      ],
                     },
                   ],
                 },
