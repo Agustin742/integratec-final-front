@@ -5,12 +5,14 @@ export const BACKEND_ARTIFACT_PATHS: Readonly<{
   openapi: string;
   contracts: string;
   realtimeState: string;
+  realtimeAvatar: string;
 }>;
 
 export const FRONTEND_OUTPUT_PATHS: Readonly<{
   openapi: string;
   contracts: string;
   realtimeState: string;
+  realtimeAvatar: string;
 }>;
 
 export const GENERATED_HEADER: string;

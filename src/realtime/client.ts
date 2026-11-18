@@ -1,0 +1,785 @@
+import { Client } from '@colyseus/sdk';
+import { z } from 'zod';
+import { getPublicConfig } from '../config/public-config';
+import {
+  AVATAR_INPUT_MESSAGE,
+  avatarInputSchema,
+  CLASSROOM_ROOM_NAME,
+  CLOSE_CODE_ACCESS_REVOKED,
+  CLOSE_CODE_TOO_MANY_CONNECTIONS,
+  CLOSE_CODE_VERIFICATION_UNAVAILABLE,
+  CLOSE_REASON_ACCESS_REVOKED,
+  CLOSE_REASON_TOO_MANY_CONNECTIONS,
+  CLOSE_REASON_VERIFICATION_UNAVAILABLE,
+  type AvatarInput,
+  type ClassroomJoinOptions,
+} from './contracts.generated';
+import { ClassroomState } from './room-state.generated';
+
+z.config({ jitless: true });
+
+export const realtimeMessages = {
+  connecting: 'Conectando con el aula en vivo...',
+  connected: 'Conectado al aula en vivo.',
+  reconnecting: 'Se perdió la conexión con el aula. Intentando reconectar...',
+  accessDenied: 'No tenés permiso para ingresar a esta aula en vivo.',
+  lostAccess: 'Tu acceso a esta aula en vivo fue revocado.',
+  tooManyConnections: 'Tenés demasiadas sesiones abiertas en esta aula.',
+  unauthorized:
+    'Tu sesión venció o no pudo verificarse. Volvé a iniciar sesión.',
+  verificationUnavailable:
+    'No se pudo verificar el acceso en este momento. Podés reintentar.',
+  connectionFailed: 'No se pudo conectar con el aula en vivo.',
+} as const;
+
+export type RealtimeConnectionStatus =
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'rejected'
+  | 'lost-access'
+  | 'disconnected';
+
+export type RealtimeFailureReason =
+  | 'forbidden'
+  | 'unauthorized'
+  | 'too-many-connections'
+  | 'verification-unavailable'
+  | 'invalid-classroom'
+  | 'connection-error';
+
+export interface RealtimeParticipant {
+  readonly userId: string;
+  readonly displayName: string;
+  readonly role: string;
+  readonly x: number;
+  readonly z: number;
+  readonly rotation: number;
+  readonly status: string;
+}
+
+export interface RealtimeSnapshot {
+  readonly status: RealtimeConnectionStatus;
+  readonly classroomId: string | null;
+  readonly roomId: string | null;
+  readonly sessionId: string | null;
+  readonly presenceUncertain: boolean;
+  readonly reason: RealtimeFailureReason | null;
+  readonly message: string | null;
+  readonly participants: ReadonlyMap<string, RealtimeParticipant>;
+}
+
+export interface RealtimeAuthPort {
+  getAccessToken(): string | undefined;
+  refreshAccessToken(): Promise<string | undefined>;
+  registerCleanup(cleanup: () => void): () => void;
+}
+
+export interface RealtimeRoomLike<TState = ClassroomState> {
+  readonly roomId: string;
+  readonly sessionId: string;
+  readonly reconnectionToken?: string;
+  readonly state: TState;
+  onStateChange(callback: (state: TState) => void): unknown;
+  onDrop?(callback: (code: number, reason?: string) => void): unknown;
+  onLeave(callback: (code: number, reason?: string) => void): unknown;
+  onError(callback: (code: number, message?: string) => void): unknown;
+  onMessage(
+    type: '*',
+    callback: (type: string, message: unknown) => void,
+  ): unknown;
+  send(type: string, message?: unknown): void;
+  leave(consented?: boolean): Promise<number>;
+  removeAllListeners(): void;
+}
+
+export interface RealtimeSdkClientLike {
+  auth: { token: string | undefined };
+  joinOrCreate(
+    roomName: string,
+    options?: ClassroomJoinOptions,
+  ): Promise<RealtimeRoomLike<ClassroomState>>;
+  reconnect(
+    reconnectionToken: string,
+  ): Promise<RealtimeRoomLike<ClassroomState>>;
+}
+
+export interface CreateClassroomRealtimeClientOptions {
+  readonly auth: RealtimeAuthPort;
+  readonly realtimeUrl?: string;
+  readonly createSdkClient?: (endpoint: string) => RealtimeSdkClientLike;
+}
+
+export interface ClassroomRealtimeClient {
+  getSnapshot(): RealtimeSnapshot;
+  subscribe(listener: () => void): () => void;
+  connect(classroomId: string): Promise<boolean>;
+  disconnect(): Promise<void>;
+  sendAvatarInput(input: AvatarInput): boolean;
+  onMessage<T>(
+    type: string,
+    schema: z.ZodType<T>,
+    handler: (payload: T) => void,
+  ): () => void;
+  dispose(): void;
+}
+
+interface RegisteredMessageHandler {
+  readonly schema: z.ZodType<unknown>;
+  readonly handler: (payload: unknown) => void;
+}
+
+const MAX_SEEN_EVENT_IDS = 500;
+const EMPTY_PARTICIPANTS: ReadonlyMap<string, RealtimeParticipant> = new Map();
+
+function createDefaultSdkClient(endpoint: string): RealtimeSdkClientLike {
+  const sdk = new Client(endpoint);
+  return {
+    auth: sdk.auth as { token: string | undefined },
+    joinOrCreate: (roomName: string, options?: ClassroomJoinOptions) =>
+      sdk.joinOrCreate(roomName, options) as unknown as Promise<
+        RealtimeRoomLike<ClassroomState>
+      >,
+    reconnect: (reconnectionToken: string) =>
+      sdk.reconnect(reconnectionToken) as unknown as Promise<
+        RealtimeRoomLike<ClassroomState>
+      >,
+  };
+}
+
+function readParticipants(
+  state: ClassroomState | undefined,
+): ReadonlyMap<string, RealtimeParticipant> {
+  if (!state?.avatars) {
+    return EMPTY_PARTICIPANTS;
+  }
+  const next = new Map<string, RealtimeParticipant>();
+  state.avatars.forEach((avatar, key) => {
+    const userId = avatar.userId || key;
+    next.set(
+      userId,
+      Object.freeze({
+        userId,
+        displayName: avatar.displayName,
+        role: avatar.role,
+        x: avatar.x,
+        z: avatar.z,
+        rotation: avatar.rotation,
+        status: avatar.status,
+      }),
+    );
+  });
+  return next;
+}
+
+function extractErrorCode(error: unknown): number | undefined {
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === 'number' && Number.isFinite(code)) {
+      return code;
+    }
+  }
+  return undefined;
+}
+
+function extractErrorReason(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message.toLowerCase();
+  }
+  if (typeof error === 'object' && error !== null) {
+    const candidate = error as { message?: unknown; reason?: unknown };
+    if (typeof candidate.message === 'string') {
+      return candidate.message.toLowerCase();
+    }
+    if (typeof candidate.reason === 'string') {
+      return candidate.reason.toLowerCase();
+    }
+  }
+  if (typeof error === 'string') {
+    return error.toLowerCase();
+  }
+  return '';
+}
+
+function classifyFailure(
+  error: unknown,
+  forLiveClose: boolean,
+): {
+  status: RealtimeConnectionStatus;
+  reason: RealtimeFailureReason;
+  message: string;
+} {
+  const code = extractErrorCode(error);
+  const text = extractErrorReason(error);
+  const hasAccessRevokedReason = text.includes(CLOSE_REASON_ACCESS_REVOKED);
+  const hasTooManyReason = text.includes(CLOSE_REASON_TOO_MANY_CONNECTIONS);
+
+  // D14: Colyseus shares 4001 (server shutdown) and 4002 (protocol error), so require the reason text.
+  if (
+    code === 403 ||
+    (code === CLOSE_CODE_ACCESS_REVOKED && hasAccessRevokedReason) ||
+    (code === undefined && hasAccessRevokedReason)
+  ) {
+    return {
+      status: forLiveClose ? 'lost-access' : 'rejected',
+      reason: 'forbidden',
+      message: forLiveClose
+        ? realtimeMessages.lostAccess
+        : realtimeMessages.accessDenied,
+    };
+  }
+
+  if (
+    (code === CLOSE_CODE_TOO_MANY_CONNECTIONS && hasTooManyReason) ||
+    (code === undefined && hasTooManyReason)
+  ) {
+    return {
+      status: 'rejected',
+      reason: 'too-many-connections',
+      message: realtimeMessages.tooManyConnections,
+    };
+  }
+
+  if (
+    code === CLOSE_CODE_VERIFICATION_UNAVAILABLE ||
+    text.includes(CLOSE_REASON_VERIFICATION_UNAVAILABLE)
+  ) {
+    return {
+      status: 'disconnected',
+      reason: 'verification-unavailable',
+      message: realtimeMessages.verificationUnavailable,
+    };
+  }
+
+  if (code === 401 || text.includes('unauthorized')) {
+    return {
+      status: 'rejected',
+      reason: 'unauthorized',
+      message: realtimeMessages.unauthorized,
+    };
+  }
+
+  if (code === 400 || text.includes('bad request')) {
+    return {
+      status: 'rejected',
+      reason: 'invalid-classroom',
+      message: realtimeMessages.connectionFailed,
+    };
+  }
+
+  return {
+    status: 'disconnected',
+    reason: 'connection-error',
+    message: realtimeMessages.connectionFailed,
+  };
+}
+
+function isUnauthorizedJoinError(error: unknown): boolean {
+  const code = extractErrorCode(error);
+  if (
+    code === CLOSE_CODE_ACCESS_REVOKED ||
+    code === CLOSE_CODE_TOO_MANY_CONNECTIONS ||
+    code === CLOSE_CODE_VERIFICATION_UNAVAILABLE
+  ) {
+    return false;
+  }
+  if (code === 401) {
+    return true;
+  }
+  return extractErrorReason(error).includes('unauthorized');
+}
+
+export function createClassroomRealtimeClient(
+  options: CreateClassroomRealtimeClientOptions,
+): ClassroomRealtimeClient {
+  const endpoint = options.realtimeUrl ?? getPublicConfig().realtimeUrl;
+  const createSdk = options.createSdkClient ?? createDefaultSdkClient;
+  const { auth } = options;
+
+  let snapshot: RealtimeSnapshot = Object.freeze({
+    status: 'disconnected',
+    classroomId: null,
+    roomId: null,
+    sessionId: null,
+    presenceUncertain: true,
+    reason: null,
+    message: null,
+    participants: EMPTY_PARTICIPANTS,
+  });
+
+  const listeners = new Set<() => void>();
+  const messageHandlers = new Map<string, Set<RegisteredMessageHandler>>();
+  const seenEventIds: string[] = [];
+  const seenEventIdSet = new Set<string>();
+  const lastSeqByType = new Map<string, number>();
+
+  let epoch = 0;
+  let disposed = false;
+  let activeRoom: RealtimeRoomLike<ClassroomState> | null = null;
+  let inFlightConnect: {
+    classroomId: string;
+    promise: Promise<boolean>;
+  } | null = null;
+
+  function publish(next: Omit<RealtimeSnapshot, 'presenceUncertain'>): void {
+    snapshot = Object.freeze({
+      ...next,
+      presenceUncertain: next.status !== 'connected',
+    });
+    for (const listener of [...listeners]) {
+      try {
+        listener();
+      } catch {
+        /* Subscriber errors must not interrupt realtime lifecycle cleanup. */
+      }
+    }
+  }
+
+  function resetMessageGuards(): void {
+    seenEventIds.length = 0;
+    seenEventIdSet.clear();
+    lastSeqByType.clear();
+  }
+
+  function detachRoom(
+    room: RealtimeRoomLike<ClassroomState> | null,
+    leaveRoom: boolean,
+  ): void {
+    if (!room) {
+      return;
+    }
+    try {
+      room.removeAllListeners();
+    } catch {
+      /* Ignore teardown errors from already-closed rooms. */
+    }
+    if (leaveRoom) {
+      void Promise.resolve(room.leave(true)).catch(() => undefined);
+    }
+    if (activeRoom === room) {
+      activeRoom = null;
+    }
+  }
+
+  function isEventFresh(type: string, payload: unknown): boolean {
+    if (typeof payload === 'object' && payload !== null) {
+      const record = payload as Record<string, unknown>;
+      if (
+        typeof record.classroomId === 'string' &&
+        record.classroomId !== snapshot.classroomId
+      ) {
+        return false;
+      }
+      if (
+        typeof record.eventId === 'string' &&
+        record.eventId !== '' &&
+        seenEventIdSet.has(record.eventId)
+      ) {
+        return false;
+      }
+      if (typeof record.seq === 'number' && Number.isInteger(record.seq)) {
+        const previous = lastSeqByType.get(type);
+        if (previous !== undefined && record.seq <= previous) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  function commitEventGuards(type: string, payload: unknown): void {
+    if (typeof payload !== 'object' || payload === null) {
+      return;
+    }
+    const record = payload as Record<string, unknown>;
+    if (
+      typeof record.eventId === 'string' &&
+      record.eventId !== '' &&
+      !seenEventIdSet.has(record.eventId)
+    ) {
+      seenEventIdSet.add(record.eventId);
+      seenEventIds.push(record.eventId);
+      if (seenEventIds.length > MAX_SEEN_EVENT_IDS) {
+        const evicted = seenEventIds.shift();
+        if (evicted !== undefined) {
+          seenEventIdSet.delete(evicted);
+        }
+      }
+    }
+    if (typeof record.seq === 'number' && Number.isInteger(record.seq)) {
+      const previous = lastSeqByType.get(type);
+      if (previous === undefined || record.seq > previous) {
+        lastSeqByType.set(type, record.seq);
+      }
+    }
+  }
+
+  function attachRoom(
+    room: RealtimeRoomLike<ClassroomState>,
+    classroomId: string,
+    roomEpoch: number,
+  ): void {
+    activeRoom = room;
+    publish({
+      status: 'connected',
+      classroomId,
+      roomId: room.roomId,
+      sessionId: room.sessionId,
+      reason: null,
+      message: null,
+      participants: readParticipants(room.state),
+    });
+
+    room.onStateChange((state) => {
+      if (disposed || roomEpoch !== epoch || activeRoom !== room) {
+        return;
+      }
+      publish({
+        status: snapshot.status,
+        classroomId,
+        roomId: room.roomId,
+        sessionId: room.sessionId,
+        reason: snapshot.reason,
+        message: snapshot.message,
+        participants: readParticipants(state),
+      });
+    });
+
+    room.onMessage('*', (type, payload) => {
+      if (disposed || roomEpoch !== epoch || activeRoom !== room) {
+        return;
+      }
+      const handlers = messageHandlers.get(type);
+      if (!handlers || handlers.size === 0) {
+        return;
+      }
+      if (!isEventFresh(type, payload)) {
+        return;
+      }
+      let accepted = false;
+      for (const entry of [...handlers]) {
+        const parsed = entry.schema.safeParse(payload);
+        if (parsed.success) {
+          accepted = true;
+          entry.handler(parsed.data);
+        }
+      }
+      if (accepted) {
+        commitEventGuards(type, payload);
+      }
+    });
+
+    room.onDrop?.(() => {
+      if (disposed || roomEpoch !== epoch || activeRoom !== room) {
+        return;
+      }
+      const reconnectionToken = room.reconnectionToken;
+      publish({
+        status: 'reconnecting',
+        classroomId,
+        roomId: room.roomId,
+        sessionId: room.sessionId,
+        reason: null,
+        message: realtimeMessages.reconnecting,
+        participants: snapshot.participants,
+      });
+
+      if (!reconnectionToken) {
+        detachRoom(room, false);
+        publish({
+          status: 'disconnected',
+          classroomId,
+          roomId: null,
+          sessionId: null,
+          reason: 'connection-error',
+          message: realtimeMessages.connectionFailed,
+          participants: EMPTY_PARTICIPANTS,
+        });
+        return;
+      }
+
+      const sdk = createSdk(endpoint);
+      sdk.auth.token = auth.getAccessToken();
+      void sdk.reconnect(reconnectionToken).then(
+        (reconnectedRoom) => {
+          if (disposed || roomEpoch !== epoch || activeRoom !== room) {
+            detachRoom(reconnectedRoom, true);
+            return;
+          }
+          detachRoom(room, false);
+          attachRoom(reconnectedRoom, classroomId, roomEpoch);
+        },
+        (error: unknown) => {
+          if (disposed || roomEpoch !== epoch || activeRoom !== room) {
+            return;
+          }
+          detachRoom(room, false);
+          const failure = classifyFailure(error, true);
+          publish({
+            status: failure.status,
+            classroomId,
+            roomId: null,
+            sessionId: null,
+            reason: failure.reason,
+            message: failure.message,
+            participants: EMPTY_PARTICIPANTS,
+          });
+        },
+      );
+    });
+
+    room.onLeave((code, reason) => {
+      if (disposed || roomEpoch !== epoch || activeRoom !== room) {
+        return;
+      }
+      detachRoom(room, false);
+      if (code === 1000) {
+        publish({
+          status: 'disconnected',
+          classroomId: null,
+          roomId: null,
+          sessionId: null,
+          reason: null,
+          message: null,
+          participants: EMPTY_PARTICIPANTS,
+        });
+        return;
+      }
+      const failure = classifyFailure({ code, message: reason }, true);
+      publish({
+        status: failure.status,
+        classroomId,
+        roomId: null,
+        sessionId: null,
+        reason: failure.reason,
+        message: failure.message,
+        participants: EMPTY_PARTICIPANTS,
+      });
+    });
+
+    room.onError((code, message) => {
+      if (disposed || roomEpoch !== epoch || activeRoom !== room) {
+        return;
+      }
+      const failure = classifyFailure({ code, message }, true);
+      if (failure.status === 'lost-access' || failure.status === 'rejected') {
+        detachRoom(room, false);
+        publish({
+          status: failure.status,
+          classroomId,
+          roomId: null,
+          sessionId: null,
+          reason: failure.reason,
+          message: failure.message,
+          participants: EMPTY_PARTICIPANTS,
+        });
+      }
+    });
+  }
+
+  async function disconnect(): Promise<void> {
+    epoch += 1;
+    inFlightConnect = null;
+    resetMessageGuards();
+    const current = activeRoom;
+    activeRoom = null;
+    detachRoom(current, true);
+    publish({
+      status: 'disconnected',
+      classroomId: null,
+      roomId: null,
+      sessionId: null,
+      reason: null,
+      message: null,
+      participants: EMPTY_PARTICIPANTS,
+    });
+  }
+
+  async function connect(rawClassroomId: string): Promise<boolean> {
+    if (disposed) {
+      return false;
+    }
+    const classroomId = rawClassroomId.trim();
+    if (classroomId === '') {
+      publish({
+        status: 'rejected',
+        classroomId: null,
+        roomId: null,
+        sessionId: null,
+        reason: 'invalid-classroom',
+        message: realtimeMessages.connectionFailed,
+        participants: EMPTY_PARTICIPANTS,
+      });
+      return false;
+    }
+
+    if (
+      snapshot.classroomId === classroomId &&
+      snapshot.status === 'connected' &&
+      activeRoom !== null
+    ) {
+      return true;
+    }
+
+    if (inFlightConnect?.classroomId === classroomId) {
+      return inFlightConnect.promise;
+    }
+
+    epoch += 1;
+    const connectEpoch = epoch;
+    resetMessageGuards();
+    const previousRoom = activeRoom;
+    activeRoom = null;
+    detachRoom(previousRoom, true);
+
+    publish({
+      status: 'connecting',
+      classroomId,
+      roomId: null,
+      sessionId: null,
+      reason: null,
+      message: realtimeMessages.connecting,
+      participants: EMPTY_PARTICIPANTS,
+    });
+
+    const attemptConnect = async (): Promise<boolean> => {
+      const initialToken = auth.getAccessToken();
+      if (!initialToken) {
+        if (!disposed && connectEpoch === epoch) {
+          publish({
+            status: 'rejected',
+            classroomId,
+            roomId: null,
+            sessionId: null,
+            reason: 'unauthorized',
+            message: realtimeMessages.unauthorized,
+            participants: EMPTY_PARTICIPANTS,
+          });
+        }
+        return false;
+      }
+
+      const joinWithToken = async (
+        token: string,
+      ): Promise<RealtimeRoomLike<ClassroomState>> => {
+        const sdk = createSdk(endpoint);
+        // FD3: send bearer token only through client.auth.token; options carry classroomId only.
+        sdk.auth.token = token;
+        return sdk.joinOrCreate(CLASSROOM_ROOM_NAME, { classroomId });
+      };
+
+      try {
+        let joinedRoom: RealtimeRoomLike<ClassroomState>;
+        try {
+          joinedRoom = await joinWithToken(initialToken);
+        } catch (firstError) {
+          if (disposed || connectEpoch !== epoch) {
+            return false;
+          }
+          if (!isUnauthorizedJoinError(firstError)) {
+            throw firstError;
+          }
+          const refreshedToken = await auth.refreshAccessToken();
+          if (disposed || connectEpoch !== epoch) {
+            return false;
+          }
+          if (!refreshedToken) {
+            throw firstError;
+          }
+          joinedRoom = await joinWithToken(refreshedToken);
+        }
+
+        if (disposed || connectEpoch !== epoch) {
+          detachRoom(joinedRoom, true);
+          return false;
+        }
+
+        attachRoom(joinedRoom, classroomId, connectEpoch);
+        return true;
+      } catch (error) {
+        if (disposed || connectEpoch !== epoch) {
+          return false;
+        }
+        const failure = classifyFailure(error, false);
+        publish({
+          status: failure.status,
+          classroomId,
+          roomId: null,
+          sessionId: null,
+          reason: failure.reason,
+          message: failure.message,
+          participants: EMPTY_PARTICIPANTS,
+        });
+        return false;
+      } finally {
+        if (inFlightConnect?.promise === connectPromise) {
+          inFlightConnect = null;
+        }
+      }
+    };
+
+    const connectPromise = attemptConnect();
+    inFlightConnect = { classroomId, promise: connectPromise };
+    return connectPromise;
+  }
+
+  const unregisterCleanup = auth.registerCleanup(() => {
+    void disconnect();
+  });
+
+  return {
+    getSnapshot: () => snapshot,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    connect,
+    disconnect,
+    sendAvatarInput(input) {
+      if (disposed || snapshot.status !== 'connected' || !activeRoom) {
+        return false;
+      }
+      const parsed = avatarInputSchema.safeParse(input);
+      if (!parsed.success) {
+        return false;
+      }
+      activeRoom.send(AVATAR_INPUT_MESSAGE, parsed.data);
+      return true;
+    },
+    onMessage(type, schema, handler) {
+      let bucket = messageHandlers.get(type);
+      if (!bucket) {
+        bucket = new Set();
+        messageHandlers.set(type, bucket);
+      }
+      const entry: RegisteredMessageHandler = {
+        schema: schema as z.ZodType<unknown>,
+        handler: handler as (payload: unknown) => void,
+      };
+      bucket.add(entry);
+      return () => {
+        bucket.delete(entry);
+        if (bucket.size === 0) {
+          messageHandlers.delete(type);
+        }
+      };
+    },
+    dispose() {
+      if (disposed) {
+        return;
+      }
+      disposed = true;
+      unregisterCleanup();
+      epoch += 1;
+      inFlightConnect = null;
+      resetMessageGuards();
+      const current = activeRoom;
+      activeRoom = null;
+      detachRoom(current, true);
+      listeners.clear();
+      messageHandlers.clear();
+    },
+  };
+}
