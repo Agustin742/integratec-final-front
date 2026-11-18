@@ -504,6 +504,70 @@ export function classroomActivityDetailQueryKey(
   );
 }
 
+export interface AnnouncementListQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+}
+
+export interface NormalizedAnnouncementListQueryParams {
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+/**
+ * Key of `GET /classrooms/{id}/announcements`: paginated chronological list
+ * of announcements for one classroom, scoped by both `userId` and
+ * `classroomId` (`rules/state-management.md`).
+ */
+export function classroomAnnouncementsQueryKey(
+  userId: string,
+  classroomId: string,
+  params: AnnouncementListQueryParams = {},
+): ScopedQueryKey<NormalizedAnnouncementListQueryParams> {
+  const normalizedParams = Object.freeze({
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+  });
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'announcements',
+    'list',
+    normalizedParams,
+  );
+}
+
+/**
+ * Predicate matching every announcement list query entry owned by `userId` and
+ * `classroomId`.
+ */
+export function createClassroomAnnouncementsPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'announcements' &&
+      segment.resource === 'list'
+    );
+  };
+}
+
 /**
  * Key of `GET /classrooms/{id}/points`: the signed-in student's server-computed
  * points wallet and one page of movements, scoped by `userId` and `classroomId`
