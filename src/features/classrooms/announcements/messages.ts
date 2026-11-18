@@ -37,6 +37,9 @@ export const announcementMessages = {
     removedNoticeTitle: 'Anuncio eliminado',
     removedNoticeDescription: (title: string) =>
       `Se eliminó "${title}" del tablón del aula.`,
+    alreadyRemovedNoticeTitle: 'El anuncio ya no estaba',
+    alreadyRemovedNoticeDescription:
+      'Alguien lo eliminó antes. Actualizamos el tablón.',
     removeErrorTitle: 'No pudimos eliminar el anuncio',
     paginationPrevious: 'Anterior',
     paginationNext: 'Siguiente',

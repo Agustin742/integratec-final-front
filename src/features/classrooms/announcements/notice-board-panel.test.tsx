@@ -563,6 +563,73 @@ describe('NoticeBoardPanel', () => {
     ).toHaveFocus();
   });
 
+  it('treats a delete 404 as already removed without a destructive alert', async () => {
+    const store = createClassroomAnnouncementsStore({
+      classroomId: CLASSROOM_ID,
+      authorId: profile.id,
+      initialItems: [makeAnnouncement({ title: 'Aviso ya borrado' })],
+    });
+    mswServer.use(...store.handlers);
+
+    renderNoticeBoardPanel({ role: 'TEACHER' });
+    await screen.findByText('Aviso ya borrado');
+
+    // Someone else removes it first, so the teacher's own DELETE gets a real 404.
+    const [existing] = store.getItems();
+    await fetch(
+      `${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}/announcements/${existing!.id}`,
+      { method: 'DELETE' },
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Confirmar eliminación' }),
+    );
+
+    expect(
+      await screen.findByText('El anuncio ya no estaba'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Alguien lo eliminó antes. Actualizamos el tablón.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('No pudimos eliminar el anuncio'),
+    ).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Tablón de anuncios' }),
+      ).toHaveFocus();
+    });
+  });
+
+  it('moves focus to the board heading after a successful edit save', async () => {
+    const store = createClassroomAnnouncementsStore({
+      classroomId: CLASSROOM_ID,
+      authorId: profile.id,
+      initialItems: [makeAnnouncement({ title: 'Aviso a guardar' })],
+    });
+    mswServer.use(...store.handlers);
+
+    renderNoticeBoardPanel({ role: 'TEACHER' });
+    await screen.findByText('Aviso a guardar');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    fireEvent.change(screen.getByLabelText('Título'), {
+      target: { value: 'Aviso guardado' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('heading', { name: 'Editar anuncio' }),
+      ).not.toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: 'Tablón de anuncios' }),
+      ).toHaveFocus();
+    });
+  });
+
   it.each(['edit', 'create'] as const)(
     'locks row Edit and Remove while a %s submit is in flight',
     async (flow) => {

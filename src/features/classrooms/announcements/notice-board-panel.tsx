@@ -209,6 +209,9 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
           : announcementMessages.form.updatedNoticeDescription(saved.title),
     });
     await reconcileAnnouncements(mode === 'create');
+    if (mode === 'edit') {
+      headingRef.current?.focus();
+    }
   }
 
   async function handleConfirmRemove(item: AnnouncementDto) {
@@ -240,10 +243,21 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
         return;
       }
       setPendingConfirmId(null);
-      if (
-        isUncertainAnnouncementError(error) ||
-        (error instanceof ApiError && error.status === 404)
-      ) {
+      if (error instanceof ApiError && error.status === 404) {
+        if (editingAnnouncement?.id === item.id) {
+          setEditingAnnouncement(null);
+        }
+        setActionNotice({
+          kind: 'success',
+          title: announcementMessages.list.alreadyRemovedNoticeTitle,
+          description:
+            announcementMessages.list.alreadyRemovedNoticeDescription,
+        });
+        await reconcileAnnouncements(false);
+        headingRef.current?.focus();
+        return;
+      }
+      if (isUncertainAnnouncementError(error)) {
         await reconcileAnnouncements(false);
       }
       setActionNotice({
