@@ -1013,6 +1013,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/classrooms/{id}/me/report-card": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the authenticated student's graded activities of one classroom
+         * @description One item per graded activity: score, feedback and net credited points, latest grading first. The activity title and maxScore are frozen at grading time, so later activity edits never rewrite the card. Ungraded, deleted and unpublished activities are not listed, like every other student-facing classroom query. This card is the student resource; staff and parents answer 403 (the parent view is HU-ACT-006, out of scope here).
+         */
+        get: operations["StudentMetricsController_reportCard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/me/activity-metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the authenticated student's own daily activity metrics
+         * @description Raw per-UTC-day signals for the caller only: connected seconds, submissions and classroom-channel messages. No composite level is computed (gap 17 stays open); messageCount stays 0 until chat ships.
+         */
+        get: operations["StudentMetricsController_myDailyMetrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/activity-metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the raw per-student activity totals of one classroom
+         * @description Teaching-staff summary: raw totals per active enrolled student (connected seconds, submissions, messages, graded and ungraded submission counts), display name ascending. Students who left keep their daily history but no longer appear here. The school owner and admin read any classroom of their school without membership.
+         */
+        get: operations["ClassroomMetricsController_classroomMetrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2548,6 +2608,72 @@ export interface components {
         };
         CreateForumPostDto: {
             body: string;
+        };
+        ReportCardItemDto: {
+            /**
+             * Format: uuid
+             * @description Graded activity UUID.
+             */
+            activityId: string;
+            /** @description Activity title frozen at grading time; later edits do not change it. */
+            activityTitle: string;
+            /**
+             * @description Activity type.
+             * @enum {string}
+             */
+            activityType: "TP" | "EXAM";
+            /** @description Activity maxScore (0-100) frozen at grading time; later edits do not change it. */
+            maxScore: number;
+            /** @description Awarded score (0..maxScore). */
+            score: number;
+            /** @description Written feedback left by the grader. */
+            feedback: string;
+            /** @description Net credited weighted points for this grade. */
+            pointsAwarded: number;
+            /** @description Whether the submission was late. */
+            isLate: boolean;
+            /**
+             * Format: date-time
+             * @description Submission instant (UTC).
+             */
+            submittedAt: string;
+            /**
+             * Format: date-time
+             * @description Latest grading instant (UTC).
+             */
+            gradedAt: string;
+        };
+        DailyMetricDto: {
+            /**
+             * Format: date
+             * @description UTC calendar date the signals belong to.
+             */
+            day: string;
+            /** @description Aggregated connected seconds reported by the realtime server. */
+            connectedSeconds: number;
+            /** @description Submissions created that day. */
+            submissionCount: number;
+            /** @description Classroom-channel participation events that day. Always 0 until chat (RF-COM-002) ships. */
+            messageCount: number;
+        };
+        StudentMetricSummaryDto: {
+            /**
+             * Format: uuid
+             * @description Enrolled student UUID.
+             */
+            studentId: string;
+            /** @description Student display name. */
+            displayName: string;
+            /** @description Sum of connected seconds across all recorded UTC days. */
+            connectedSeconds: number;
+            /** @description Sum of submission counts across all recorded UTC days. */
+            submissionCount: number;
+            /** @description Sum of message counts across all recorded UTC days. */
+            messageCount: number;
+            /** @description Submissions with a grade in this classroom. */
+            gradedCount: number;
+            /** @description Submissions without a grade yet in this classroom. */
+            ungradedCount: number;
         };
         /** @enum {string} */
         ClassroomPanelKey: "activities" | "material" | "grades" | "chat" | "notices" | "shop" | "bot" | "members" | "settings" | "pet";
@@ -6219,6 +6345,204 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    StudentMetricsController_reportCard: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The student's graded activities, paginated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ReportCardItemDto"][];
+                        /** @example 1 */
+                        page: number;
+                        /** @example 20 */
+                        pageSize: number;
+                        /**
+                         * @description Item count across all pages.
+                         * @example 42
+                         */
+                        total: number;
+                    };
+                };
+            };
+            /** @description Missing or invalid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom, but the caller lacks the role this resource requires. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Malformed, nonexistent, or inaccessible classroom. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    StudentMetricsController_myDailyMetrics: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Raw daily metric rows, latest day first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["DailyMetricDto"][];
+                        /** @example 1 */
+                        page: number;
+                        /** @example 20 */
+                        pageSize: number;
+                        /**
+                         * @description Item count across all pages.
+                         * @example 42
+                         */
+                        total: number;
+                    };
+                };
+            };
+            /** @description Missing or invalid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom, but the caller lacks the role this resource requires. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Malformed, nonexistent, or inaccessible classroom. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ClassroomMetricsController_classroomMetrics: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Raw per-student totals, paginated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["StudentMetricSummaryDto"][];
+                        /** @example 1 */
+                        page: number;
+                        /** @example 20 */
+                        pageSize: number;
+                        /**
+                         * @description Item count across all pages.
+                         * @example 42
+                         */
+                        total: number;
+                    };
+                };
+            };
+            /** @description Missing or invalid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom, but the caller is not teaching staff (students and parents). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Malformed, nonexistent, or inaccessible classroom. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
             };
         };
     };
