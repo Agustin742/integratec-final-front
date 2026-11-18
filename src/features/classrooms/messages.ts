@@ -18,6 +18,7 @@ export const classroomMessages = {
     settings: 'Configuración',
   },
   role: 'Tu rol en esta aula',
+  backToList: 'Volver a mis aulas',
   errorTitle: 'No pudimos cargar el aula',
   errorDescription: 'Revisá tu conexión e intentá de nuevo.',
   roles: {

@@ -6,14 +6,20 @@ import {
   useState,
   type RefObject,
 } from 'react';
-import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
+import {
+  Link,
+  Outlet,
+  useLocation,
+  useNavigate,
+  useParams,
+} from 'react-router';
 import type { components } from '@/api/schema.generated';
 import { NotFoundPage } from '@/app/pages/not-found-page';
 import { useDocumentTitle } from '@/app/router/document-title';
 import { ErrorState, LoadingState } from '@/components/feedback/states';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { useSessionCleanup, useSessionSnapshot } from '@/session/provider';
 import { Classroom2DLayout } from './classroom-2d-layout';
 import { Classroom3DStage } from './classroom-3d-stage';
@@ -242,17 +248,39 @@ function WorkspaceContext({
       >
         <header className="min-w-0 space-y-3">
           <div className="flex min-w-0 flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0 space-y-1.5">
-              <h2
-                ref={heading}
-                tabIndex={-1}
-                className="font-display text-2xl font-semibold text-foreground wrap-anywhere"
+            <div className="flex min-w-0 items-start gap-3">
+              <Link
+                to="/classrooms"
+                aria-label={messages.backToList}
+                title={messages.backToList}
+                className={buttonVariants({ variant: 'ghost', size: 'icon' })}
               >
-                {classroom.name}
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                {messages.role}: {messages.roles[classroom.myRole]}
-              </p>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="size-5"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <path d="M19 12H5M12 19l-7-7 7-7" />
+                </svg>
+              </Link>
+              <div className="min-w-0 space-y-1.5">
+                <h2
+                  ref={heading}
+                  tabIndex={-1}
+                  className="font-display text-2xl font-semibold text-foreground wrap-anywhere"
+                >
+                  {classroom.name}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {messages.role}: {messages.roles[classroom.myRole]}
+                </p>
+              </div>
             </div>
             {!isParent && (
               <div className="flex flex-wrap items-center gap-2.5">
