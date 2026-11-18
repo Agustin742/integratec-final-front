@@ -67,6 +67,6 @@ Synthetic component tests cover loading, server name/parent metadata, exact Outl
 
 ## Deferred
 
-Panel business content beyond the delivered `members` staff roster (`#33`), full in-scene 3D furniture/interactions, and parent tools are not delivered. Panel registration, nested URL opening, and accessible 2D Classic Mode navigation (`#34`) are provided; the remaining eight minimum entries explicitly identify their content as pending. B/SSE invalidation is consumed, but this slice promises no globally instantaneous propagation. Login return destinations remain restricted to `/`.
+Panel business content beyond the delivered `members` staff tabs (roster `#33` and `invite_members`-gated invitations/join-code `#32`), full in-scene 3D furniture/interactions, and parent tools are not delivered. Panel registration, nested URL opening, and accessible 2D Classic Mode navigation (`#34`) are provided; the remaining seven minimum entries explicitly identify their content as pending. B/SSE invalidation is consumed, but this slice promises no globally instantaneous propagation. Login return destinations remain restricted to `/`.
 
 See [routing](./routing.md), [state ownership](../rules/state-management.md), and [classroom authority](../rules/classrooms-and-roles.md).
