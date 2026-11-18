@@ -238,8 +238,9 @@ function ClassroomFormContent({
     return () => {
       isMountedRef.current = false;
       abortControllerRef.current?.abort();
+      onSubmittingChange(false);
     };
-  }, []);
+  }, [onSubmittingChange]);
 
   useEffect(() => {
     onCanDismissChange(confirmNavigation);
@@ -291,9 +292,7 @@ function ClassroomFormContent({
         if (error.kind === 'forbidden' || error.status === 403) {
           onForbidden(mode.kind);
         }
-        if (mode.kind === 'edit') {
-          onReconcileRequired();
-        }
+        onReconcileRequired();
       } else if (isUncertainWriteError(error)) {
         onReconcileRequired();
       }
@@ -302,9 +301,7 @@ function ClassroomFormContent({
       if (abortControllerRef.current === controller) {
         abortControllerRef.current = null;
       }
-      if (isMountedRef.current) {
-        onSubmittingChange(false);
-      }
+      onSubmittingChange(false);
     }
   };
 

@@ -494,8 +494,14 @@ describe('ClassroomListPage (/)', () => {
   });
 
   test('S2: handles forced 403 forbidden on create without pretending success', async () => {
+    let listRequests = 0;
     mswServer.use(
-      createClassroomListHandler({ items: [] }),
+      createClassroomListHandler({
+        resolveResponse: () => {
+          listRequests += 1;
+          return { items: [], page: 1, pageSize: 20, total: 0 };
+        },
+      }),
       createCreateClassroomHandler({
         error: {
           status: 403,
@@ -532,6 +538,9 @@ describe('ClassroomListPage (/)', () => {
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
       classroomMessages.form.errors.forbidden,
     );
+    await waitFor(() => {
+      expect(listRequests).toBeGreaterThanOrEqual(2);
+    });
 
     // Close dialog (no unsaved prompt or confirm): creation controls must now be gone.
     vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -1475,5 +1484,98 @@ describe('ClassroomListPage (/)', () => {
     expect(
       screen.queryByText(classroomMessages.list.emptyTitle),
     ).not.toBeInTheDocument();
+  });
+
+  test('resets dialog submitting lock when unmounted mid-flight by switching active context', async () => {
+    let releaseCreate!: () => void;
+    const createGate = new Promise<void>((resolve) => {
+      releaseCreate = resolve;
+    });
+
+    mswServer.use(
+      createClassroomListHandler({
+        items: [independentTeacherClassroom, schoolTeacherClassroom],
+      }),
+      createCreateClassroomHandler({
+        resolveResponse: async () => {
+          await createGate;
+          return {
+            ...independentTeacherClassroom,
+            id: '4e5f6a7b-0000-4000-8000-000000000999',
+            name: 'Aula interrumpida',
+            deskCount: 12,
+            pet: null,
+          };
+        },
+      }),
+    );
+
+    renderHomeRoute();
+
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: classroomMessages.list.createAction,
+      }),
+    );
+
+    const dialog = await screen.findByRole('dialog', {
+      name: classroomMessages.form.createTitle,
+    });
+    fireEvent.change(
+      within(dialog).getByLabelText(classroomMessages.form.fields.name.label),
+      { target: { value: 'Aula interrumpida' } },
+    );
+    fireEvent.click(
+      within(dialog).getByRole('button', {
+        name: classroomMessages.form.actions.createSubmit,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(
+        within(dialog).getByRole('button', {
+          name: classroomMessages.form.actions.createPending,
+        }),
+      ).toHaveAttribute('aria-disabled', 'true');
+    });
+
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const switcher = screen.getByRole('region', {
+      name: classroomMessages.list.contextSwitcher.regionLabel,
+      hidden: true,
+    });
+    fireEvent.click(
+      within(switcher).getByRole('button', {
+        name: /Docente independiente/,
+        hidden: true,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    releaseCreate();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: classroomMessages.list.createAction,
+      }),
+    );
+    const reopenedDialog = await screen.findByRole('dialog', {
+      name: classroomMessages.form.createTitle,
+    });
+    fireEvent.click(
+      within(reopenedDialog).getByRole('button', {
+        name: classroomMessages.form.actions.cancel,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
   });
 });

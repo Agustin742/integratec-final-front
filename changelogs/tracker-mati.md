@@ -1,5 +1,15 @@
 # Tracker — Mati
 
+## 2026-11-18 — PR #84 review fixes (unmount submitting reset and 403 create reconciliation) (#30)
+
+- **Status:** completed (pushed to `feat/30-classrooms-list-and-create` on [PR #84](https://github.com/Agustin742/integratec-final-front/pull/84)).
+- **Area / files:** `src/features/classrooms/classroom-form.tsx`, `src/features/classrooms/classroom-list-page.test.tsx`, and this tracker.
+- **Change:** Applied two non-blocking review fixes from the PR #84 audit:
+  1. Reset `onSubmittingChange(false)` both in `ClassroomFormContent` unmount cleanup and unconditionally inside `finally` so closing/unmounting the dialog mid-flight never leaves `ClassroomFormDialog` locked (`submitting === true`) on reopen.
+  2. Triggered `onReconcileRequired()` on `403`/`404` regardless of `mode.kind` so a `403` during `create` also reconciles stale list capabilities immediately.
+  3. Added regression assertions in `src/features/classrooms/classroom-list-page.test.tsx` (kept `clampListParam` inside `src/api/query-keys.ts` to avoid a circular dependency with `src/components/pagination/pagination.ts`).
+- **Verification:** `prettier`, `vitest` (3 files, `30/30`: `classroom-list-page.test.tsx` 15, `classroom-service.test.ts` 8, `query-client.test.tsx` 7), `lint`, `typecheck`, `build` (`423` modules), `security:check`, and `git diff --check` verified cleanly after the final code edit.
+
 ## 2026-11-17 — Implement virtual classroom list and creation/configuration screens (#30)
 
 - **Status:** completed
