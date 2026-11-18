@@ -152,7 +152,6 @@ function setup(
   };
 }
 const pendingCatalogCases = [
-  ['activities', 'Actividades'],
   ['grades', 'Calificaciones'],
   ['chat', 'Chat'],
   ['notices', 'Avisos'],
@@ -197,6 +196,19 @@ test('default catalog opens material by URL with MaterialPanel and closes cleanl
   const view = setup(['material'], '/classrooms/a/panels/material', true);
   const dialog = await screen.findByRole('dialog', { name: 'Material' });
   expect(dialog).toHaveTextContent('Cargando material del aula…');
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+  await screen.findByRole('button', { name: 'Open grades' });
+  expect(view.router.state.location.pathname).toBe('/classrooms/a');
+  expect(view.router.state.historyAction).toBe('REPLACE');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(document.activeElement).toHaveTextContent('Classroom a');
+});
+
+test('default catalog opens activities by URL with ActivitiesPanel and closes cleanly', async () => {
+  const view = setup(['activities'], '/classrooms/a/panels/activities', true);
+  const dialog = await screen.findByRole('dialog', { name: 'Actividades' });
+  expect(dialog).toHaveTextContent('Actividades');
+  expect(dialog).not.toHaveTextContent('Funcionalidad pendiente');
   fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
   await screen.findByRole('button', { name: 'Open grades' });
   expect(view.router.state.location.pathname).toBe('/classrooms/a');
