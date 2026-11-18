@@ -504,6 +504,26 @@ export function classroomActivityDetailQueryKey(
   );
 }
 
+/**
+ * Key of `GET /activities/{activityId}/submissions/me`: the calling student's
+ * own submission to one activity. The contract marks the response as not
+ * cacheable, so consumers keep it fresh rather than relying on cached reads.
+ */
+export function classroomActivitySubmissionQueryKey(
+  userId: string,
+  classroomId: string,
+  activityId: string,
+): ScopedQueryKey<{ readonly activityId: string }> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'activities',
+    'submission',
+    Object.freeze({
+      activityId: normalizeRequiredText(activityId, 'activityId'),
+    }),
+  );
+}
+
 export interface AnnouncementListQueryParams {
   readonly page?: number;
   readonly pageSize?: number;
