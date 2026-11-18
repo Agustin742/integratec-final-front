@@ -1,6 +1,5 @@
-import { messages } from '../messages';
-import { AuthPlaceholderPage } from './auth-placeholder-page';
+import { InvitationAcceptView } from '@/features/classrooms/invitation-accept-view';
 
 export function InvitationAcceptPage() {
-  return <AuthPlaceholderPage {...messages.pages.invitationAccept} />;
+  return <InvitationAcceptView />;
 }

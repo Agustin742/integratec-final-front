@@ -4,6 +4,9 @@ import type { components } from '@/api/schema.generated';
 import { NotFoundPage } from '@/app/pages/not-found-page';
 import { useDocumentTitle } from '@/app/router/document-title';
 import { ErrorState, LoadingState } from '@/components/feedback/states';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { joinMessages } from './join-messages';
+import { readClassroomJoinOutcome } from './join-schema';
 import { classroomMessages as messages } from './messages';
 import { useClassroomContext } from './use-classroom-capabilities';
 import { useClassroomContextEvents } from './use-classroom-context-events';
@@ -92,6 +95,7 @@ function WorkspaceContext({
     );
   }
   const { classroom, userId } = context;
+  const joinOutcome = readClassroomJoinOutcome(location.state, classroomId);
   // Types describe the published contract, not validation of network bytes.
   // Missing or malformed availability never falls back to role/capabilities.
   const keys: unknown = classroom.availablePanels;
@@ -122,6 +126,34 @@ function WorkspaceContext({
             {messages.role}: {messages.roles[classroom.myRole]}
           </p>
         </header>
+        {joinOutcome && (
+          <Alert
+            variant={joinOutcome.alreadyMember ? 'info' : 'success'}
+            role="status"
+            aria-live="polite"
+            data-testid="classroom-join-outcome"
+          >
+            <AlertTitle as="h3">
+              {joinOutcome.alreadyMember
+                ? joinMessages.outcome.alreadyMemberTitle
+                : joinMessages.outcome.joinedTitle}
+            </AlertTitle>
+            <AlertDescription>
+              {joinOutcome.role === 'TEACHER'
+                ? joinOutcome.alreadyMember
+                  ? joinMessages.outcome.teacherAlreadyMemberBody
+                  : joinMessages.outcome.teacherJoinedBody
+                : joinOutcome.alreadyMember
+                  ? joinMessages.outcome.alreadyMemberBody
+                  : joinMessages.outcome.joinedBody}{' '}
+              {joinOutcome.desk
+                ? joinMessages.outcome.formatAssignedDesk(
+                    joinOutcome.desk.deskIndex,
+                  )
+                : joinMessages.outcome.noDeskAssigned}
+            </AlertDescription>
+          </Alert>
+        )}
         <Outlet
           key={location.key}
           context={{ ...classroom, claimPanelRoute, closePanelRoute }}

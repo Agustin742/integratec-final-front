@@ -64,6 +64,18 @@ Successful confirmation calls the existing session controller logout path, synch
 
 ![Password reset mobile screen (360px)](./assets/auth/password-reset-360.png)
 
+## Invitation acceptance & join by classroom code (`/invitations/accept`)
+
+The `/invitations/accept` route (`src/app/pages/invitation-accept-page.tsx`, rendering `InvitationAcceptView` from `src/features/classrooms/invitation-accept-view.tsx`) is mounted inside `AuthLayout` outside `PublicOnly` and `RequireAuth`, and branches explicitly on session state:
+
+- **Unauthenticated gate (`status === 'unauthenticated'`):** Renders no classroom data, invitation form, or join-by-code inputs, and exposes explicit links to `/login?next=...` and `/register?next=...` carrying only `safeSessionRedirect`-approved return locations (`/invitations/accept` or single-parameter `/invitations/accept?token=<token>`). After signing in, `PublicOnly` automatically returns the user to `/invitations/accept`.
+- **Email invitation mode (`status === 'authenticated'` with `?token=`):** Latches the validated query token in React component state and immediately removes `?token=` from the URL via `replace` navigation with a non-secret `invitationTokenScrubbed` marker (`TM-006`). Requires explicit user confirmation before sending `POST /invitations/accept`, never blocks acceptance on account email mismatch, guards concurrent clicks, and maps invalid/expired/revoked/used (`400`/`404`), conflict (`409`), rate-limit (`429`), and network failures to privacy-safe `es-AR` alerts.
+- **Join-by-code mode (`status === 'authenticated'`):** Presents a single alphanumeric code field (`POST /classrooms/join`) with no role selector (student role only), preserves typed input on failure for correction, and never persists codes in client storage. On `200`/`201` success, invalidates user classroom queries and navigates to `/classrooms/:classroomId` passing transient `joinOutcome` state so `ClassroomWorkspace` displays an accessible `role="status"` enrollment banner (differentiating new enrollment from idempotent `alreadyMember: true` re-join and showing the assigned desk).
+
+![Student classroom join desktop screen (1280px)](./assets/classrooms/join-classroom-1280.png)
+
+![Student classroom join mobile screen (360px)](./assets/classrooms/join-classroom-360.png)
+
 ## Guards
 
 Guards are components that read `useSessionSnapshot()`; auth is not decided in loaders, because the session is asynchronous and owned by the session controller (see [session lifecycle](./session-lifecycle.md)).
@@ -105,7 +117,7 @@ It shows loading while pending, forbidden when the server did not grant the capa
 
 1. Add the route to the `protected` branch in `createAppRoutes` (or use `protectedRoutes` in tests) as a lazy module, and render a heading with `PlaceholderPage` or call `useDocumentTitle` yourself.
 2. If it needs a capability, nest it under `RequireCapability`.
-3. To let login return the user to it, add its exact path to `APPROVED_DESTINATIONS` in `src/session/redirect.ts`. Today only `/` is approved and matching is exact, so any other path falls back to `/`. Dynamic classroom paths are deliberately not approved in this foundation; opening one while signed out leads to login with `/` as the safe return destination. Expanding that allowlist needs a separate scoped change. `safeSessionRedirect` takes an optional allowlist only so tests can prove forwarding; application code never passes it.
+3. To let login return the user to it, add its exact path to `APPROVED_DESTINATIONS` in `src/session/redirect.ts`. Today `/` and `/invitations/accept` (including single-parameter `/invitations/accept?token=<token>` targets validated against length and character bounds) are approved; any other path falls back to `/`. Dynamic classroom paths are deliberately not approved in this foundation; opening one while signed out leads to login with `/` as the safe return destination. Expanding that allowlist needs a separate scoped change. `safeSessionRedirect` takes an optional allowlist only so tests can prove forwarding; application code never passes it.
 4. Add tests with `createMemoryRouter(createAppRoutes({ protectedRoutes }))`.
 
 ## Hosting requirement for deep links
