@@ -34,6 +34,8 @@ export interface AnnouncementFormProps {
   readonly classroomId: string;
   readonly mode: AnnouncementFormMode;
   readonly onSubmitStart?: () => void;
+  readonly onSubmitSettled?: () => void;
+  readonly onEditTargetMissing?: () => void;
   readonly onSuccess: (saved: AnnouncementDto, mode: 'create' | 'edit') => void;
   readonly onReconcileRequired: (resetPage: boolean) => void;
   readonly onCancelEdit?: () => void;
@@ -43,6 +45,8 @@ export function AnnouncementForm({
   classroomId,
   mode,
   onSubmitStart,
+  onSubmitSettled,
+  onEditTargetMissing,
   onSuccess,
   onReconcileRequired,
   onCancelEdit,
@@ -109,10 +113,11 @@ export function AnnouncementForm({
         if (isAbortError(error)) {
           return;
         }
-        if (
-          isUncertainAnnouncementError(error) ||
-          (isEdit && error instanceof ApiError && error.status === 404)
-        ) {
+        if (isEdit && error instanceof ApiError && error.status === 404) {
+          onEditTargetMissing?.();
+          return;
+        }
+        if (isUncertainAnnouncementError(error)) {
           onReconcileRequired(!isEdit);
         }
         if (error instanceof ApiError) {
@@ -124,6 +129,8 @@ export function AnnouncementForm({
           code: null,
           userMessage: announcementMessages.form.serverErrors.uncertain,
         });
+      } finally {
+        onSubmitSettled?.();
       }
     },
   );

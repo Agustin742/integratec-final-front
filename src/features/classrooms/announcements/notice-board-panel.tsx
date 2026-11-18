@@ -59,6 +59,7 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
   const [editingAnnouncement, setEditingAnnouncement] =
     useState<AnnouncementDto | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [isFormSubmitting, setIsFormSubmitting] = useState(false);
   const [pendingConfirmId, setPendingConfirmId] = useState<string | null>(null);
   const [actionNotice, setActionNotice] = useState<{
     readonly kind: 'success' | 'error';
@@ -69,6 +70,7 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
   const removingRef = useRef(false);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
   const unmountAbortRef = useRef<AbortController | null>(null);
+  const editPageRef = useRef(1);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -117,6 +119,39 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
     await queryClient.invalidateQueries({
       predicate: createClassroomAnnouncementsPredicate(userId, classroomId),
     });
+    if (
+      editingAnnouncement === null ||
+      resetPage ||
+      editPageRef.current !== page
+    ) {
+      return;
+    }
+    const refreshed = queryClient.getQueryData<{
+      readonly items: readonly AnnouncementDto[];
+    }>(
+      classroomAnnouncementsQueryKey(userId, classroomId, {
+        page,
+        pageSize: PAGE_SIZE,
+      }),
+    );
+    if (
+      refreshed &&
+      !refreshed.items.some((item) => item.id === editingAnnouncement.id)
+    ) {
+      setEditingAnnouncement(null);
+      headingRef.current?.focus();
+    }
+  }
+
+  function handleEditTargetMissing() {
+    setEditingAnnouncement(null);
+    setActionNotice({
+      kind: 'error',
+      title: announcementMessages.form.editMissingNoticeTitle,
+      description: announcementMessages.form.serverErrors.notFound,
+    });
+    void reconcileAnnouncements(false);
+    headingRef.current?.focus();
   }
 
   async function handleFormSuccess(
@@ -297,7 +332,12 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
               ? { kind: 'edit', announcement: editingAnnouncement }
               : { kind: 'create' }
           }
-          onSubmitStart={() => setActionNotice(null)}
+          onSubmitStart={() => {
+            setIsFormSubmitting(true);
+            setActionNotice(null);
+          }}
+          onSubmitSettled={() => setIsFormSubmitting(false)}
+          onEditTargetMissing={handleEditTargetMissing}
           onSuccess={(saved, mode) => {
             void handleFormSuccess(saved, mode);
           }}
@@ -358,10 +398,12 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
                 canModifyItem={canModifyItem}
                 editingId={editingAnnouncement?.id ?? null}
                 removingId={removingId}
+                actionsLocked={isFormSubmitting}
                 pendingConfirmId={pendingConfirmId}
                 onStartEdit={(item) => {
                   setActionNotice(null);
                   setPendingConfirmId(null);
+                  editPageRef.current = page;
                   setEditingAnnouncement(item);
                 }}
                 onRequestRemove={(id) => {

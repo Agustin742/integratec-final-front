@@ -10,6 +10,7 @@ export interface AnnouncementListProps {
   readonly canModifyItem: (item: AnnouncementDto) => boolean;
   readonly editingId: string | null;
   readonly removingId: string | null;
+  readonly actionsLocked?: boolean;
   readonly pendingConfirmId: string | null;
   readonly onStartEdit: (item: AnnouncementDto) => void;
   readonly onRequestRemove: (announcementId: string) => void;
@@ -22,6 +23,7 @@ export function AnnouncementList({
   canModifyItem,
   editingId,
   removingId,
+  actionsLocked = false,
   pendingConfirmId,
   onStartEdit,
   onRequestRemove,
@@ -96,7 +98,7 @@ export function AnnouncementList({
                       type="button"
                       variant="outline"
                       size="sm"
-                      disabled={isRemoving || isEditing}
+                      disabled={actionsLocked || isRemoving || isEditing}
                       onClick={() => onStartEdit(item)}
                     >
                       {announcementMessages.list.editLabel}
@@ -108,7 +110,7 @@ export function AnnouncementList({
                       type="button"
                       variant="outline"
                       size="sm"
-                      disabled={removingId !== null}
+                      disabled={actionsLocked || removingId !== null}
                       onClick={() => onRequestRemove(item.id)}
                     >
                       {isRemoving

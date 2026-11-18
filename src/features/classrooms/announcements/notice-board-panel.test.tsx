@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -483,4 +484,131 @@ describe('NoticeBoardPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
     expect(await screen.findByText('Aviso 01')).toBeInTheDocument();
   });
+
+  it('closes the edit form and shows an error notice when the edited announcement is gone (404)', async () => {
+    const store = createClassroomAnnouncementsStore({
+      classroomId: CLASSROOM_ID,
+      authorId: profile.id,
+      initialItems: [makeAnnouncement({ title: 'Aviso a editar' })],
+    });
+    mswServer.use(...store.handlers);
+
+    renderNoticeBoardPanel({ role: 'TEACHER' });
+    await screen.findByText('Aviso a editar');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    expect(
+      screen.getByRole('heading', { name: 'Editar anuncio' }),
+    ).toBeInTheDocument();
+
+    store.failNext('update', {
+      status: 404,
+      body: {
+        code: 'NOT_FOUND',
+        message: 'Announcement not found.',
+        correlationId: 'req-update-404',
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    expect(
+      await screen.findByText(/ya no existen o dejaron de ser accesibles/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Editar anuncio' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Publicar anuncio' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Tablón de anuncios' }),
+    ).toHaveFocus();
+  });
+
+  it.each(['edit', 'create'] as const)(
+    'locks row Edit and Remove while a %s submit is in flight',
+    async (flow) => {
+      const store = createClassroomAnnouncementsStore({
+        classroomId: CLASSROOM_ID,
+        authorId: profile.id,
+        initialItems: [
+          makeAnnouncement({
+            id: '00000000-0000-4000-8000-000000002101',
+            title: 'Primer aviso',
+            createdAt: '2026-11-17T09:00:00.000Z',
+            updatedAt: '2026-11-17T09:00:00.000Z',
+          }),
+          makeAnnouncement({
+            id: '00000000-0000-4000-8000-000000002102',
+            title: 'Segundo aviso',
+            createdAt: '2026-11-18T09:00:00.000Z',
+            updatedAt: '2026-11-18T09:00:00.000Z',
+          }),
+        ],
+      });
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const savedItem = makeAnnouncement({
+        id: '00000000-0000-4000-8000-000000002103',
+        title: 'Guardado',
+      });
+      const slow = flow === 'edit' ? http.patch : http.post;
+      const path =
+        flow === 'edit'
+          ? `${TEST_API_BASE_URL}/classrooms/:id/announcements/:announcementId`
+          : `${TEST_API_BASE_URL}/classrooms/:id/announcements`;
+      mswServer.use(
+        ...store.handlers,
+        slow(path, async () => {
+          await gate;
+          return HttpResponse.json(savedItem, {
+            status: flow === 'edit' ? 200 : 201,
+          });
+        }),
+      );
+
+      renderNoticeBoardPanel({ role: 'TEACHER' });
+      await screen.findByText('Primer aviso');
+
+      if (flow === 'edit') {
+        fireEvent.click(screen.getAllByRole('button', { name: 'Editar' })[0]!);
+        fireEvent.click(
+          screen.getByRole('button', { name: 'Guardar cambios' }),
+        );
+      } else {
+        fireEvent.change(screen.getByLabelText('Título'), {
+          target: { value: 'Nuevo aviso' },
+        });
+        fireEvent.change(screen.getByLabelText('Contenido'), {
+          target: { value: 'Contenido nuevo.' },
+        });
+        fireEvent.click(
+          screen.getByRole('button', { name: 'Publicar anuncio' }),
+        );
+      }
+
+      await waitFor(() => {
+        for (const button of screen.getAllByRole('button', {
+          name: /^(Editar|Eliminar)$/,
+        })) {
+          expect(button).toBeDisabled();
+        }
+      });
+      expect(
+        screen.getAllByRole('button', { name: /^(Editar|Eliminar)$/ }),
+      ).toHaveLength(4);
+
+      release();
+
+      await waitFor(() => {
+        for (const button of screen.getAllByRole('button', {
+          name: /^(Editar|Eliminar)$/,
+        })) {
+          expect(button).toBeEnabled();
+        }
+      });
+    },
+  );
 });

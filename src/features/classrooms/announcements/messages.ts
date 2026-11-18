@@ -67,6 +67,7 @@ export const announcementMessages = {
     publishedNoticeDescription: (title: string) =>
       `"${title}" ya está visible en el tablón del aula.`,
     updatedNoticeTitle: 'Anuncio actualizado',
+    editMissingNoticeTitle: 'No pudimos guardar los cambios',
     updatedNoticeDescription: (title: string) =>
       `Se guardaron los cambios en "${title}".`,
     serverErrors: {
