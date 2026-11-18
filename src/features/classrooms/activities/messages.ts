@@ -77,13 +77,19 @@ export const activityMessages = {
       forum: 'Foro de consultas',
       review: 'Revisión docente',
     },
+    dueAtTerm: 'Fecha límite',
+    opensAtTerm: 'Apertura',
+    maxScoreTerm: 'Puntaje máximo',
+    weightTerm: 'Ponderación',
+    weightValue: (multiplier: number) => `×${multiplier}`,
+    latePolicyTerm: 'Entrega tardía',
     pendingTabTitle: 'Sección disponible próximamente',
     submissionPendingDescription:
-      'La entrega de archivos y resolución de exámenes se habilitará en las próximas historias (HU-ACT-003).',
+      'Próximamente vas a poder subir tu entrega o resolver el examen desde esta sección.',
     forumPendingDescription:
-      'El foro de consultas de esta actividad se habilitará en HU-COM-003.',
+      'Próximamente vas a poder hacer consultas y leer respuestas sobre esta actividad.',
     reviewPendingDescription:
-      'La cola de revisión y calificación docente se habilitará en HU-ACT-004.',
+      'Próximamente vas a poder revisar entregas y calificar esta actividad desde esta sección.',
     questionsHeading: 'Consignas de múltiple opción',
     correctOptionBadge: 'Correcta',
   },

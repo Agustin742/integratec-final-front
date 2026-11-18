@@ -79,10 +79,20 @@ const teacherQuestionSchema = z.object({
   options: z.array(teacherOptionSchema),
 });
 
-export const activityDetailDtoSchema: z.ZodType<ActivityDetailDto> = z.object({
-  ...baseActivityFields,
-  questions: z.union([
-    z.array(teacherQuestionSchema),
-    z.array(studentQuestionSchema),
-  ]),
-});
+const teacherActivityDetailDtoSchema: z.ZodType<TeacherActivityResponseDto> =
+  z.object({
+    ...baseActivityFields,
+    createdById: z.string().uuid(),
+    questions: z.array(teacherQuestionSchema),
+  });
+
+const studentActivityDetailDtoSchema: z.ZodType<StudentActivityResponseDto> =
+  z.object({
+    ...baseActivityFields,
+    questions: z.array(studentQuestionSchema),
+  });
+
+export const activityDetailDtoSchema: z.ZodType<ActivityDetailDto> = z.union([
+  teacherActivityDetailDtoSchema,
+  studentActivityDetailDtoSchema,
+]);

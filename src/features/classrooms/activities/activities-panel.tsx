@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router';
 import { ApiError } from '@/api/errors';
@@ -17,30 +17,15 @@ import {
 } from '@/components/feedback/states';
 import { PaginationControls } from '@/components/pagination/pagination-controls';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { DEFAULT_SCHOOL_TIME_ZONE, formatDeadline } from '@/lib/dates';
+import { Button, buttonStyles } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { useSessionService } from '@/session/provider';
-import {
-  useClassroomCapabilities,
-  useClassroomContext,
-} from '../use-classroom-capabilities';
+import { useClassroomContext } from '../use-classroom-capabilities';
 import { listClassroomActivities } from './activity-service';
+import { formatActivityDeadline } from './format-activity-deadline';
 import { activityMessages } from './messages';
 
 const PAGE_SIZE = 10;
-
-function formatActivityDeadline(iso: string, timeZone: string): string {
-  const safeZone = timeZone.trim() || DEFAULT_SCHOOL_TIME_ZONE;
-  try {
-    return formatDeadline(iso, { timeZone: safeZone });
-  } catch {
-    try {
-      return formatDeadline(iso, { timeZone: DEFAULT_SCHOOL_TIME_ZONE });
-    } catch {
-      return `${iso} (${safeZone})`;
-    }
-  }
-}
 
 export function ActivitiesPanel() {
   const { classroomId } = useParams();
@@ -66,17 +51,22 @@ function ActivitiesPanelContent({ classroomId }: { classroomId: string }) {
   const { client } = useSessionService();
   const queryClient = useQueryClient();
   const context = useClassroomContext(classroomId);
-  const capabilities = useClassroomCapabilities(classroomId);
 
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState<ActivitySortOrder>('dueAt');
   const [stateFilter, setStateFilter] = useState<ActivityStateFilter | 'ALL'>(
     'ALL',
   );
+  const reconciledErrorRef = useRef<unknown>(null);
+  const terminalCleanupRef = useRef<{
+    readonly userId: string;
+    readonly classroomId: string;
+  } | null>(null);
 
   const userId = context.status === 'ready' ? context.userId : null;
   const isStaff =
-    capabilities.status === 'ready' && capabilities.can('publish_content');
+    context.status === 'ready' &&
+    context.classroom.capabilities.includes('publish_content');
   const effectiveState =
     isStaff && stateFilter !== 'ALL' ? stateFilter : undefined;
 
@@ -98,24 +88,60 @@ function ActivitiesPanelContent({ classroomId }: { classroomId: string }) {
   });
 
   const listError = query.error instanceof ApiError ? query.error : null;
+  const isAccessError =
+    query.isError && (listError?.status === 403 || listError?.status === 404);
 
   useEffect(() => {
-    if (
-      userId === null ||
-      !query.isError ||
-      (listError?.status !== 403 && listError?.status !== 404)
-    ) {
+    if (!query.isError) {
+      reconciledErrorRef.current = null;
+      if (userId !== null) {
+        terminalCleanupRef.current = null;
+      }
       return;
     }
+    if (userId === null || !isAccessError) {
+      return;
+    }
+    terminalCleanupRef.current = { userId, classroomId };
+    // Clear other cached pages/filters without deleting the active query,
+    // which would otherwise recreate and refetch in a loop while mounted.
     queryClient.removeQueries({
       predicate: createClassroomActivitiesPredicate(userId, classroomId),
+      type: 'inactive',
     });
-    if (listError.status === 404) {
+    if (
+      listError?.status === 404 &&
+      reconciledErrorRef.current !== query.error
+    ) {
+      reconciledErrorRef.current = query.error;
       void queryClient.invalidateQueries({
         queryKey: classroomDetailQueryKey(userId, classroomId),
+        exact: true,
       });
     }
-  }, [classroomId, listError?.status, query.isError, queryClient, userId]);
+  }, [
+    classroomId,
+    isAccessError,
+    listError?.status,
+    query.error,
+    query.isError,
+    queryClient,
+    userId,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      const cleanup = terminalCleanupRef.current;
+      if (cleanup !== null) {
+        queryClient.removeQueries({
+          predicate: createClassroomActivitiesPredicate(
+            cleanup.userId,
+            cleanup.classroomId,
+          ),
+        });
+      }
+    };
+  }, [queryClient]);
 
   if (context.status === 'pending') {
     return <LoadingState label={activityMessages.loadingLabel} />;
@@ -215,7 +241,7 @@ function ActivitiesPanelContent({ classroomId }: { classroomId: string }) {
               setSort(event.target.value as ActivitySortOrder);
               setPage(1);
             }}
-            className="min-h-10 rounded-xl border-2 border-field-border bg-card px-3 py-1.5 text-sm font-normal text-card-foreground focus-visible:border-primary focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
+            className="min-h-11 rounded-xl border-2 border-field-border bg-card px-3 py-1.5 text-sm font-normal text-card-foreground focus-visible:border-primary focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
           >
             <option value="dueAt">{activityMessages.sortOptions.dueAt}</option>
             <option value="-dueAt">
@@ -241,7 +267,7 @@ function ActivitiesPanelContent({ classroomId }: { classroomId: string }) {
                 );
                 setPage(1);
               }}
-              className="min-h-10 rounded-xl border-2 border-field-border bg-card px-3 py-1.5 text-sm font-normal text-card-foreground focus-visible:border-primary focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
+              className="min-h-11 rounded-xl border-2 border-field-border bg-card px-3 py-1.5 text-sm font-normal text-card-foreground focus-visible:border-primary focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
             >
               <option value="ALL">{activityMessages.stateFilterAll}</option>
               <option value="PUBLISHED">
@@ -350,7 +376,10 @@ function ActivitiesPanelContent({ classroomId }: { classroomId: string }) {
                         <Link
                           to={`/classrooms/${encodeURIComponent(classroomId)}/activities/${encodeURIComponent(item.id)}`}
                           aria-label={`${activityMessages.openDetailLabel}: ${item.title}`}
-                          className="inline-flex min-h-10 shrink-0 items-center rounded-xl border-2 border-edge bg-card px-3 py-1.5 font-display text-sm font-semibold text-card-foreground focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
+                          className={cn(
+                            buttonStyles({ variant: 'outline', size: 'sm' }),
+                            'shrink-0',
+                          )}
                         >
                           {activityMessages.openDetailLabel}
                         </Link>

@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router';
 import { ApiError } from '@/api/errors';
@@ -15,36 +15,23 @@ import {
 } from '@/components/feedback/states';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DEFAULT_SCHOOL_TIME_ZONE, formatDeadline } from '@/lib/dates';
 import { useSessionService } from '@/session/provider';
-import {
-  useClassroomCapabilities,
-  useClassroomContext,
-} from '../use-classroom-capabilities';
+import { useClassroomContext } from '../use-classroom-capabilities';
+import { useClassroomContextEvents } from '../use-classroom-context-events';
 import type { ActivityDetailDto } from './activity-schema';
 import { getClassroomActivity } from './activity-service';
+import { formatActivityDeadline } from './format-activity-deadline';
 import { activityMessages } from './messages';
 
-export interface ActivityDetailPageProps {
-  /** Extension slot for HU-ACT-003 (student file/MC submission). */
-  readonly renderSubmissionTab?: (activity: ActivityDetailDto) => ReactNode;
-  /** Extension slot for HU-COM-003 (per-activity query forum). */
-  readonly renderForumTab?: (activity: ActivityDetailDto) => ReactNode;
-  /** Extension slot for HU-ACT-004 (teacher review & grading). */
-  readonly renderReviewTab?: (activity: ActivityDetailDto) => ReactNode;
-}
+type ActivityDetailTab = 'overview' | 'submission' | 'forum' | 'review';
 
-function formatActivityDeadline(iso: string, timeZone: string): string {
-  const safeZone = timeZone.trim() || DEFAULT_SCHOOL_TIME_ZONE;
-  try {
-    return formatDeadline(iso, { timeZone: safeZone });
-  } catch {
-    try {
-      return formatDeadline(iso, { timeZone: DEFAULT_SCHOOL_TIME_ZONE });
-    } catch {
-      return `${iso} (${safeZone})`;
-    }
-  }
+export interface ActivityDetailPageProps {
+  /** Extension slot for student file or multiple-choice submission. */
+  readonly renderSubmissionTab?: (activity: ActivityDetailDto) => ReactNode;
+  /** Extension slot for the per-activity query forum. */
+  readonly renderForumTab?: (activity: ActivityDetailDto) => ReactNode;
+  /** Extension slot for teacher review and grading. */
+  readonly renderReviewTab?: (activity: ActivityDetailDto) => ReactNode;
 }
 
 export function ActivityDetailPage({
@@ -93,56 +80,101 @@ function ActivityDetailContent({
   const { client } = useSessionService();
   const queryClient = useQueryClient();
   const context = useClassroomContext(classroomId);
-  const capabilities = useClassroomCapabilities(classroomId);
+  useClassroomContextEvents(classroomId);
+
+  const [activeTab, setActiveTab] = useState<ActivityDetailTab>('overview');
+  const reconciledErrorRef = useRef<unknown>(null);
+  const terminalCleanupRef = useRef<{
+    readonly userId: string;
+    readonly classroomId: string;
+    readonly activityId: string;
+  } | null>(null);
 
   const userId = context.status === 'ready' ? context.userId : null;
   const isStaff =
-    capabilities.status === 'ready' && capabilities.can('publish_content');
-
-  const detailQueryKey = classroomActivityDetailQueryKey(
-    userId ?? 'signed-out',
-    classroomId,
-    activityId,
-  );
+    context.status === 'ready' &&
+    context.classroom.capabilities.includes('publish_content');
+  const canParticipate =
+    context.status === 'ready' &&
+    context.classroom.capabilities.includes('participate_activities');
 
   const query = useQuery({
-    queryKey: detailQueryKey,
+    queryKey: classroomActivityDetailQueryKey(
+      userId ?? 'signed-out',
+      classroomId,
+      activityId,
+    ),
     queryFn: ({ signal }) =>
       getClassroomActivity(client, classroomId, activityId, { signal }),
     enabled: userId !== null,
   });
 
   const apiError = query.error instanceof ApiError ? query.error : null;
+  const isAccessError =
+    query.isError && (apiError?.status === 403 || apiError?.status === 404);
+  const isTerminalError =
+    query.isError &&
+    (apiError?.status === 403 || apiError?.status === 404 || !query.data);
 
-  useDocumentTitle(query.data ? query.data.title : activityMessages.heading);
+  useDocumentTitle(
+    context.status === 'ready' && !isTerminalError && query.data
+      ? query.data.title
+      : activityMessages.heading,
+  );
 
   useEffect(() => {
-    if (
-      userId === null ||
-      !query.isError ||
-      (apiError?.status !== 403 && apiError?.status !== 404)
-    ) {
+    if (!query.isError) {
+      reconciledErrorRef.current = null;
+      if (userId !== null) {
+        terminalCleanupRef.current = null;
+      }
       return;
     }
-    queryClient.removeQueries({ queryKey: detailQueryKey });
-    if (apiError.status === 404) {
+    if (userId === null || !isAccessError) {
+      return;
+    }
+    terminalCleanupRef.current = { userId, classroomId, activityId };
+    if (
+      apiError?.status === 404 &&
+      reconciledErrorRef.current !== query.error
+    ) {
+      reconciledErrorRef.current = query.error;
       void queryClient.invalidateQueries({
         queryKey: classroomDetailQueryKey(userId, classroomId),
+        exact: true,
       });
     }
   }, [
+    activityId,
     apiError?.status,
     classroomId,
-    detailQueryKey,
+    isAccessError,
+    query.error,
     query.isError,
     queryClient,
     userId,
   ]);
 
+  useEffect(() => {
+    return () => {
+      const cleanup = terminalCleanupRef.current;
+      if (cleanup !== null) {
+        queryClient.removeQueries({
+          queryKey: classroomActivityDetailQueryKey(
+            cleanup.userId,
+            cleanup.classroomId,
+            cleanup.activityId,
+          ),
+          exact: true,
+        });
+      }
+    };
+  }, [queryClient]);
+
   const backLink = (
     <Link
       to={`/classrooms/${encodeURIComponent(classroomId)}`}
-      className="inline-flex min-h-10 items-center text-sm font-semibold text-primary underline underline-offset-4 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
+      className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline underline-offset-4 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
     >
       {activityMessages.detail.backToClassroomLabel}
     </Link>
@@ -194,10 +226,6 @@ function ActivityDetailContent({
     );
   }
 
-  const isTerminalError =
-    query.isError &&
-    (apiError?.status === 403 || apiError?.status === 404 || !query.data);
-
   if (isTerminalError) {
     const isForbidden = apiError?.status === 403;
     const isNotFound = apiError?.status === 404;
@@ -239,6 +267,12 @@ function ActivityDetailContent({
     return null;
   }
 
+  const effectiveTab: ActivityDetailTab =
+    (activeTab === 'submission' && !canParticipate) ||
+    (activeTab === 'review' && !isStaff)
+      ? 'overview'
+      : activeTab;
+
   return (
     <section className="mx-auto max-w-4xl space-y-6 px-4 py-6">
       <div className="space-y-3">
@@ -277,19 +311,25 @@ function ActivityDetailContent({
         />
       ) : null}
 
-      <Tabs defaultValue="overview" className="min-w-0 space-y-4">
+      <Tabs
+        value={effectiveTab}
+        onValueChange={(value) => setActiveTab(value as ActivityDetailTab)}
+        className="min-w-0 space-y-4"
+      >
         <TabsList aria-label={activityMessages.detail.tabsLabel}>
-          <TabsTrigger value="overview">
+          <TabsTrigger value="overview" className="min-h-11">
             {activityMessages.detail.tabs.overview}
           </TabsTrigger>
-          <TabsTrigger value="submission">
-            {activityMessages.detail.tabs.submission}
-          </TabsTrigger>
-          <TabsTrigger value="forum">
+          {canParticipate ? (
+            <TabsTrigger value="submission" className="min-h-11">
+              {activityMessages.detail.tabs.submission}
+            </TabsTrigger>
+          ) : null}
+          <TabsTrigger value="forum" className="min-h-11">
             {activityMessages.detail.tabs.forum}
           </TabsTrigger>
           {isStaff ? (
-            <TabsTrigger value="review">
+            <TabsTrigger value="review" className="min-h-11">
               {activityMessages.detail.tabs.review}
             </TabsTrigger>
           ) : null}
@@ -300,7 +340,7 @@ function ActivityDetailContent({
             <dl className="grid gap-3 text-sm sm:grid-cols-2">
               <div>
                 <dt className="font-semibold text-foreground">
-                  {activityMessages.dueAtLabel}
+                  {activityMessages.detail.dueAtTerm}
                 </dt>
                 <dd className="text-muted-foreground">
                   <time dateTime={activity.dueAt}>
@@ -311,7 +351,7 @@ function ActivityDetailContent({
               {activity.opensAt ? (
                 <div>
                   <dt className="font-semibold text-foreground">
-                    {activityMessages.opensAtLabel}
+                    {activityMessages.detail.opensAtTerm}
                   </dt>
                   <dd className="text-muted-foreground">
                     <time dateTime={activity.opensAt}>
@@ -325,10 +365,25 @@ function ActivityDetailContent({
               ) : null}
               <div>
                 <dt className="font-semibold text-foreground">
-                  {activityMessages.maxScoreLabel(activity.maxScore)}
+                  {activityMessages.detail.maxScoreTerm}
+                </dt>
+                <dd className="text-muted-foreground">{activity.maxScore}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-foreground">
+                  {activityMessages.detail.weightTerm}
                 </dt>
                 <dd className="text-muted-foreground">
-                  {activityMessages.weightLabel(activity.weightMultiplier)} ·{' '}
+                  {activityMessages.detail.weightValue(
+                    activity.weightMultiplier,
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-foreground">
+                  {activityMessages.detail.latePolicyTerm}
+                </dt>
+                <dd className="text-muted-foreground">
                   {activity.allowLate
                     ? activityMessages.lateAllowedLabel
                     : activityMessages.lateDisallowedLabel}
@@ -382,17 +437,21 @@ function ActivityDetailContent({
           ) : null}
         </TabsContent>
 
-        <TabsContent value="submission">
-          {renderSubmissionTab ? (
-            renderSubmissionTab(activity)
-          ) : (
-            <EmptyState
-              headingLevel="h3"
-              title={activityMessages.detail.pendingTabTitle}
-              description={activityMessages.detail.submissionPendingDescription}
-            />
-          )}
-        </TabsContent>
+        {canParticipate ? (
+          <TabsContent value="submission">
+            {renderSubmissionTab ? (
+              renderSubmissionTab(activity)
+            ) : (
+              <EmptyState
+                headingLevel="h3"
+                title={activityMessages.detail.pendingTabTitle}
+                description={
+                  activityMessages.detail.submissionPendingDescription
+                }
+              />
+            )}
+          </TabsContent>
+        ) : null}
 
         <TabsContent value="forum">
           {renderForumTab ? (
