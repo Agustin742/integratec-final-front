@@ -115,6 +115,11 @@ jobs:
         run: |
           bash scripts/ci/run_frontend_check.sh test
 
+      - name: Check 3D asset budgets
+        id: assets
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: bash scripts/ci/run_frontend_check.sh assets:check
+
       - name: Build frontend
         id: build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
@@ -143,6 +148,7 @@ jobs:
           FORMAT: ${{ steps.format.outputs.result || 'Skipped (setup failed or no package)' }}
           TYPECHECK: ${{ steps.typecheck.outputs.result || 'Skipped (setup failed or no package)' }}
           TEST: ${{ steps.test.outputs.result || 'Skipped (setup failed or no package)' }}
+          ASSETS: ${{ steps.assets.outputs.result || 'Skipped (setup failed or no package)' }}
           BUILD: ${{ steps.build.outputs.result || 'Skipped (setup failed or no package)' }}
         run: |
           {
@@ -153,5 +159,6 @@ jobs:
             printf '| format:check | %s |\n' "$FORMAT"
             printf '| typecheck | %s |\n' "$TYPECHECK"
             printf '| test | %s |\n' "$TEST"
+            printf '| assets:check | %s |\n' "$ASSETS"
             printf '| build | %s |\n' "$BUILD"
           } >> "$GITHUB_STEP_SUMMARY"

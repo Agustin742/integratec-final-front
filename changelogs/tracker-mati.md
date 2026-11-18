@@ -1,5 +1,17 @@
 # Tracker — Mati
 
+## 2026-11-18 — Add GLB asset pipeline (Draco/meshopt/KTX2) and asset budget check script (#25)
+
+- **Status:** in-progress (ready for blind RDD audit and PR approval)
+- **Area / files:** `public/decoders/`, `src/features/world/`, `src/features/classrooms/classroom-workspace.tsx`, `scripts/assets/`, `package.json`, `.github/workflows/ci.yml`, `docs/3d-assets.md`, `changelogs/tracker-mati.md`
+- **Change:** Implemented [issue #25](https://github.com/Agustin742/integratec-final-front/issues/25) (`FD8`) on `feat/25-glb-asset-pipeline`:
+  1. Vendored same-origin Draco (`public/decoders/draco/`) and KTX2/Basis (`public/decoders/basis/`) decoders from `three/examples/jsm/libs/` compatible with strict CSP (`'wasm-unsafe-eval'`, `worker-src 'self' blob:`).
+  2. Implemented `src/features/world/asset-cache.ts` (`createConfiguredGltfLoader` with Draco/KTX2/meshopt, single-flight `loadGlbAsset` / `readCachedGlbAsset`, `disposeObject3D`, `clearAssetCache`), `src/features/world/glb-asset.tsx` (`GlbAsset` with `Suspense` + per-asset error boundary placeholder), wired `clearAssetCache` into `WorldCanvas` (`scopeKey` / unmount) and `ClassroomWorkspace` (`useSessionCleanup` + `classroomId` change), and added `src/features/world/asset-cache.test.tsx`.
+  3. Implemented `scripts/assets/check-asset-budget.mjs` + `pnpm assets:check` (`<= 1 MB` avatar GLB, `<= 8 MB` compressed classroom scene GLB, per-file report), wired it into `.github/workflows/ci.yml`, added `src/features/world/asset-budget.test.ts`, and documented the compression pipeline and exception process in `docs/3d-assets.md`.
+- **Reason:** Make 3D GLB loading, caching, error isolation, GPU resource disposal, and FD8 size budget enforcement repeatable and verifiable (`rules/3d-world-and-camera.md`, `rules/documentation-and-decisions.md`, `rules/deployment-and-operations.md`).
+- **Verification:** On Node `22.23.4` and pnpm `10.34.9`: `pnpm lint`, `pnpm typecheck`, `pnpm test` (59 files, 657 tests passed including `asset-cache.test.tsx` and `asset-budget.test.ts`), `pnpm build` (`472` modules), `pnpm security:check`, `pnpm format:check`, and `git diff --check origin/develop..HEAD --` passed. `pnpm assets:check` ran against `public/models/` and failed with exit code `1` as expected on 3 pre-existing uncompressed avatar GLBs (`avatars/female/body.glb` 3.63 MB, `avatars/male/body.glb` 2.61 MB, `character.glb` 2.58 MB > 1.00 MB limit; 22 other models passed). Not run locally: `pnpm e2e` (no UI routes/panels changed), `actionlint` 1.7.7, and `python3` CI scripts (`scripts/ci/check_docs.py`, `scripts/ci/test_*.py`; `python3` unavailable on Windows, run in Ubuntu CI).
+- **Next step:** Run blind RDD audit and await explicit user approval before pushing or opening the PR against `develop`.
+
 ## 2026-11-18 — PR #84 review fixes (unmount submitting reset and 403 create reconciliation) (#30)
 
 - **Status:** completed (pushed to `feat/30-classrooms-list-and-create` on [PR #84](https://github.com/Agustin742/integratec-final-front/pull/84)).
