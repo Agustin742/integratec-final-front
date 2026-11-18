@@ -22,12 +22,18 @@ export function DialogContent({
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-foreground/45 data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in" />
       <DialogPrimitive.Content
         className={cn(
-          'fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl border border-edge bg-popover p-7 pt-16 text-popover-foreground shadow-float data-[state=closed]:animate-dialog-out data-[state=open]:animate-dialog-in',
+          'fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex flex-col overflow-hidden rounded-3xl border border-edge bg-popover text-popover-foreground shadow-float data-[state=closed]:animate-dialog-out data-[state=open]:animate-dialog-in',
           className,
         )}
         {...props}
       >
-        {children}
+        {/* The shell clips to the radius; only this wrapper scrolls. It starts below the pinned close key and is inset from the right and bottom edges, so the scrollbar never meets the key, the border or the corners. */}
+        <div
+          data-dialog-scroll
+          className="mt-14 mr-2 mb-4 min-h-0 flex-1 overflow-y-auto pt-2 pr-5 pb-3 pl-7"
+        >
+          {children}
+        </div>
         <DialogPrimitive.Close
           aria-label={uiMessages.close}
           className="key-bevel motion-press absolute top-3 right-3 inline-flex size-11 items-center justify-center rounded-xl bg-secondary font-display text-xl leading-none text-secondary-foreground [--key:var(--key-secondary)] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"

@@ -18,6 +18,7 @@ export const classroomMessages = {
     settings: 'Configuración',
   },
   role: 'Tu rol en esta aula',
+  backToList: 'Volver a mis aulas',
   errorTitle: 'No pudimos cargar el aula',
   errorDescription: 'Revisá tu conexión e intentá de nuevo.',
   roles: {
@@ -26,6 +27,23 @@ export const classroomMessages = {
     PARENT: 'Familiar',
     OWNER: 'Titular de la escuela',
     ADMIN: 'Administración escolar',
+  },
+  viewMode: {
+    switchTo2d: 'Cambiar a Modo 2D Clásico',
+    switchTo3d: 'Cambiar a Vista 3D',
+    shortcutHint: 'Atajo: Alt+M',
+    stage3dHeading: 'Vista 3D del aula',
+    stage3dDescription:
+      'Entorno tridimensional del aula. Podés pasar al Modo 2D Clásico en cualquier momento sin cerrar sesión ni perder tu contexto.',
+    canvasLabel: 'Escena 3D del aula',
+    mode2dHeading: 'Modo 2D Clásico',
+    mode2dDescription:
+      'Accedé por teclado o pantalla táctil a todas las herramientas disponibles de esta aula con las mismas validaciones del servidor.',
+    mode2dNavLabel: 'Paneles del aula en Modo 2D Clásico',
+    openPanelAction: 'Abrir panel',
+    mode2dEmptyTitle: 'No hay paneles disponibles',
+    mode2dEmptyDescription:
+      'El servidor todavía no habilitó paneles para tu cuenta en esta aula. Si cambia tu disponibilidad, los vas a ver acá al instante.',
   },
   list: {
     subtitle:
