@@ -514,10 +514,6 @@ function ActivityEditorFormFields({
   onRequestClose,
 }: ActivityEditorFormFieldsProps) {
   const { control } = form;
-  console.error(
-    'FIELDS RENDER errors=',
-    JSON.stringify(form.formState.errors).slice(0, 400),
-  );
   const typeGroupId = useId();
   const formatGroupId = useId();
   const allowLateId = useId();
