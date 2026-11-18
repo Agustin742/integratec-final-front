@@ -115,6 +115,11 @@ jobs:
         run: |
           bash scripts/ci/run_frontend_check.sh test
 
+      - name: Check 3D asset budgets
+        id: assets
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: pnpm assets:check
+
       - name: Build frontend
         id: build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}

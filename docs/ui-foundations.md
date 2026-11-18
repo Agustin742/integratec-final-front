@@ -87,6 +87,8 @@ The base components follow the "painted toy / soft resin / clean clay" direction
 
 Surface tokens: `--edge #e8d3ac` (default 1px border, replaces wood on panels), `--tray #efd9b4`, `--tray-hover #f6e7c8`, `--field-border #a9835f`. Semantic tints (surface / ink / bevel): success `#e0f1cc`/`#24542f`/`#b9d996`, info `#d8f3f0`/`#1d5a58`/`#a0dbd5`, warning `#fdf0bd`/`#5e4a0a`/`#e8cb62`, danger `#fde3dc`/`#8a2a25`/`#f0aa9f`. Text is darkened rather than the surface.
 
+**Scrollbar tokens** (`tokens.css`): `--scrollbar-thumb` (= `--field-border #a9835f`, 3:1 against cream and pale cream), `--scrollbar-thumb-hover` (= `--input #806348`) and `--scrollbar-track` (`transparent`). `index.css` applies them on `html` with `scrollbar-color` and `scrollbar-width: thin`, with `::-webkit-scrollbar` pill styling only where `scrollbar-color` is unsupported; forced-colors mode keeps system scrollbars. Scrollbars are never hidden. A component with its own scroll area can use `scrollbar-thumb-(--scrollbar-thumb) scrollbar-track-(--scrollbar-track)`.
+
 `key-bevel` (resting bevel) and `motion-press` (hover lift 1px, press travel 2px with the bevel shrinking 3px to 1px and scale .98) work together; disabled keys are flat with no press, busy keys keep the bevel without motion. `prefers-reduced-motion` removes scale and travel; the bevel change remains as the pressed cue.
 
 Contrast measured for the new pairs (`tokens.test.ts` enforces them):

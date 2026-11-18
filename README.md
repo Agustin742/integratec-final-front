@@ -59,6 +59,20 @@ Read the [project rules](rules/README.md) before contributing. They cover GitHub
 
 The product rules develop the expected behavior for classrooms/roles, activities and grading, communication, the AI briefing, movement, avatars, and realtime presence. Their acceptance checklists describe future implementation evidence, not working features; open domain decisions are explicitly separated from established requirements.
 
+## Local verification before pushing
+
+Locally, run only the tests affected by your branch plus the static checks, then push and let CI run the full suite:
+
+```sh
+pnpm vitest run --changed origin/develop --reporter=dot
+pnpm lint
+pnpm typecheck
+pnpm build
+pnpm security:check
+```
+
+`--changed origin/develop` runs the test files whose import graph reaches a file changed on the branch (committed and uncommitted). Changes to `package.json`, `vite.config.*` or `vitest.config.*` rerun the whole suite. The full test suite, formatting and the remaining gates run in the [CI](#ci) `checks` job; a pull request is ready to merge only when that job passes.
+
 ## Promotion flow
 
 Work branches enter `develop` through reviewed pull requests. Changes are promoted by pull request from `develop` to `test`, then from `test` to `main`. See [Git workflow](rules/git-workflow.md) for commit and merge conventions. CI runs for pull requests targeting `develop`, `test`, or `main` and pushes to `develop`. Work branches may target `develop`; only `develop` may target `test`, and only `test` may target `main`.

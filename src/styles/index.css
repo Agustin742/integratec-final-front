@@ -16,6 +16,31 @@
     font-size: var(--text-body);
     line-height: 1.6;
   }
+  /* Themed scrollbars: standard properties first, WebKit pseudo-elements only
+     where scrollbar-color is unsupported. Forced colors keep system scrollbars. */
+  @media not (forced-colors: active) {
+    html {
+      scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+      scrollbar-width: thin;
+    }
+    @supports not (scrollbar-color: auto) {
+      ::-webkit-scrollbar {
+        width: 0.75rem;
+        height: 0.75rem;
+      }
+      ::-webkit-scrollbar-track {
+        background: var(--scrollbar-track);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--scrollbar-thumb);
+        border: 3px solid var(--background);
+        border-radius: 9999px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--scrollbar-thumb-hover);
+      }
+    }
+  }
   :focus-visible {
     outline: 3px solid var(--ring);
     outline-offset: 3px;
