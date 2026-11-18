@@ -1,9 +1,11 @@
-import { useLayoutEffect, useRef, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import type { components } from '@/api/schema.generated';
 import { NotFoundPage } from '@/app/pages/not-found-page';
 import { useDocumentTitle } from '@/app/router/document-title';
 import { ErrorState, LoadingState } from '@/components/feedback/states';
+import { useSessionCleanup } from '@/session/provider';
+import { clearAssetCache } from '@/features/world';
 import { classroomMessages as messages } from './messages';
 import { useClassroomContext } from './use-classroom-capabilities';
 import { useClassroomContextEvents } from './use-classroom-context-events';
@@ -68,6 +70,12 @@ function WorkspaceContext({
   };
   const context = useClassroomContext(classroomId);
   useClassroomContextEvents(classroomId);
+  useSessionCleanup(() => clearAssetCache());
+  useEffect(() => {
+    return () => {
+      clearAssetCache();
+    };
+  }, [classroomId]);
   useDocumentTitle(
     context.status === 'ready' ? context.classroom.name : messages.title,
   );
