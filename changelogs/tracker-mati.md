@@ -1,5 +1,17 @@
 # Tracker — Mati
 
+## 2026-11-18 — Implement in-app notification center with unread count and read state (#50)
+
+- **Status:** in-progress (ready for blind RDD audit and PR approval)
+- **Area / files:** `src/api/query-keys.ts`, `src/features/notifications/`, `src/app/router/app-shell.tsx`, `src/test/msw/handlers.ts`, `e2e/notifications.spec.ts`, `docs/threat-model.md`, `docs/notifications.md`, `docs/assets/notifications/notifications-*.png`, `changelogs/tracker-mati.md`
+- **Change:** Implemented [issue #50](https://github.com/Agustin742/integratec-final-front/issues/50) (`HU-COM-004`) on `feat/50-in-app-notifications`:
+  1. Added user-scoped `notificationsListQueryKey` and `createNotificationsPredicate` (`src/api/query-keys.ts`), jitless Zod schemas + `dedupeAndSortNotifications` + `getNotificationTargetPath` (`src/features/notifications/notification-schema.ts`), typed REST service (`src/features/notifications/notification-service.ts`), centralized `es-AR` copy (`src/features/notifications/messages.ts`), stateful contract-faithful MSW store (`src/test/msw/handlers.ts`), and service unit tests (`notification-service.test.ts`).
+  2. Implemented `NotificationCenter` (`src/features/notifications/notification-center.tsx`) wired into `AppShell` (`src/app/router/app-shell.tsx`): unread badge button, slide-over `Sheet` tray, polite `aria-live` announcements, loading/empty/error/stale states, mark-one/mark-all read with synchronous double-click locks and server reconciliation, deep links to classroom panels, polling + focus refetch, and immediate teardown on logout, plus RTL tests (`notification-center.test.tsx`).
+  3. Added Playwright E2E coverage (`e2e/notifications.spec.ts`), captured `1280px` and `360px` screenshots under `docs/assets/notifications/`, and updated `docs/threat-model.md` (`TM-022`–`TM-024`) and `docs/notifications.md`.
+- **Reason:** Give authenticated users an accessible notification bell, unread counter, notification tray, read/unread actions, deep links, and polling reconciliation (`rules/communication-and-notifications.md`, `rules/realtime-and-presence.md`, `rules/state-management.md`, `rules/ui-and-accessibility.md`, `rules/authentication-and-session.md`).
+- **Verification:** On Node `22.23.4` and pnpm `10.34.9`: `pnpm lint`, `pnpm typecheck`, `pnpm test` (65 files, 696 tests passed), `pnpm build` (`450` modules), `pnpm security:check`, `pnpm format:check`, focused Playwright `e2e/notifications.spec.ts` (`2/2` desktop and mobile passed with zero CSP violations, zero page errors, and zero horizontal overflow), and `git diff --check origin/develop..HEAD --` verified cleanly. Skipped/unavailable locally on Windows: full `pnpm e2e` suite (ran focused `e2e/notifications.spec.ts` only) and `python3` CI scripts (`scripts/ci/check_docs.py`, `scripts/ci/test_*.py`; `python3` unavailable on this Windows workstation, runs in Ubuntu CI).
+- **Next step:** Run blind `rdd-auditor` and await explicit user approval before pushing or opening the PR against `develop`.
+
 ## 2026-11-18 — Study material manager with upload progress and signed downloads (#40)
 
 - **Status:** completed
