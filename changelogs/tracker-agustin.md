@@ -4,7 +4,7 @@
 
 - **Status:** completed (pending merge of PR #92)
 - **Area / files:** `src/features/classrooms/announcements/`, `docs/threat-model.md`
-- **Change:** Reviewed TheKade's PR #92 and merged `develop` into it (threat model entries renumbered to TM-025..TM-027). Fixes on the PR branch: stale edit form on 404 and row actions locked during submit (0943560), duplicate guard after an uncertain create (ed1c105), delete 404 treated as already removed and focus restored after edit (53856c4), corrected threat model mitigations and friendlier content helper copy (d657473), card actions wrapping below the title on narrow screens (c85f3a3).
+- **Change:** Reviewed TheKade's PR #92 and merged `develop` into it (threat model entries renumbered to TM-028..TM-030 after two develop merges). Fixes on the PR branch: stale edit form on 404 and row actions locked during submit (0943560), duplicate guard after an uncertain create (ed1c105), delete 404 treated as already removed and focus restored after edit (53856c4), corrected threat model mitigations and friendlier content helper copy (d657473), card actions wrapping below the title on narrow screens (c85f3a3).
 - **Reason:** Verified review findings against the code before applying them.
 - **Verification:** Per-task affected tests, lint, typecheck, build and `security:check`; RDD review of 0943560..53856c4 approved.
 - **Next step:** Mobile card header layout, then open the review for merge.
