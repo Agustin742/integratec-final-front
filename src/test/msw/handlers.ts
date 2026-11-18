@@ -46,6 +46,54 @@ export type PasswordResetRequestedResponsePayload =
 export type PasswordResetConfirmRequestPayload =
   components['schemas']['PasswordResetConfirmRequestDto'];
 
+export type InvitationKindPayload =
+  components['schemas']['ClassroomInvitationResponseDto']['kind'];
+export type InvitationRolePayload =
+  components['schemas']['ClassroomInvitationResponseDto']['role'];
+export type InvitationStatePayload =
+  components['schemas']['ClassroomInvitationResponseDto']['state'];
+export type InvitationStateFilterPayload = InvitationStatePayload | 'ALL';
+
+export type ClassroomInvitationPayload = Omit<
+  components['schemas']['ClassroomInvitationResponseDto'],
+  'targetEmail' | 'maxUses'
+> & {
+  readonly targetEmail: string | null;
+  readonly maxUses: number | null;
+};
+
+export type CreatedClassroomInvitationPayload = Omit<
+  components['schemas']['CreatedClassroomInvitationResponseDto'],
+  'targetEmail' | 'maxUses'
+> & {
+  readonly targetEmail: string | null;
+  readonly maxUses: number | null;
+};
+
+export interface PaginatedClassroomInvitationsPayload {
+  readonly items: ClassroomInvitationPayload[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
+}
+
+export type CreateClassroomInvitationRequestPayload =
+  components['schemas']['CreateClassroomInvitationDto'];
+export type RevokeInvitationResponsePayload =
+  components['schemas']['RevokeInvitationResponseDto'];
+export type CreateJoinCodeRequestPayload =
+  components['schemas']['CreateJoinCodeDto'];
+
+export type JoinCodeResponsePayload = Omit<
+  components['schemas']['JoinCodeResponseDto'],
+  'maxUses'
+> & {
+  readonly maxUses: number | null;
+};
+
+export type RevokeJoinCodeResponsePayload =
+  operations['ClassroomsController_revokeJoinCode']['responses'][200]['content']['application/json'];
+
 export interface MswErrorResponseSpec {
   readonly status: number;
   readonly body: ErrorBodyPayload;
@@ -1400,6 +1448,759 @@ export function createClassroomRosterStore(
           return failure === 'drop-response'
             ? HttpResponse.error()
             : new HttpResponse(null, { status: 204 });
+        },
+      }),
+    ],
+  };
+}
+
+export type InvitationFailureSpec =
+  MswErrorResponseSpec | 'network' | 'drop-response';
+
+export interface CreateClassroomInvitationsHandlerOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly items?: readonly ClassroomInvitationPayload[];
+  readonly total?: number;
+  readonly page?: number;
+  readonly pageSize?: number;
+  readonly error?: MswErrorResponseSpec | 'network';
+  readonly resolveResponse?: (query: {
+    readonly classroomId: string;
+    readonly page: number;
+    readonly pageSize: number;
+    readonly status: InvitationStateFilterPayload;
+    readonly request: Request;
+  }) =>
+    | PaginatedClassroomInvitationsPayload
+    | Response
+    | Promise<PaginatedClassroomInvitationsPayload | Response>;
+  readonly onRequest?: (request: Request) => void | Promise<void>;
+}
+
+const VALID_INVITATION_FILTER_SET: ReadonlySet<InvitationStateFilterPayload> =
+  new Set(['PENDING', 'USED', 'REVOKED', 'EXPIRED', 'ALL']);
+
+function filterInvitations(
+  items: readonly ClassroomInvitationPayload[],
+  status: InvitationStateFilterPayload,
+): ClassroomInvitationPayload[] {
+  return items.filter((item) =>
+    status === 'ALL' ? true : item.state === status,
+  );
+}
+
+/**
+ * Contract-faithful MSW handler for `GET /classrooms/{id}/invitations`
+ * (`ClassroomsController_listInvitations`).
+ */
+export function createClassroomInvitationsHandler(
+  options: CreateClassroomInvitationsHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomSegment = options.classroomId ?? ':id';
+  return http.get(
+    `${baseUrl}/classrooms/${classroomSegment}/invitations`,
+    async ({ params, request }) => {
+      await options.onRequest?.(request);
+
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+
+      const url = new URL(request.url);
+      const parsedPage = Number(
+        url.searchParams.get('page') ?? options.page ?? 1,
+      );
+      const parsedPageSize = Number(
+        url.searchParams.get('pageSize') ?? options.pageSize ?? 20,
+      );
+      const page =
+        Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+      const pageSize =
+        Number.isFinite(parsedPageSize) && parsedPageSize > 0
+          ? parsedPageSize
+          : 20;
+      const rawStatus = url.searchParams.get('status') ?? 'PENDING';
+      const status: InvitationStateFilterPayload =
+        VALID_INVITATION_FILTER_SET.has(
+          rawStatus as InvitationStateFilterPayload,
+        )
+          ? (rawStatus as InvitationStateFilterPayload)
+          : 'PENDING';
+
+      if (options.resolveResponse) {
+        const resolvedClassroomId =
+          options.classroomId ?? String(params.id ?? '');
+        const resolved = await options.resolveResponse({
+          classroomId: resolvedClassroomId,
+          page,
+          pageSize,
+          status,
+          request,
+        });
+        if (resolved instanceof Response) {
+          return resolved;
+        }
+        return HttpResponse.json(resolved, { status: 200 });
+      }
+
+      const filtered = filterInvitations(options.items ?? [], status);
+      const start = (page - 1) * pageSize;
+      const payload: PaginatedClassroomInvitationsPayload = {
+        items: filtered.slice(start, start + pageSize),
+        page,
+        pageSize,
+        total: options.total ?? filtered.length,
+      };
+      return HttpResponse.json(payload, { status: 200 });
+    },
+  );
+}
+
+export interface CreateCreateClassroomInvitationHandlerOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly error?: MswErrorResponseSpec | 'network';
+  readonly resolveResponse?: (args: {
+    readonly classroomId: string;
+    readonly body: unknown;
+    readonly request: Request;
+  }) =>
+    | CreatedClassroomInvitationPayload
+    | Response
+    | Promise<CreatedClassroomInvitationPayload | Response>;
+  readonly onRequest?: (
+    request: Request,
+    body: unknown,
+  ) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `POST /classrooms/{id}/invitations`
+ * (`ClassroomsController_createInvitation`).
+ */
+export function createCreateClassroomInvitationHandler(
+  options: CreateCreateClassroomInvitationHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomSegment = options.classroomId ?? ':id';
+  return http.post(
+    `${baseUrl}/classrooms/${classroomSegment}/invitations`,
+    async ({ params, request }) => {
+      const body: unknown = await request
+        .clone()
+        .json()
+        .catch(() => undefined);
+      await options.onRequest?.(request, body);
+
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+
+      const resolvedClassroomId =
+        options.classroomId ?? String(params.id ?? '');
+
+      if (options.resolveResponse) {
+        const resolved = await options.resolveResponse({
+          classroomId: resolvedClassroomId,
+          body,
+          request,
+        });
+        if (resolved instanceof Response) {
+          return resolved;
+        }
+        return HttpResponse.json(resolved, { status: 201 });
+      }
+
+      const email =
+        typeof body === 'object' &&
+        body !== null &&
+        'email' in body &&
+        typeof body.email === 'string'
+          ? body.email.trim()
+          : 'student@example.edu.ar';
+      const created: CreatedClassroomInvitationPayload = {
+        id: '70000000-0000-4000-8000-000000000001',
+        kind: 'EMAIL',
+        targetEmail: email,
+        role: 'STUDENT',
+        maxUses: 1,
+        useCount: 0,
+        state: 'PENDING',
+        expiresAt: '2026-11-25T16:00:00.000Z',
+        createdAt: '2026-11-18T16:00:00.000Z',
+        token: 'invite-secret-token-0001',
+      };
+      return HttpResponse.json(created, { status: 201 });
+    },
+  );
+}
+
+export interface CreateRevokeClassroomInvitationHandlerOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly invitationId?: string;
+  readonly error?: MswErrorResponseSpec | 'network';
+  readonly resolveResponse?: (args: {
+    readonly classroomId: string;
+    readonly invitationId: string;
+    readonly request: Request;
+  }) =>
+    | RevokeInvitationResponsePayload
+    | Response
+    | Promise<RevokeInvitationResponsePayload | Response>;
+  readonly onRequest?: (
+    request: Request,
+    invitationId: string,
+  ) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `DELETE /classrooms/{id}/invitations/{invitationId}`
+ * (`ClassroomsController_revokeInvitation`).
+ */
+export function createRevokeClassroomInvitationHandler(
+  options: CreateRevokeClassroomInvitationHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomSegment = options.classroomId ?? ':id';
+  const invitationSegment = options.invitationId ?? ':invitationId';
+  return http.delete(
+    `${baseUrl}/classrooms/${classroomSegment}/invitations/${invitationSegment}`,
+    async ({ params, request }) => {
+      const resolvedClassroomId =
+        options.classroomId ?? String(params.id ?? '');
+      const resolvedInvitationId =
+        options.invitationId ?? String(params.invitationId ?? '');
+      await options.onRequest?.(request, resolvedInvitationId);
+
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+
+      if (options.resolveResponse) {
+        const resolved = await options.resolveResponse({
+          classroomId: resolvedClassroomId,
+          invitationId: resolvedInvitationId,
+          request,
+        });
+        if (resolved instanceof Response) {
+          return resolved;
+        }
+        return HttpResponse.json(resolved, { status: 200 });
+      }
+
+      const payload: RevokeInvitationResponsePayload = {
+        id: resolvedInvitationId,
+        state: 'REVOKED',
+      };
+      return HttpResponse.json(payload, { status: 200 });
+    },
+  );
+}
+
+export interface CreateGenerateJoinCodeHandlerOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly error?: MswErrorResponseSpec | 'network';
+  readonly resolveResponse?: (args: {
+    readonly classroomId: string;
+    readonly body: unknown;
+    readonly request: Request;
+  }) =>
+    | JoinCodeResponsePayload
+    | Response
+    | Promise<JoinCodeResponsePayload | Response>;
+  readonly onRequest?: (
+    request: Request,
+    body: unknown,
+  ) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `POST /classrooms/{id}/join-code`
+ * (`ClassroomsController_generateJoinCode`).
+ */
+export function createGenerateJoinCodeHandler(
+  options: CreateGenerateJoinCodeHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomSegment = options.classroomId ?? ':id';
+  return http.post(
+    `${baseUrl}/classrooms/${classroomSegment}/join-code`,
+    async ({ params, request }) => {
+      const body: unknown = await request
+        .clone()
+        .json()
+        .catch(() => ({}));
+      await options.onRequest?.(request, body);
+
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+
+      const resolvedClassroomId =
+        options.classroomId ?? String(params.id ?? '');
+
+      if (options.resolveResponse) {
+        const resolved = await options.resolveResponse({
+          classroomId: resolvedClassroomId,
+          body,
+          request,
+        });
+        if (resolved instanceof Response) {
+          return resolved;
+        }
+        return HttpResponse.json(resolved, { status: 201 });
+      }
+
+      const maxUses =
+        typeof body === 'object' &&
+        body !== null &&
+        'maxUses' in body &&
+        typeof body.maxUses === 'number'
+          ? body.maxUses
+          : null;
+      const payload: JoinCodeResponsePayload = {
+        id: '80000000-0000-4000-8000-000000000001',
+        code: 'K7P9X2M',
+        role: 'STUDENT',
+        maxUses,
+        useCount: 0,
+        state: 'PENDING',
+        expiresAt: '2026-11-25T16:00:00.000Z',
+        createdAt: '2026-11-18T16:00:00.000Z',
+      };
+      return HttpResponse.json(payload, { status: 201 });
+    },
+  );
+}
+
+export interface CreateRevokeJoinCodeHandlerOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly error?: MswErrorResponseSpec | 'network';
+  readonly resolveResponse?: (args: {
+    readonly classroomId: string;
+    readonly request: Request;
+  }) =>
+    | RevokeJoinCodeResponsePayload
+    | Response
+    | Promise<RevokeJoinCodeResponsePayload | Response>;
+  readonly onRequest?: (request: Request) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `DELETE /classrooms/{id}/join-code`
+ * (`ClassroomsController_revokeJoinCode`).
+ */
+export function createRevokeJoinCodeHandler(
+  options: CreateRevokeJoinCodeHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomSegment = options.classroomId ?? ':id';
+  return http.delete(
+    `${baseUrl}/classrooms/${classroomSegment}/join-code`,
+    async ({ params, request }) => {
+      await options.onRequest?.(request);
+
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+
+      const resolvedClassroomId =
+        options.classroomId ?? String(params.id ?? '');
+
+      if (options.resolveResponse) {
+        const resolved = await options.resolveResponse({
+          classroomId: resolvedClassroomId,
+          request,
+        });
+        if (resolved instanceof Response) {
+          return resolved;
+        }
+        return HttpResponse.json(resolved, { status: 200 });
+      }
+
+      const payload: RevokeJoinCodeResponsePayload = {
+        success: true,
+        message: 'Join code revoked successfully',
+      };
+      return HttpResponse.json(payload, { status: 200 });
+    },
+  );
+}
+
+export interface ClassroomInvitationsStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId: string;
+  readonly initialInvitations?: readonly ClassroomInvitationPayload[];
+  readonly onListRequest?: (request: Request) => void | Promise<void>;
+  readonly onCreateInvitationRequest?: (
+    request: Request,
+    body: unknown,
+  ) => void | Promise<void>;
+  readonly onRevokeInvitationRequest?: (
+    request: Request,
+    invitationId: string,
+  ) => void | Promise<void>;
+  readonly onGenerateJoinCodeRequest?: (
+    request: Request,
+    body: unknown,
+  ) => void | Promise<void>;
+  readonly onRevokeJoinCodeRequest?: (request: Request) => void | Promise<void>;
+}
+
+export interface ClassroomInvitationsStore {
+  readonly read: () => readonly ClassroomInvitationPayload[];
+  readonly failNextList: (failure: MswErrorResponseSpec | 'network') => void;
+  readonly failNextCreateInvitation: (failure: InvitationFailureSpec) => void;
+  readonly failNextRevokeInvitation: (failure: InvitationFailureSpec) => void;
+  readonly failNextGenerateJoinCode: (failure: InvitationFailureSpec) => void;
+  readonly failNextRevokeJoinCode: (failure: InvitationFailureSpec) => void;
+  readonly handlers: readonly HttpHandler[];
+}
+
+/**
+ * Stateful MSW store for `/classrooms/{id}/invitations` and `/classrooms/{id}/join-code`.
+ * Enforces one-time token/code exposure, atomic join-code regeneration
+ * (marking any prior `PENDING` `JOIN_CODE` as `REVOKED`), `404` when no active
+ * join code exists, `400` when revoking a non-`PENDING` invitation, and
+ * `failNext*` fault injection including `'drop-response'` after server commit.
+ */
+export function createClassroomInvitationsStore(
+  options: ClassroomInvitationsStoreOptions,
+): ClassroomInvitationsStore {
+  let items: ClassroomInvitationPayload[] = (
+    options.initialInvitations ?? []
+  ).map((item) => ({ ...item }));
+  let seq = 1;
+  let nextListFailure: MswErrorResponseSpec | 'network' | undefined;
+  let nextCreateFailure: InvitationFailureSpec | undefined;
+  let nextRevokeFailure: InvitationFailureSpec | undefined;
+  let nextGenerateCodeFailure: InvitationFailureSpec | undefined;
+  let nextRevokeCodeFailure: InvitationFailureSpec | undefined;
+
+  const toFailureResponse = (
+    failure: MswErrorResponseSpec | 'network',
+  ): Response =>
+    failure === 'network'
+      ? HttpResponse.error()
+      : createErrorEnvelopeResponse(failure.status, failure.body);
+
+  return {
+    read: () => items.map((item) => ({ ...item })),
+    failNextList(failure) {
+      nextListFailure = failure;
+    },
+    failNextCreateInvitation(failure) {
+      nextCreateFailure = failure;
+    },
+    failNextRevokeInvitation(failure) {
+      nextRevokeFailure = failure;
+    },
+    failNextGenerateJoinCode(failure) {
+      nextGenerateCodeFailure = failure;
+    },
+    failNextRevokeJoinCode(failure) {
+      nextRevokeCodeFailure = failure;
+    },
+    handlers: [
+      createClassroomInvitationsHandler({
+        baseUrl: options.baseUrl,
+        classroomId: options.classroomId,
+        onRequest: options.onListRequest,
+        resolveResponse: ({ page, pageSize, status }) => {
+          if (nextListFailure !== undefined) {
+            const failure = nextListFailure;
+            nextListFailure = undefined;
+            return toFailureResponse(failure);
+          }
+          const filtered = filterInvitations(items, status);
+          const start = (page - 1) * pageSize;
+          return {
+            items: filtered.slice(start, start + pageSize),
+            page,
+            pageSize,
+            total: filtered.length,
+          };
+        },
+      }),
+      createCreateClassroomInvitationHandler({
+        baseUrl: options.baseUrl,
+        classroomId: options.classroomId,
+        onRequest: options.onCreateInvitationRequest,
+        resolveResponse: ({ body }) => {
+          const failure = nextCreateFailure;
+          nextCreateFailure = undefined;
+          if (failure !== undefined && failure !== 'drop-response') {
+            return toFailureResponse(failure);
+          }
+
+          const record =
+            typeof body === 'object' && body !== null
+              ? (body as Record<string, unknown>)
+              : {};
+          const rawEmail =
+            typeof record.email === 'string' ? record.email.trim() : '';
+          const role = record.role;
+          if (
+            rawEmail === '' ||
+            !rawEmail.includes('@') ||
+            role !== 'STUDENT'
+          ) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Validation failed on invitation payload.',
+              correlationId: 'corr-inv-create-400',
+              details:
+                rawEmail === '' || !rawEmail.includes('@')
+                  ? [
+                      {
+                        field: 'email',
+                        messages: ['Ingresá un correo electrónico válido.'],
+                      },
+                    ]
+                  : undefined,
+            });
+          }
+
+          const currentSeq = seq;
+          seq += 1;
+          const createdAt = new Date(
+            Date.UTC(2026, 10, 18, 16, currentSeq, 0),
+          ).toISOString();
+          const expiresAt = new Date(
+            Date.UTC(2026, 10, 25, 16, currentSeq, 0),
+          ).toISOString();
+          const id = `71000000-0000-4000-8000-${String(currentSeq).padStart(12, '0')}`;
+          const listItem: ClassroomInvitationPayload = {
+            id,
+            kind: 'EMAIL',
+            targetEmail: rawEmail,
+            role: 'STUDENT',
+            maxUses: 1,
+            useCount: 0,
+            state: 'PENDING',
+            expiresAt,
+            createdAt,
+          };
+          items = [listItem, ...items];
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+
+          return {
+            ...listItem,
+            token: `inv-token-${String(currentSeq).padStart(4, '0')}`,
+          };
+        },
+      }),
+      createRevokeClassroomInvitationHandler({
+        baseUrl: options.baseUrl,
+        classroomId: options.classroomId,
+        onRequest: options.onRevokeInvitationRequest,
+        resolveResponse: ({ invitationId }) => {
+          const failure = nextRevokeFailure;
+          nextRevokeFailure = undefined;
+          if (failure !== undefined && failure !== 'drop-response') {
+            return toFailureResponse(failure);
+          }
+
+          const target = items.find((item) => item.id === invitationId);
+          if (!target) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Invitation not found.',
+              correlationId: 'corr-inv-revoke-404',
+            });
+          }
+          if (target.state !== 'PENDING') {
+            return createErrorEnvelopeResponse(400, {
+              code: 'BAD_REQUEST',
+              message: 'Only pending invitations can be revoked.',
+              correlationId: 'corr-inv-revoke-400',
+            });
+          }
+
+          items = items.map((item) =>
+            item.id === invitationId ? { ...item, state: 'REVOKED' } : item,
+          );
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+
+          return {
+            id: invitationId,
+            state: 'REVOKED',
+          };
+        },
+      }),
+      createGenerateJoinCodeHandler({
+        baseUrl: options.baseUrl,
+        classroomId: options.classroomId,
+        onRequest: options.onGenerateJoinCodeRequest,
+        resolveResponse: ({ body }) => {
+          const failure = nextGenerateCodeFailure;
+          nextGenerateCodeFailure = undefined;
+          if (failure !== undefined && failure !== 'drop-response') {
+            return toFailureResponse(failure);
+          }
+
+          const record =
+            typeof body === 'object' && body !== null
+              ? (body as Record<string, unknown>)
+              : {};
+          const maxUses =
+            record.maxUses === undefined ? null : Number(record.maxUses);
+          if (
+            maxUses !== null &&
+            (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > 1000)
+          ) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid maxUses parameter.',
+              correlationId: 'corr-join-code-400-uses',
+              details: [
+                {
+                  field: 'maxUses',
+                  messages: ['Ingresá un entero entre 1 y 1000.'],
+                },
+              ],
+            });
+          }
+
+          const expiresInSeconds =
+            record.expiresInSeconds === undefined
+              ? 604_800
+              : Number(record.expiresInSeconds);
+          if (
+            !Number.isInteger(expiresInSeconds) ||
+            expiresInSeconds < 60 ||
+            expiresInSeconds > 2_592_000
+          ) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid expiresInSeconds parameter.',
+              correlationId: 'corr-join-code-400-ttl',
+            });
+          }
+
+          const currentSeq = seq;
+          seq += 1;
+          const createdAtMs = Date.UTC(2026, 10, 18, 16, currentSeq, 0);
+          const createdAt = new Date(createdAtMs).toISOString();
+          const expiresAt = new Date(
+            createdAtMs + expiresInSeconds * 1000,
+          ).toISOString();
+          const id = `81000000-0000-4000-8000-${String(currentSeq).padStart(12, '0')}`;
+          const code = `CODE${String(currentSeq).padStart(4, '0')}`;
+
+          // Atomic regeneration marks any existing active JOIN_CODE as REVOKED.
+          items = items.map((item) =>
+            item.kind === 'JOIN_CODE' && item.state === 'PENDING'
+              ? { ...item, state: 'REVOKED' }
+              : item,
+          );
+
+          const newItem: ClassroomInvitationPayload = {
+            id,
+            kind: 'JOIN_CODE',
+            targetEmail: null,
+            role: 'STUDENT',
+            maxUses,
+            useCount: 0,
+            state: 'PENDING',
+            expiresAt,
+            createdAt,
+          };
+          items = [newItem, ...items];
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+
+          return {
+            id,
+            code,
+            role: 'STUDENT',
+            maxUses,
+            useCount: 0,
+            state: 'PENDING',
+            expiresAt,
+            createdAt,
+          };
+        },
+      }),
+      createRevokeJoinCodeHandler({
+        baseUrl: options.baseUrl,
+        classroomId: options.classroomId,
+        onRequest: options.onRevokeJoinCodeRequest,
+        resolveResponse: () => {
+          const failure = nextRevokeCodeFailure;
+          nextRevokeCodeFailure = undefined;
+          if (failure !== undefined && failure !== 'drop-response') {
+            return toFailureResponse(failure);
+          }
+
+          const hasActiveCode = items.some(
+            (item) => item.kind === 'JOIN_CODE' && item.state === 'PENDING',
+          );
+          if (!hasActiveCode) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'No active join code exists for this classroom.',
+              correlationId: 'corr-join-code-revoke-404',
+            });
+          }
+
+          items = items.map((item) =>
+            item.kind === 'JOIN_CODE' && item.state === 'PENDING'
+              ? { ...item, state: 'REVOKED' }
+              : item,
+          );
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+
+          return {
+            success: true,
+            message: 'Join code revoked successfully',
+          };
         },
       }),
     ],
