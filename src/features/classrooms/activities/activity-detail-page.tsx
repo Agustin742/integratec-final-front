@@ -1,16 +1,21 @@
-import type { ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, type ReactNode } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router';
 import { ApiError } from '@/api/errors';
-import { classroomActivityDetailQueryKey } from '@/api/query-keys';
+import {
+  classroomActivityDetailQueryKey,
+  classroomDetailQueryKey,
+} from '@/api/query-keys';
+import { useDocumentTitle } from '@/app/router/document-title';
 import {
   EmptyState,
   ErrorState,
   LoadingState,
+  StaleDataNotice,
 } from '@/components/feedback/states';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { formatDeadline } from '@/lib/dates';
+import { DEFAULT_SCHOOL_TIME_ZONE, formatDeadline } from '@/lib/dates';
 import { useSessionService } from '@/session/provider';
 import {
   useClassroomCapabilities,
@@ -30,10 +35,15 @@ export interface ActivityDetailPageProps {
 }
 
 function formatActivityDeadline(iso: string, timeZone: string): string {
+  const safeZone = timeZone.trim() || DEFAULT_SCHOOL_TIME_ZONE;
   try {
-    return formatDeadline(iso, { timeZone });
+    return formatDeadline(iso, { timeZone: safeZone });
   } catch {
-    return `${iso} (${timeZone})`;
+    try {
+      return formatDeadline(iso, { timeZone: DEFAULT_SCHOOL_TIME_ZONE });
+    } catch {
+      return `${iso} (${safeZone})`;
+    }
   }
 }
 
@@ -43,8 +53,10 @@ export function ActivityDetailPage({
   renderReviewTab,
 }: ActivityDetailPageProps = {}) {
   const { classroomId, activityId } = useParams();
+  const normalizedClassroomId = classroomId?.trim();
+  const normalizedActivityId = activityId?.trim();
 
-  if (!classroomId || !activityId) {
+  if (!normalizedClassroomId || !normalizedActivityId) {
     return (
       <section className="mx-auto max-w-4xl px-4 py-6">
         <ErrorState
@@ -58,9 +70,9 @@ export function ActivityDetailPage({
 
   return (
     <ActivityDetailContent
-      key={`${classroomId}:${activityId}`}
-      classroomId={classroomId}
-      activityId={activityId}
+      key={`${normalizedClassroomId}:${normalizedActivityId}`}
+      classroomId={normalizedClassroomId}
+      activityId={normalizedActivityId}
       renderSubmissionTab={renderSubmissionTab}
       renderForumTab={renderForumTab}
       renderReviewTab={renderReviewTab}
@@ -79,6 +91,7 @@ function ActivityDetailContent({
   readonly activityId: string;
 }) {
   const { client } = useSessionService();
+  const queryClient = useQueryClient();
   const context = useClassroomContext(classroomId);
   const capabilities = useClassroomCapabilities(classroomId);
 
@@ -86,33 +99,62 @@ function ActivityDetailContent({
   const isStaff =
     capabilities.status === 'ready' && capabilities.can('publish_content');
 
+  const detailQueryKey = classroomActivityDetailQueryKey(
+    userId ?? 'signed-out',
+    classroomId,
+    activityId,
+  );
+
   const query = useQuery({
-    queryKey: classroomActivityDetailQueryKey(
-      userId ?? 'signed-out',
-      classroomId,
-      activityId,
-    ),
+    queryKey: detailQueryKey,
     queryFn: ({ signal }) =>
       getClassroomActivity(client, classroomId, activityId, { signal }),
     enabled: userId !== null,
   });
 
-  if (context.status === 'pending' || query.isPending) {
+  const apiError = query.error instanceof ApiError ? query.error : null;
+
+  useDocumentTitle(query.data ? query.data.title : activityMessages.heading);
+
+  useEffect(() => {
+    if (
+      userId === null ||
+      !query.isError ||
+      (apiError?.status !== 403 && apiError?.status !== 404)
+    ) {
+      return;
+    }
+    queryClient.removeQueries({ queryKey: detailQueryKey });
+    if (apiError.status === 404) {
+      void queryClient.invalidateQueries({
+        queryKey: classroomDetailQueryKey(userId, classroomId),
+      });
+    }
+  }, [
+    apiError?.status,
+    classroomId,
+    detailQueryKey,
+    query.isError,
+    queryClient,
+    userId,
+  ]);
+
+  const backLink = (
+    <Link
+      to={`/classrooms/${encodeURIComponent(classroomId)}`}
+      className="inline-flex min-h-10 items-center text-sm font-semibold text-primary underline underline-offset-4 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
+    >
+      {activityMessages.detail.backToClassroomLabel}
+    </Link>
+  );
+
+  if (context.status === 'pending') {
     return (
       <section className="mx-auto max-w-4xl px-4 py-6">
         <LoadingState label={activityMessages.detail.loadingLabel} />
       </section>
     );
   }
-
-  const backLink = (
-    <Link
-      to={`/classrooms/${classroomId}`}
-      className="inline-flex min-h-10 items-center text-sm font-semibold text-primary underline underline-offset-4 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
-    >
-      {activityMessages.detail.backToClassroomLabel}
-    </Link>
-  );
 
   if (context.status === 'error') {
     const isForbidden = context.error.status === 403;
@@ -143,8 +185,20 @@ function ActivityDetailContent({
     );
   }
 
-  if (query.isError || !query.data) {
-    const apiError = query.error instanceof ApiError ? query.error : null;
+  if (query.isPending) {
+    return (
+      <section className="mx-auto max-w-4xl space-y-4 px-4 py-6">
+        {backLink}
+        <LoadingState label={activityMessages.detail.loadingLabel} />
+      </section>
+    );
+  }
+
+  const isTerminalError =
+    query.isError &&
+    (apiError?.status === 403 || apiError?.status === 404 || !query.data);
+
+  if (isTerminalError) {
     const isForbidden = apiError?.status === 403;
     const isNotFound = apiError?.status === 404;
     return (
@@ -181,6 +235,9 @@ function ActivityDetailContent({
   }
 
   const activity = query.data;
+  if (!activity) {
+    return null;
+  }
 
   return (
     <section className="mx-auto max-w-4xl space-y-6 px-4 py-6">
@@ -208,6 +265,18 @@ function ActivityDetailContent({
         </div>
       </div>
 
+      {query.isError ? (
+        <StaleDataNotice
+          title={activityMessages.staleTitle}
+          description={activityMessages.staleDescription}
+          onRetry={() => {
+            void query.refetch();
+          }}
+          isRetrying={query.isRefetching}
+          retryLabel={activityMessages.retryLabel}
+        />
+      ) : null}
+
       <Tabs defaultValue="overview" className="min-w-0 space-y-4">
         <TabsList aria-label={activityMessages.detail.tabsLabel}>
           <TabsTrigger value="overview">
@@ -227,7 +296,7 @@ function ActivityDetailContent({
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
-          <div className="rounded-xl border border-edge bg-card p-5 shadow-xs space-y-4">
+          <div className="space-y-4 rounded-xl border border-edge bg-card p-5 shadow-xs">
             <dl className="grid gap-3 text-sm sm:grid-cols-2">
               <div>
                 <dt className="font-semibold text-foreground">
@@ -284,7 +353,7 @@ function ActivityDetailContent({
                 {activity.questions.map((question) => (
                   <li
                     key={question.id}
-                    className="rounded-xl border border-edge bg-card p-4 shadow-xs space-y-2"
+                    className="space-y-2 rounded-xl border border-edge bg-card p-4 shadow-xs"
                   >
                     <p className="font-semibold text-foreground">
                       {question.position}. {question.prompt}
@@ -296,7 +365,9 @@ function ActivityDetailContent({
                           className="flex flex-wrap items-center gap-2"
                         >
                           <span>{option.label}</span>
-                          {'isCorrect' in option && option.isCorrect ? (
+                          {isStaff &&
+                          'isCorrect' in option &&
+                          option.isCorrect ? (
                             <Badge variant="default">
                               {activityMessages.detail.correctOptionBadge}
                             </Badge>

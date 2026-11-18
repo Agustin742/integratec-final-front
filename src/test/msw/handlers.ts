@@ -1884,6 +1884,14 @@ export function createClassroomActivitiesStore(
             return fail(failure);
           }
 
+          if (options.classroomId && params.id !== options.classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-activities-get-404',
+            });
+          }
+
           if (role === 'PARENT') {
             return createErrorEnvelopeResponse(403, {
               code: 'FORBIDDEN',

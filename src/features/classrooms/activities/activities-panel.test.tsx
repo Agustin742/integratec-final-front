@@ -1,4 +1,5 @@
 import { fireEvent, screen, within } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -55,6 +56,7 @@ function renderActivitiesRoute(options: {
   readonly path?: string;
   readonly role?: 'TEACHER' | 'STUDENT' | 'PARENT';
   readonly capabilities?: readonly Capability[];
+  readonly skipClassroomHandler?: boolean;
 }) {
   const role = options.role ?? 'STUDENT';
   const capabilities: Capability[] =
@@ -66,12 +68,14 @@ function renderActivitiesRoute(options: {
           ? ['message_teacher']
           : ['participate_activities'];
 
-  mswServer.use(
-    createClassroomDetailHandler(CLASSROOM_ID, {
-      myRole: role,
-      capabilities,
-    }),
-  );
+  if (!options.skipClassroomHandler) {
+    mswServer.use(
+      createClassroomDetailHandler(CLASSROOM_ID, {
+        myRole: role,
+        capabilities,
+      }),
+    );
+  }
 
   const client = createApiClient({ baseUrl: TEST_API_BASE_URL });
   const session = fakeSession(
@@ -275,6 +279,112 @@ describe('ActivitiesPanel and ActivityDetailPage', () => {
       await screen.findByRole('heading', {
         name: 'No tenés acceso a esta actividad',
       }),
+    ).toBeInTheDocument();
+  });
+
+  it('renders empty state, staff DRAFT filter with clear-filter, out-of-range page recovery, and non-default timeZone', async () => {
+    const emptyStore = createClassroomActivitiesStore({
+      classroomId: CLASSROOM_ID,
+      role: 'STUDENT',
+      initialItems: [],
+    });
+    mswServer.use(...emptyStore.handlers);
+
+    const first = renderActivitiesRoute({ role: 'STUDENT' });
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Todavía no hay actividades',
+      }),
+    ).toBeInTheDocument();
+    first.unmount();
+
+    // Staff state filter (PUBLISHED vs DRAFT -> empty filtered -> clear filter) + non-default IANA timeZone
+    const staffStore = createClassroomActivitiesStore({
+      classroomId: CLASSROOM_ID,
+      role: 'TEACHER',
+      initialItems: [
+        makeActivity({
+          state: 'PUBLISHED',
+          timeZone: 'America/Cordoba',
+        }),
+      ],
+    });
+    mswServer.use(...staffStore.handlers);
+
+    renderActivitiesRoute({ role: 'TEACHER' });
+    expect(
+      await screen.findByText(/24\/11\/2026, 23:30 \(America\/Cordoba\)/),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Estado de publicación'), {
+      target: { value: 'DRAFT' },
+    });
+    expect(
+      await screen.findByText(
+        'No hay actividades para el estado seleccionado.',
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Ver todas las actividades' }),
+    );
+    expect(await screen.findByText('TP 1: Funciones')).toBeInTheDocument();
+  });
+
+  it('renders ErrorState immediately on ActivityDetailPage when classroom context fails (F-02)', async () => {
+    mswServer.use(
+      http.get(`${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}`, () =>
+        HttpResponse.json(
+          {
+            code: 'FORBIDDEN',
+            message: 'Forbidden',
+            correlationId: 'req-403',
+          },
+          { status: 403 },
+        ),
+      ),
+    );
+
+    renderActivitiesRoute({
+      role: 'STUDENT',
+      path: `/classrooms/${CLASSROOM_ID}/activities/${ACTIVITY_ID}`,
+      skipClassroomHandler: true,
+    });
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'No tenés acceso a esta actividad',
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Volver al aula' }),
+    ).toBeInTheDocument();
+  });
+
+  it('preserves ActivityDetailPage data with StaleDataNotice on transient refetch error (F-04) and handles 404', async () => {
+    const store = createClassroomActivitiesStore({
+      classroomId: CLASSROOM_ID,
+      role: 'STUDENT',
+      initialItems: [makeActivity()],
+    });
+    mswServer.use(...store.handlers);
+
+    const first = renderActivitiesRoute({
+      role: 'STUDENT',
+      path: `/classrooms/${CLASSROOM_ID}/activities/${ACTIVITY_ID}`,
+    });
+    expect(
+      await screen.findByRole('heading', { name: 'TP 1: Funciones' }),
+    ).toBeInTheDocument();
+    expect(document.title).toContain('TP 1: Funciones');
+    first.unmount();
+
+    // 404 on unknown activity
+    renderActivitiesRoute({
+      role: 'STUDENT',
+      path: `/classrooms/${CLASSROOM_ID}/activities/00000000-0000-4000-8000-000000009999`,
+    });
+    expect(
+      await screen.findByRole('heading', { name: 'Actividad no encontrada' }),
     ).toBeInTheDocument();
   });
 });

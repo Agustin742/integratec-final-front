@@ -73,7 +73,7 @@ export async function getClassroomActivity(
       kind: 'unexpected',
       status: 200,
       code: null,
-      userMessage: activityMessages.detail.errorTitle,
+      userMessage: activityMessages.errorDescription,
     });
   }
   return parsed.data;

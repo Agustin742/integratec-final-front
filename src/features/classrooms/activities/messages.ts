@@ -13,6 +13,9 @@ export const activityMessages = {
     'Cuando el docente publique una actividad o examen, va a aparecer acá con su fecha límite.',
   emptyPageTitle: 'No hay más actividades en esta página',
   emptyPageDescription: 'Volvé a la primera página para ver las actividades.',
+  backToFirstPageLabel: 'Volver a la primera página',
+  clearFilterLabel: 'Ver todas las actividades',
+  emptyFilteredDescription: 'No hay actividades para el estado seleccionado.',
   errorTitle: 'No pudimos cargar las actividades',
   errorDescription:
     'Ocurrió un problema al consultar las actividades del aula. Reintentá en unos segundos.',

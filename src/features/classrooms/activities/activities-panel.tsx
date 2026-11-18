@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router';
 import { ApiError } from '@/api/errors';
 import {
   classroomActivitiesQueryKey,
+  classroomDetailQueryKey,
+  createClassroomActivitiesPredicate,
   type ActivitySortOrder,
   type ActivityStateFilter,
 } from '@/api/query-keys';
@@ -16,7 +18,7 @@ import {
 import { PaginationControls } from '@/components/pagination/pagination-controls';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { formatDeadline } from '@/lib/dates';
+import { DEFAULT_SCHOOL_TIME_ZONE, formatDeadline } from '@/lib/dates';
 import { useSessionService } from '@/session/provider';
 import {
   useClassroomCapabilities,
@@ -28,16 +30,22 @@ import { activityMessages } from './messages';
 const PAGE_SIZE = 10;
 
 function formatActivityDeadline(iso: string, timeZone: string): string {
+  const safeZone = timeZone.trim() || DEFAULT_SCHOOL_TIME_ZONE;
   try {
-    return formatDeadline(iso, { timeZone });
+    return formatDeadline(iso, { timeZone: safeZone });
   } catch {
-    return `${iso} (${timeZone})`;
+    try {
+      return formatDeadline(iso, { timeZone: DEFAULT_SCHOOL_TIME_ZONE });
+    } catch {
+      return `${iso} (${safeZone})`;
+    }
   }
 }
 
 export function ActivitiesPanel() {
   const { classroomId } = useParams();
-  if (!classroomId) {
+  const normalizedClassroomId = classroomId?.trim();
+  if (!normalizedClassroomId) {
     return (
       <ErrorState
         headingLevel="h3"
@@ -46,11 +54,17 @@ export function ActivitiesPanel() {
       />
     );
   }
-  return <ActivitiesPanelContent key={classroomId} classroomId={classroomId} />;
+  return (
+    <ActivitiesPanelContent
+      key={normalizedClassroomId}
+      classroomId={normalizedClassroomId}
+    />
+  );
 }
 
 function ActivitiesPanelContent({ classroomId }: { classroomId: string }) {
   const { client } = useSessionService();
+  const queryClient = useQueryClient();
   const context = useClassroomContext(classroomId);
   const capabilities = useClassroomCapabilities(classroomId);
 
@@ -83,6 +97,26 @@ function ActivitiesPanelContent({ classroomId }: { classroomId: string }) {
     enabled: userId !== null,
   });
 
+  const listError = query.error instanceof ApiError ? query.error : null;
+
+  useEffect(() => {
+    if (
+      userId === null ||
+      !query.isError ||
+      (listError?.status !== 403 && listError?.status !== 404)
+    ) {
+      return;
+    }
+    queryClient.removeQueries({
+      predicate: createClassroomActivitiesPredicate(userId, classroomId),
+    });
+    if (listError.status === 404) {
+      void queryClient.invalidateQueries({
+        queryKey: classroomDetailQueryKey(userId, classroomId),
+      });
+    }
+  }, [classroomId, listError?.status, query.isError, queryClient, userId]);
+
   if (context.status === 'pending') {
     return <LoadingState label={activityMessages.loadingLabel} />;
   }
@@ -113,7 +147,6 @@ function ActivitiesPanelContent({ classroomId }: { classroomId: string }) {
     );
   }
 
-  const listError = query.error instanceof ApiError ? query.error : null;
   const isTerminalListError =
     query.isError &&
     (listError?.status === 403 || listError?.status === 404 || !query.data);
@@ -150,6 +183,17 @@ function ActivitiesPanelContent({ classroomId }: { classroomId: string }) {
       />
     );
   }
+
+  const isOutOfRangePage =
+    query.data !== undefined &&
+    query.data.items.length === 0 &&
+    page > 1 &&
+    query.data.total > 0;
+  const isFilteredEmpty =
+    query.data !== undefined &&
+    query.data.items.length === 0 &&
+    query.data.total === 0 &&
+    effectiveState !== undefined;
 
   return (
     <div className="min-w-0 space-y-4">
@@ -231,23 +275,36 @@ function ActivitiesPanelContent({ classroomId }: { classroomId: string }) {
             <EmptyState
               headingLevel="h4"
               title={
-                page > 1
+                isOutOfRangePage
                   ? activityMessages.emptyPageTitle
                   : activityMessages.emptyTitle
               }
               description={
-                page > 1
+                isOutOfRangePage
                   ? activityMessages.emptyPageDescription
-                  : activityMessages.emptyDescription
+                  : isFilteredEmpty
+                    ? activityMessages.emptyFilteredDescription
+                    : activityMessages.emptyDescription
               }
               action={
-                page > 1 ? (
+                isOutOfRangePage ? (
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => setPage(1)}
                   >
-                    {activityMessages.retryLabel}
+                    {activityMessages.backToFirstPageLabel}
+                  </Button>
+                ) : isFilteredEmpty ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setStateFilter('ALL');
+                      setPage(1);
+                    }}
+                  >
+                    {activityMessages.clearFilterLabel}
                   </Button>
                 ) : undefined
               }
@@ -291,7 +348,8 @@ function ActivitiesPanelContent({ classroomId }: { classroomId: string }) {
                         </div>
 
                         <Link
-                          to={`/classrooms/${classroomId}/activities/${item.id}`}
+                          to={`/classrooms/${encodeURIComponent(classroomId)}/activities/${encodeURIComponent(item.id)}`}
+                          aria-label={`${activityMessages.openDetailLabel}: ${item.title}`}
                           className="inline-flex min-h-10 shrink-0 items-center rounded-xl border-2 border-edge bg-card px-3 py-1.5 font-display text-sm font-semibold text-card-foreground focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
                         >
                           {activityMessages.openDetailLabel}
@@ -337,6 +395,7 @@ function ActivitiesPanelContent({ classroomId }: { classroomId: string }) {
                   page={query.data.page}
                   pageSize={query.data.pageSize}
                   total={query.data.total}
+                  busy={query.isFetching}
                   onPageChange={(nextPage) => setPage(nextPage)}
                 />
               ) : null}
