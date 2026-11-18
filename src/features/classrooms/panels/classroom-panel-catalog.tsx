@@ -1,5 +1,6 @@
 import type { components } from '@/api/schema.generated';
 import { EmptyState } from '@/components/feedback/states';
+import { NoticeBoardPanel } from '../announcements/notice-board-panel';
 import { MaterialPanel } from '../materials/material-panel';
 import { ClassroomRosterPanel } from '../classroom-roster-panel';
 import { classroomMessages as messages } from '../messages';
@@ -31,7 +32,11 @@ export const classroomPanelCatalog = [
   },
   entry('grades'),
   entry('chat'),
-  entry('notices'),
+  {
+    key: 'notices',
+    title: messages.panels.notices,
+    component: NoticeBoardPanel,
+  },
   entry('shop'),
   entry('bot'),
   {
