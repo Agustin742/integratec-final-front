@@ -35,17 +35,17 @@ export const useClassroomModeStore = create<ClassroomModeStoreState>((set) => ({
   setOwnerMode: (userId, mode) => set({ ownerUserId: userId, mode }),
   syncOwner: (userId) =>
     set((state) => {
-      if (userId === null) {
-        return state.ownerUserId === null && state.mode === DEFAULT_MODE
-          ? state
-          : { ownerUserId: null, mode: DEFAULT_MODE };
-      }
-      if (state.ownerUserId === userId) {
+      if (state.ownerUserId === null || state.ownerUserId === userId) {
         return state;
       }
-      return { ownerUserId: userId, mode: DEFAULT_MODE };
+      return { ownerUserId: null, mode: DEFAULT_MODE };
     }),
-  reset: () => set({ ownerUserId: null, mode: DEFAULT_MODE }),
+  reset: () =>
+    set((state) =>
+      state.ownerUserId === null && state.mode === DEFAULT_MODE
+        ? state
+        : { ownerUserId: null, mode: DEFAULT_MODE },
+    ),
 }));
 
 export function getClassroomMode(userId: string | null): ClassroomViewMode {
