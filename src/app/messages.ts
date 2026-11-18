@@ -23,9 +23,9 @@ export const messages = {
         'Acá vas a poder aceptar una invitación a un aula. Pantalla en construcción.',
     },
     home: {
-      title: 'Inicio',
+      title: 'Mis aulas',
       description:
-        'Acá vas a ver tus aulas y tu actividad. Pantalla en construcción.',
+        'Administrá tus aulas virtuales, cambiá de contexto o ingresá a un aula existente.',
     },
     notFound: {
       title: 'Página no encontrada',
