@@ -237,4 +237,55 @@ export const classroomMessages = {
     removeUnexpected:
       'No pudimos procesar la baja del estudiante. Intentá nuevamente en unos segundos.',
   },
+  activities: {
+    validation: {
+      titleRequired: 'Ingresá un título para la actividad.',
+      instantInvalid: 'Ingresá una fecha y hora válidas.',
+      opensAtOnlyForExams:
+        'La fecha de apertura solo aplica a exámenes, no a trabajos prácticos.',
+      opensAtBeforeDueAt:
+        'La apertura del examen debe ser anterior a la fecha límite.',
+      questionsRequired:
+        'Las actividades de opción múltiple necesitan al menos una pregunta.',
+      questionsForbiddenForFile:
+        'Las actividades con entrega de archivo no admiten preguntas de opción múltiple.',
+      exactlyOneCorrectOption:
+        'Cada pregunta debe tener exactamente una opción marcada como correcta.',
+      questionPromptRequired: 'Ingresá el enunciado de la pregunta.',
+      optionLabelRequired: 'Ingresá el texto de la opción.',
+      weightMultiplierPositive: 'La ponderación debe ser un número mayor que cero.',
+      weightMultiplierDecimals: 'La ponderación admite hasta dos decimales.',
+      maxScorePositive: 'El puntaje máximo debe ser un número mayor que cero.',
+    },
+    list: {
+      errorDescription: 'No pudimos cargar las actividades del aula.',
+      forbidden:
+        'Tu rol actual no tiene permisos para ver las actividades de esta aula.',
+      notFound: 'No encontramos el aula indicada o ya no tenés acceso.',
+    },
+    detail: {
+      errorDescription: 'No pudimos cargar la actividad.',
+      forbidden: 'Tu rol actual no tiene permisos para ver esta actividad.',
+      notFound: 'No encontramos la actividad o ya no tenés acceso.',
+    },
+    write: {
+      uncertain:
+        'No pudimos confirmar la operación en el servidor. Verificá el estado real de la actividad antes de volver a intentar.',
+      validation:
+        'El servidor rechazó los datos de la actividad. Revisá los campos marcados.',
+      forbidden:
+        'Tu rol actual no tiene permisos para gestionar actividades en esta aula.',
+      notFound:
+        'No encontramos la actividad o el aula indicada, o ya no tenés acceso.',
+      updateQuestionsLocked:
+        'Las preguntas ya no pueden modificarse porque existe al menos una entrega de la actividad.',
+      publishNotPublishable:
+        'La actividad no se puede publicar: revisá que la fecha límite sea futura y que las preguntas de opción múltiple estén completas.',
+      publishAlreadyPublished: 'La actividad ya estaba publicada.',
+      deactivateHasSubmissions:
+        'No se puede eliminar la actividad porque tiene entregas asociadas. Su historial académico se conserva.',
+      deactivateUnexpected:
+        'No pudimos desactivar la actividad. Intentá nuevamente en unos segundos.',
+    },
+  },
 } as const;

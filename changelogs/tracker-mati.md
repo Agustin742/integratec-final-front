@@ -1,5 +1,6 @@
 # Tracker — Mati
 
+<<<<<<< HEAD
 ## 2026-11-18 — Study material manager with upload progress and signed downloads (#40)
 
 - **Status:** completed
@@ -12,6 +13,15 @@
 - **Reason:** Allow teachers/staff to upload and remove classroom study materials and members to download them via server-issued short-lived signed URLs (`rules/activities-and-grading.md`, `rules/security.md`, `rules/error-handling-and-feedback.md`, `rules/ui-and-accessibility.md`, `rules/forms-and-validation.md`).
 - **Verification:** On Node `22.23.4` and pnpm `10.34.9`: `pnpm lint`, `pnpm typecheck`, `pnpm test` (59 files, 666 tests passed), `pnpm build` (`442` modules), `pnpm security:check`, `pnpm format:check`, focused Playwright `e2e/study-materials.spec.ts` (`4/4` desktop and mobile passed with zero CSP violations and zero horizontal overflow), and `git diff --check origin/develop..HEAD --` passed. Skipped/unavailable locally: full `pnpm e2e` suite (ran focused `e2e/study-materials.spec.ts` only) and `python3` checks (`scripts/ci/check_docs.py`, `scripts/ci/test_*.py`; `python3` unavailable on this Windows workstation, runs in Ubuntu CI). Blind RDD audit (`041a6c0`): fixed 1 BLOCKER (`F-01` `sr-only` file input tab order) and `F-02`–`F-08` warnings (focus management on remove confirm/cancel, `page=1` reset on `503` reconcile, download unmount abort, `context.status === 'error'` handling, `404` remove reconciliation & alert clearing, docs table fix, 360px scroll-to-top capture, and added tests).
 - **Next step:** Merged with `develop` (`#87`, `#88`) and approved for merge.
+=======
+## 2026-11-18 — Teacher activity editor for assignments and exams with multiple-choice builder (#39)
+
+- **Status:** in-progress
+- **Area / files (planned):** `src/features/classrooms/activities/` (schemas, services, panel, editor), `src/api/query-keys.ts`, `src/features/classrooms/panels/classroom-panel-catalog.tsx`, `src/test/msw/handlers.ts`, `e2e/`, `docs/`, `changelogs/tracker-mati.md`
+- **Change:** Implementing [issue #39](https://github.com/Agustin742/integratec-final-front/issues/39) (HU-ACT-001 part 1/2) on `feat/39-teacher-activity-editor` from `develop` (`c50d62b`): activity form (type/format/title/description/due date/late policy/max score/weight), accessible multiple-choice builder, publish flow with confirmation and pending/failed/uncertain states, teacher activity list with status, server-rule-compliant deactivation UX, 3D panel registry + 2D route entry, MSW handlers from the contract, unit tests and Playwright E2E.
+- **Reason:** Let teachers create, edit and publish TP and Exam activities including a multiple-choice question builder, per `rules/activities-and-grading.md`.
+- **Verification:** Pending — full local check suite will be recorded when complete.
+- **Next step:** T1 integration layer (schemas, service, query keys, MSW handlers).
 
 ## 2026-11-18 — Build the Colyseus realtime client wrapper with token join and reconnect handling (#23)
 

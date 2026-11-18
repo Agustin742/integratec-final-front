@@ -335,3 +335,114 @@ export function createClassroomMaterialsPredicate(
     );
   };
 }
+export type ClassroomActivitiesSort =
+  | 'dueAt'
+  | 'createdAt'
+  | '-dueAt'
+  | '-createdAt';
+
+export type ClassroomActivitiesStateFilter = 'DRAFT' | 'PUBLISHED';
+
+export interface ClassroomActivitiesQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+  readonly sort?: ClassroomActivitiesSort;
+  /** Staff only. Students always receive published activities only. */
+  readonly state?: ClassroomActivitiesStateFilter;
+}
+
+export interface NormalizedClassroomActivitiesQueryParams {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly sort: ClassroomActivitiesSort;
+  readonly state: ClassroomActivitiesStateFilter | null;
+}
+
+/**
+ * Key of `GET /classrooms/{id}/activities`: paginated activity summaries
+ * scoped by `userId` and `classroomId` (`rules/state-management.md`).
+ */
+export function classroomActivitiesQueryKey(
+  userId: string,
+  classroomId: string,
+  params: ClassroomActivitiesQueryParams = {},
+): ScopedQueryKey<NormalizedClassroomActivitiesQueryParams> {
+  const sort: ClassroomActivitiesSort =
+    params.sort === 'createdAt' ||
+    params.sort === '-dueAt' ||
+    params.sort === '-createdAt'
+      ? params.sort
+      : 'dueAt';
+  const normalizedParams = Object.freeze({
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+    sort,
+    state:
+      params.state === 'DRAFT' || params.state === 'PUBLISHED'
+        ? params.state
+        : null,
+  });
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'classrooms',
+    'activities',
+    normalizedParams,
+  );
+}
+
+export interface NormalizedClassroomActivityDetailQueryParams {
+  readonly activityId: string;
+}
+
+/**
+ * Key of `GET /classrooms/{id}/activities/{activityId}`: one activity detail
+ * scoped by `userId` and `classroomId` (`rules/state-management.md`).
+ */
+export function classroomActivityDetailQueryKey(
+  userId: string,
+  classroomId: string,
+  activityId: string,
+): ScopedQueryKey<NormalizedClassroomActivityDetailQueryParams> {
+  const normalizedParams = Object.freeze({
+    activityId: normalizeRequiredText(activityId, 'activityId'),
+  });
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'classrooms',
+    'activities',
+    normalizedParams,
+  );
+}
+
+/**
+ * Predicate matching every classroom activities query entry (list and detail)
+ * owned by `userId` and `classroomId`, so a confirmed write reconciles all
+ * affected activity views at once.
+ */
+export function createClassroomActivitiesPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'classrooms' &&
+      segment.resource === 'activities'
+    );
+  };
+}
