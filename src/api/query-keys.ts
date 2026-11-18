@@ -336,10 +336,7 @@ export function createClassroomMaterialsPredicate(
   };
 }
 export type ClassroomActivitiesSort =
-  | 'dueAt'
-  | 'createdAt'
-  | '-dueAt'
-  | '-createdAt';
+  'dueAt' | 'createdAt' | '-dueAt' | '-createdAt';
 
 export type ClassroomActivitiesStateFilter = 'DRAFT' | 'PUBLISHED';
 

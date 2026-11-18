@@ -1747,7 +1747,8 @@ export type TeacherActivityPayload =
   components['schemas']['TeacherActivityResponseDto'];
 export type StudentActivityPayload =
   components['schemas']['StudentActivityResponseDto'];
-export type ActivitySummaryPayload = components['schemas']['ActivitySummaryDto'];
+export type ActivitySummaryPayload =
+  components['schemas']['ActivitySummaryDto'];
 export type CreateActivityRequestPayload =
   components['schemas']['CreateActivityDto'];
 export type UpdateActivityRequestPayload =
