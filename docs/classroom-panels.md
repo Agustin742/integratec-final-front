@@ -22,7 +22,7 @@ the issue; team acceptance of the reconciled criterion remains part of PR review
 
 | Registered key | Title                                       |
 | -------------- | ------------------------------------------- |
-| `activities`   | Actividades                                 |
+| `activities`   | Actividades (`ActivitiesPanel`, `#41`)      |
 | `material`     | Material (`MaterialPanel`, `#40`)           |
 | `grades`       | Calificaciones                              |
 | `chat`         | Chat                                        |
@@ -115,9 +115,12 @@ The public-route browser check captures the pending entry at
 [1280px](./assets/classroom-panels/entry-1280.png) and
 [360px](./assets/classroom-panels/entry-360.png), the `#33` staff roster panel at
 [1280px](./assets/classrooms/roster-1280.png) and
-[360px](./assets/classrooms/roster-360.png), and the `#40` study material
+[360px](./assets/classrooms/roster-360.png), the `#40` study material
 manager (`MaterialPanel`, `e2e/study-materials.spec.ts`) at
 [1280px](./assets/classrooms/study-materials-1280.png) and
-[360px](./assets/classrooms/study-materials-360.png). Pending entries show
+[360px](./assets/classrooms/study-materials-360.png), and the `#41`
+student activity inbox (`ActivitiesPanel`, `e2e/activities-inbox.spec.ts`) at
+[1280px](./assets/classrooms/activities-inbox-1280.png) and
+[360px](./assets/classrooms/activities-inbox-360.png). Pending entries show
 pending functionality rather than fabricated data; verification results and
 synthetic boundaries are recorded in the contributor trackers and `e2e/` specs.

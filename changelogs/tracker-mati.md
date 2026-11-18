@@ -1,5 +1,17 @@
 # Tracker — Mati
 
+## 2026-11-18 — Implement student activity inbox and shared activity detail route (#41)
+
+- **Status:** in-progress (ready for blind RDD audit and PR approval)
+- **Area / files:** `src/api/query-keys.ts`, `src/features/classrooms/activities/`, `src/features/classrooms/classroom-workspace.tsx`, `src/features/classrooms/panels/classroom-panel-catalog.tsx`, `src/features/classrooms/classroom-workspace-panels.test.tsx`, `src/app/router/routes.tsx`, `src/test/msw/handlers.ts`, `e2e/activities-inbox.spec.ts`, `docs/threat-model.md`, `docs/classroom-panels.md`, `docs/assets/classrooms/activities-inbox-*.png`, `changelogs/tracker-mati.md`
+- **Change:** Implemented [issue #41](https://github.com/Agustin742/integratec-final-front/issues/41) (`HU-ACT-002`) on `feat/41-student-activity-inbox`:
+  1. Added user/classroom-scoped `classroomActivitiesQueryKey`, `createClassroomActivitiesPredicate`, and `classroomActivityDetailQueryKey` (`src/api/query-keys.ts`), jitless Zod schemas (`src/features/classrooms/activities/activity-schema.ts`), typed REST service (`src/features/classrooms/activities/activity-service.ts`), centralized `es-AR` copy (`src/features/classrooms/activities/messages.ts`), contract-faithful MSW store (`src/test/msw/handlers.ts`), and service tests (`activity-service.test.ts`).
+  2. Implemented `ActivitiesPanel` (wired into `classroomPanelCatalog` `'activities'` key; sort by `dueAt`/`createdAt`, staff-only `state` filter, `formatDeadline` in school IANA `timeZone`, `403`/`404` terminal error clearing, pagination) and `ActivityDetailPage` (`/classrooms/:classroomId/activities/:activityId` with `Consigna`, `Entrega` `HU-ACT-003` slot, `Foro de consultas` `HU-COM-003` slot, staff-only `Revisión docente` `HU-ACT-004` slot, and student/teacher question shaping), plus `unmountedRef` guard in `ClassroomWorkspace.closePanelRoute` so outgoing panel links don't redirect back to the classroom root.
+  3. Added RTL/axe-core tests (`activities-panel.test.tsx`), updated `classroom-workspace-panels.test.tsx`, added Playwright E2E (`e2e/activities-inbox.spec.ts`), captured `1280px` and `360px` screenshots under `docs/assets/classrooms/`, and updated `docs/threat-model.md` (`TM-023`–`TM-024`) and `docs/classroom-panels.md`.
+- **Reason:** Show classroom activities with server-returned deadlines in school IANA `timeZone` and host the shared `/classrooms/:classroomId/activities/:activityId` detail route (`rules/activities-and-grading.md`, `rules/data-and-time.md`, `rules/ui-and-accessibility.md`, `rules/state-management.md`, `rules/error-handling-and-feedback.md`).
+- **Verification:** On Node `22.23.4` and pnpm `10.34.9`: `pnpm lint`, `pnpm typecheck`, `pnpm test` (67 files, 723 tests passed), `pnpm build` (`453` modules), `pnpm security:check`, `pnpm format:check`, focused Playwright `e2e/activities-inbox.spec.ts` (`2/2` desktop and mobile passed with zero CSP violations, zero page errors, and zero horizontal overflow), and `git diff --check origin/develop..HEAD --` verified cleanly. Skipped/unavailable locally on Windows: full `pnpm e2e` suite (ran focused `e2e/activities-inbox.spec.ts` only) and `python3` CI scripts (`scripts/ci/check_docs.py`, `scripts/ci/test_*.py`; `python3` unavailable on this Windows workstation, runs in Ubuntu CI).
+- **Next step:** Run blind `rdd-auditor` and await explicit user approval before pushing or opening the PR against `develop`.
+
 ## 2026-11-18 — Study material manager with upload progress and signed downloads (#40)
 
 - **Status:** completed
