@@ -172,11 +172,12 @@ describe('NoticeBoardPanel', () => {
     ).toBeInTheDocument();
     expect(within(list).getByText('1 mención')).toBeInTheDocument();
 
-    // Edit the published announcement
+    // Edit the published announcement (moves focus to title input)
     fireEvent.click(within(list).getByRole('button', { name: 'Editar' }));
     expect(
       screen.getByRole('heading', { name: 'Editar anuncio' }),
     ).toBeInTheDocument();
+    expect(screen.getByLabelText('Título')).toHaveFocus();
     fireEvent.change(screen.getByLabelText('Título'), {
       target: { value: 'Clase de consulta (reprogramada)' },
     });
@@ -188,7 +189,7 @@ describe('NoticeBoardPanel', () => {
     ).toBeInTheDocument();
     expect(within(list).getByText(/Editado:/)).toBeInTheDocument();
 
-    // Inline remove confirmation with focus handoff
+    // Inline remove confirmation with focus handoff and post-remove heading focus
     const removeButton = within(list).getByRole('button', { name: 'Eliminar' });
     fireEvent.click(removeButton);
     const cancelRemove = within(list).getByRole('button', {
@@ -205,6 +206,9 @@ describe('NoticeBoardPanel', () => {
         screen.getByRole('heading', { name: 'Todavía no hay anuncios' }),
       ).toBeInTheDocument();
     });
+    expect(
+      screen.getByRole('heading', { name: 'Tablón de anuncios' }),
+    ).toHaveFocus();
   });
 
   it('renders announcements chronologically for students without publish, edit, or delete controls', async () => {
@@ -344,5 +348,139 @@ describe('NoticeBoardPanel', () => {
     expect(
       screen.getByRole('button', { name: 'Eliminar' }),
     ).toBeInTheDocument();
+  });
+
+  it('validates client boundaries and preserves draft on server 400 rejection', async () => {
+    const store = createClassroomAnnouncementsStore({
+      classroomId: CLASSROOM_ID,
+      authorId: profile.id,
+    });
+    mswServer.use(...store.handlers);
+
+    renderNoticeBoardPanel({ role: 'TEACHER' });
+    await screen.findByRole('heading', { name: 'Todavía no hay anuncios' });
+
+    // Empty submit triggers client validation without calling server
+    fireEvent.click(screen.getByRole('button', { name: 'Publicar anuncio' }));
+    expect(
+      await screen.findByText('Ingresá un título para el anuncio.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Ingresá el contenido del anuncio.'),
+    ).toBeInTheDocument();
+
+    // Whitespace-only title triggers required validation
+    fireEvent.change(screen.getByLabelText('Título'), {
+      target: { value: '   ' },
+    });
+    fireEvent.change(screen.getByLabelText('Contenido'), {
+      target: { value: 'Contenido válido.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Publicar anuncio' }));
+    expect(
+      await screen.findByText('Ingresá un título para el anuncio.'),
+    ).toBeInTheDocument();
+
+    // Server 400 rejection preserves user draft
+    store.failNext('create', {
+      status: 400,
+      body: {
+        code: 'BAD_REQUEST',
+        message: 'Demasiadas menciones.',
+        correlationId: 'req-400',
+        details: [{ field: 'content', messages: ['Máximo 20 menciones.'] }],
+      },
+    });
+    fireEvent.change(screen.getByLabelText('Título'), {
+      target: { value: 'Título válido' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Publicar anuncio' }));
+    expect(await screen.findByText('Máximo 20 menciones.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Título')).toHaveValue('Título válido');
+    expect(screen.getByLabelText('Contenido')).toHaveValue('Contenido válido.');
+  });
+
+  it('clears cached announcements and form if a refetch returns 403 or 404 (F-01)', async () => {
+    const store = createClassroomAnnouncementsStore({
+      classroomId: CLASSROOM_ID,
+      authorId: profile.id,
+      initialItems: [makeAnnouncement({ title: 'Aviso privado' })],
+    });
+    mswServer.use(...store.handlers);
+
+    renderNoticeBoardPanel({ role: 'TEACHER' });
+    await screen.findByText('Aviso privado');
+
+    // Simulate access revocation (403 on list refetch triggered by 404 remove reconcile)
+    store.failNext('remove', {
+      status: 404,
+      body: {
+        code: 'NOT_FOUND',
+        message: 'Not found',
+        correlationId: 'req-404',
+      },
+    });
+    store.failNext('list', {
+      status: 403,
+      body: {
+        code: 'FORBIDDEN',
+        message: 'Forbidden',
+        correlationId: 'req-403',
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Confirmar eliminación' }),
+    );
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'No tenés acceso a los anuncios',
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Aviso privado')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Publicar anuncio' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('supports manage_school edit without publish_content and paginates announcements', async () => {
+    const items = Array.from({ length: 12 }, (_, index) =>
+      makeAnnouncement({
+        id: `00000000-0000-4000-8000-${String(3000 + index).padStart(12, '0')}`,
+        authorId: OTHER_TEACHER_ID,
+        title: `Aviso ${String(index + 1).padStart(2, '0')}`,
+        createdAt: `2026-11-${String(10 + index).padStart(2, '0')}T10:00:00.000Z`,
+        updatedAt: `2026-11-${String(10 + index).padStart(2, '0')}T10:00:00.000Z`,
+      }),
+    );
+    const store = createClassroomAnnouncementsStore({
+      classroomId: CLASSROOM_ID,
+      authorId: OTHER_TEACHER_ID,
+      initialItems: items,
+    });
+    mswServer.use(...store.handlers);
+
+    renderNoticeBoardPanel({
+      role: 'ADMIN',
+      capabilities: ['manage_school'],
+    });
+
+    await screen.findByText('Aviso 12');
+    expect(
+      screen.queryByRole('heading', { name: 'Publicar anuncio' }),
+    ).not.toBeInTheDocument();
+
+    // Clicking Editar opens the edit form even without publish_content
+    fireEvent.click(screen.getAllByRole('button', { name: 'Editar' })[0]!);
+    expect(
+      screen.getByRole('heading', { name: 'Editar anuncio' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar edición' }));
+
+    // Paginate to page 2
+    fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    expect(await screen.findByText('Aviso 01')).toBeInTheDocument();
   });
 });

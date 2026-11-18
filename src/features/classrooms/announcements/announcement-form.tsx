@@ -20,6 +20,7 @@ import {
 } from './announcement-schema';
 import {
   createClassroomAnnouncement,
+  isAbortError,
   isUncertainAnnouncementError,
   updateClassroomAnnouncement,
 } from './announcement-service';
@@ -32,14 +33,16 @@ export type AnnouncementFormMode =
 export interface AnnouncementFormProps {
   readonly classroomId: string;
   readonly mode: AnnouncementFormMode;
+  readonly onSubmitStart?: () => void;
   readonly onSuccess: (saved: AnnouncementDto, mode: 'create' | 'edit') => void;
-  readonly onReconcileRequired: () => void;
+  readonly onReconcileRequired: (resetPage: boolean) => void;
   readonly onCancelEdit?: () => void;
 }
 
 export function AnnouncementForm({
   classroomId,
   mode,
+  onSubmitStart,
   onSuccess,
   onReconcileRequired,
   onCancelEdit,
@@ -48,6 +51,7 @@ export function AnnouncementForm({
   const headingId = useId();
   const isEdit = mode.kind === 'edit';
   const unmountAbortRef = useRef<AbortController | null>(null);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -57,6 +61,12 @@ export function AnnouncementForm({
       unmountAbortRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (isEdit) {
+      titleInputRef.current?.focus();
+    }
+  }, [isEdit, mode]);
 
   const form = useZodForm<AnnouncementFormInput, AnnouncementFormValues>({
     schema: announcementFormSchema,
@@ -74,6 +84,7 @@ export function AnnouncementForm({
   const { isSubmitting, handleSubmit } = useProtectedSubmit(
     form,
     async (values) => {
+      onSubmitStart?.();
       try {
         const saved = isEdit
           ? await updateClassroomAnnouncement(
@@ -95,11 +106,14 @@ export function AnnouncementForm({
         }
         onSuccess(saved, mode.kind);
       } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') {
+        if (isAbortError(error)) {
           return;
         }
-        if (isUncertainAnnouncementError(error)) {
-          onReconcileRequired();
+        if (
+          isUncertainAnnouncementError(error) ||
+          (isEdit && error instanceof ApiError && error.status === 404)
+        ) {
+          onReconcileRequired(!isEdit);
         }
         if (error instanceof ApiError) {
           throw error;
@@ -149,6 +163,10 @@ export function AnnouncementForm({
           {(fieldProps) => (
             <Input
               {...fieldProps}
+              ref={(el) => {
+                fieldProps.ref(el);
+                titleInputRef.current = el;
+              }}
               type="text"
               maxLength={ANNOUNCEMENT_TITLE_MAX_LENGTH}
               placeholder={announcementMessages.form.titlePlaceholder}

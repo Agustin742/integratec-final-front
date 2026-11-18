@@ -12,7 +12,6 @@ import {
   LoadingState,
   StaleDataNotice,
 } from '@/components/feedback/states';
-import { getPaginationMeta } from '@/components/pagination/pagination';
 import { PaginationControls } from '@/components/pagination/pagination-controls';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -25,6 +24,7 @@ import { AnnouncementForm } from './announcement-form';
 import { AnnouncementList } from './announcement-list';
 import type { AnnouncementDto } from './announcement-schema';
 import {
+  isAbortError,
   isUncertainAnnouncementError,
   listClassroomAnnouncements,
   removeClassroomAnnouncement,
@@ -44,7 +44,9 @@ export function NoticeBoardPanel() {
       />
     );
   }
-  return <NoticeBoardPanelContent classroomId={classroomId} />;
+  return (
+    <NoticeBoardPanelContent key={classroomId} classroomId={classroomId} />
+  );
 }
 
 function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
@@ -54,7 +56,6 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
   const capabilities = useClassroomCapabilities(classroomId);
 
   const [page, setPage] = useState(1);
-  const [createResetSeq, setCreateResetSeq] = useState(0);
   const [editingAnnouncement, setEditingAnnouncement] =
     useState<AnnouncementDto | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
@@ -64,6 +65,9 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
     readonly title: string;
     readonly description: string;
   } | null>(null);
+
+  const removingRef = useRef(false);
+  const headingRef = useRef<HTMLHeadingElement | null>(null);
   const unmountAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -120,9 +124,6 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
     mode: 'create' | 'edit',
   ) {
     setEditingAnnouncement(null);
-    if (mode === 'create') {
-      setCreateResetSeq((seq) => seq + 1);
-    }
     setActionNotice({
       kind: 'success',
       title:
@@ -138,6 +139,10 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
   }
 
   async function handleConfirmRemove(item: AnnouncementDto) {
+    if (removingRef.current) {
+      return;
+    }
+    removingRef.current = true;
     setRemovingId(item.id);
     setActionNotice(null);
     try {
@@ -156,14 +161,16 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
         ),
       });
       await reconcileAnnouncements(false);
+      headingRef.current?.focus();
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
+      if (isAbortError(error)) {
         return;
       }
       setPendingConfirmId(null);
-      if (isUncertainAnnouncementError(error)) {
-        await reconcileAnnouncements(false);
-      } else if (error instanceof ApiError && error.status === 404) {
+      if (
+        isUncertainAnnouncementError(error) ||
+        (error instanceof ApiError && error.status === 404)
+      ) {
         await reconcileAnnouncements(false);
       }
       setActionNotice({
@@ -175,6 +182,7 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
             : announcementMessages.errorDescription,
       });
     } finally {
+      removingRef.current = false;
       setRemovingId(null);
     }
   }
@@ -210,18 +218,58 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
   }
 
   const listError = query.error instanceof ApiError ? query.error : null;
-  const paginationMeta = query.data
-    ? getPaginationMeta({
-        page: query.data.page,
-        pageSize: query.data.pageSize,
-        total: query.data.total,
-      })
-    : null;
+  const isTerminalListError =
+    query.isError &&
+    (listError?.status === 403 || listError?.status === 404 || !query.data);
+
+  if (isTerminalListError) {
+    const isForbidden = listError?.status === 403;
+    const isNotFound = listError?.status === 404;
+    return (
+      <ErrorState
+        headingLevel="h3"
+        title={
+          isForbidden
+            ? announcementMessages.forbiddenTitle
+            : isNotFound
+              ? announcementMessages.notFoundTitle
+              : announcementMessages.errorTitle
+        }
+        description={
+          isForbidden
+            ? announcementMessages.forbiddenDescription
+            : isNotFound
+              ? announcementMessages.notFoundDescription
+              : (listError?.userMessage ??
+                announcementMessages.errorDescription)
+        }
+        onRetry={
+          isForbidden || isNotFound
+            ? undefined
+            : () => {
+                void query.refetch();
+              }
+        }
+        retryLabel={announcementMessages.retryLabel}
+      />
+    );
+  }
+
+  const showForm =
+    canPublish ||
+    (editingAnnouncement !== null && canModifyItem(editingAnnouncement));
+  const totalPages = query.data
+    ? Math.max(1, Math.ceil(query.data.total / query.data.pageSize))
+    : 1;
 
   return (
     <div className="min-w-0 space-y-5">
       <div className="space-y-1">
-        <h3 className="text-lg font-semibold text-foreground">
+        <h3
+          ref={headingRef}
+          tabIndex={-1}
+          className="text-lg font-semibold text-foreground focus:outline-none"
+        >
           {announcementMessages.heading}
         </h3>
         <p className="text-sm text-muted-foreground">
@@ -238,12 +286,10 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
         </Alert>
       ) : null}
 
-      {canPublish ? (
+      {showForm ? (
         <AnnouncementForm
           key={
-            editingAnnouncement
-              ? `edit-${editingAnnouncement.id}`
-              : `create-${createResetSeq}`
+            editingAnnouncement ? `edit-${editingAnnouncement.id}` : 'create'
           }
           classroomId={classroomId}
           mode={
@@ -251,45 +297,22 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
               ? { kind: 'edit', announcement: editingAnnouncement }
               : { kind: 'create' }
           }
+          onSubmitStart={() => setActionNotice(null)}
           onSuccess={(saved, mode) => {
             void handleFormSuccess(saved, mode);
           }}
-          onReconcileRequired={() => {
-            void reconcileAnnouncements(false);
+          onReconcileRequired={(resetPage) => {
+            void reconcileAnnouncements(resetPage);
           }}
-          onCancelEdit={() => setEditingAnnouncement(null)}
+          onCancelEdit={() => {
+            setEditingAnnouncement(null);
+            headingRef.current?.focus();
+          }}
         />
       ) : null}
 
       {query.isPending ? (
         <LoadingState label={announcementMessages.loadingTitle} />
-      ) : query.isError && !query.data ? (
-        <ErrorState
-          headingLevel="h3"
-          title={
-            listError?.status === 403
-              ? announcementMessages.forbiddenTitle
-              : listError?.status === 404
-                ? announcementMessages.notFoundTitle
-                : announcementMessages.errorTitle
-          }
-          description={
-            listError?.status === 403
-              ? announcementMessages.forbiddenDescription
-              : listError?.status === 404
-                ? announcementMessages.notFoundDescription
-                : (listError?.userMessage ??
-                  announcementMessages.errorDescription)
-          }
-          onRetry={
-            listError?.status === 403 || listError?.status === 404
-              ? undefined
-              : () => {
-                  void query.refetch();
-                }
-          }
-          retryLabel={announcementMessages.retryLabel}
-        />
       ) : query.data ? (
         <div className="min-w-0 space-y-4">
           {query.isError ? (
@@ -351,7 +374,7 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
                 onCancelRemove={() => setPendingConfirmId(null)}
               />
 
-              {paginationMeta && paginationMeta.totalPages > 1 ? (
+              {totalPages > 1 ? (
                 <PaginationControls
                   page={query.data.page}
                   pageSize={query.data.pageSize}

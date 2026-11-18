@@ -11,6 +11,12 @@ import {
 } from './announcement-schema';
 import { announcementMessages } from './messages';
 
+export function isAbortError(error: unknown): boolean {
+  return (
+    (error instanceof DOMException || error instanceof Error) &&
+    error.name === 'AbortError'
+  );
+}
 export interface AnnouncementServiceOptions {
   readonly signal?: AbortSignal;
 }
@@ -182,7 +188,7 @@ export async function createClassroomAnnouncement(
       }),
     );
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
+    if (isAbortError(error)) {
       throw error;
     }
     throw translateMutationError(mapApiError(error));
@@ -216,7 +222,7 @@ export async function updateClassroomAnnouncement(
       }),
     );
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
+    if (isAbortError(error)) {
       throw error;
     }
     throw translateMutationError(mapApiError(error));
@@ -247,7 +253,7 @@ export async function removeClassroomAnnouncement(
       }),
     );
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
+    if (isAbortError(error)) {
       throw error;
     }
     throw translateMutationError(mapApiError(error));

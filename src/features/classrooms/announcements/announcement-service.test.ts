@@ -10,6 +10,7 @@ import {
   TEST_API_BASE_URL,
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
+import { announcementFormSchema } from './announcement-schema';
 import {
   createClassroomAnnouncement,
   isUncertainAnnouncementError,
@@ -167,5 +168,42 @@ describe('announcement-service', () => {
         queryKey: classroomAnnouncementsQueryKey(USER_A, 'other-classroom'),
       }),
     ).toBe(false);
+  });
+
+  it('validates announcementFormSchema boundaries', () => {
+    expect(
+      announcementFormSchema.safeParse({ title: '   ', content: 'Body' })
+        .success,
+    ).toBe(false);
+    expect(
+      announcementFormSchema.safeParse({
+        title: 'Line 1\nLine 2',
+        content: 'Body',
+      }).success,
+    ).toBe(false);
+    expect(
+      announcementFormSchema.safeParse({
+        title: 'a'.repeat(201),
+        content: 'Body',
+      }).success,
+    ).toBe(false);
+    expect(
+      announcementFormSchema.safeParse({ title: 'Ok', content: '   ' }).success,
+    ).toBe(false);
+    expect(
+      announcementFormSchema.safeParse({
+        title: 'Ok',
+        content: 'b'.repeat(5001),
+      }).success,
+    ).toBe(false);
+    expect(
+      announcementFormSchema.safeParse({
+        title: '  Aviso válido  ',
+        content: '  Contenido válido  ',
+      }),
+    ).toEqual({
+      success: true,
+      data: { title: 'Aviso válido', content: 'Contenido válido' },
+    });
   });
 });

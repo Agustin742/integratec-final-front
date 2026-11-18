@@ -3,12 +3,13 @@
 The classroom workspace mounts the reusable panel provider with backend A's
 `availablePanels`, **not action authorization**. The default production catalog
 registers nine panel entries with centralized titles: `material` renders
-`MaterialPanel` ([`#40`](https://github.com/Agustin742/integratec-final-front/issues/40))
+`MaterialPanel` ([`#40`](https://github.com/Agustin742/integratec-final-front/issues/40)),
+`notices` renders `NoticeBoardPanel` ([`#49`](https://github.com/Agustin742/integratec-final-front/issues/49)),
 and `members` renders `ClassroomRosterPanel`
 ([`HU-AUL-003`](https://github.com/Agustin742/integratec-final-front/issues/33):
 staff-only paginated roster, status/prefix filters, linked guardians, and
 idempotent logical removal preserving academic history), while the remaining
-seven entries display the shared, honest “Funcionalidad pendiente” state until
+six entries display the shared, honest “Funcionalidad pendiente” state until
 their respective stories land.
 
 ## Approved scope reconciliation
@@ -26,7 +27,7 @@ the issue; team acceptance of the reconciled criterion remains part of PR review
 | `material`     | Material (`MaterialPanel`, `#40`)           |
 | `grades`       | Calificaciones                              |
 | `chat`         | Chat                                        |
-| `notices`      | Avisos                                      |
+| `notices`      | Avisos (`NoticeBoardPanel`, `#49`)          |
 | `shop`         | Tienda                                      |
 | `bot`          | Asistente de estudio                        |
 | `members`      | Integrantes (`ClassroomRosterPanel`, `#33`) |

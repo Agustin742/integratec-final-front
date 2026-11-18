@@ -108,7 +108,7 @@ export function AnnouncementList({
                       type="button"
                       variant="outline"
                       size="sm"
-                      disabled={isRemoving}
+                      disabled={removingId !== null}
                       onClick={() => onRequestRemove(item.id)}
                     >
                       {isRemoving
