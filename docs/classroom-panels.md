@@ -2,13 +2,15 @@
 
 The classroom workspace mounts the reusable panel provider with backend A's
 `availablePanels`, **not action authorization**. The default production catalog
-registers nine panel entries with centralized titles: `material` renders
-`MaterialPanel` ([`#40`](https://github.com/Agustin742/integratec-final-front/issues/40))
-and `members` renders `ClassroomRosterPanel`
-([`HU-AUL-003`](https://github.com/Agustin742/integratec-final-front/issues/33):
-staff-only paginated roster, status/prefix filters, linked guardians, and
-idempotent logical removal preserving academic history), while the remaining
-seven entries display the shared, honest “Funcionalidad pendiente” state until
+registers nine panel entries with centralized titles: `activities` renders
+`ActivitiesPanel` ([`#41`](https://github.com/Agustin742/integratec-final-front/issues/41)),
+`material` renders `MaterialPanel` ([`#40`](https://github.com/Agustin742/integratec-final-front/issues/40)),
+`notices` renders `NoticeBoardPanel` ([`#49`](https://github.com/Agustin742/integratec-final-front/issues/49))
+and `members` renders `ClassroomMembersPanel`
+([`HU-AUL-003`](https://github.com/Agustin742/integratec-final-front/issues/33)
+`ClassroomRosterPanel` and capability-gated [`HU-AUL-002`](https://github.com/Agustin742/integratec-final-front/issues/32)
+`ClassroomInvitationsPanel` for `invite_members`-authorized email invitations and one-time classroom join codes), while the remaining
+six entries display the shared, honest “Funcionalidad pendiente” state until
 their respective stories land.
 
 ## Approved scope reconciliation
@@ -20,17 +22,17 @@ to action capabilities. Actions still require their own server checks. This
 frontend decision does not change the backend permission matrix or remotely edit
 the issue; team acceptance of the reconciled criterion remains part of PR review.
 
-| Registered key | Title                                       |
-| -------------- | ------------------------------------------- |
-| `activities`   | Actividades                                 |
-| `material`     | Material (`MaterialPanel`, `#40`)           |
-| `grades`       | Calificaciones                              |
-| `chat`         | Chat                                        |
-| `notices`      | Avisos                                      |
-| `shop`         | Tienda                                      |
-| `bot`          | Asistente de estudio                        |
-| `members`      | Integrantes (`ClassroomRosterPanel`, `#33`) |
-| `settings`     | Configuración                               |
+| Registered key | Title                                                |
+| -------------- | ---------------------------------------------------- |
+| `activities`   | Actividades (`ActivitiesPanel`, `#41`)               |
+| `material`     | Material (`MaterialPanel`, `#40`)                    |
+| `grades`       | Calificaciones                                       |
+| `chat`         | Chat                                                 |
+| `notices`      | Avisos (`NoticeBoardPanel`, `#49`)                   |
+| `shop`         | Tienda                                               |
+| `bot`          | Asistente de estudio                                 |
+| `members`      | Integrantes (`ClassroomMembersPanel`, `#33` + `#32`) |
+| `settings`     | Configuración                                        |
 
 `pet` is reserved and never emitted by the current backend contract. It remains
 unregistered and inaccessible even if a malformed response lists it. Unknown
@@ -88,7 +90,7 @@ controller and default entry catalog. Denied keys share a
 not-found presentation. Close replaces the nested URL with the workspace URL;
 revocation and scope changes discard the intent and draft without reopening.
 
-Product components beyond the staff `members` roster (`#33`), study `material` manager (`#40`), and 2D/3D consumers remain separate stories; this infrastructure does not implement their contents. Backend
+Product components beyond `activities` inbox (`#41`), the staff `members` roster (`#33`), capability-gated invitations/join-code tab (`#32`), study `material` manager (`#40`), `notices` announcement board (`#49`), and 2D/3D consumers remain separate stories; this infrastructure does not implement their contents. Note for `#41` (human-approved scope reconciliation on `2026-11-18`): because backend `Agustin742/integratec-final-back#29` is still open, `ActivitySummaryDto` and `StudentActivityResponseDto` do not yet expose a server-derived student work status (`Pending`/`Submitted`/`Graded`/`Overdue`) or `canSubmit` flag, so `ActivitiesPanel` and `ActivityDetailPage` render only server-confirmed metadata and deadlines in the school `timeZone` without deriving overdue state from the browser clock (`rules/activities-and-grading.md`, `rules/data-and-time.md`), deferring student status/overdue/`canSubmit` UI until `back#29` lands. Backend
 [B (#93)](https://github.com/Agustin742/integratec-final-back/pull/93) is consumed by
 one workspace-owned authenticated fetch stream. Connection, invalidation hints
 (including the initial hint), and EOF reset the shared context query and reload
@@ -115,10 +117,18 @@ The public-route browser check captures the pending entry at
 [1280px](./assets/classroom-panels/entry-1280.png) and
 [360px](./assets/classroom-panels/entry-360.png), the `#33` staff roster panel at
 [1280px](./assets/classrooms/roster-1280.png) and
-[360px](./assets/classrooms/roster-360.png), and the `#40` study material
+[360px](./assets/classrooms/roster-360.png), the `#32` invitations and join-code tab (`e2e/classroom-invitations.spec.ts`) at
+[1280px](./assets/classrooms/invitations-1280.png) and
+[360px](./assets/classrooms/invitations-360.png), the `#40` study material
 manager (`MaterialPanel`, `e2e/study-materials.spec.ts`) at
 [1280px](./assets/classrooms/study-materials-1280.png) and
-[360px](./assets/classrooms/study-materials-360.png). Pending entries show
+[360px](./assets/classrooms/study-materials-360.png), and the `#41`
+student activity inbox (`ActivitiesPanel`, `e2e/activities-inbox.spec.ts`) at
+[1280px](./assets/classrooms/activities-inbox-1280.png) and
+[360px](./assets/classrooms/activities-inbox-360.png), and the `#49`
+announcements notice board (`NoticeBoardPanel`, `e2e/announcements.spec.ts`) at
+[1280px](./assets/classrooms/announcements-1280.png) and
+[360px](./assets/classrooms/announcements-360.png). Pending entries show
 pending functionality rather than fabricated data; verification results and
 synthetic boundaries are recorded in the contributor trackers and `e2e/` specs.
 Accessible Classic 2D panel navigation backed by the same `ClassroomPanelsProvider`

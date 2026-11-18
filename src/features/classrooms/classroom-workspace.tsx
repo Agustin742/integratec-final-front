@@ -88,6 +88,13 @@ function WorkspaceContext({
   const navigate = useNavigate();
   const latestLocation = useRef(location);
   const consumedRoute = useRef<string | null>(null);
+  const unmountedRef = useRef(false);
+  useLayoutEffect(() => {
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
+    };
+  }, []);
   useLayoutEffect(() => {
     latestLocation.current = location;
   }, [location]);
@@ -97,7 +104,8 @@ function WorkspaceContext({
     return true;
   };
   const closePanelRoute = () => {
-    // A departing dialog must not redirect a newer classroom/navigation.
+    // A departing dialog or unmounting workspace must not redirect a newer navigation.
+    if (unmountedRef.current) return;
     if (latestLocation.current.key === location.key)
       void navigate(`/classrooms/${encodeURIComponent(classroomId)}`, {
         replace: true,
