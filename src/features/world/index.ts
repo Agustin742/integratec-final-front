@@ -15,3 +15,10 @@ export {
   selectionIntent,
   type WorldIntent,
 } from './interactions';
+export { resolveAvatarParts, type AvatarParts } from './avatar/avatar-parts';
+export {
+  composeAvatar,
+  type AvatarPartKind,
+  type ComposeAvatarInput,
+  type ComposedAvatar,
+} from './avatar/compose-avatar';
