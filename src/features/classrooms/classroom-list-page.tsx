@@ -265,10 +265,16 @@ function ClassroomListWorkspace({
         ? contexts.some((context) => context.canCreate)
         : (activeContext?.canCreate ?? false));
 
+  const showFullEmptyState =
+    query.data !== undefined && items.length === 0 && total === 0;
   const showHeaderCreateButton =
     query.data !== undefined &&
     (items.length > 0 || total > 0) &&
     canCreateInScope;
+  // The full empty state already centers both entry actions; repeating the
+  // join link in the header would duplicate it.
+  const showHeaderJoinLink = !showFullEmptyState;
+  const showHeaderActions = showHeaderJoinLink || showHeaderCreateButton;
 
   const openCreateDialog = (trigger?: HTMLElement | null) => {
     triggerRef.current = trigger ?? null;
@@ -403,13 +409,22 @@ function ClassroomListWorkspace({
           </p>
         </div>
 
-        {showHeaderCreateButton && (
-          <Button
-            type="button"
-            onClick={(event) => openCreateDialog(event.currentTarget)}
-          >
-            {classroomMessages.list.createAction}
-          </Button>
+        {showHeaderActions && (
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            {showHeaderJoinLink && (
+              <Link to="/invitations/accept" className={primaryEntryLinkClass}>
+                {classroomMessages.list.joinWithCodeAction}
+              </Link>
+            )}
+            {showHeaderCreateButton && (
+              <Button
+                type="button"
+                onClick={(event) => openCreateDialog(event.currentTarget)}
+              >
+                {classroomMessages.list.createAction}
+              </Button>
+            )}
+          </div>
         )}
       </div>
 
@@ -514,14 +529,22 @@ function ClassroomListWorkspace({
                   : classroomMessages.list.emptyTeacherDescription
               }
               action={
-                !creationForbidden ? (
-                  <Button
-                    type="button"
-                    onClick={(event) => openCreateDialog(event.currentTarget)}
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <Link
+                    to="/invitations/accept"
+                    className={primaryEntryLinkClass}
                   >
-                    {classroomMessages.list.createFirstAction}
-                  </Button>
-                ) : undefined
+                    {classroomMessages.list.joinWithCodeAction}
+                  </Link>
+                  {!creationForbidden && (
+                    <Button
+                      type="button"
+                      onClick={(event) => openCreateDialog(event.currentTarget)}
+                    >
+                      {classroomMessages.list.createFirstAction}
+                    </Button>
+                  )}
+                </div>
               }
             />
           ) : items.length === 0 ? (

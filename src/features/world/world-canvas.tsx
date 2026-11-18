@@ -15,12 +15,19 @@ import {
   WebGLRenderer,
 } from 'three';
 import { frameCamera } from './camera';
+import {
+  DEFAULT_SCOPE,
+  clearAssetCache,
+  configureKtx2RendererSupport,
+} from './asset-cache';
 import { worldMessages as copy } from './messages';
 import { WorldFallback } from './world-fallback';
 
 export interface WorldCanvasProps {
   children?: ReactNode;
   label: string;
+  /** Changing `scopeKey` or unmounting disposes cached scene assets. */
+  scopeKey?: string;
 }
 
 class SceneBoundary extends Component<
@@ -52,13 +59,19 @@ function CameraFraming() {
   return null;
 }
 
-export function WorldCanvas({ children, label }: WorldCanvasProps) {
+export function WorldCanvas({ children, label, scopeKey }: WorldCanvasProps) {
   const host = useRef<HTMLDivElement>(null);
   const creationErrors = useRef(new Set<unknown>());
   const [failed, setFailed] = useState(false);
   const [visible, setVisible] = useState(false);
   const [tabVisible, setTabVisible] = useState(() => !document.hidden);
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    return () => {
+      clearAssetCache({ scopeKey: scopeKey ?? DEFAULT_SCOPE });
+    };
+  }, [scopeKey]);
 
   useLayoutEffect(() => {
     // R3F 9.4 configures its renderer asynchronously without a rejection boundary.
@@ -130,6 +143,7 @@ export function WorldCanvas({ children, label }: WorldCanvasProps) {
       renderer.outputColorSpace = SRGBColorSpace;
       renderer.toneMapping = ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1;
+      configureKtx2RendererSupport(renderer);
       return renderer;
     } catch (error) {
       creationErrors.current.add(error);
@@ -161,7 +175,10 @@ export function WorldCanvas({ children, label }: WorldCanvasProps) {
                 dpr={[1, 2]}
                 frameloop={visible && tabVisible ? 'demand' : 'never'}
                 gl={createRenderer}
-                onCreated={({ gl }) => setCanvas(gl.domElement)}
+                onCreated={({ gl }) => {
+                  configureKtx2RendererSupport(gl);
+                  setCanvas(gl.domElement);
+                }}
               >
                 <CameraFraming />
                 {/* Keep future loader suspensions inside the R3F subtree
