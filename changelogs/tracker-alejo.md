@@ -1,5 +1,14 @@
 # Tracker — Alejo
 
+## 2026-11-17 — Profile and base avatar configuration form (#29)
+
+- **Status:** completed (published as [PR #82](https://github.com/Agustin742/integratec-final-front/pull/82); review, CI and merge remain team actions).
+- **Area / files:** `src/session/transport.ts`, `src/session/controller.ts`, `src/session/controller.test.ts`, `src/api/query-keys.ts`, `src/features/profile/`, `src/app/messages.ts`, `src/app/pages/profile-page.tsx`, `src/app/router/routes.tsx`, `src/app/router/app-shell.tsx`, `src/test/msw/handlers.ts`, `e2e/profile.spec.ts`, `docs/routing.md`, `docs/threat-model.md`, `docs/session-lifecycle.md`, `docs/assets/profile/`, and this tracker; branch `feat/29-profile-avatar-form`, worktree `odd/worktrees/29-profile`.
+- **Change:** Implemented [#29](https://github.com/Agustin742/integratec-final-front/issues/29) (`HU-AUT-003` part 1/2) with AI assistance: display-name and base-avatar forms with explicit save, per-form pending/confirmed/failed states, 2D preview, unsaved-draft marking, `403`/`400` keeping the draft and last confirmed state, uncertain writes reconciled via `GET /users/me`, `SessionController.applyConfirmedProfile` with authenticated/user-id/schema guards, user-scoped `ownProfileQueryKey` evicted at logout, contract-faithful stateful MSW store, and RTL/schema/controller tests plus E2E. Second-review follow-ups: merged `origin/develop` (23 commits, merge `ea119a8`), moved the work entry from `tracker-mati.md` to this tracker (the issue is assigned to AlejoElPaisano; `changelogs/README.md` requires each participant to update only their own tracker), and documented profile threats (`TM-008`..`TM-011`) in `docs/threat-model.md` plus the own-profile integration in `docs/session-lifecycle.md`.
+- **Reason:** Deliver `HU-AUT-003` part 1/2 and align the PR with the auth-feature documentation precedent (`#27`/`#28`).
+- **Verification:** After the merge (Node 22.23.4): lint, typecheck, unit suite, build, `security:check`, prettier on changed files and `git diff --check origin/develop..HEAD` pass; Playwright 54/54 with exit 0. The first PR CI run failed once on a timing flake in `src/features/classrooms/classroom-workspace.test.tsx:116` (`pending()[0]` undefined; a `develop`-side file this branch does not touch); the file passed 3/3 local reruns.
+- **Next step:** Confirm CI green on the follow-up docs commits; teammate review and approval before merge.
+
 ## 2026-11-16 — Publish three stacked classroom PRs (#26)
 
 - **Status:** completed (three stacked PRs published; CI/team review and merge remain separate).

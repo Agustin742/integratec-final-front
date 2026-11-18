@@ -1,17 +1,4 @@
-
 # Tracker — Mati
-
-## 2026-11-17 — Implement profile and base avatar configuration form (#29)
-
-- **Status:** completed (verified locally on `feat/29-profile-avatar-form`)
-- **Area / files:** `src/session/transport.ts`, `src/session/controller.ts`, `src/session/controller.test.ts`, `src/api/query-keys.ts`, `src/features/profile/`, `src/app/messages.ts`, `src/app/pages/profile-page.tsx`, `src/app/router/routes.tsx`, `src/app/router/app-shell.tsx`, `src/test/msw/handlers.ts`, `e2e/profile.spec.ts`, `docs/routing.md`, `docs/assets/profile/`, `changelogs/tracker-mati.md`
-- **Change:** Implemented [issue #29](https://github.com/Agustin742/integratec-final-front/issues/29) (`HU-AUT-003` part 1/2) on `feat/29-profile-avatar-form` in worktree `odd/worktrees/29-profile`:
-  1. Extracted `avatarSchema` in `src/session/transport.ts`, added `SessionController.applyConfirmedProfile()` in `src/session/controller.ts` (scoped to the matching authenticated user ID), and added user-scoped `ownProfileQueryKey` in `src/api/query-keys.ts`.
-  2. Added `src/features/profile/` (`messages.ts`, `avatar-options.ts`, jitless Zod `profile-schema.ts`, `profile-service.ts` for `GET /users/me`, `PATCH /users/me/profile`, and `PATCH /users/me/avatar`, `use-own-profile.ts`, `avatar-preview.tsx` 2D/DOM preview, `choice-group.tsx`, `save-status.tsx`, `display-name-form.tsx`, `avatar-form.tsx`, and `profile-view.tsx`) with explicit save triggers, draft vs. saved status distinction, `400`/`403` draft-preserving error handling, network-uncertain reconciliation, and unsaved-changes navigation guards.
-  3. Wired lazy `/profile` route behind `RequireAuth`, added `Mi perfil` navigation link in `AppShell`, added stateful contract-faithful `createOwnProfileStore` MSW handlers in `src/test/msw/handlers.ts`, added unit/RTL/axe-core integration tests (`profile-schema.test.ts`, `profile-page.test.tsx`, `controller.test.ts`) and Playwright E2E coverage (`e2e/profile.spec.ts`), and updated `docs/routing.md` with `1280px` and `360px` screenshots under `docs/assets/profile/`.
-- **Reason:** Allow signed-in users to edit and persist their display name and contract-defined base avatar options across sessions (`rules/avatars-and-customization.md`, `rules/forms-and-validation.md`, `rules/state-management.md`, `rules/ui-and-accessibility.md`, `rules/api-contracts.md`).
-- **Verification:** Ran `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm security:check`, `pnpm format:check`, `pnpm e2e`, and `git diff --check origin/develop..HEAD --` in `odd/worktrees/29-profile` using the project-local Node 22 runtime (`odd/tools/node_modules/node/bin/node.exe`).
-- **Next step:** Ready for PR review against `develop`.
 
 ## 2026-11-16 — Complete the classroom panel entry catalog (#26)
 
