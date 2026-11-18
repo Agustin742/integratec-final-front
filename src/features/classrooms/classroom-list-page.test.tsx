@@ -317,6 +317,50 @@ describe('ClassroomListPage (/)', () => {
     ).toBeVisible();
   });
 
+  test('offers a join-by-code entry link to /invitations/accept in the header and in the empty state', async () => {
+    mswServer.use(
+      createClassroomListHandler({
+        resolveResponse: () => ({
+          items: [],
+          page: 1,
+          pageSize: 20,
+          total: 0,
+        }),
+      }),
+    );
+
+    renderHomeRoute();
+
+    await screen.findByText(classroomMessages.list.emptyTitle);
+    const links = screen.getAllByRole('link', {
+      name: classroomMessages.list.joinWithCodeAction,
+    });
+    expect(links).toHaveLength(2);
+    for (const link of links) {
+      expect(link).toHaveAttribute('href', '/invitations/accept');
+    }
+  });
+
+  test('shows the join-by-code entry link in the header when classrooms exist', async () => {
+    mswServer.use(
+      createClassroomListHandler({
+        resolveResponse: () => ({
+          items: [independentTeacherClassroom],
+          page: 1,
+          pageSize: 20,
+          total: 1,
+        }),
+      }),
+    );
+
+    renderHomeRoute();
+
+    const link = await screen.findByRole('link', {
+      name: classroomMessages.list.joinWithCodeAction,
+    });
+    expect(link).toHaveAttribute('href', '/invitations/accept');
+  });
+
   test('S1/S3: teacher creates classroom from empty state and sees server-confirmed path in list with link to F16', async () => {
     const serverItems: ClassroomListItemPayload[] = [];
     let capturedCreateBody: unknown = null;
