@@ -1,5 +1,16 @@
 # Tracker — Alejo
 
+## 2026-11-18 — PR #82 review fixes (reconcile error guard, logout abort handling, pending input lock) (#29)
+
+- **Status:** completed (pushed to `feat/29-profile-avatar-form` on [PR #82](https://github.com/Agustin742/integratec-final-front/pull/82)).
+- **Area / files:** `src/features/profile/profile-service.ts`, `src/features/profile/use-own-profile.ts`, `src/features/profile/display-name-form.tsx`, `src/features/profile/avatar-form.tsx`, `src/features/profile/profile-page.test.tsx`, and this tracker.
+- **Change:** Fixed three review blockers and one minor observation:
+  1. `useOwnProfile.reconcile()` returns `null` when `result.isError || result.data === undefined` so offline/failed `GET /users/me` refetches never reuse stale cached data to confirm an uncertain write.
+  2. Exported `isAbortError` from `profile-service.ts` and returned cleanly on `isAbortError(error)` inside `onValid` for both `DisplayNameForm` and `AvatarForm`, preventing unhandled promise rejections if logout or session change aborts a save mid-flight.
+  3. Passed `disabled={isSubmitting}` to the `DisplayNameForm` `<Input>` and all five `AvatarForm` `<ChoiceGroup>` controls so in-flight edits cannot clobber newer drafts on confirmation, and cleared stale `hairId`/`topId` errors inside `changeBody`.
+  4. Added 3 regression tests in `src/features/profile/profile-page.test.tsx`.
+- **Verification:** `prettier`, `vitest` (`profile-page.test.tsx`, `profile-schema.test.ts`, `avatar-preview.test.tsx`), `lint`, `typecheck`, `build`, `security:check`, and `git diff --check` verified cleanly after the final edit.
+
 ## 2026-11-18 — Refine the profile avatar preview and evidence (#29, PR #82)
 
 - **Status:** completed (local implementation and functional verification; current-head CI, team review and merge status are tracked in [PR #82](https://github.com/Agustin742/integratec-final-front/pull/82), not implied by this entry).

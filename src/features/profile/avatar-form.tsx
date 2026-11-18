@@ -25,7 +25,7 @@ import {
 import { ChoiceGroup } from './choice-group';
 import { profileMessages } from './messages';
 import { avatarFormSchema } from './profile-schema';
-import { saveAvatar } from './profile-service';
+import { isAbortError, saveAvatar } from './profile-service';
 import { SaveStatusBadge, type SaveStatus } from './save-status';
 import type { ProfileSectionProps } from './section-props';
 import { useSessionService } from '@/session/provider';
@@ -88,6 +88,9 @@ export function AvatarForm({
       const saved = await saveAvatar(client, values);
       settle(saved);
     } catch (error) {
+      if (isAbortError(error)) {
+        return;
+      }
       // An unreadable outcome is reconciled with the server before anything
       // is claimed or repeated.
       if (error instanceof ApiError && error.kind === 'network') {
@@ -117,6 +120,7 @@ export function AvatarForm({
     form.setValue('bodyId', nextBody, options);
     form.setValue('hairId', next.hairId, options);
     form.setValue('topId', next.topId, options);
+    form.clearErrors(['hairId', 'topId']);
     setAdjusted(next.hairId !== current.hairId || next.topId !== current.topId);
     setAnnouncement('');
   };
@@ -196,6 +200,7 @@ export function AvatarForm({
                 value={field.value}
                 onChange={changeBody}
                 onBlur={field.onBlur}
+                disabled={isSubmitting}
                 error={fieldState.error?.message}
               />
             )}
@@ -214,6 +219,7 @@ export function AvatarForm({
                   setAdjusted(false);
                 }}
                 onBlur={field.onBlur}
+                disabled={isSubmitting}
                 error={fieldState.error?.message}
               />
             )}
@@ -230,6 +236,7 @@ export function AvatarForm({
                 onChange={field.onChange}
                 onBlur={field.onBlur}
                 swatch
+                disabled={isSubmitting}
                 error={fieldState.error?.message}
               />
             )}
@@ -248,6 +255,7 @@ export function AvatarForm({
                   setAdjusted(false);
                 }}
                 onBlur={field.onBlur}
+                disabled={isSubmitting}
                 error={fieldState.error?.message}
               />
             )}
@@ -264,6 +272,7 @@ export function AvatarForm({
                 onChange={field.onChange}
                 onBlur={field.onBlur}
                 swatch
+                disabled={isSubmitting}
                 error={fieldState.error?.message}
               />
             )}

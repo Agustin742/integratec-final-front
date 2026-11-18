@@ -49,7 +49,10 @@ export function useOwnProfile() {
   /** Reads the authoritative profile again, e.g. after an uncertain write. */
   const reconcile = useCallback(async (): Promise<OwnProfileDto | null> => {
     const result = await query.refetch();
-    return result.data ?? null;
+    if (result.isError || result.data === undefined) {
+      return null;
+    }
+    return result.data;
   }, [query]);
 
   return { query, userId, commit, reconcile };

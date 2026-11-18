@@ -19,6 +19,7 @@ import { expectAccessible } from '@/test/accessibility';
 import {
   TEST_API_BASE_URL,
   createLoginHandler,
+  createLogoutHandler,
   createOwnProfileStore,
   type OwnProfileStore,
 } from '@/test/msw/handlers';
@@ -473,5 +474,111 @@ describe('Profile page (/profile)', () => {
     fireEvent.click(link);
     await waitForProfile();
     expect(view.router.state.location.pathname).toBe('/profile');
+  });
+
+  test('does not claim success when reconciliation fails offline even if the cached value matches', async () => {
+    const store = createOwnProfileStore();
+    await renderProfile(store);
+    await waitForProfile();
+
+    store.failNext('profile', 'network');
+    store.failNextRead('network');
+
+    fireEvent.change(nameInput(), { target: { value: '  Ana López  ' } });
+    fireEvent.click(
+      within(nameSection()).getByRole('button', {
+        name: copy.displayName.submit,
+      }),
+    );
+
+    const alert = await within(nameSection()).findByRole('alert');
+    expect(alert).toHaveTextContent(copy.errors.networkUncertain);
+    expect(saveStatus(nameSection())).toBe('failed');
+    expect(nameSection()).not.toHaveTextContent(copy.displayName.confirmed);
+  });
+
+  test('disables name and avatar inputs while a save is in flight', async () => {
+    let releaseProfile!: () => void;
+    let releaseAvatar!: () => void;
+    const store = createOwnProfileStore({
+      onProfileRequest: () =>
+        new Promise<void>((resolve) => {
+          releaseProfile = resolve;
+        }),
+      onAvatarRequest: () =>
+        new Promise<void>((resolve) => {
+          releaseAvatar = resolve;
+        }),
+    });
+    await renderProfile(store);
+    await waitForProfile();
+
+    fireEvent.change(nameInput(), { target: { value: 'Ana María' } });
+    fireEvent.click(
+      within(nameSection()).getByRole('button', {
+        name: copy.displayName.submit,
+      }),
+    );
+    await waitFor(() => expect(saveStatus(nameSection())).toBe('saving'));
+    expect(nameInput()).toBeDisabled();
+
+    releaseProfile();
+    await waitFor(() => expect(saveStatus(nameSection())).toBe('saved'));
+    expect(nameInput()).toBeEnabled();
+
+    selectChoice('Color de pelo', 'Rubio');
+    fireEvent.click(screen.getByRole('button', { name: copy.avatar.submit }));
+    await waitFor(() => expect(saveStatus(avatarSection())).toBe('saving'));
+    expect(radio('Color de pelo', 'Rubio')).toBeDisabled();
+    expect(radio('Cuerpo', 'Masculino')).toBeDisabled();
+
+    releaseAvatar();
+    await waitFor(() => expect(saveStatus(avatarSection())).toBe('saved'));
+    expect(radio('Color de pelo', 'Rubio')).toBeEnabled();
+  });
+
+  test('logging out during an in-flight profile save aborts cleanly without unhandled rejection', async () => {
+    let releaseProfile!: () => void;
+    let releaseAvatar!: () => void;
+    const store = createOwnProfileStore({
+      onProfileRequest: () =>
+        new Promise<void>((resolve) => {
+          releaseProfile = resolve;
+        }),
+      onAvatarRequest: () =>
+        new Promise<void>((resolve) => {
+          releaseAvatar = resolve;
+        }),
+    });
+    const view = await renderProfile(store);
+    mswServer.use(createLogoutHandler());
+    await waitForProfile();
+
+    const rejections: unknown[] = [];
+    const onUnhandled = (reason: unknown) => {
+      rejections.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      fireEvent.change(nameInput(), { target: { value: 'Ana En Vuelo' } });
+      fireEvent.click(
+        within(nameSection()).getByRole('button', {
+          name: copy.displayName.submit,
+        }),
+      );
+      await waitFor(() => expect(saveStatus(nameSection())).toBe('saving'));
+
+      selectChoice('Color de pelo', 'Rubio');
+      fireEvent.click(screen.getByRole('button', { name: copy.avatar.submit }));
+      await waitFor(() => expect(saveStatus(avatarSection())).toBe('saving'));
+
+      await view.session.controller.logout();
+      releaseProfile();
+      releaseAvatar();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(rejections).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
   });
 });

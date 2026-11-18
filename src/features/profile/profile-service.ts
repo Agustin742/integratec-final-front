@@ -9,7 +9,7 @@ export interface ProfileRequestOptions {
   readonly signal?: AbortSignal;
 }
 
-const isAbortError = (cause: unknown): boolean =>
+export const isAbortError = (cause: unknown): boolean =>
   (cause instanceof Error || cause instanceof DOMException) &&
   cause.name === 'AbortError';
 

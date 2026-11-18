@@ -17,7 +17,7 @@ import {
   type DisplayNameFormOutput,
   type OwnProfileDto,
 } from './profile-schema';
-import { saveDisplayName } from './profile-service';
+import { isAbortError, saveDisplayName } from './profile-service';
 import { SaveStatusBadge, type SaveStatus } from './save-status';
 import type { ProfileSectionProps } from './section-props';
 
@@ -73,6 +73,9 @@ export function DisplayNameForm({
       const saved = await saveDisplayName(client, values.displayName);
       confirm(saved.displayName);
     } catch (error) {
+      if (isAbortError(error)) {
+        return;
+      }
       // An unreadable outcome is reconciled with the server before anything
       // is claimed or repeated.
       if (error instanceof ApiError && error.kind === 'network') {
@@ -127,7 +130,12 @@ export function DisplayNameForm({
           description={copy.hint}
         >
           {(fieldProps) => (
-            <Input {...fieldProps} type="text" autoComplete="nickname" />
+            <Input
+              {...fieldProps}
+              type="text"
+              autoComplete="nickname"
+              disabled={isSubmitting}
+            />
           )}
         </FormField>
         <div className="flex flex-wrap items-center gap-3">
