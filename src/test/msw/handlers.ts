@@ -3130,4 +3130,154 @@ export function createClassroomActivitiesStore(
   };
 }
 
-export const defaultHandlers: readonly HttpHandler[] = [createHealthHandler()];
+export interface NotificationStoreItem {
+  readonly id: string;
+  readonly kind:
+    | 'activity_published'
+    | 'grade_posted'
+    | 'announcement'
+    | 'mention'
+    | 'activity_forum_reply';
+  readonly resourceId: string;
+  readonly classroomId: string;
+  readonly studentId: string | null;
+  readonly readAt: string | null;
+  readonly createdAt: string;
+}
+
+export type NotificationStoreOp = 'list' | 'read' | 'readAll';
+export type NotificationStoreFailure =
+  MswErrorResponseSpec | 'network' | 'drop-response';
+
+export interface NotificationsStoreOptions {
+  readonly baseUrl?: string;
+  readonly initialItems?: readonly NotificationStoreItem[];
+  readonly readTimestamp?: string;
+}
+
+export interface NotificationsStore {
+  readonly handlers: readonly HttpHandler[];
+  getItems: () => readonly NotificationStoreItem[];
+  pushItem: (item: NotificationStoreItem) => void;
+  removeByClassroom: (classroomId: string) => void;
+  failNext: (
+    op: NotificationStoreOp,
+    failure: NotificationStoreFailure,
+  ) => void;
+}
+
+/**
+ * Stateful contract-faithful MSW store for in-app notifications
+ * (`NotificationsController_list`, `NotificationsController_read`,
+ * `NotificationsController_readAll`).
+ */
+export function createNotificationsStore(
+  options: NotificationsStoreOptions = {},
+): NotificationsStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const readTimestamp = options.readTimestamp ?? '2026-11-18T14:00:00.000Z';
+  let items: NotificationStoreItem[] = [...(options.initialItems ?? [])];
+  const pending: Partial<
+    Record<NotificationStoreOp, NotificationStoreFailure>
+  > = {};
+
+  const fail = (failure: NotificationStoreFailure): Response => {
+    if (failure === 'network' || failure === 'drop-response') {
+      return HttpResponse.error();
+    }
+    return createErrorEnvelopeResponse(failure.status, failure.body);
+  };
+
+  return {
+    getItems: () => items,
+    pushItem: (item) => {
+      items = [item, ...items.filter((existing) => existing.id !== item.id)];
+    },
+    removeByClassroom: (classroomId) => {
+      items = items.filter((item) => item.classroomId !== classroomId);
+    },
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    handlers: [
+      http.get(`${baseUrl}/notifications`, ({ request }) => {
+        const failure = pending.list;
+        pending.list = undefined;
+        if (failure !== undefined) {
+          return fail(failure);
+        }
+
+        const url = new URL(request.url);
+        const page = Math.max(1, Number(url.searchParams.get('page') ?? 1));
+        const pageSize = Math.min(
+          100,
+          Math.max(1, Number(url.searchParams.get('pageSize') ?? 20)),
+        );
+        const ordered = [...items].sort((a, b) =>
+          b.createdAt.localeCompare(a.createdAt),
+        );
+        const start = (page - 1) * pageSize;
+        return HttpResponse.json({
+          items: ordered.slice(start, start + pageSize),
+          page,
+          pageSize,
+          total: ordered.length,
+        });
+      }),
+      http.patch(`${baseUrl}/notifications/read-all`, () => {
+        const failure = pending.readAll;
+        pending.readAll = undefined;
+        if (failure !== undefined && failure !== 'drop-response') {
+          return fail(failure);
+        }
+
+        let updated = 0;
+        items = items.map((item) => {
+          if (item.readAt !== null) {
+            return item;
+          }
+          updated += 1;
+          return { ...item, readAt: readTimestamp };
+        });
+
+        return failure === 'drop-response'
+          ? HttpResponse.error()
+          : HttpResponse.json({ updated });
+      }),
+      http.patch(`${baseUrl}/notifications/:id/read`, ({ params }) => {
+        const failure = pending.read;
+        pending.read = undefined;
+        if (failure !== undefined && failure !== 'drop-response') {
+          return fail(failure);
+        }
+
+        const index = items.findIndex((item) => item.id === params.id);
+        if (index === -1) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Notification not found.',
+            correlationId: 'req-notifications-read-404',
+          });
+        }
+
+        const existing = items[index];
+        const next: NotificationStoreItem =
+          existing.readAt !== null
+            ? existing
+            : { ...existing, readAt: readTimestamp };
+        items = items.map((item, idx) => (idx === index ? next : item));
+
+        return failure === 'drop-response'
+          ? HttpResponse.error()
+          : HttpResponse.json(next);
+      }),
+    ],
+  };
+}
+
+export const defaultHandlers: readonly HttpHandler[] = [
+  createHealthHandler(),
+  http.get(`${TEST_API_BASE_URL}/notifications`, () =>
+    HttpResponse.json({ items: [], page: 1, pageSize: 20, total: 0 }),
+  ),
+];
