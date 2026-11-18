@@ -20,11 +20,16 @@ export function useClassroomContextEvents(classroomId: string): void {
     let renewal: ReturnType<typeof setTimeout> | undefined;
     let retry: ReturnType<typeof setTimeout> | undefined;
     let delay = 1_000;
-    const reload = () => {
+    const resetContext = () => {
       if (stopped) return;
       // Reset cancels obsolete REST, removes private data for ALL observers,
       // then fetches the same authoritative query. No parallel context store.
       void queryClient.resetQueries({ queryKey, exact: true });
+    };
+    const reconcileContext = () => {
+      if (stopped) return;
+      // Routine reconnects keep confirmed panels mounted while verifying with the server.
+      void queryClient.invalidateQueries({ queryKey, exact: true });
     };
     const stop = () => {
       stopped = true;
@@ -68,8 +73,9 @@ export function useClassroomContextEvents(classroomId: string): void {
           await stream.cancel();
           return;
         }
-        reload(); // Register first, then reconcile: no connection/read gap.
-        await readContextEvents(stream, classroomId, reload, signal);
+        delay = 1_000;
+        reconcileContext(); // Register first, then reconcile: no connection/read gap.
+        await readContextEvents(stream, classroomId, resetContext, signal);
       } catch (error) {
         // Authentication recovery belongs exclusively to client middleware.
         terminal =
@@ -81,7 +87,7 @@ export function useClassroomContextEvents(classroomId: string): void {
         clearTimeout(renewal);
         connection?.abort();
         if (!stopped) {
-          reload(); // EOF, renewal, setup or framing failure all reconcile.
+          reconcileContext(); // EOF, renewal, setup or framing failure all reconcile.
           if (!terminal) {
             retry = setTimeout(() => {
               void connect();

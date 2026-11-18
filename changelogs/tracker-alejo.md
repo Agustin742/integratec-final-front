@@ -51,7 +51,6 @@
 - **Delivery strategy:** Local work-unit slices now; prepare chained PR slices if needed when publication is authorized. Runtime hints measured all history since `origin/main`, not this feature's actual `develop` baseline `5b4f50d`. No PR, push, merge or B integration was performed.
 - **Next step:** Keep #26 open for backend B integration and final acceptance; publication remains Alejo's decision.
 
-
 ## 2026-11-15 — Integrate merged classroom contract A (#26)
 
 - **Status:** completed (bounded local A integration and functional/independent verification; native review declined for its candidate, no native approval; full #26/B and delivery remain deferred).
@@ -65,7 +64,6 @@
 - **Review limits:** Integrated heading fallback was read statically; standalone-provider tests cover unusable triggers. Synthetic-session checks prove visible isolation, not actual controller cache purging; no live-backend or new upstream-generation-provenance proof. The earlier crashed verifier remains a failed attempt, not an approval.
 - **Native outcome:** Human explicitly authorized the provider-offered packaged `sync --agent pi`, which exited 0; subsequent inspect was ready. Automatic coordinator assessment still could not declare untracked files. Ordinary START through the offered facade returned **`consent-declined-this-candidate`**, `lineage_created: false`, no mutation or verdict. Decline honored with no restart. Final read-only ASSESS recorded explicit declined outcome and item-2 self/independent plan; both proof obligations passed. No native approval or acknowledgement is claimed, and the global review switch was not changed.
 - **Next step:** Integrate backend B after its merge and explicit continuation, then complete full #26 acceptance and prepare reviewable delivery. A remains local: its code is now committed in the work units recorded above; no push, PR or #26 closure performed. Passing functional results and all historical failures are preserved.
-
 
 ## 2026-11-14 — PR #75 registration review (#27)
 

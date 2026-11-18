@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 import { ApiQueryProvider, createAppQueryClient } from '@/api/query-client';
 import { createSession } from '@/session/controller';
@@ -13,10 +13,27 @@ import {
 } from '@/session/test-fixtures';
 import { render } from '@/test/render';
 import {
+  ClassroomPanelsProvider,
+  useClassroomPanels,
+} from './panels/classroom-panels';
+import {
   useClassroomContext,
   useClassroomCapabilities,
 } from './use-classroom-capabilities';
 import { useClassroomContextEvents } from './use-classroom-context-events';
+
+function DraftPanel() {
+  return <input aria-label="draft" defaultValue="" />;
+}
+
+function PanelOpener() {
+  const panels = useClassroomPanels();
+  return (
+    <button type="button" onClick={() => panels.openPanel('grades')}>
+      Open
+    </button>
+  );
+}
 
 function Owner({ id }: { id: string }) {
   useClassroomContextEvents(id);
@@ -27,6 +44,23 @@ function Owner({ id }: { id: string }) {
         {context.status === 'ready' ? context.classroom.name : context.status}
       </output>
       <Guard id={id} />
+      {context.status === 'ready' && (
+        <ClassroomPanelsProvider
+          userId={context.userId}
+          classroomId={id}
+          registry={[
+            { key: 'grades', title: 'Grades Panel', component: DraftPanel },
+          ]}
+          availability={{
+            confirmed: true,
+            keys: context.classroom.availablePanels,
+          }}
+          description="Panel test"
+          fallbackFocus={() => null}
+        >
+          <PanelOpener />
+        </ClassroomPanelsProvider>
+      )}
     </>
   );
 }
@@ -277,3 +311,74 @@ test.each([404, 503])(
     expect(attempts()).toBe(status === 503 ? 3 : 1);
   },
 );
+
+test('open panel draft survives EOF and repeated 60s renewals with 1s backoff reset; real hints still reset', async () => {
+  vi.useFakeTimers();
+  const view = setup();
+  await ready();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Open' }));
+  const draft = screen.getByLabelText('draft') as HTMLInputElement;
+  fireEvent.change(draft, { target: { value: 'borrador docente' } });
+  expect(draft).toHaveValue('borrador docente');
+
+  // EOF reconciles via invalidation without unmounting the open panel.
+  await act(async () => {
+    view.streams[0].source.close();
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1_000);
+  });
+  expect(view.streams).toHaveLength(2);
+  expect(screen.getByLabelText('draft')).toHaveValue('borrador docente');
+
+  // Six consecutive 60s renewals keep the open dialog mounted and always reconnect in 1s.
+  for (let i = 0; i < 6; i++) {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(screen.getByLabelText('draft')).toHaveValue('borrador docente');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(view.streams).toHaveLength(3 + i);
+    expect(screen.getByLabelText('draft')).toHaveValue('borrador docente');
+  }
+
+  // An explicit invalidation hint still resets confirmed context immediately.
+  view.hold();
+  await view.hint();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(50);
+  });
+  expect(screen.getByLabelText('guard')).toHaveTextContent('denied');
+  expect(screen.queryByLabelText('draft')).not.toBeInTheDocument();
+});
+
+test('backoff resets to 1s after recovering from transient 503 failures', async () => {
+  vi.useFakeTimers();
+  let streamAttempt = 0;
+  const view = setup(() => (++streamAttempt <= 2 ? 503 : 200));
+  await ready();
+  expect(streamAttempt).toBe(1);
+
+  // 1st retry after 1s -> 503, 2nd retry after 2s -> 200 healthy stream.
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1_000);
+  });
+  expect(streamAttempt).toBe(2);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(2_000);
+  });
+  expect(streamAttempt).toBe(3);
+  expect(view.streams).toHaveLength(1);
+
+  // Healthy stream resets backoff back to 1s on its 60s renewal (not 4s).
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(60_000);
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1_000);
+  });
+  expect(view.streams).toHaveLength(2);
+});
