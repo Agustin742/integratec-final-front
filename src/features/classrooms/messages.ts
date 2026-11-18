@@ -167,4 +167,73 @@ export const classroomMessages = {
         'Tenés cambios sin guardar en el formulario del aula. ¿Querés descartarlos?',
     },
   },
+  roster: {
+    heading: 'Nómina de estudiantes',
+    subtitle:
+      'Consultá el estado de matrícula, los adultos responsables vinculados y gestioná bajas lógicas conservando el historial académico.',
+    loading: 'Cargando nómina de estudiantes…',
+    errorTitle: 'No pudimos cargar la nómina del aula',
+    errorDescription:
+      'Revisá tu conexión e intentá actualizar el listado de integrantes.',
+    forbiddenTitle: 'Sin permisos para ver la nómina',
+    forbiddenDescription:
+      'Solo docentes o personal directivo autorizado de esta aula pueden consultar la nómina y gestionar bajas.',
+    notFoundTitle: 'No encontramos la nómina del aula',
+    notFoundDescription:
+      'El aula no existe o ya no tenés acceso para consultar sus integrantes.',
+    staleTitle: 'Nómina pendiente de sincronización',
+    staleDescription:
+      'Mostrando la última nómina confirmada. Falló la actualización en segundo plano.',
+    emptyTitle: 'Todavía no hay estudiantes en el aula',
+    emptyDescription:
+      'Cuando los estudiantes se unan mediante invitación o código, van a aparecer en esta nómina.',
+    emptyFilteredTitle: 'No encontramos estudiantes con ese filtro',
+    emptyFilteredDescription:
+      'Probá ajustar la búsqueda por nombre o el filtro de estado de matrícula.',
+    emptyPageTitle: 'No hay estudiantes en esta página',
+    emptyPageDescription:
+      'Volvé a una página anterior para ver el resto de la nómina.',
+    clearFiltersAction: 'Limpiar filtros',
+    searchLabel: 'Buscar estudiante',
+    searchPlaceholder: 'Buscar por nombre…',
+    searchClearAction: 'Limpiar búsqueda',
+    stateFilterLabel: 'Estado de matrícula',
+    stateOptions: {
+      ALL: 'Todos',
+      ACTIVE: 'Activos',
+      INACTIVE: 'Dados de baja',
+    },
+    states: {
+      ACTIVE: 'Activo',
+      INACTIVE: 'Dado de baja',
+    },
+    removedAt: (formattedDate: string) => `Baja lógica: ${formattedDate}`,
+    guardiansHeading: 'Adultos responsables vinculados',
+    guardiansEmpty: 'Sin adultos responsables vinculados',
+    guardianStates: {
+      ACTIVE: 'Vínculo activo',
+      INACTIVE: 'Vínculo inactivo',
+    },
+    guardianHistoricalNote: 'Estado histórico del vínculo familiar',
+    removeAction: 'Dar de baja',
+    removeAriaLabel: (name: string) => `Dar de baja a ${name}`,
+    confirmTitle: (name: string) => `Confirmar baja lógica de «${name}»`,
+    confirmDescription:
+      'El estudiante perderá el acceso al aula, se liberará su pupitre y se desactivarán sus vínculos familiares activos. Su historial académico (entregas, calificaciones y actividad previa) se conserva.',
+    confirmSubmit: 'Confirmar baja',
+    confirmPending: 'Dando de baja…',
+    confirmCancel: 'Cancelar',
+    removedTitle: 'Estudiante dado de baja',
+    removedDescription: (name: string) =>
+      `Confirmamos la baja lógica de «${name}». Su historial académico fue conservado.`,
+    removeErrorTitle: 'No pudimos completar la baja',
+    removeForbidden:
+      'Tu rol actual no tiene permisos para dar de baja a estudiantes en esta aula.',
+    removeNotFound:
+      'No encontramos al estudiante o el aula indicada, o ya no tenés acceso.',
+    removeUncertain:
+      'No pudimos confirmar si la baja lógica se completó en el servidor. Actualizamos la nómina para verificar el estado real antes de volver a intentar.',
+    removeUnexpected:
+      'No pudimos procesar la baja del estudiante. Intentá nuevamente en unos segundos.',
+  },
 } as const;
