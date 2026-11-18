@@ -18,6 +18,7 @@ import { NotFoundPage } from '@/app/pages/not-found-page';
 import { useDocumentTitle } from '@/app/router/document-title';
 import { ErrorState, LoadingState } from '@/components/feedback/states';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { WalletIndicator } from '@/features/points/wallet-indicator';
 import { Button, buttonStyles } from '@/components/ui/button';
 import { useSessionCleanup, useSessionSnapshot } from '@/session/provider';
 import { Classroom2DLayout } from './classroom-2d-layout';
@@ -310,6 +311,9 @@ function WorkspaceContext({
               </div>
             )}
           </div>
+          {classroom.myRole === 'STUDENT' && (
+            <WalletIndicator classroomId={classroomId} />
+          )}
         </header>
         {joinOutcome && (
           <Alert

@@ -567,3 +567,82 @@ export function createClassroomAnnouncementsPredicate(
     );
   };
 }
+
+/**
+ * Key of `GET /classrooms/{id}/points`: the signed-in student's server-computed
+ * points wallet and one page of movements, scoped by `userId` and `classroomId`
+ * (`rules/state-management.md`).
+ */
+export interface StudentWalletQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+}
+
+export interface NormalizedStudentWalletQueryParams {
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+/**
+ * Clamps wallet pagination the same way the roster and materials keys do, so
+ * the query key and the outgoing request always agree on the page values.
+ */
+export function normalizeStudentWalletQueryParams(
+  params: StudentWalletQueryParams,
+): NormalizedStudentWalletQueryParams {
+  return Object.freeze({
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+  });
+}
+
+/**
+ * Key of `GET /classrooms/{id}/points`: the caller's own wallet, scoped by
+ * `userId` and `classroomId`, so other pages and classrooms read isolated
+ * cache entries (`rules/state-management.md`).
+ */
+export function studentWalletQueryKey(
+  userId: string,
+  classroomId: string,
+  params: StudentWalletQueryParams = {},
+): ScopedQueryKey<NormalizedStudentWalletQueryParams> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'points',
+    'wallet',
+    normalizeStudentWalletQueryParams(params),
+  );
+}
+
+/**
+ * Predicate matching every student wallet query entry owned by `userId` in
+ * `classroomId`; used by mutations to refresh the balance through query
+ * invalidation.
+ */
+export function createStudentWalletPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'points' &&
+      segment.resource === 'wallet'
+    );
+  };
+}

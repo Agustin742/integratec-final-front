@@ -47,6 +47,47 @@ const profile: components['schemas']['OwnProfileDto'] = {
   },
 };
 const classroomURL = `${apiOrigin}/classrooms/${classroomId}`;
+const walletPathname = `/classrooms/${classroomId}/points`;
+const wallet: components['schemas']['StudentWalletDto'] = {
+  classroomId,
+  studentId: '00000000-0000-4000-8000-000000000046',
+  balance: 130,
+  items: [
+    {
+      id: '00000000-0000-4000-8000-000000000451',
+      entryKind: 'EARNING',
+      amount: 50,
+      sourceType: 'submission_grade',
+      sourceId: '00000000-0000-4000-8000-000000000452',
+      reason: 'Activity graded: Fractions Quiz',
+      actorId: '00000000-0000-4000-8000-000000000453',
+      createdAt: '2026-11-10T12:00:00.000Z',
+    },
+    {
+      id: '00000000-0000-4000-8000-000000000454',
+      entryKind: 'DEBIT',
+      amount: -20,
+      sourceType: 'shop_purchase',
+      sourceId: '00000000-0000-4000-8000-000000000455',
+      reason: 'Shop purchase: Blue Classroom Cap',
+      actorId: null,
+      createdAt: '2026-11-12T15:30:00.000Z',
+    },
+    {
+      id: '00000000-0000-4000-8000-000000000456',
+      entryKind: 'COMPENSATION',
+      amount: 5,
+      sourceType: 'grade_revision',
+      sourceId: '00000000-0000-4000-8000-000000000457',
+      reason: 'Regrade adjustment: Fractions Quiz',
+      actorId: '00000000-0000-4000-8000-000000000453',
+      createdAt: '2026-11-14T09:00:00.000Z',
+    },
+  ],
+  page: 1,
+  pageSize: 20,
+  total: 3,
+};
 const entry = `./classrooms/${classroomId}`;
 const heading = (page: Page, name: string) =>
   page.getByRole('heading', { level: 2, name, exact: true });
@@ -99,6 +140,13 @@ test.beforeEach(async ({ page, baseURL }) => {
       // do not emit hints/EOF that would reset their deliberately gated reads.
       await new Promise<void>((resolve) => page.once('close', () => resolve()));
       return;
+    }
+    // The student workspace header now also reads the points wallet (#45);
+    // its request carries pagination query params, so match on the pathname.
+    if (url.origin === apiOrigin && url.pathname === walletPathname) {
+      expect(request.method()).toBe('GET');
+      expect(request.headers().authorization).toBe('Bearer synthetic-access');
+      return route.fulfill({ json: wallet });
     }
     await route.abort();
     throw new Error(

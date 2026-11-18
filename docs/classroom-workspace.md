@@ -2,7 +2,7 @@
 
 The protected directory at `/` ([routing](./routing.md#classroom-directory-and-management)) lists the classrooms returned by `GET /me/classrooms` and links each classroom card to `/classrooms/:classroomId`.
 
-`/classrooms/:classroomId` is a protected workspace entry. For non-parent accounts, it hosts the lazy 3D classroom viewport (`Classroom3DStage`), a one-click `3D` / `Modo 2D Clásico` toggle (`#34`), and the accessible 2D Classic Mode panel launcher (`Classroom2DLayout`). A returned `PARENT` role keeps the neutral metadata view without 3D canvas or 2D classroom panels (`rules/classrooms-and-roles.md`). The production panel entry catalog follows the [approved #26 scope reconciliation](./classroom-panels.md#approved-scope-reconciliation); panel business functionality remains outside this workspace foundation.
+`/classrooms/:classroomId` is a protected workspace entry. For non-parent accounts, it hosts the lazy 3D classroom viewport (`Classroom3DStage`), a one-click `3D` / `Modo 2D Clásico` toggle (`#34`), and the accessible 2D Classic Mode panel launcher (`Classroom2DLayout`). A returned `PARENT` role keeps the neutral metadata view without 3D canvas or 2D classroom panels (`rules/classrooms-and-roles.md`). The production panel entry catalog follows the [approved #26 scope reconciliation](./classroom-panels.md#approved-scope-reconciliation); panel business functionality remains outside this workspace foundation. Students additionally see the read-only [points wallet indicator](./ui-wallet.md) (#45) in the workspace header in both modes; it is not part of the panel registry.
 
 ## Data and lifecycle
 
