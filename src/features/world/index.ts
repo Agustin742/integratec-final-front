@@ -22,3 +22,4 @@ export {
   type ComposeAvatarInput,
   type ComposedAvatar,
 } from './avatar/compose-avatar';
+export { AvatarModel, type AvatarModelProps } from './avatar/avatar-model';
