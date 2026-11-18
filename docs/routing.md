@@ -64,6 +64,18 @@ Successful confirmation calls the existing session controller logout path, synch
 
 ![Password reset mobile screen (360px)](./assets/auth/password-reset-360.png)
 
+## Classroom directory and management
+
+The `/` protected route (`src/app/pages/home-page.tsx`, rendering `ClassroomListPage` from `src/features/classrooms/classroom-list-page.tsx` and `ClassroomFormDialog` from `src/features/classrooms/classroom-form.tsx`) serves as the authenticated classroom directory:
+
+- **Server-authoritative listing & states:** Fetches `GET /me/classrooms` through user-scoped TanStack Query keys (`classroomListQueryKey(userId, params)`) and distinguishes loading (`LoadingState`), empty (`EmptyState` offering `"Crear mi primera aula"` when creation has not been denied), initial failure (`ErrorState` with retry), and stale refresh failure (`StaleDataNotice` preserving confirmed data). Each classroom card displays the server-returned `myRole`, organizational path (`Escuela` or `Docente independiente`), and modality (`Modalidad escolar (con familias)` or `Educación de adultos`), plus an entry link to `/classrooms/:classroomId`.
+- **Capability gating & active context:** Creation and `"Configurar aula"` controls are offered only when server-returned `capabilities` include `configure_classroom`; `STUDENT` and `PARENT` views omit create/edit controls, and any forced `403 FORBIDDEN` response displays a clear forbidden alert and reconciles stale controls. When an account holds memberships across multiple organizational contexts (independent teacher and/or schools), an active context switcher filters the visible classrooms and discards unsaved dialog drafts on switch or account change.
+- **Creation, configuration & reconciliation:** `classroomFormSchema` enforces jitless Zod validation matching backend `VisibleText` limits (`name` 1–120, optional `subject` 1–200, `adultMode`, optional `schoolId` UUID when belonging to multiple schools) while explaining adult-mode rules on parent links. `useProtectedSubmit` blocks duplicate submissions and `useUnsavedChangesGuard` protects unsaved edits; uncertain outcomes (`5xx`, network failures, malformed `2xx`) keep user input intact without claiming rollback and automatically refetch `GET /me/classrooms` before retry.
+
+![Classroom list desktop screen (1280px)](./assets/classrooms/list-1280.png)
+
+![Classroom list mobile screen (360px)](./assets/classrooms/list-360.png)
+
 ## Guards
 
 Guards are components that read `useSessionSnapshot()`; auth is not decided in loaders, because the session is asynchronous and owned by the session controller (see [session lifecycle](./session-lifecycle.md)).

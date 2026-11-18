@@ -1,18 +1,29 @@
 # Tracker — Mati
 
+## 2026-11-17 — Implement virtual classroom list and creation/configuration screens (#30)
+
+- **Status:** in-progress
+- **Area / files:** `docs/threat-model.md`, `src/api/query-keys.ts`, `src/features/classrooms/`, `src/app/pages/home-page.tsx`, `src/app/messages.ts`, `src/test/msw/handlers.ts`, `e2e/classrooms-list.spec.ts`, `docs/routing.md`, `docs/classroom-workspace.md`, `docs/assets/classrooms/`, `changelogs/tracker-mati.md`
+- **Change:** Implemented [issue #30](https://github.com/Agustin742/integratec-final-front/issues/30) (`HU-AUL-001`) on `feat/30-classrooms-list-and-create` from `develop` (`c21089e`):
+  1. Added `TM-008`–`TM-010` to `docs/threat-model.md`, user-scoped classroom list query keys/predicates (`src/api/query-keys.ts`), centralized `es-AR` classroom list/form messages (`src/features/classrooms/messages.ts`), jitless Zod schemas with `VisibleText` and XOR organizational path invariant (`src/features/classrooms/classroom-schema.ts`), typed REST services and uncertain-write helper (`src/features/classrooms/classroom-service.ts`), MSW handlers (`src/test/msw/handlers.ts`), and unit/query tests (`2241396`).
+  2. Implemented `ClassroomFormDialog`/`ClassroomFormContent` and `ClassroomListPage`/`ClassroomListWorkspace` with server-capability gating, dirty-draft active-context switching confirmation, uncertain-outcome server reconciliation, and accessibility/RTL test suites (`0ee6fff`).
+  3. Added Playwright desktop/mobile E2E coverage (`e2e/classrooms-list.spec.ts` including teacher create/configure/F16 entry, student gating, 200% zoom, and active CSP assertions), captured `1280px` and `360px` screenshots under `docs/assets/classrooms/`, and documented the route and captures in `docs/routing.md` and `docs/classroom-workspace.md`.
+- **Reason:** Allow teachers and school staff to list, create, and configure virtual classrooms while gating creation/configuration controls by server-returned capabilities and reconciling uncertain outcomes against the server (`rules/classrooms-and-roles.md`, `rules/forms-and-validation.md`, `rules/error-handling-and-feedback.md`, `rules/state-management.md`).
+- **Next step:** Run full Step 6 profile verification and blind `rdd-auditor` review before Mandatory Pause #2.
+
 ## 2026-11-16 — Complete the classroom panel entry catalog (#26)
 
-- **Status:** completed (approved implementation published in PR #80; integration remains In review)
+- **Status:** completed (merged into `develop` via PRs [#78](https://github.com/Agustin742/integratec-final-front/pull/78), [#79](https://github.com/Agustin742/integratec-final-front/pull/79), and [#80](https://github.com/Agustin742/integratec-final-front/pull/80), commit `c21089e`)
 - **Area / files:** `src/features/classrooms/`, `docs/classroom-panels.md`, `docs/classroom-workspace.md`, panel route/browser tests.
 - **Change:** Complete the production panel entry catalog with explicitly pending content, server-confirmed availability and reserved pet exclusion, following the human-approved scope reconciliation.
 - **Reason:** Existing PRs #78–#80 implement the infrastructure but leave the production catalog empty; opening a PR did not establish full acceptance.
 - **Verification:** Initial RED 11 failures/28 passes; corrected focused 39/39 and final full suite 477/477 pass. Final lint/types/build/security/format/docs/whitespace pass; Python CI 8/8 pass after fixing HEAD-identical CRLF checkout noise (152 normalized files; unchanged logical diff). Independent review 55/55 passes; focused structural recheck accepts the subsequent one-class height correction. Correct-worktree browser run had 51/52 passes; the sole mobile 200% zoom failure is corrected, with desktop/mobile 2/2 passing on the final UI (across runs, not a single final 52/52 run). Captures at 1280/360 are linked in `docs/classroom-panels.md`. Earlier asynchronous-test, CRLF, wrong-preview/undefined-pnpm setup, missing-capture and zoom failures are retained in local evidence. Native assessment: medium/under-budget/review not due; item-2 independent verification fulfilled, no native review approval claimed. Mock evidence is not live-backend or distributed SSE proof.
-- **Publication:** Catalog source `f38617f` and tracking were pushed to PR #80 after human authorization. PR #80 and issue #26 now document the approved scope, exact verification counts, desktop/mobile captures and ordered integration; remote bodies/head were read back successfully. All three PRs remain open with no submitted team reviews; #78 CI passes, #79/#80 CI is absent until retargeting. Issue #26 stays In review, not prematurely Done.
-- **Next step:** Obtain current-head team acceptance, merge #78, then retarget #79 and #80 to develop in turn and wait for CI/approval before each merge. No PR merge, issue closure or deployment performed.
+- **Publication:** Merged into `develop` (`c21089e`).
+- **Next step:** Completed and merged.
 
 ## 2026-11-15 — Implement login, password reset, and logout screens (#28)
 
-- **Status:** completed (ready to push PR #77 follow-up fixes and E2E verification)
+- **Status:** completed (merged into `develop` via [PR #77](https://github.com/Agustin742/integratec-final-front/pull/77), commit `5483634`)
 - **Area / files:** `docs/threat-model.md`, `src/session/`, `src/features/auth/`, `src/app/messages.ts`, `src/app/pages/login-page.tsx`, `src/app/pages/password-reset-page.tsx`, `src/app/router/`, `src/test/msw/handlers.ts`, `e2e/auth-session.spec.ts`, `docs/routing.md`, `docs/session-lifecycle.md`, `docs/assets/auth/`, `changelogs/tracker-mati.md`
 - **Change:** Implemented [issue #28](https://github.com/Agustin742/integratec-final-front/issues/28) (`HU-AUT-002`) on `feat/28-login-password-reset-logout` in [PR #77](https://github.com/Agustin742/integratec-final-front/pull/77):
   1. Updated `docs/threat-model.md`, added `LoginFailureReason`/`LoginResult` and `verifySession` in `src/session/controller.ts`, added `src/app/router/return-target.ts` helpers (reused in `RegisterForm`), centralized `es-AR` auth/shell messages, added jitless Zod schemas & password-reset services, and added MSW auth handlers (`f8a78fe`).
@@ -21,7 +32,7 @@
   4. Pulled `Calegaris` PR #77 fixes for `?token=` URL scrubbing (`ff09764`) and single-flight `SessionController.logout()` + `AppShell` rapid-click guard (`a423341`), then hardened `LoginForm` and `PasswordResetForm` (`shouldDirty: true` password clearing, `useUnsavedChangesGuard` in-app `<Link>` click protection, non-secret `resetTokenScrubbed` `location.state` marker so Browser Back returns to request mode without persisting `?token=` in `window.history.state`), expanded unit/RTL/E2E tests, and synced `docs/routing.md`, `docs/session-lifecycle.md`, and `docs/threat-model.md` (`c99276c`).
 - **Reason:** Complete the user-facing session lifecycle screens and flows (`rules/authentication-and-session.md`, `rules/forms-and-validation.md`, `rules/error-handling-and-feedback.md`, `rules/security.md`).
 - **Verification:** On Node `22.23.4` and pnpm `10.34.9`: `pnpm lint`, `pnpm typecheck`, `pnpm test` (39 files, 435 tests passed), `pnpm build`, `pnpm security:check`, `pnpm format:check`, `pnpm e2e` (44/44 Playwright desktop and mobile scenarios including `e2e/auth-session.spec.ts`, URL `?token=` scrubbing with and without `?next=%2F`, active CSP checks, and zero horizontal overflow), and `git diff --check origin/develop..HEAD --` passed; `impeccable detect` returned `[]`. Blind RDD audit on `c99276c`: `Audit: APPROVED · c99276c60c075c45f85df620d6b91c525a30e4e7 · lenses: risk, resilience, readability, reliability · blockers fixed: 0 · follow-ups: none` (prior audit on `221070c`: `APPROVED · 0 blockers`). Local `python3` / `py` (`C:\Python314\python.exe` missing) and `actionlint` 1.7.7 are unavailable on this Windows workstation and run in the Ubuntu GitHub Actions `checks` job.
-- **Next step:** Push updated commits to `feat/28-login-password-reset-logout` and reply on [PR #77](https://github.com/Agustin742/integratec-final-front/pull/77) after user confirmation.
+- **Next step:** Completed and merged in [PR #77](https://github.com/Agustin742/integratec-final-front/pull/77).
 
 ## 2026-11-14 — Implement account registration and organizational path selection screen (#27)
 

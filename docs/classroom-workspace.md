@@ -1,5 +1,7 @@
 # Classroom context foundation
 
+The protected directory at `/` ([routing](./routing.md#classroom-directory-and-management)) lists the classrooms returned by `GET /me/classrooms` and links each classroom card to `/classrooms/:classroomId`.
+
 `/classrooms/:classroomId` is a protected, context-only entry. It displays the server's classroom name and resolved role, without panel links or classroom tools. A returned parent context gets the same neutral metadata, not a new parent classroom experience. The production panel entry catalog now follows the [approved #26 scope reconciliation](./classroom-panels.md#approved-scope-reconciliation); panel business functionality remains outside this workspace foundation.
 
 ## Data and lifecycle
