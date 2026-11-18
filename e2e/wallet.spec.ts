@@ -104,10 +104,22 @@ const errorBody = (
   },
 });
 
+const monitorsByPage = new WeakMap<
+  Page,
+  { cspViolations: string[]; pageErrors: string[] }
+>();
+
 // Synthetic credentials enter the real hydration/verification flow, not an auth bypass.
 test.beforeEach(async ({ page, baseURL }) => {
   expect(baseURL).toBeTruthy();
   const appOrigin = new URL(baseURL!).origin;
+  const cspViolations: string[] = [];
+  const pageErrors: string[] = [];
+  monitorsByPage.set(page, { cspViolations, pageErrors });
+
+  await page.exposeFunction('__recordCspViolation__', (directive: string) => {
+    cspViolations.push(directive);
+  });
   await page.addInitScript(() => {
     const tabOwner = '00000000-0000-4000-8000-000000000002';
     window.name = `\n[integratec-tab:${tabOwner}]`;
@@ -122,6 +134,17 @@ test.beforeEach(async ({ page, baseURL }) => {
         tabOwner,
       }),
     );
+    window.addEventListener('securitypolicyviolation', (event) => {
+      const report = window as unknown as {
+        __recordCspViolation__?: (directive: string) => void;
+      };
+      report.__recordCspViolation__?.(
+        `${event.violatedDirective}:${event.blockedURI}`,
+      );
+    });
+  });
+  page.on('pageerror', (error) => {
+    pageErrors.push(error.message);
   });
   await page.route('**/*', async (route) => {
     const request = route.request();
@@ -146,6 +169,12 @@ test.beforeEach(async ({ page, baseURL }) => {
       `Unexpected external request: ${url.origin}${url.pathname}`,
     );
   });
+});
+
+test.afterEach(async ({ page }) => {
+  const monitors = monitorsByPage.get(page);
+  expect(monitors?.cspViolations).toEqual([]);
+  expect(monitors?.pageErrors).toEqual([]);
 });
 
 test('student wallet opens from the workspace header and closes to its trigger', async ({
@@ -231,4 +260,5 @@ test('wallet failure shows unavailable, never a zero balance', async ({
     }),
   ).toBeVisible();
   await expect(page.getByText('0 puntos', { exact: true })).toHaveCount(0);
+  await expect(page.getByText(diagnostic)).toHaveCount(0);
 });

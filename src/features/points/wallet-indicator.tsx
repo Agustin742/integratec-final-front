@@ -6,6 +6,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useSessionSnapshot } from '@/session/provider';
 import { pointsMessages } from './messages';
 import { useStudentWallet } from './use-student-wallet';
 import { WalletPanel } from './wallet-panel';
@@ -23,8 +24,20 @@ export interface WalletIndicatorProps {
  * confirmed balance otherwise. The mount point decides whether to render it;
  * no role gating happens here. Opening the dialog shows the wallet panel;
  * Radix returns focus to this trigger on close.
+ *
+ * Scopes internal dialog `open` state by `${userId}:${classroomId}` so
+ * switching accounts or classrooms closes any open wallet dialog cleanly.
  */
 export function WalletIndicator({ classroomId }: WalletIndicatorProps) {
+  const snapshot = useSessionSnapshot();
+  const userId =
+    snapshot.status === 'authenticated' ? snapshot.user.id : 'signed-out';
+  const scopeKey = `${userId}:${classroomId.trim()}`;
+
+  return <WalletIndicatorInner key={scopeKey} classroomId={classroomId} />;
+}
+
+function WalletIndicatorInner({ classroomId }: WalletIndicatorProps) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const wallet = useStudentWallet(classroomId);

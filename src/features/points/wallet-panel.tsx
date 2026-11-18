@@ -9,6 +9,7 @@ import {
 import { DEFAULT_PAGE_SIZE } from '@/components/pagination/pagination';
 import { PaginationControls } from '@/components/pagination/pagination-controls';
 import { formatInstant } from '@/lib/dates';
+import { useSessionSnapshot } from '@/session/provider';
 import { pointsMessages } from './messages';
 import { useStudentWallet, type StudentWallet } from './use-student-wallet';
 
@@ -75,17 +76,34 @@ function MovementItem({ movement }: { readonly movement: PointMovement }) {
  * The client never computes, edits, or transfers points; a balance that
  * cannot be retrieved surfaces as an error state, never as zero
  * (`rules/points-and-shop.md`). Rendered inside the indicator's dialog.
+ *
+ * Keys inner pagination state by `${userId}:${classroomId}` so changing
+ * accounts or classrooms resets the page back to 1.
  */
 export function WalletPanel({
   classroomId: propClassroomId,
 }: WalletPanelProps = {}) {
   // The roster precedent: the id comes from props or the route params.
   const params = useParams<{ classroomId: string }>();
-  const resolvedClassroomId = propClassroomId ?? params.classroomId ?? '';
+  const resolvedClassroomId = (
+    propClassroomId ??
+    params.classroomId ??
+    ''
+  ).trim();
+  const snapshot = useSessionSnapshot();
+  const userId =
+    snapshot.status === 'authenticated' ? snapshot.user.id : 'signed-out';
+  const scopeKey = `${userId}:${resolvedClassroomId}`;
 
+  return (
+    <WalletPanelContent key={scopeKey} classroomId={resolvedClassroomId} />
+  );
+}
+
+function WalletPanelContent({ classroomId }: { readonly classroomId: string }) {
   const balanceHeadingId = useId();
   const [page, setPage] = useState(1);
-  const wallet = useStudentWallet(resolvedClassroomId, {
+  const wallet = useStudentWallet(classroomId, {
     page,
     pageSize: DEFAULT_PAGE_SIZE,
   });
@@ -100,12 +118,14 @@ export function WalletPanel({
         title={messages.errorTitle}
         description={messages.errorDescription}
         onRetry={wallet.retry}
+        isRetrying={wallet.isFetching}
         retryLabel={messages.retryAction}
       />
     );
   }
 
-  const { wallet: data, meta, stale, retry } = wallet;
+  const { wallet: data, meta, stale, retry, isFetching } = wallet;
+  const isOutOfRangeEmpty = data.total > 0 && data.items.length === 0;
 
   return (
     <section aria-labelledby={balanceHeadingId} className="min-w-0 space-y-5">
@@ -127,14 +147,21 @@ export function WalletPanel({
           title={messages.staleTitle}
           description={messages.staleDescription}
           onRetry={retry}
+          isRetrying={isFetching}
         />
       )}
 
       {data.items.length === 0 ? (
         <EmptyState
           headingLevel="h3"
-          title={messages.emptyTitle}
-          description={messages.emptyDescription}
+          title={
+            isOutOfRangeEmpty ? messages.emptyPageTitle : messages.emptyTitle
+          }
+          description={
+            isOutOfRangeEmpty
+              ? messages.emptyPageDescription
+              : messages.emptyDescription
+          }
         />
       ) : (
         <ul className="min-w-0 space-y-3" aria-label={messages.listLabel}>
@@ -150,6 +177,7 @@ export function WalletPanel({
           pageSize={meta.pageSize}
           total={meta.total}
           onPageChange={setPage}
+          busy={isFetching}
         />
       )}
     </section>

@@ -59,6 +59,41 @@ test('forwards an approved non-default destination through the login round trip'
   expect(readReturnTarget(params, withClassrooms)).toBe('/classrooms');
 });
 
+test('forwards /invitations/accept and single valid invitation tokens across auth routes', () => {
+  const bareUrl = buildLoginRedirect({
+    pathname: '/invitations/accept',
+    search: '',
+    hash: '',
+  });
+  expect(bareUrl).toBe('/login?next=%2Finvitations%2Faccept');
+  expect(
+    readReturnTarget(new URL(bareUrl, 'https://app.example').searchParams),
+  ).toBe('/invitations/accept');
+
+  const tokenUrl = buildLoginRedirect({
+    pathname: '/invitations/accept',
+    search: '?token=inv_valid_token_123',
+    hash: '',
+  });
+  expect(tokenUrl).toBe(
+    '/login?next=%2Finvitations%2Faccept%3Ftoken%3Dinv_valid_token_123',
+  );
+  const loginParams = new URL(tokenUrl, 'https://app.example').searchParams;
+  expect(readReturnTarget(loginParams)).toBe(
+    '/invitations/accept?token=inv_valid_token_123',
+  );
+  expect(buildAuthReturnHref(REGISTER_PATH, loginParams)).toBe(
+    '/register?next=%2Finvitations%2Faccept%3Ftoken%3Dinv_valid_token_123',
+  );
+
+  const rejectedMalformed = buildLoginRedirect({
+    pathname: '/invitations/accept',
+    search: '?token=a&extra=1',
+    hash: '',
+  });
+  expect(rejectedMalformed).toBe('/login?next=%2F');
+});
+
 test('the production allowlist still degrades a non-default destination to "/"', () => {
   expect(
     buildLoginRedirect({ pathname: '/classrooms', search: '', hash: '' }),

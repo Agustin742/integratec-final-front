@@ -1,21 +1,29 @@
-import { useQuery, type QueryClient } from '@tanstack/react-query';
-import { requestApi } from '@/api/client';
+import { useEffect, useRef } from 'react';
+import {
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
+import { requestApi, type TypedApiClient } from '@/api/client';
 import { ApiError } from '@/api/errors';
 import { apiErrorMessages } from '@/api/messages';
 import {
+  classroomDetailQueryKey,
   createStudentWalletPredicate,
   normalizeStudentWalletQueryParams,
   studentWalletQueryKey,
+  type NormalizedStudentWalletQueryParams,
   type StudentWalletQueryParams,
 } from '@/api/query-keys';
 import {
   getPaginationMeta,
   type PaginationMeta,
 } from '@/components/pagination/pagination';
-import type { components } from '@/api/schema.generated';
 import { useSessionService, useSessionSnapshot } from '@/session/provider';
+import { pointsMessages } from './messages';
+import { studentWalletSchema, type StudentWalletDto } from './wallet-schema';
 
-export type StudentWallet = components['schemas']['StudentWalletDto'];
+export type StudentWallet = StudentWalletDto;
 
 /**
  * `requestApi` maps every failure to an `ApiError` except an abort, which it
@@ -33,12 +41,49 @@ function toApiError(error: unknown): ApiError {
   });
 }
 
+function isRevokedAccessError(error: ApiError): boolean {
+  return (
+    error.kind === 'forbidden' ||
+    error.status === 403 ||
+    error.kind === 'not-found' ||
+    error.status === 404
+  );
+}
+
+async function fetchStudentWallet(
+  client: TypedApiClient,
+  classroomId: string,
+  query: NormalizedStudentWalletQueryParams,
+  signal?: AbortSignal,
+): Promise<StudentWallet> {
+  const payload: unknown = await requestApi(() =>
+    client.GET('/classrooms/{id}/points', {
+      params: { path: { id: classroomId }, query },
+      signal,
+    }),
+  );
+
+  const parsed = studentWalletSchema.safeParse(payload);
+  if (!parsed.success) {
+    throw new ApiError({
+      kind: 'unexpected',
+      status: 200,
+      code: null,
+      userMessage: pointsMessages.error.unexpected,
+    });
+  }
+
+  return parsed.data;
+}
+
 export type StudentWalletState =
   | { readonly status: 'pending' }
   | {
       readonly status: 'error';
       readonly error: ApiError;
       readonly retry: () => void;
+      readonly isFetching: boolean;
+      readonly isRefetching: boolean;
     }
   | {
       readonly status: 'ready';
@@ -47,6 +92,8 @@ export type StudentWalletState =
       /** True when a background refresh failed and the data shown is stale. */
       readonly stale: boolean;
       readonly retry: () => void;
+      readonly isFetching: boolean;
+      readonly isRefetching: boolean;
     };
 
 const PENDING = Object.freeze({ status: 'pending' as const });
@@ -58,12 +105,15 @@ const PENDING = Object.freeze({ status: 'pending' as const });
  *
  * - The balance is read-only server data: the client never computes or edits
  *   it (`rules/points-and-shop.md`).
- * - Without a signed-in user the query stays disabled and the state is
- *   `pending`; nothing is fetched or filled.
- * - A failed first load surfaces `status: 'error'` with the mapped `ApiError`
- *   (`403` for a non-student, `404` for an out-of-scope classroom), never a
- *   zero balance. A failed background refresh keeps the confirmed data with
- *   `stale: true`, the roster precedent.
+ * - Without a signed-in user or non-blank `classroomId` the query stays disabled
+ *   and the state is `pending`; nothing is fetched or filled.
+ * - Responses are validated with jitless `studentWalletSchema` so malformed 2xx
+ *   payloads surface as an error rather than `undefined puntos`.
+ * - `403` (non-student / revoked role) and `404` (out-of-scope classroom)
+ *   clear any cached balance/ledger immediately, surface `status: 'error'`, and
+ *   invalidate `classroomDetailQueryKey` so the workspace reconciles access.
+ * - Other failed background refreshes (`5xx`, network) keep the last confirmed
+ *   data with `stale: true`, matching the roster precedent.
  */
 export function useStudentWallet(
   classroomId: string,
@@ -71,29 +121,76 @@ export function useStudentWallet(
 ): StudentWalletState {
   const { client } = useSessionService();
   const snapshot = useSessionSnapshot();
+  const queryClient = useQueryClient();
   const userId = snapshot.status === 'authenticated' ? snapshot.user.id : null;
+  const trimmedClassroomId = classroomId.trim();
+  const enabled = userId !== null && trimmedClassroomId !== '';
 
   // The key and the request share the same normalized page values, so every
   // page and page size combination is one cache entry.
   const normalized = normalizeStudentWalletQueryParams(params);
+  const reconciledContextErrorRef = useRef<unknown>(null);
 
   const query = useQuery({
-    // Without a signed-in user the query stays disabled; the key only needs
-    // to be valid and is never fetched or filled.
+    // Without a signed-in user or valid classroomId the query stays disabled;
+    // the fallback segments keep the key non-blank without fetching.
     queryKey: studentWalletQueryKey(
       userId ?? 'signed-out',
-      classroomId,
+      trimmedClassroomId !== '' ? trimmedClassroomId : 'missing',
       params,
     ),
     queryFn: ({ signal }) =>
-      requestApi(() =>
-        client.GET('/classrooms/{id}/points', {
-          params: { path: { id: classroomId }, query: normalized },
-          signal,
-        }),
-      ),
-    enabled: userId !== null,
+      fetchStudentWallet(client, trimmedClassroomId, normalized, signal),
+    enabled,
   });
+
+  const mappedError = query.isError ? toApiError(query.error) : null;
+  const isRevokedAccess =
+    mappedError !== null && isRevokedAccessError(mappedError);
+
+  useEffect(() => {
+    if (!query.isError) {
+      reconciledContextErrorRef.current = null;
+      return;
+    }
+    if (
+      !enabled ||
+      userId === null ||
+      !isRevokedAccess ||
+      reconciledContextErrorRef.current === query.error
+    ) {
+      return;
+    }
+    reconciledContextErrorRef.current = query.error;
+    void queryClient.invalidateQueries({
+      queryKey: classroomDetailQueryKey(userId, trimmedClassroomId),
+      exact: true,
+    });
+  }, [
+    enabled,
+    isRevokedAccess,
+    query.error,
+    query.isError,
+    queryClient,
+    trimmedClassroomId,
+    userId,
+  ]);
+
+  if (!enabled) {
+    return PENDING;
+  }
+
+  // Revoked access (403/404) must hide cached balance and private ledger
+  // immediately rather than serving stale data.
+  if (mappedError !== null && isRevokedAccess) {
+    return {
+      status: 'error',
+      error: mappedError,
+      retry: () => void query.refetch(),
+      isFetching: query.isFetching,
+      isRefetching: query.isRefetching,
+    };
+  }
 
   if (query.data !== undefined) {
     return {
@@ -102,15 +199,21 @@ export function useStudentWallet(
       meta: getPaginationMeta(query.data),
       stale: query.isError,
       retry: () => void query.refetch(),
+      isFetching: query.isFetching,
+      isRefetching: query.isRefetching,
     };
   }
-  if (query.isError) {
+
+  if (mappedError !== null) {
     return {
       status: 'error',
-      error: toApiError(query.error),
+      error: mappedError,
       retry: () => void query.refetch(),
+      isFetching: query.isFetching,
+      isRefetching: query.isRefetching,
     };
   }
+
   return PENDING;
 }
 

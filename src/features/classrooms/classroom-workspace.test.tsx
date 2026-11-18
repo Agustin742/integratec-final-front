@@ -244,9 +244,11 @@ test.each([403, 404, 500, 'network'] as const)(
   },
 );
 
+const studentWalletClassroomId = '00000000-0000-4000-8000-000000000045';
+
 const walletResponse = (): Response =>
   Response.json({
-    classroomId: 'a',
+    classroomId: studentWalletClassroomId,
     studentId: profile.id,
     balance: 130,
     items: [],
@@ -264,10 +266,10 @@ test('a student workspace renders the wallet indicator and queries the wallet en
       return Promise.resolve(walletResponse());
     }
     return Promise.resolve(
-      Response.json({ ...detail('a'), myRole: 'STUDENT' }),
+      Response.json({ ...detail(studentWalletClassroomId), myRole: 'STUDENT' }),
     );
   });
-  const { container } = setup(fetch);
+  const { container } = setup(fetch, `/classrooms/${studentWalletClassroomId}`);
 
   const trigger = await screen.findByRole('button', {
     name: pointsMessages.wallet.indicator.accessibleName('130 puntos'),

@@ -1,4 +1,11 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import {
   afterAll,
   afterEach,
@@ -11,6 +18,7 @@ import {
 } from 'vitest';
 import { createApiClient } from '@/api/client';
 import { createAppQueryClient } from '@/api/query-client';
+import { classroomDetailQueryKey } from '@/api/query-keys';
 import { fakeSession } from '@/app/router/fake-session';
 import { SessionProvider } from '@/session/provider';
 import { profile } from '@/session/test-fixtures';
@@ -22,6 +30,7 @@ import {
 import { mswServer } from '@/test/msw/server';
 import { render } from '@/test/render';
 import { pointsMessages } from './messages';
+import { invalidateStudentWallet } from './use-student-wallet';
 import { WalletIndicator } from './wallet-indicator';
 
 beforeAll(() => {
@@ -44,9 +53,10 @@ afterAll(() => {
 });
 
 const classroomId = '4e5f6a7b-0000-4000-8000-000000000045';
+const secondClassroomId = '4e5f6a7b-0000-4000-8000-000000000099';
 const copy = pointsMessages.wallet;
 
-function renderIndicator() {
+function renderIndicator(targetClassroomId = classroomId) {
   const session = fakeSession(
     { status: 'authenticated', user: profile },
     createApiClient({ baseUrl: TEST_API_BASE_URL }),
@@ -56,7 +66,7 @@ function renderIndicator() {
   });
   const view = render(
     <SessionProvider service={session.service}>
-      <WalletIndicator classroomId={classroomId} />
+      <WalletIndicator classroomId={targetClassroomId} />
     </SessionProvider>,
     { queryClient },
   );
@@ -102,6 +112,46 @@ describe('WalletIndicator (#45)', () => {
     await expectAccessible(container);
   });
 
+  test('blank classroomId renders pending safely without throwing or calling the API', async () => {
+    const onRequest = vi.fn();
+    mswServer.use(createStudentWalletHandler(classroomId, { onRequest }));
+    const { container } = renderIndicator('   ');
+
+    const trigger = screen.getByRole('button', {
+      name: copy.indicator.accessibleName(copy.indicator.pending),
+    });
+    expect(trigger).toHaveTextContent(copy.indicator.pending);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(onRequest).not.toHaveBeenCalled();
+    await expectAccessible(container);
+  });
+
+  test('malformed 200 payload shows the unavailable label instead of undefined puntos', async () => {
+    mswServer.use(
+      http.get(`${TEST_API_BASE_URL}/classrooms/${classroomId}/points`, () =>
+        HttpResponse.json({
+          classroomId,
+          studentId: profile.id,
+          items: [],
+          page: 1,
+          pageSize: 20,
+          total: 0,
+        }),
+      ),
+    );
+    const { container } = renderIndicator();
+
+    const trigger = await screen.findByRole('button', {
+      name: copy.indicator.accessibleName(copy.indicator.unavailable),
+    });
+    expect(trigger).toHaveTextContent(copy.indicator.unavailable);
+    expect(trigger).not.toHaveTextContent('undefined puntos');
+    expect(trigger).not.toHaveTextContent('puntos');
+    await expectAccessible(container);
+  });
+
   test('a 403 wallet shows the unavailable label and never a numeric balance', async () => {
     mswServer.use(createStudentWalletHandler(classroomId, { status: 403 }));
     const { container } = renderIndicator();
@@ -114,5 +164,79 @@ describe('WalletIndicator (#45)', () => {
     expect(trigger).not.toHaveTextContent('puntos');
     expect(screen.queryByText('0')).not.toBeInTheDocument();
     await expectAccessible(container);
+  });
+
+  test.each([403, 404] as const)(
+    'revoked access (%i) during background refresh replaces cached balance with unavailable and invalidates classroom context',
+    async (status) => {
+      mswServer.use(createStudentWalletHandler(classroomId));
+      const { queryClient } = renderIndicator();
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+      expect(
+        await screen.findByRole('button', {
+          name: copy.indicator.accessibleName(copy.indicator.ready(130)),
+        }),
+      ).toBeVisible();
+
+      mswServer.use(createStudentWalletHandler(classroomId, { status }));
+      await act(async () => {
+        await invalidateStudentWallet(queryClient, {
+          userId: profile.id,
+          classroomId,
+        });
+      });
+
+      const unavailableTrigger = await screen.findByRole('button', {
+        name: copy.indicator.accessibleName(copy.indicator.unavailable),
+      });
+      expect(unavailableTrigger).toBeVisible();
+      expect(unavailableTrigger).not.toHaveTextContent('130 puntos');
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: classroomDetailQueryKey(profile.id, classroomId),
+        exact: true,
+      });
+    },
+  );
+
+  test('changing classroomId or userId resets the open dialog state', async () => {
+    mswServer.use(
+      createStudentWalletHandler(classroomId),
+      createStudentWalletHandler(secondClassroomId, {
+        response: { balance: 40 },
+      }),
+    );
+    const { rerender, session } = renderIndicator();
+
+    const trigger = await screen.findByRole('button', {
+      name: copy.indicator.accessibleName(copy.indicator.ready(130)),
+    });
+    fireEvent.click(trigger);
+    expect(
+      await screen.findByRole('dialog', { name: copy.panel.title }),
+    ).toBeVisible();
+
+    rerender(
+      <SessionProvider service={session.service}>
+        <WalletIndicator classroomId={secondClassroomId} />
+      </SessionProvider>,
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    const secondTrigger = await screen.findByRole('button', {
+      name: copy.indicator.accessibleName(copy.indicator.ready(40)),
+    });
+    fireEvent.click(secondTrigger);
+    expect(
+      await screen.findByRole('dialog', { name: copy.panel.title }),
+    ).toBeVisible();
+
+    await act(async () => {
+      session.set({
+        status: 'authenticated',
+        user: { ...profile, id: '00000000-0000-4000-8000-000000000009' },
+      });
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

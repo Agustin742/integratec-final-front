@@ -30,10 +30,17 @@ export const pointsMessages = {
       emptyTitle: 'Todavía no tenés movimientos',
       emptyDescription:
         'Los puntos aparecen cuando un docente califica una actividad o cuando comprás en la tienda. El saldo siempre lo calcula el servidor.',
+      emptyPageTitle: 'No hay movimientos en esta página',
+      emptyPageDescription:
+        'Volvé a una página anterior para ver el resto de tus movimientos.',
       listLabel: 'Historial de movimientos de puntos',
       dateColumn: 'Fecha',
       reasonColumn: 'Motivo',
       movementColumn: 'Movimiento',
     },
+  },
+  error: {
+    unexpected:
+      'No pudimos interpretar los datos de tu billetera. Intentá de nuevo.',
   },
 } as const;

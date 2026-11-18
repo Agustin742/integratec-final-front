@@ -50,6 +50,7 @@ export const classroomMessages = {
       'Probá volver a una página anterior para ver tus aulas.',
     createAction: 'Crear aula',
     createFirstAction: 'Crear mi primera aula',
+    joinWithCodeAction: 'Unirme con un código',
     enterAction: 'Entrar al aula',
     configureAction: 'Configurar aula',
     noSubject: 'Sin materia ni descripción cargada',
