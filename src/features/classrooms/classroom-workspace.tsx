@@ -19,9 +19,9 @@ import { useDocumentTitle } from '@/app/router/document-title';
 import { ErrorState, LoadingState } from '@/components/feedback/states';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button, buttonStyles } from '@/components/ui/button';
-import { useSessionSnapshot } from '@/session/provider';
+import { useSessionCleanup, useSessionSnapshot } from '@/session/provider';
 import { Classroom2DLayout } from './classroom-2d-layout';
-import { Classroom3DStage } from './classroom-3d-stage';
+import { Classroom3DStage, clearLoadedWorldAssets } from './classroom-3d-stage';
 import { useClassroomViewMode } from './classroom-mode-store';
 import { joinMessages } from './join-messages';
 import { readClassroomJoinOutcome } from './join-schema';
@@ -141,6 +141,12 @@ function WorkspaceContext({
   }, [hasIncomingOutcome, location, navigate]);
   const context = useClassroomContext(classroomId);
   useClassroomContextEvents(classroomId);
+  useSessionCleanup(() => clearLoadedWorldAssets({ disposeDecoders: true }));
+  useEffect(() => {
+    return () => {
+      clearLoadedWorldAssets({ scopeKey: classroomId });
+    };
+  }, [classroomId]);
   const snapshot = useSessionSnapshot();
   const sessionUserId =
     snapshot.status === 'authenticated' ? snapshot.user.id : null;
@@ -195,7 +201,6 @@ function WorkspaceContext({
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [modeToggleEnabled, handleModeToggle]);
-
   useDocumentTitle(
     context.status === 'ready' ? context.classroom.name : messages.title,
   );
@@ -333,7 +338,10 @@ function WorkspaceContext({
               headingRef={activeViewHeadingRef}
             />
           ) : (
-            <Classroom3DStage headingRef={activeViewHeadingRef} />
+            <Classroom3DStage
+              headingRef={activeViewHeadingRef}
+              scopeKey={classroomId}
+            />
           ))}
         <Outlet
           key={location.key}

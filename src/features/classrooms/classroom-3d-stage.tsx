@@ -12,12 +12,32 @@ import { classroomMessages } from './messages';
 
 export interface Classroom3DStageProps {
   readonly headingRef?: RefObject<HTMLHeadingElement | null>;
+  readonly scopeKey?: string;
 }
 
+type ClearAssetCacheFn = (options?: {
+  scopeKey?: string;
+  disposeDecoders?: boolean;
+}) => void;
+
+let loadedClearAssetCache: ClearAssetCacheFn | null = null;
+
 const loadWorldCanvas = () =>
-  import('../world').then((module) => ({
-    default: module.WorldCanvas,
-  }));
+  import('../world').then((module) => {
+    loadedClearAssetCache = module.clearAssetCache;
+    return { default: module.WorldCanvas };
+  });
+
+/**
+ * Clears GLB assets/decoders only if the lazy `../world` chunk has been loaded,
+ * keeping `three` out of the initial `ClassroomWorkspace` / 2D Classic bundle.
+ */
+export function clearLoadedWorldAssets(options?: {
+  scopeKey?: string;
+  disposeDecoders?: boolean;
+}): void {
+  loadedClearAssetCache?.(options);
+}
 
 /**
  * Local boundary: a failed 3D chunk load or render error shows the truthful
@@ -43,7 +63,10 @@ class StageBoundary extends Component<
  * not eagerly execute Three.js initialization, while unmounting cleanly when
  * switching to Classic 2D Mode.
  */
-export function Classroom3DStage({ headingRef }: Classroom3DStageProps) {
+export function Classroom3DStage({
+  headingRef,
+  scopeKey,
+}: Classroom3DStageProps) {
   const [LazyWorldCanvas] = useState(() => lazy(loadWorldCanvas));
   const supportsBrowserObservers = typeof ResizeObserver !== 'undefined';
 
@@ -69,7 +92,10 @@ export function Classroom3DStage({ headingRef }: Classroom3DStageProps) {
       {supportsBrowserObservers ? (
         <StageBoundary>
           <Suspense fallback={<p role="status">{worldMessages.loading}</p>}>
-            <LazyWorldCanvas label={classroomMessages.viewMode.canvasLabel} />
+            <LazyWorldCanvas
+              label={classroomMessages.viewMode.canvasLabel}
+              scopeKey={scopeKey}
+            />
           </Suspense>
         </StageBoundary>
       ) : (
