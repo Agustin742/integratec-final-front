@@ -1,8 +1,24 @@
 import { StrictMode, useEffect, useRef } from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, expect, test, vi } from 'vitest';
-import { OrthographicCamera } from 'three';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import {
+  BoxGeometry,
+  Group,
+  Mesh,
+  MeshStandardMaterial,
+  OrthographicCamera,
+} from 'three';
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import type { CanvasProps, RootState } from '@react-three/fiber';
+import {
+  DEFAULT_SCOPE,
+  clearAssetCache,
+  createConfiguredGltfLoader,
+  getAssetCacheSize,
+  loadGlbAsset,
+  setGlbLoaderForTests,
+} from './asset-cache';
 import { WorldCanvas } from './world-canvas';
 
 const renderer = vi.hoisted(() => ({
@@ -21,6 +37,8 @@ const state = {
 vi.mock('three', async (original) => ({
   ...(await original<typeof import('three')>()),
   WebGLRenderer: class {
+    capabilities = { isWebGL2: true };
+    extensions = { has: () => false, get: () => null };
     constructor() {
       if (renderer.fail) throw renderer.failure;
     }
@@ -35,13 +53,24 @@ vi.mock('@react-three/fiber', () => ({
     useEffect(() => {
       const props = initialProps.current;
       try {
-        if (typeof props.gl === 'function')
-          props.gl({ canvas: canvas.current! });
+        const glInstance =
+          typeof props.gl === 'function'
+            ? props.gl({ canvas: canvas.current! })
+            : undefined;
         if (renderer.delayOnCreated) {
           renderer.created = props.onCreated;
           return () => renderer.dispose();
         }
-        props.onCreated?.({ gl: { domElement: canvas.current } } as RootState);
+        props.onCreated?.({
+          gl: Object.assign(
+            {
+              domElement: canvas.current,
+              capabilities: { isWebGL2: true },
+              extensions: { has: () => false, get: () => null },
+            },
+            glInstance,
+          ),
+        } as unknown as RootState);
       } catch (reason) {
         const event = new Event('unhandledrejection', { cancelable: true });
         Object.defineProperty(event, 'reason', { value: reason });
@@ -88,6 +117,11 @@ beforeEach(() => {
       disconnect = disconnect;
     },
   );
+});
+afterEach(() => {
+  clearAssetCache({ disposeDecoders: true });
+  setGlbLoaderForTests(null);
+  vi.restoreAllMocks();
 });
 
 test('caps DPR, owns an orthographic camera and starts paused until visibility is known', () => {
@@ -214,8 +248,12 @@ test('announces loading outside the busy container until the canvas is ready', (
   expect(loading.closest('[aria-busy="true"]')).toBeNull();
   act(() => {
     renderer.created?.({
-      gl: { domElement: document.createElement('canvas') },
-    } as RootState);
+      gl: {
+        domElement: document.createElement('canvas'),
+        capabilities: { isWebGL2: true },
+        extensions: { has: () => false, get: () => null },
+      },
+    } as unknown as RootState);
   });
   expect(screen.queryByText('Preparando la vista 3D…')).not.toBeInTheDocument();
   expect(region).toHaveAttribute('aria-busy', 'false');
@@ -265,4 +303,52 @@ test('cleans observer/listeners on StrictMode unmount and supports a fresh remou
   render(<WorldCanvas label="Technical world" />);
   act(() => intersect(true));
   expect(renderer.props.frameloop).toBe('demand');
+});
+test('configures KTX2 renderer support inside createRenderer before onCreated runs', () => {
+  const detectSupport = vi.spyOn(KTX2Loader.prototype, 'detectSupport');
+  renderer.delayOnCreated = true;
+  render(<WorldCanvas label="Technical world" />);
+  createConfiguredGltfLoader();
+  expect(detectSupport).toHaveBeenCalledTimes(1);
+});
+test('preserves scoped caches and KTX2 renderer support across StrictMode and unscoped unmount', async () => {
+  const detectSupport = vi.spyOn(KTX2Loader.prototype, 'detectSupport');
+  const makeGltf = () => {
+    const group = new Group();
+    group.add(new Mesh(new BoxGeometry(1, 1, 1), new MeshStandardMaterial()));
+    return {
+      scene: group,
+      scenes: [group],
+      animations: [],
+      cameras: [],
+      asset: {},
+    } as unknown as GLTF;
+  };
+  setGlbLoaderForTests({
+    loadAsync: vi.fn(async () => makeGltf()),
+  });
+
+  await loadGlbAsset('/models/classroom.glb', { scopeKey: 'classroom-42' });
+  await loadGlbAsset('/models/reference.glb');
+  expect(getAssetCacheSize('classroom-42')).toBe(1);
+  expect(getAssetCacheSize(DEFAULT_SCOPE)).toBe(1);
+
+  const view = render(
+    <StrictMode>
+      <WorldCanvas label="Technical world" />
+    </StrictMode>,
+  );
+
+  expect(getAssetCacheSize('classroom-42')).toBe(1);
+  detectSupport.mockClear();
+  createConfiguredGltfLoader();
+  expect(detectSupport).toHaveBeenCalledTimes(1);
+
+  view.unmount();
+
+  expect(getAssetCacheSize(DEFAULT_SCOPE)).toBe(0);
+  expect(getAssetCacheSize('classroom-42')).toBe(1);
+  detectSupport.mockClear();
+  createConfiguredGltfLoader();
+  expect(detectSupport).toHaveBeenCalledTimes(1);
 });

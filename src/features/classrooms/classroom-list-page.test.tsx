@@ -317,7 +317,7 @@ describe('ClassroomListPage (/)', () => {
     ).toBeVisible();
   });
 
-  test('offers a join-by-code entry link to /invitations/accept in the header and in the empty state', async () => {
+  test('offers a single join-by-code entry link to /invitations/accept, only inside the empty state', async () => {
     mswServer.use(
       createClassroomListHandler({
         resolveResponse: () => ({
@@ -335,10 +335,13 @@ describe('ClassroomListPage (/)', () => {
     const links = screen.getAllByRole('link', {
       name: classroomMessages.list.joinWithCodeAction,
     });
-    expect(links).toHaveLength(2);
-    for (const link of links) {
-      expect(link).toHaveAttribute('href', '/invitations/accept');
-    }
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute('href', '/invitations/accept');
+    // It sits next to the centered "create first" action, not in the header.
+    const createFirst = screen.getByRole('button', {
+      name: classroomMessages.list.createFirstAction,
+    });
+    expect(createFirst.parentElement).toContainElement(links[0]);
   });
 
   test('shows the join-by-code entry link in the header when classrooms exist', async () => {

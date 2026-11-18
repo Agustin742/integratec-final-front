@@ -4,8 +4,13 @@ import { LoadingState } from '@/components/feedback/states';
 import { BaseLayout } from '@/components/layout/base-layout';
 import { Button } from '@/components/ui/button';
 import { Toast, toast } from '@/components/ui/toast';
+import { resetClassroomModeStore } from '@/features/classrooms/classroom-mode-store';
 import { NotificationCenter } from '@/features/notifications/notification-center';
-import { useSessionService, useSessionSnapshot } from '@/session/provider';
+import {
+  useSessionCleanup,
+  useSessionService,
+  useSessionSnapshot,
+} from '@/session/provider';
 import { messages } from '../messages';
 import { MAIN_CONTENT_ID } from './focus-on-navigation';
 
@@ -23,6 +28,9 @@ export function AppShell() {
   const { controller } = useSessionService();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const isLoggingOutRef = useRef(false);
+  // The shell outlives every protected route, so logout from any page clears
+  // the per-user classroom view preference (rules/state-management.md).
+  useSessionCleanup(resetClassroomModeStore);
 
   const handleLogout = async () => {
     if (isLoggingOutRef.current) {

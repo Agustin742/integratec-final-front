@@ -135,6 +135,23 @@ test('loads the public protected route with server name and neutral parent role 
   await expectAccessible(container);
 });
 
+test('offers an icon-only back link to the classroom list', async () => {
+  const fetch = vi.fn(() => Promise.resolve(response('a')));
+  const { router } = setup(fetch);
+  const link = await screen.findByRole('link', { name: 'Volver a mis aulas' });
+  expect(link).toHaveAttribute('href', '/');
+  expect(link).toHaveAttribute('title', 'Volver a mis aulas');
+  expect(link.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+  fireEvent.click(link);
+  await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+  expect(
+    await screen.findByRole('heading', { name: messages.pages.home.title }),
+  ).toBeVisible();
+  expect(
+    screen.queryByText(messages.pages.notFound.title),
+  ).not.toBeInTheDocument();
+});
+
 test('exposes exact persisted context through Outlet and shares the capability cache', async () => {
   const fetch = vi.fn(() => Promise.resolve(response('a')));
   const { queryClient } = setup(fetch, '/context/a');
