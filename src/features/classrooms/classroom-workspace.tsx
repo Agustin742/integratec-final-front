@@ -18,15 +18,11 @@ import { NotFoundPage } from '@/app/pages/not-found-page';
 import { useDocumentTitle } from '@/app/router/document-title';
 import { ErrorState, LoadingState } from '@/components/feedback/states';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button, buttonStyles } from '@/components/ui/button';
-import { useSessionCleanup, useSessionSnapshot } from '@/session/provider';
+import { useSessionSnapshot } from '@/session/provider';
 import { Classroom2DLayout } from './classroom-2d-layout';
 import { Classroom3DStage } from './classroom-3d-stage';
-import {
-  resetClassroomModeStore,
-  useClassroomViewMode,
-} from './classroom-mode-store';
+import { useClassroomViewMode } from './classroom-mode-store';
 import { joinMessages } from './join-messages';
 import { readClassroomJoinOutcome } from './join-schema';
 import { classroomMessages as messages } from './messages';
@@ -149,10 +145,6 @@ function WorkspaceContext({
   const sessionUserId =
     snapshot.status === 'authenticated' ? snapshot.user.id : null;
   const { mode, toggleMode } = useClassroomViewMode(sessionUserId);
-  const handleSessionCleanup = useCallback(() => {
-    resetClassroomModeStore();
-  }, []);
-  useSessionCleanup(handleSessionCleanup);
 
   const isParent =
     context.status === 'ready' && context.classroom.myRole === 'PARENT';
@@ -284,12 +276,16 @@ function WorkspaceContext({
             </div>
             {!isParent && (
               <div className="flex flex-wrap items-center gap-2.5">
-                <Badge variant="outline">
-                  {messages.viewMode.labels[mode]}
-                </Badge>
+                {/* Visual cue only: aria-keyshortcuts on the button already announces Alt+M. */}
+                <span
+                  aria-hidden="true"
+                  className="hidden text-xs text-muted-foreground sm:inline"
+                >
+                  {messages.viewMode.shortcutHint}
+                </span>
                 <Button
                   type="button"
-                  variant="secondary"
+                  variant="outline"
                   size="sm"
                   aria-keyshortcuts="Alt+M"
                   onClick={handleModeToggle}

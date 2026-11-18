@@ -322,6 +322,54 @@ describe('ClassroomWorkspace 3D / 2D Classic Mode switch (#34)', () => {
     expect(gradesBtn).toHaveFocus();
   });
 
+  test('2D panel buttons are named exactly by the panel title, keeping the visible open cue out of the accessible name', async () => {
+    setupWorkspace({ path: '/classrooms/a' });
+
+    await screen.findByRole('heading', { level: 2, name: 'Aula a' });
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: classroomMessages.viewMode.switchTo2d,
+      }),
+    );
+    const nav = await screen.findByRole('navigation', {
+      name: classroomMessages.viewMode.mode2dNavLabel,
+    });
+
+    const activities = within(nav).getByRole('button', {
+      name: 'Actividades',
+    });
+    expect(
+      within(nav).getByRole('button', { name: 'Calificaciones' }),
+    ).toBeVisible();
+    expect(
+      within(activities).getByText(classroomMessages.viewMode.openPanelAction),
+    ).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  test('header shows a single toggle with a visible, non-duplicated Alt+M hint and no mode badge', async () => {
+    setupWorkspace({ path: '/classrooms/a' });
+
+    await screen.findByRole('heading', { level: 2, name: 'Aula a' });
+    const toggle = screen.getByRole('button', {
+      name: classroomMessages.viewMode.switchTo2d,
+    });
+    const hint = screen.getByText(classroomMessages.viewMode.shortcutHint);
+    expect(hint).toBeVisible();
+    // aria-keyshortcuts already announces the shortcut; the visible text must not repeat it.
+    expect(hint).toHaveAttribute('aria-hidden', 'true');
+    expect(toggle).toHaveAttribute('aria-keyshortcuts', 'Alt+M');
+    expect(toggle).not.toHaveAttribute('aria-describedby');
+    expect(screen.queryByText('Vista 3D')).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    await screen.findByRole('heading', {
+      level: 3,
+      name: classroomMessages.viewMode.mode2dHeading,
+    });
+    // Only the section heading carries the mode name; no extra badge repeats it.
+    expect(screen.getAllByText('Modo 2D Clásico')).toHaveLength(1);
+  });
+
   test('S2: shows honest empty state in 2D mode when server returns no availablePanels', async () => {
     setupWorkspace({
       path: '/classrooms/a',

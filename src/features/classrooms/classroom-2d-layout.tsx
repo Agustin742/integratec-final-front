@@ -57,11 +57,15 @@ export function Classroom2DLayout({
                 <Button
                   type="button"
                   variant="outline"
+                  aria-label={panel.title}
                   className="h-auto min-h-11 w-full justify-between px-4 py-3 text-left"
                   onClick={(event) => openPanel(panel.key, event.currentTarget)}
                 >
                   <span className="min-w-0 wrap-anywhere">{panel.title}</span>
-                  <span className="shrink-0 text-xs font-medium text-muted-foreground">
+                  <span
+                    aria-hidden="true"
+                    className="shrink-0 text-xs font-medium text-muted-foreground"
+                  >
                     {classroomMessages.viewMode.openPanelAction}
                   </span>
                 </Button>

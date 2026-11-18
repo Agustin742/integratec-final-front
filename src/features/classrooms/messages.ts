@@ -29,10 +29,6 @@ export const classroomMessages = {
     ADMIN: 'Administración escolar',
   },
   viewMode: {
-    labels: {
-      '3d': 'Vista 3D',
-      '2d': 'Modo 2D Clásico',
-    },
     switchTo2d: 'Cambiar a Modo 2D Clásico',
     switchTo3d: 'Cambiar a Vista 3D',
     shortcutHint: 'Atajo: Alt+M',
