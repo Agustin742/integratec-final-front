@@ -19,7 +19,10 @@ import {
   test,
   vi,
 } from 'vitest';
-import { classroomDetailQueryKey } from '@/api/query-keys';
+import {
+  classroomDetailQueryKey,
+  classroomListQueryKey,
+} from '@/api/query-keys';
 import { messages as appMessages } from '@/app/messages';
 import { createAppRoutes } from '@/app/router/routes';
 import { createSession } from '@/session/controller';
@@ -441,6 +444,12 @@ describe('ClassroomListPage (/)', () => {
         name: classroomMessages.list.configureAction,
       }),
     ).toBeVisible();
+    expect(document.activeElement).toBe(
+      screen.getByRole('heading', {
+        level: 2,
+        name: appMessages.pages.home.title,
+      }),
+    );
   });
 
   test('S2: student and parent roles do not see create or configure controls', async () => {
@@ -484,7 +493,7 @@ describe('ClassroomListPage (/)', () => {
     await expectAccessible(container);
   });
 
-  test('S2: handles forced 403 forbidden on create and update without pretending success', async () => {
+  test('S2: handles forced 403 forbidden on create without pretending success', async () => {
     mswServer.use(
       createClassroomListHandler({ items: [] }),
       createCreateClassroomHandler({
@@ -818,6 +827,53 @@ describe('ClassroomListPage (/)', () => {
         name: schoolBAdminClassroom.name,
       }),
     ).not.toBeInTheDocument();
+
+    // Open Create dialog with dirty draft and verify context switch prompts and discards only on confirmation.
+    const confirmSpy = vi.spyOn(window, 'confirm');
+    fireEvent.click(
+      screen.getByRole('button', { name: classroomMessages.list.createAction }),
+    );
+    const dirtyDialog = await screen.findByRole('dialog');
+    fireEvent.change(
+      within(dirtyDialog).getByLabelText(
+        classroomMessages.form.fields.name.label,
+      ),
+      { target: { value: 'Borrador pendiente' } },
+    );
+
+    // Radix Dialog marks background controls aria-hidden; use hidden: true to exercise defensive guard on handleContextSelect.
+    confirmSpy.mockReturnValueOnce(false);
+    fireEvent.click(
+      within(switcher).getByRole('button', {
+        name: classroomMessages.list.contextSwitcher.allLabel,
+        hidden: true,
+      }),
+    );
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('dialog')).toBeVisible();
+    expect(
+      within(dirtyDialog).getByLabelText(
+        classroomMessages.form.fields.name.label,
+      ),
+    ).toHaveValue('Borrador pendiente');
+
+    confirmSpy.mockReturnValueOnce(true);
+    fireEvent.click(
+      within(switcher).getByRole('button', {
+        name: classroomMessages.list.contextSwitcher.allLabel,
+        hidden: true,
+      }),
+    );
+    expect(confirmSpy).toHaveBeenCalledTimes(2);
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole('heading', {
+        level: 3,
+        name: schoolBAdminClassroom.name,
+      }),
+    ).toBeVisible();
   });
 
   test('handles forced 403 on classroom update by showing forbidden error and reconciling stale controls', async () => {
@@ -995,5 +1051,429 @@ describe('ClassroomListPage (/)', () => {
     });
     expect(h2).toBeVisible();
     expect(h2).toHaveAttribute('tabindex', '-1');
+  });
+
+  test('S3 (A-01): dual-path teacher creates independent classroom from independent context and chooses path from all view', async () => {
+    const capturedBodies: Array<{ readonly schoolId?: string }> = [];
+    const serverItems: ClassroomListItemPayload[] = [
+      independentTeacherClassroom,
+      schoolTeacherClassroom,
+    ];
+
+    mswServer.use(
+      createClassroomListHandler({
+        resolveResponse: () => ({
+          items: [...serverItems],
+          page: 1,
+          pageSize: 20,
+          total: serverItems.length,
+        }),
+      }),
+      createCreateClassroomHandler({
+        resolveResponse: (body) => {
+          capturedBodies.push({ schoolId: body.schoolId });
+          const isSchool = Boolean(body.schoolId);
+          return {
+            ...schoolTeacherClassroom,
+            id: `4e5f6a7b-0000-4000-8000-00000000060${capturedBodies.length}`,
+            name: body.name,
+            schoolId: body.schoolId ?? null,
+            independentTeacherId: isSchool ? null : teacherId,
+            deskCount: 12,
+            pet: null,
+          };
+        },
+      }),
+    );
+
+    renderHomeRoute();
+
+    const switcher = await screen.findByRole('region', {
+      name: classroomMessages.list.contextSwitcher.regionLabel,
+    });
+
+    // 1. Switch to active Independent context and create -> schoolId MUST be omitted.
+    fireEvent.click(
+      within(switcher).getByRole('button', {
+        name: /Docente independiente/,
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: classroomMessages.list.createAction }),
+    );
+    let dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).queryByLabelText(
+        classroomMessages.form.fields.schoolId.label,
+      ),
+    ).not.toBeInTheDocument();
+    fireEvent.change(
+      within(dialog).getByLabelText(classroomMessages.form.fields.name.label),
+      { target: { value: 'Taller Independiente Dual' } },
+    );
+    fireEvent.click(
+      within(dialog).getByRole('button', {
+        name: classroomMessages.form.actions.createSubmit,
+      }),
+    );
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(capturedBodies[0]).toEqual({ schoolId: undefined });
+
+    // 2. From 'all', dual-path teacher sees school selector with independent option + single school.
+    fireEvent.click(
+      within(switcher).getByRole('button', {
+        name: classroomMessages.list.contextSwitcher.allLabel,
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: classroomMessages.list.createAction }),
+    );
+    dialog = await screen.findByRole('dialog');
+    const schoolSelect = within(dialog).getByLabelText(
+      classroomMessages.form.fields.schoolId.label,
+    );
+    expect(
+      within(schoolSelect).getByRole('option', {
+        name: classroomMessages.form.fields.schoolId.independentOption,
+      }),
+    ).toBeInTheDocument();
+    fireEvent.change(schoolSelect, { target: { value: schoolAId } });
+    fireEvent.change(
+      within(dialog).getByLabelText(classroomMessages.form.fields.name.label),
+      { target: { value: 'Aula Escolar Dual' } },
+    );
+    fireEvent.click(
+      within(dialog).getByRole('button', {
+        name: classroomMessages.form.actions.createSubmit,
+      }),
+    );
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(capturedBodies[1]).toEqual({ schoolId: schoolAId });
+  });
+
+  test('A-02 & A-08: keeps manual schoolId input mounted across 404 retries and reconciles removed classroom on PATCH 404', async () => {
+    let createAttempt = 0;
+    let listRequests = 0;
+    let existsOnServer = true;
+
+    mswServer.use(
+      createClassroomListHandler({
+        resolveResponse: () => {
+          listRequests += 1;
+          return {
+            items: existsOnServer ? [independentTeacherClassroom] : [],
+            page: 1,
+            pageSize: 20,
+            total: existsOnServer ? 1 : 0,
+          };
+        },
+      }),
+      createCreateClassroomHandler({
+        resolveResponse: () => {
+          createAttempt += 1;
+          if (createAttempt === 1) {
+            return HttpResponse.json(
+              {
+                error: {
+                  code: 'VALIDATION_FAILED',
+                  message: 'schoolId required',
+                  details: [
+                    { field: 'schoolId', messages: ['Indicá tu escuela.'] },
+                  ],
+                  correlationId: 'corr-400-school',
+                },
+              },
+              { status: 400 },
+            );
+          }
+          return HttpResponse.json(
+            {
+              error: {
+                code: 'NOT_FOUND',
+                message: 'School not found',
+                correlationId: 'corr-404-school',
+              },
+            },
+            { status: 404 },
+          );
+        },
+      }),
+      createUpdateClassroomHandler({
+        classroomId: independentTeacherClassroom.id,
+        error: {
+          status: 404,
+          body: {
+            code: 'NOT_FOUND',
+            message: 'Classroom deleted',
+            correlationId: 'corr-404-patch',
+          },
+        },
+      }),
+    );
+
+    renderHomeRoute();
+
+    const listCallsBeforeEdit = await waitFor(() => {
+      expect(listRequests).toBeGreaterThanOrEqual(1);
+      return listRequests;
+    });
+
+    // Trigger PATCH 404 -> must invalidate & reconcile stale removed classroom cleanly.
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: classroomMessages.list.configureAction,
+      }),
+    );
+    const editDialog = await screen.findByRole('dialog', {
+      name: classroomMessages.form.editTitle,
+    });
+    existsOnServer = false;
+    fireEvent.click(
+      within(editDialog).getByRole('button', {
+        name: classroomMessages.form.actions.editSubmit,
+      }),
+    );
+    expect(await within(editDialog).findByRole('alert')).toHaveTextContent(
+      classroomMessages.form.errors.notFound,
+    );
+    fireEvent.click(
+      within(editDialog).getByRole('button', {
+        name: classroomMessages.form.actions.cancel,
+      }),
+    );
+    await waitFor(() => {
+      expect(listRequests).toBeGreaterThan(listCallsBeforeEdit);
+      expect(
+        screen.queryByRole('heading', {
+          level: 3,
+          name: independentTeacherClassroom.name,
+        }),
+      ).not.toBeInTheDocument();
+    });
+
+    // Create flow from empty list: 400 on schoolId reveals manual UUID input and keeps it mounted after 404.
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: classroomMessages.list.createFirstAction,
+      }),
+    );
+    const createDialog = await screen.findByRole('dialog');
+    fireEvent.change(
+      within(createDialog).getByLabelText(
+        classroomMessages.form.fields.name.label,
+      ),
+      { target: { value: 'Aula con Escuela Manual' } },
+    );
+    fireEvent.click(
+      within(createDialog).getByRole('button', {
+        name: classroomMessages.form.actions.createSubmit,
+      }),
+    );
+
+    const manualSchoolInput = await within(createDialog).findByLabelText(
+      classroomMessages.form.fields.schoolId.label,
+    );
+    fireEvent.change(manualSchoolInput, {
+      target: { value: '3f6c2d9e-0000-4000-8000-000000000099' },
+    });
+    fireEvent.click(
+      within(createDialog).getByRole('button', {
+        name: classroomMessages.form.actions.createSubmit,
+      }),
+    );
+
+    expect(
+      await within(createDialog).findByText(
+        classroomMessages.form.errors.notFound,
+      ),
+    ).toBeVisible();
+    expect(
+      within(createDialog).getByLabelText(
+        classroomMessages.form.fields.schoolId.label,
+      ),
+    ).toBeVisible();
+  });
+
+  test('A-03: aborts in-flight create mutation on unmount without unhandled rejections', async () => {
+    let observedAbort = false;
+    let releaseCreate!: () => void;
+    const createGate = new Promise<void>((resolve) => {
+      releaseCreate = resolve;
+    });
+
+    mswServer.use(
+      createClassroomListHandler({ items: [] }),
+      createCreateClassroomHandler({
+        onRequest: (request) => {
+          request.signal.addEventListener('abort', () => {
+            observedAbort = true;
+          });
+        },
+        resolveResponse: async () => {
+          await createGate;
+          return HttpResponse.json(
+            {
+              ...independentTeacherClassroom,
+              deskCount: 12,
+              pet: null,
+            },
+            { status: 201 },
+          );
+        },
+      }),
+    );
+
+    const view = renderHomeRoute();
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: classroomMessages.list.createFirstAction,
+      }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(
+      within(dialog).getByLabelText(classroomMessages.form.fields.name.label),
+      { target: { value: 'Aula en vuelo' } },
+    );
+    fireEvent.click(
+      within(dialog).getByRole('button', {
+        name: classroomMessages.form.actions.createSubmit,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(
+        within(dialog).getByRole('button', {
+          name: classroomMessages.form.actions.createPending,
+        }),
+      ).toHaveAttribute('aria-disabled', 'true');
+    });
+
+    view.unmount();
+    expect(observedAbort).toBe(true);
+    releaseCreate();
+    await act(async () => {
+      await Promise.resolve();
+    });
+  });
+
+  test('A-05, A-09 & B-01: preserves selected context in page order across pages and distinguishes empty higher page', async () => {
+    const pageOneItems: ClassroomListItemPayload[] = [
+      independentTeacherClassroom,
+      ...Array.from({ length: 19 }, (_, idx) => ({
+        ...schoolTeacherClassroom,
+        id: `4e5f6a7b-0000-4000-8000-0000000010${String(idx).padStart(2, '0')}`,
+        name: `Curso Escuela ${idx + 1}`,
+      })),
+    ];
+    const pageTwoSchoolBOnly: ClassroomListItemPayload[] = [
+      {
+        ...schoolBAdminClassroom,
+        id: '4e5f6a7b-0000-4000-8000-000000002000',
+        name: 'Curso Página 2',
+      },
+    ];
+    mswServer.use(
+      createClassroomListHandler({
+        resolveResponse: ({ page }) => {
+          if (page === 1) {
+            return {
+              items: pageOneItems,
+              page: 1,
+              pageSize: 20,
+              total: 41,
+            };
+          }
+          if (page === 2) {
+            return {
+              items: pageTwoSchoolBOnly,
+              page: 2,
+              pageSize: 20,
+              total: 41,
+            };
+          }
+          return {
+            items: [],
+            page: 3,
+            pageSize: 20,
+            total: 40,
+          };
+        },
+      }),
+    );
+
+    // Pre-seed page 2 BEFORE page 1 so cache insertion order would flip School 1/2 unless sorted by queryKey[0].params.page.
+    const preseededQueryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    preseededQueryClient.setQueryData(
+      classroomListQueryKey(teacherId, {
+        page: 2,
+        pageSize: 20,
+        sort: '-createdAt',
+      }),
+      {
+        items: pageTwoSchoolBOnly,
+        page: 2,
+        pageSize: 20,
+        total: 41,
+      },
+    );
+
+    renderHomeRoute({ queryClient: preseededQueryClient });
+
+    const switcher = await screen.findByRole('region', {
+      name: classroomMessages.list.contextSwitcher.regionLabel,
+    });
+    expect(
+      within(switcher).getByRole('button', {
+        name: 'Escuela 1 · Docente',
+      }),
+    ).toBeVisible();
+    expect(
+      within(switcher).getByRole('button', {
+        name: 'Escuela 2 · Administración escolar',
+      }),
+    ).toBeVisible();
+
+    fireEvent.click(
+      within(switcher).getByRole('button', {
+        name: /Docente independiente/,
+      }),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+
+    expect(
+      await screen.findByText(classroomMessages.list.emptyFilteredTitle),
+    ).toBeVisible();
+    expect(
+      within(switcher).getByRole('button', { name: /Docente independiente/ }),
+    ).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: classroomMessages.list.contextSwitcher.clearFilterAction,
+      }),
+    );
+    expect(
+      await screen.findByRole('heading', { level: 3, name: 'Curso Página 2' }),
+    ).toBeVisible();
+
+    // Verify empty slice on page > 1 with total > 0 shows emptyPageTitle rather than account-onboarding copy.
+    fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+
+    expect(
+      await screen.findByText(classroomMessages.list.emptyPageTitle),
+    ).toBeVisible();
+    expect(
+      screen.queryByText(classroomMessages.list.emptyTitle),
+    ).not.toBeInTheDocument();
   });
 });

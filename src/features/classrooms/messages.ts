@@ -45,6 +45,9 @@ export const classroomMessages = {
     emptyFilteredTitle: 'No hay aulas en este contexto',
     emptyFilteredDescription:
       'Probá cambiar el filtro de contexto para ver el resto de tus aulas.',
+    emptyPageTitle: 'No hay aulas en esta página',
+    emptyPageDescription:
+      'Probá volver a una página anterior para ver tus aulas.',
     createAction: 'Crear aula',
     createFirstAction: 'Crear mi primera aula',
     enterAction: 'Entrar al aula',
@@ -66,6 +69,7 @@ export const classroomMessages = {
       schoolSingleLabel: 'Escuela',
       schoolIndexedLabel: (index: number) => `Escuela ${index}`,
       activeSummaryPrefix: 'Viendo:',
+      clearFilterAction: 'Ver todas mis aulas',
       discardNotice:
         'Al cambiar de contexto se descartan los cambios sin guardar en el formulario.',
     },
@@ -123,6 +127,7 @@ export const classroomMessages = {
         description:
           'Pertenecés a más de una escuela o necesitás indicar el identificador de la escuela donde se creará el aula.',
         selectPlaceholder: 'Elegí una escuela',
+        independentOption: 'Docente independiente (sin escuela)',
         uuidPlaceholder: 'Ej. 3f6c2d9e-0000-4000-8000-000000000000',
       },
     },

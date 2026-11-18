@@ -32,6 +32,7 @@ import {
 } from './classroom-schema';
 import {
   createClassroom,
+  isAbortError,
   isUncertainWriteError,
   updateClassroom,
 } from './classroom-service';
@@ -43,7 +44,12 @@ export interface SchoolContextOption {
 }
 
 export type ClassroomFormMode =
-  | { readonly kind: 'create'; readonly defaultSchoolId?: string }
+  | {
+      readonly kind: 'create';
+      readonly defaultSchoolId?: string;
+      readonly showSchoolSelector?: boolean;
+      readonly allowIndependentOption?: boolean;
+    }
   | { readonly kind: 'edit'; readonly classroom: ClassroomListItemDto };
 
 export interface ClassroomFormDialogProps {
@@ -223,6 +229,18 @@ function ClassroomFormContent({
     message: classroomMessages.form.actions.unsavedChanges,
   });
 
+  const isMountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const [manualSchoolRevealed, setManualSchoolRevealed] = useState(false);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
   useEffect(() => {
     onCanDismissChange(confirmNavigation);
   }, [onCanDismissChange, confirmNavigation]);
@@ -232,23 +250,47 @@ function ClassroomFormContent({
   }, [onDirtyStateChange, isDirty]);
 
   const onValid = async (values: ClassroomFormOutput): Promise<void> => {
+    const controller = new AbortController();
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = controller;
     onSubmittingChange(true);
     try {
       const saved =
         mode.kind === 'create'
-          ? await createClassroom(client, toCreateClassroomPayload(values))
+          ? await createClassroom(client, toCreateClassroomPayload(values), {
+              signal: controller.signal,
+            })
           : await updateClassroom(
               client,
               mode.classroom.id,
               toUpdateClassroomPayload(values),
+              { signal: controller.signal },
             );
+      if (!isMountedRef.current || controller.signal.aborted) {
+        return;
+      }
       onSuccess(saved, mode.kind);
     } catch (error) {
       if (
-        error instanceof ApiError &&
-        (error.kind === 'forbidden' || error.status === 403)
+        isAbortError(error) ||
+        controller.signal.aborted ||
+        !isMountedRef.current
       ) {
-        onForbidden(mode.kind);
+        return;
+      }
+      if (error instanceof ApiError && Boolean(error.fieldErrors.schoolId)) {
+        setManualSchoolRevealed(true);
+      }
+      if (
+        error instanceof ApiError &&
+        (error.kind === 'forbidden' ||
+          error.status === 403 ||
+          error.kind === 'not-found' ||
+          error.status === 404)
+      ) {
+        if (error.kind === 'forbidden' || error.status === 403) {
+          onForbidden(mode.kind);
+        }
         if (mode.kind === 'edit') {
           onReconcileRequired();
         }
@@ -257,7 +299,12 @@ function ClassroomFormContent({
       }
       throw error;
     } finally {
-      onSubmittingChange(false);
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
+      if (isMountedRef.current) {
+        onSubmittingChange(false);
+      }
     }
   };
 
@@ -268,9 +315,14 @@ function ClassroomFormContent({
   });
 
   const hasSchoolError = Boolean(form.formState.errors.schoolId);
-  const showSchoolSelect = isCreate && availableSchools.length > 1;
+  const showSchoolSelect =
+    isCreate &&
+    (mode.showSchoolSelector ?? availableSchools.length > 1) &&
+    availableSchools.length > 0;
+  const allowIndependentOption =
+    isCreate && Boolean(mode.allowIndependentOption);
   const showSchoolManualInput =
-    isCreate && availableSchools.length <= 1 && hasSchoolError;
+    isCreate && !showSchoolSelect && (hasSchoolError || manualSchoolRevealed);
 
   return (
     <form noValidate onSubmit={handleSubmit} className="mt-5 space-y-5">
@@ -322,7 +374,9 @@ function ClassroomFormContent({
           {(fieldProps) => (
             <select {...fieldProps} className={selectControlClass}>
               <option value="">
-                {classroomMessages.form.fields.schoolId.selectPlaceholder}
+                {allowIndependentOption
+                  ? classroomMessages.form.fields.schoolId.independentOption
+                  : classroomMessages.form.fields.schoolId.selectPlaceholder}
               </option>
               {availableSchools.map((school) => (
                 <option key={school.schoolId} value={school.schoolId}>

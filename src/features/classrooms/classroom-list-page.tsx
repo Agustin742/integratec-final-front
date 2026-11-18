@@ -1,5 +1,9 @@
 import { useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 import { Link } from 'react-router';
 import {
   classroomDetailQueryKey,
@@ -30,6 +34,7 @@ import {
 import type {
   ClassroomDetailResponseDto,
   ClassroomListItemDto,
+  PaginatedClassroomListDto,
 } from './classroom-schema';
 import { listAccessibleClassrooms } from './classroom-service';
 import { classroomMessages } from './messages';
@@ -58,6 +63,57 @@ function getItemContextKey(item: ClassroomListItemDto): string {
   return item.schoolId !== null ? `school:${item.schoolId}` : 'independent';
 }
 
+function collectContextDerivationItems(
+  queryClient: QueryClient,
+  userId: string,
+  currentPage: number,
+  currentData: PaginatedClassroomListDto | undefined,
+): readonly ClassroomListItemDto[] {
+  if (currentData === undefined) {
+    return [];
+  }
+  if (currentPage === 1 && currentData.total <= currentData.items.length) {
+    return currentData.items;
+  }
+
+  const cachedPages = queryClient
+    .getQueriesData<PaginatedClassroomListDto>({
+      predicate: createClassroomListPredicate(userId),
+    })
+    .map(([key, data]) => {
+      const first =
+        Array.isArray(key) && typeof key[0] === 'object' && key[0] !== null
+          ? (key[0] as { readonly params?: { readonly page?: unknown } })
+          : null;
+      return {
+        page: typeof first?.params?.page === 'number' ? first.params.page : 1,
+        data,
+      };
+    })
+    .filter(
+      (
+        entry,
+      ): entry is {
+        readonly page: number;
+        readonly data: PaginatedClassroomListDto;
+      } => entry.data !== undefined && entry.data.items.length > 0,
+    )
+    .sort((a, b) => a.page - b.page);
+
+  const byId = new Map<string, ClassroomListItemDto>();
+  for (const entry of cachedPages) {
+    const sourceItems =
+      entry.page === currentPage ? currentData.items : entry.data.items;
+    for (const item of sourceItems) {
+      byId.set(item.id, item);
+    }
+  }
+  for (const item of currentData.items) {
+    byId.set(item.id, item);
+  }
+  return Array.from(byId.values());
+}
+
 function deriveContextOptions(
   items: readonly ClassroomListItemDto[],
 ): readonly DerivedContextOption[] {
@@ -67,27 +123,29 @@ function deriveContextOptions(
 
   for (const item of items) {
     const key = getItemContextKey(item);
-    if (!grouped.has(key)) {
-      grouped.set(key, []);
+    let bucket = grouped.get(key);
+    if (!bucket) {
+      bucket = [];
+      grouped.set(key, bucket);
       orderedKeys.push(key);
       if (item.schoolId !== null) {
         schoolIds.push(item.schoolId);
       }
     }
-    grouped.get(key)!.push(item);
+    bucket.push(item);
   }
 
   return orderedKeys.map((key) => {
-    const groupItems = grouped.get(key)!;
+    const groupItems = grouped.get(key) ?? [];
     const isSchool = key.startsWith('school:');
-    const schoolId = isSchool ? groupItems[0].schoolId : null;
+    const schoolId = isSchool ? (groupItems[0]?.schoolId ?? null) : null;
     let label: string;
-    if (!isSchool) {
+    if (!isSchool || schoolId === null) {
       label = classroomMessages.list.contextSwitcher.independentLabel;
     } else if (schoolIds.length <= 1) {
       label = classroomMessages.list.contextSwitcher.schoolSingleLabel;
     } else {
-      const index = schoolIds.indexOf(schoolId!) + 1;
+      const index = schoolIds.indexOf(schoolId) + 1;
       label = classroomMessages.list.contextSwitcher.schoolIndexedLabel(index);
     }
 
@@ -161,7 +219,13 @@ function ClassroomListWorkspace({
 
   const items = query.data?.items ?? [];
   const total = query.data?.total ?? 0;
-  const contexts = deriveContextOptions(items);
+  const contextItems = collectContextDerivationItems(
+    queryClient,
+    userId,
+    page,
+    query.data,
+  );
+  const contexts = deriveContextOptions(contextItems);
   const showContextSwitcher = contexts.length > 1;
   const effectiveContextKey =
     activeContextKey === 'all' ||
@@ -177,6 +241,10 @@ function ClassroomListWorkspace({
   const activeContext =
     contexts.find((context) => context.key === effectiveContextKey) ?? null;
 
+  const hasIndependentCreateContext = contexts.some(
+    (context) => context.kind === 'independent' && context.canCreate,
+  );
+
   const staffSchoolOptions: readonly SchoolContextOption[] = contexts
     .filter(
       (context): context is DerivedContextOption & { schoolId: string } =>
@@ -191,24 +259,44 @@ function ClassroomListWorkspace({
 
   const canCreateInScope =
     !creationForbidden &&
-    (items.length === 0
-      ? true
+    (total === 0
+      ? items.length === 0
       : effectiveContextKey === 'all'
-        ? items.some(canConfigureClassroom)
-        : visibleItems.some(canConfigureClassroom));
+        ? contexts.some((context) => context.canCreate)
+        : (activeContext?.canCreate ?? false));
 
   const showHeaderCreateButton =
-    query.data !== undefined && items.length > 0 && canCreateInScope;
+    query.data !== undefined &&
+    (items.length > 0 || total > 0) &&
+    canCreateInScope;
 
   const openCreateDialog = (trigger?: HTMLElement | null) => {
     triggerRef.current = trigger ?? null;
-    const defaultSchoolId =
-      activeContext?.kind === 'school' && activeContext.schoolId
-        ? activeContext.schoolId
-        : staffSchoolOptions.length === 1
-          ? staffSchoolOptions[0].schoolId
-          : undefined;
-    setFormMode({ kind: 'create', defaultSchoolId });
+    let defaultSchoolId: string | undefined;
+    let showSchoolSelector = false;
+    let allowIndependentOption = false;
+
+    if (activeContext?.kind === 'school' && activeContext.schoolId) {
+      defaultSchoolId = activeContext.schoolId;
+    } else if (activeContext?.kind === 'independent') {
+      defaultSchoolId = undefined;
+    } else if (
+      staffSchoolOptions.length > 1 ||
+      (staffSchoolOptions.length >= 1 && hasIndependentCreateContext)
+    ) {
+      defaultSchoolId = undefined;
+      showSchoolSelector = true;
+      allowIndependentOption = hasIndependentCreateContext;
+    } else if (staffSchoolOptions.length === 1) {
+      defaultSchoolId = staffSchoolOptions[0].schoolId;
+    }
+
+    setFormMode({
+      kind: 'create',
+      defaultSchoolId,
+      showSchoolSelector,
+      allowIndependentOption,
+    });
     setDialogOpen(true);
   };
 
@@ -235,6 +323,7 @@ function ClassroomListWorkspace({
     setDialogOpen(false);
     setFormMode(null);
     isDialogDirtyRef.current = false;
+    setCreationForbidden(false);
     setActiveContextKey(nextKey);
     setStatusMessage('');
   };
@@ -250,6 +339,12 @@ function ClassroomListWorkspace({
     mode: 'create' | 'edit',
   ) => {
     isDialogDirtyRef.current = false;
+    if (mode === 'create') {
+      setCreationForbidden(false);
+      if (items.length === 0) {
+        triggerRef.current = headingRef.current;
+      }
+    }
     setDialogOpen(false);
     setFormMode(null);
 
@@ -287,7 +382,9 @@ function ClassroomListWorkspace({
   const formKey = `${userId}:${effectiveContextKey}:${formMode?.kind ?? 'closed'}:${
     formMode?.kind === 'edit'
       ? formMode.classroom.id
-      : (formMode?.defaultSchoolId ?? 'none')
+      : `${formMode?.defaultSchoolId ?? 'none'}:${Boolean(
+          formMode?.showSchoolSelector,
+        )}:${Boolean(formMode?.allowIndependentOption)}`
   }`;
 
   return (
@@ -407,7 +504,7 @@ function ClassroomListWorkspace({
             </section>
           )}
 
-          {items.length === 0 ? (
+          {items.length === 0 && total === 0 ? (
             <EmptyState
               headingLevel="h3"
               title={classroomMessages.list.emptyTitle}
@@ -427,11 +524,26 @@ function ClassroomListWorkspace({
                 ) : undefined
               }
             />
+          ) : items.length === 0 ? (
+            <EmptyState
+              headingLevel="h3"
+              title={classroomMessages.list.emptyPageTitle}
+              description={classroomMessages.list.emptyPageDescription}
+            />
           ) : visibleItems.length === 0 ? (
             <EmptyState
               headingLevel="h3"
               title={classroomMessages.list.emptyFilteredTitle}
               description={classroomMessages.list.emptyFilteredDescription}
+              action={
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleContextSelect('all')}
+                >
+                  {classroomMessages.list.contextSwitcher.clearFilterAction}
+                </Button>
+              }
             />
           ) : (
             <div className="grid min-w-0 gap-4 sm:grid-cols-2">

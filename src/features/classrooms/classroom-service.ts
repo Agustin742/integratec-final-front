@@ -22,9 +22,12 @@ export interface ClassroomServiceOptions {
 
 const uncertainWriteErrors = new WeakSet<ApiError>();
 
-const isAbortError = (cause: unknown): boolean =>
-  (cause instanceof Error || cause instanceof DOMException) &&
-  cause.name === 'AbortError';
+export function isAbortError(cause: unknown): boolean {
+  return (
+    (cause instanceof Error || cause instanceof DOMException) &&
+    cause.name === 'AbortError'
+  );
+}
 
 /**
  * Returns `true` when a classroom write failed with an outcome-uncertain result
