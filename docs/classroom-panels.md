@@ -7,9 +7,13 @@ registers nine panel entries with centralized titles: `material` renders
 and `members` renders `ClassroomRosterPanel`
 ([`HU-AUL-003`](https://github.com/Agustin742/integratec-final-front/issues/33):
 staff-only paginated roster, status/prefix filters, linked guardians, and
-idempotent logical removal preserving academic history), while the remaining
-seven entries display the shared, honest “Funcionalidad pendiente” state until
-their respective stories land.
+idempotent logical removal preserving academic history), `material` renders
+`MaterialPanel` (`#40`), and `activities` renders `ClassroomActivitiesPanel`
+([#39](https://github.com/Agustin742/integratec-final-front/issues/39):
+teacher activities panel with editor, multiple-choice builder and one-way
+publish flow — see the [activities feature doc](./classroom-activities.md)),
+while the remaining six entries display the shared, honest “Funcionalidad
+pendiente” state until their respective stories land.
 
 ## Approved scope reconciliation
 
@@ -22,7 +26,7 @@ the issue; team acceptance of the reconciled criterion remains part of PR review
 
 | Registered key | Title                                       |
 | -------------- | ------------------------------------------- |
-| `activities`   | Actividades                                 |
+| `activities`   | Actividades (`ClassroomActivitiesPanel`, `#39`) |
 | `material`     | Material (`MaterialPanel`, `#40`)           |
 | `grades`       | Calificaciones                              |
 | `chat`         | Chat                                        |
@@ -88,7 +92,8 @@ controller and default entry catalog. Denied keys share a
 not-found presentation. Close replaces the nested URL with the workspace URL;
 revocation and scope changes discard the intent and draft without reopening.
 
-Product components beyond the staff `members` roster (`#33`), study `material` manager (`#40`), and 2D/3D consumers remain separate stories; this infrastructure does not implement their contents. Backend
+Product components beyond the staff `members` roster (`#33`), study `material` manager (`#40`), the teacher
+activities panel (`#39`, [doc](./classroom-activities.md)) and 2D/3D consumers remain separate stories; this infrastructure does not implement their contents. Backend
 [B (#93)](https://github.com/Agustin742/integratec-final-back/pull/93) is consumed by
 one workspace-owned authenticated fetch stream. Connection, invalidation hints
 (including the initial hint), and EOF reset the shared context query and reload

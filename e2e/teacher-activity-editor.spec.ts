@@ -556,22 +556,184 @@ test('student sees only published activities without teacher actions', async ({
     0,
   );
 
-  // No capability-gated teacher actions are offered to the student.
+  expect(cspViolations).toEqual([]);
+  expect(pageErrors).toEqual([]);
+});
+
+test('captures activities panel and editor UI evidence for documentation', async ({
+  page,
+}, testInfo) => {
+  const width = testInfo.project.name === 'mobile' ? 360 : 1280;
+  await page.setViewportSize({ width, height: 800 });
+  const { cspViolations, pageErrors } = await attachRuntimeMonitors(page);
+
+  const publishedTp: TeacherActivity = {
+    id: '11111111-1111-4111-8111-111111111111',
+    classroomId,
+    type: 'TP',
+    format: 'FILE',
+    state: 'PUBLISHED',
+    title: 'TP de fluidos',
+    description: 'Medición de densidades.',
+    opensAt: null,
+    dueAt: '2027-01-15T21:00:00.000Z',
+    allowLate: true,
+    maxScore: 10,
+    weightMultiplier: 1,
+    publishedAt: syntheticNow,
+    timeZone: schoolTimeZone,
+    questionCount: 0,
+    createdAt: syntheticNow,
+    updatedAt: syntheticNow,
+    createdById: userId,
+    questions: [],
+  };
+  const draftExam: TeacherActivity = {
+    id: '11111111-1111-4111-8111-111111111112',
+    classroomId,
+    type: 'EXAM',
+    format: 'MULTIPLE_CHOICE',
+    state: 'DRAFT',
+    title: 'Examen de repaso',
+    description: '',
+    opensAt: null,
+    dueAt: '2030-06-20T21:00:00.000Z',
+    allowLate: false,
+    maxScore: 8,
+    weightMultiplier: 1.5,
+    publishedAt: null,
+    timeZone: schoolTimeZone,
+    questionCount: 1,
+    createdAt: syntheticNow,
+    updatedAt: syntheticNow,
+    createdById: userId,
+    questions: [
+      {
+        id: '22222222-2222-4222-8222-222222222201',
+        position: 1,
+        prompt: '¿Qué magnitud mide un dinamómetro?',
+        options: [
+          {
+            id: '22222222-2222-4222-8222-222222222202',
+            position: 1,
+            label: 'Fuerza',
+            isCorrect: true,
+          },
+          {
+            id: '22222222-2222-4222-8222-222222222203',
+            position: 2,
+            label: 'Masa',
+            isCorrect: false,
+          },
+        ],
+      },
+    ],
+  };
+
+  await interceptClassroomApi(page, testInfo, {
+    store: [publishedTp, draftExam],
+    context: classroomContext('TEACHER'),
+  });
+
+  await page.goto(`./classrooms/${classroomId}/panels/activities`);
+
+  const panel = page.getByRole('dialog', {
+    name: classroomMessages.panels.activities,
+    exact: true,
+  });
+  await expect(panel).toBeVisible();
   await expect(
-    panel.getByRole('button', { name: panelCopy.createAction, exact: true }),
-  ).toHaveCount(0);
+    panel.getByText(publishedTp.title, { exact: true }),
+  ).toBeVisible();
+  await expect(panel.getByText(draftExam.title, { exact: true })).toBeVisible();
   await expect(
-    panel.getByRole('button', {
-      name: panelCopy.editAriaLabel(publishedTp.title),
+    panel.getByText(panelCopy.states.DRAFT, { exact: true }),
+  ).toBeVisible();
+  await expect(
+    panel.getByText(panelCopy.states.PUBLISHED, { exact: true }),
+  ).toBeVisible();
+
+  await page.screenshot({
+    path: `docs/assets/activities/list-${width}.png`,
+    fullPage: true,
+  });
+
+  await panel
+    .getByRole('button', { name: panelCopy.createAction, exact: true })
+    .click();
+
+  const editor = page.getByRole('dialog', {
+    name: editorCopy.createTitle,
+    exact: true,
+  });
+  await expect(editor).toBeVisible();
+
+  const examTitle = 'Examen de unidades del SI';
+  await editor
+    .getByText(editorCopy.fields.type.options.EXAM.label, { exact: true })
+    .click();
+  await editor
+    .getByText(editorCopy.fields.format.options.MULTIPLE_CHOICE.label, {
       exact: true,
-    }),
-  ).toHaveCount(0);
-  await expect(
-    panel.getByRole('button', {
-      name: panelCopy.deactivateAriaLabel(publishedTp.title),
+    })
+    .click();
+  await editor
+    .getByLabel(editorCopy.fields.title.label, { exact: true })
+    .fill(examTitle);
+  await editor
+    .getByLabel(editorCopy.fields.description.label, { exact: true })
+    .fill('Repaso de unidades y magnitudes.');
+  await editor
+    .getByLabel(editorCopy.fields.dueAt.label, { exact: true })
+    .fill('2030-06-15T18:00');
+  await editor
+    .getByLabel(editorCopy.fields.maxScore.label, { exact: true })
+    .fill('10');
+  await editor
+    .getByRole('button', {
+      name: editorCopy.questions.addQuestion,
       exact: true,
-    }),
-  ).toHaveCount(0);
+    })
+    .click();
+  await editor
+    .getByLabel(editorCopy.questions.prompt.label, { exact: true })
+    .fill('¿Cuál es la unidad de fuerza del SI?');
+  await editor
+    .getByLabel(editorCopy.questions.optionLabel(1), { exact: true })
+    .fill('Newton');
+  await editor
+    .getByLabel(editorCopy.questions.optionLabel(2), { exact: true })
+    .fill('Joule');
+  await editor
+    .getByRole('radio', {
+      name: editorCopy.questions.markCorrect(1),
+      exact: true,
+    })
+    .check();
+
+  await page.screenshot({
+    path: `docs/assets/activities/editor-${width}.png`,
+    fullPage: true,
+  });
+
+  await editor
+    .getByRole('button', {
+      name: editorCopy.actions.createSubmit,
+      exact: true,
+    })
+    .click();
+
+  const publish = page.getByRole('dialog', {
+    name: editorCopy.publish.title(examTitle),
+    exact: true,
+  });
+  await expect(publish).toBeVisible();
+  await expect(publish).toContainText(editorCopy.publish.description);
+
+  await page.screenshot({
+    path: `docs/assets/activities/publish-${width}.png`,
+    fullPage: true,
+  });
 
   expect(cspViolations).toEqual([]);
   expect(pageErrors).toEqual([]);
