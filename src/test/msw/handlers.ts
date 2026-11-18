@@ -9,6 +9,10 @@ export type ClassroomDetailPayload =
   components['schemas']['ClassroomDetailResponseDto'];
 export type ClassroomListItemPayload =
   components['schemas']['ClassroomListItemDto'];
+export type RosterGuardianPayload = components['schemas']['RosterGuardianDto'];
+export type RosterStudentPayload = components['schemas']['RosterStudentDto'];
+export type PaginatedClassroomRosterPayload =
+  operations['ClassroomRosterController_list']['responses'][200]['content']['application/json'];
 export type PaginatedClassroomListPayload =
   operations['MeClassroomsController_listMyClassrooms']['responses'][200]['content']['application/json'];
 export type CreateClassroomRequestPayload =
@@ -872,6 +876,304 @@ export function createOwnProfileStore(
         return failure === 'drop-response'
           ? HttpResponse.error()
           : HttpResponse.json(saved.avatar);
+      }),
+    ],
+  };
+}
+
+export interface CreateClassroomRosterHandlerOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly items?: readonly RosterStudentPayload[];
+  readonly total?: number;
+  readonly page?: number;
+  readonly pageSize?: number;
+  readonly error?: MswErrorResponseSpec | 'network';
+  readonly resolveResponse?: (query: {
+    readonly classroomId: string;
+    readonly page: number;
+    readonly pageSize: number;
+    readonly state: 'ACTIVE' | 'INACTIVE' | null;
+    readonly q: string | null;
+    readonly request: Request;
+  }) =>
+    | PaginatedClassroomRosterPayload
+    | Response
+    | Promise<PaginatedClassroomRosterPayload | Response>;
+  readonly onRequest?: (request: Request) => void | Promise<void>;
+}
+
+function filterAndOrderRoster(
+  items: readonly RosterStudentPayload[],
+  state: 'ACTIVE' | 'INACTIVE' | null,
+  q: string | null,
+): RosterStudentPayload[] {
+  const normalizedPrefix = q ? q.trim().toLowerCase() : '';
+  return [...items]
+    .filter((item) => (state ? item.state === state : true))
+    .filter((item) =>
+      normalizedPrefix === ''
+        ? true
+        : item.displayName.toLowerCase().startsWith(normalizedPrefix),
+    )
+    .sort((a, b) => {
+      const byName = a.displayName.localeCompare(b.displayName);
+      return byName !== 0
+        ? byName
+        : a.membershipId.localeCompare(b.membershipId);
+    });
+}
+
+/**
+ * Contract-faithful MSW handler for `GET /classrooms/{id}/roster`
+ * (`ClassroomRosterController_list`).
+ */
+export function createClassroomRosterHandler(
+  options: CreateClassroomRosterHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomSegment = options.classroomId ?? ':id';
+  return http.get(
+    `${baseUrl}/classrooms/${classroomSegment}/roster`,
+    async ({ params, request }) => {
+      await options.onRequest?.(request);
+
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+
+      const url = new URL(request.url);
+      const parsedPage = Number(
+        url.searchParams.get('page') ?? options.page ?? 1,
+      );
+      const parsedPageSize = Number(
+        url.searchParams.get('pageSize') ?? options.pageSize ?? 20,
+      );
+      const page =
+        Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+      const pageSize =
+        Number.isFinite(parsedPageSize) && parsedPageSize > 0
+          ? parsedPageSize
+          : 20;
+      const rawState = url.searchParams.get('state');
+      const state =
+        rawState === 'ACTIVE' || rawState === 'INACTIVE' ? rawState : null;
+      const rawQuery = url.searchParams.get('q');
+      const q = rawQuery !== null && rawQuery.length > 0 ? rawQuery : null;
+
+      if (options.resolveResponse) {
+        const resolvedClassroomId =
+          options.classroomId ?? String(params.id ?? '');
+        const resolved = await options.resolveResponse({
+          classroomId: resolvedClassroomId,
+          page,
+          pageSize,
+          state,
+          q,
+          request,
+        });
+        if (resolved instanceof Response) {
+          return resolved;
+        }
+        return HttpResponse.json(resolved, { status: 200 });
+      }
+
+      const filtered = filterAndOrderRoster(options.items ?? [], state, q);
+      const start = (page - 1) * pageSize;
+      const pagedItems = filtered.slice(start, start + pageSize);
+      const payload: PaginatedClassroomRosterPayload = {
+        items: pagedItems,
+        page,
+        pageSize,
+        total: options.total ?? filtered.length,
+      };
+      return HttpResponse.json(payload, { status: 200 });
+    },
+  );
+}
+
+export interface CreateRemoveClassroomStudentHandlerOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly studentId?: string;
+  readonly error?: MswErrorResponseSpec | 'network';
+  readonly resolveResponse?: (args: {
+    readonly classroomId: string;
+    readonly studentId: string;
+    readonly request: Request;
+  }) => Response | void | Promise<Response | void>;
+  readonly onRequest?: (
+    request: Request,
+    studentId: string,
+  ) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `DELETE /classrooms/{id}/students/{studentId}`
+ * (`ClassroomRemovalController_remove`).
+ */
+export function createRemoveClassroomStudentHandler(
+  options: CreateRemoveClassroomStudentHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomSegment = options.classroomId ?? ':id';
+  const studentSegment = options.studentId ?? ':studentId';
+  return http.delete(
+    `${baseUrl}/classrooms/${classroomSegment}/students/${studentSegment}`,
+    async ({ params, request }) => {
+      const resolvedClassroomId =
+        options.classroomId ?? String(params.id ?? '');
+      const resolvedStudentId =
+        options.studentId ?? String(params.studentId ?? '');
+      await options.onRequest?.(request, resolvedStudentId);
+
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+
+      if (options.resolveResponse) {
+        const resolved = await options.resolveResponse({
+          classroomId: resolvedClassroomId,
+          studentId: resolvedStudentId,
+          request,
+        });
+        if (resolved instanceof Response) {
+          return resolved;
+        }
+      }
+
+      return new HttpResponse(null, { status: 204 });
+    },
+  );
+}
+
+export type RosterFailureSpec =
+  MswErrorResponseSpec | 'network' | 'drop-response';
+
+export interface ClassroomRosterStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId: string;
+  readonly initialStudents?: readonly RosterStudentPayload[];
+  readonly removedAtTimestamp?: string;
+  readonly onListRequest?: (request: Request) => void | Promise<void>;
+  readonly onDeleteRequest?: (
+    request: Request,
+    studentUserId: string,
+  ) => void | Promise<void>;
+}
+
+export interface ClassroomRosterStore {
+  readonly read: () => readonly RosterStudentPayload[];
+  readonly failNextList: (failure: MswErrorResponseSpec | 'network') => void;
+  readonly failNextDelete: (failure: RosterFailureSpec) => void;
+  readonly handlers: readonly HttpHandler[];
+}
+
+/**
+ * Stateful MSW store for `GET /classrooms/{id}/roster` and idempotent
+ * `DELETE /classrooms/{id}/students/{studentId}` (`userId`-addressed).
+ */
+export function createClassroomRosterStore(
+  options: ClassroomRosterStoreOptions,
+): ClassroomRosterStore {
+  let students: RosterStudentPayload[] = (options.initialStudents ?? []).map(
+    (student) => ({
+      ...student,
+      guardians: student.guardians.map((guardian) => ({ ...guardian })),
+    }),
+  );
+  let nextListFailure: MswErrorResponseSpec | 'network' | undefined;
+  let nextDeleteFailure: RosterFailureSpec | undefined;
+
+  const toFailureResponse = (
+    failure: MswErrorResponseSpec | 'network',
+  ): Response =>
+    failure === 'network'
+      ? HttpResponse.error()
+      : createErrorEnvelopeResponse(failure.status, failure.body);
+
+  return {
+    read: () => students.map((student) => ({ ...student })),
+    failNextList(failure) {
+      nextListFailure = failure;
+    },
+    failNextDelete(failure) {
+      nextDeleteFailure = failure;
+    },
+    handlers: [
+      createClassroomRosterHandler({
+        baseUrl: options.baseUrl,
+        classroomId: options.classroomId,
+        onRequest: options.onListRequest,
+        resolveResponse: ({ page, pageSize, state, q }) => {
+          if (nextListFailure !== undefined) {
+            const failure = nextListFailure;
+            nextListFailure = undefined;
+            return toFailureResponse(failure);
+          }
+          const filtered = filterAndOrderRoster(students, state, q);
+          const start = (page - 1) * pageSize;
+          return {
+            items: filtered.slice(start, start + pageSize),
+            page,
+            pageSize,
+            total: filtered.length,
+          };
+        },
+      }),
+      createRemoveClassroomStudentHandler({
+        baseUrl: options.baseUrl,
+        classroomId: options.classroomId,
+        onRequest: options.onDeleteRequest,
+        resolveResponse: ({ studentId }) => {
+          const failure = nextDeleteFailure;
+          nextDeleteFailure = undefined;
+          if (failure !== undefined && failure !== 'drop-response') {
+            return toFailureResponse(failure);
+          }
+          const targetIndex = students.findIndex(
+            (student) => student.userId === studentId,
+          );
+          if (targetIndex === -1) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Student membership not found',
+              correlationId: 'corr-roster-404',
+            });
+          }
+          const target = students[targetIndex];
+          students = students.map((student, index) =>
+            index !== targetIndex
+              ? student
+              : {
+                  ...student,
+                  state: 'INACTIVE',
+                  deletedAt:
+                    student.deletedAt ??
+                    options.removedAtTimestamp ??
+                    '2026-11-18T15:00:00.000Z',
+                  guardians: target.guardians.map((guardian) => ({
+                    ...guardian,
+                    state: 'INACTIVE',
+                  })),
+                },
+          );
+          return failure === 'drop-response'
+            ? HttpResponse.error()
+            : new HttpResponse(null, { status: 204 });
+        },
       }),
     ],
   };
