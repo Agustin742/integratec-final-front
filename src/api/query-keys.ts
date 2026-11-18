@@ -266,3 +266,72 @@ export function createClassroomRosterPredicate(
 export function ownProfileQueryKey(userId: string): ScopedQueryKey {
   return createScopedQueryKey({ userId }, 'profile', 'own');
 }
+
+export type MaterialSortOrder = 'createdAt' | '-createdAt';
+
+export interface MaterialListQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+  readonly sort?: MaterialSortOrder;
+}
+
+export interface NormalizedMaterialListQueryParams {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly sort: MaterialSortOrder;
+}
+
+/**
+ * Key of `GET /classrooms/{id}/materials`: paginated list of active study
+ * materials for one classroom, scoped by both `userId` and `classroomId`
+ * (`rules/state-management.md`).
+ */
+export function classroomMaterialsQueryKey(
+  userId: string,
+  classroomId: string,
+  params: MaterialListQueryParams = {},
+): ScopedQueryKey<NormalizedMaterialListQueryParams> {
+  const normalizedParams = Object.freeze({
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+    sort: params.sort ?? '-createdAt',
+  });
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'materials',
+    'list',
+    normalizedParams,
+  );
+}
+
+/**
+ * Predicate matching every material list query entry owned by `userId` and
+ * `classroomId`.
+ */
+export function createClassroomMaterialsPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'materials' &&
+      segment.resource === 'list'
+    );
+  };
+}

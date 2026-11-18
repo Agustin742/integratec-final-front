@@ -881,6 +881,225 @@ export function createOwnProfileStore(
   };
 }
 
+export interface ClassroomMaterialItem {
+  readonly id: string;
+  readonly classroomId: string;
+  readonly authorId: string;
+  readonly filename: string;
+  readonly contentType: 'application/pdf' | 'image/png' | 'image/jpeg';
+  readonly sizeBytes: number;
+  readonly createdAt: string;
+}
+
+export type MaterialStoreOp = 'list' | 'upload' | 'download' | 'remove';
+export type MaterialStoreFailure =
+  MswErrorResponseSpec | 'network' | 'drop-response';
+
+export interface ClassroomMaterialsStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly authorId?: string;
+  readonly initialItems?: readonly ClassroomMaterialItem[];
+  readonly signedUrlBase?: string;
+  readonly expiresInSeconds?: number;
+}
+
+export interface ClassroomMaterialsStore {
+  readonly handlers: readonly HttpHandler[];
+  read(): readonly ClassroomMaterialItem[];
+  failNext(op: MaterialStoreOp, failure: MaterialStoreFailure): void;
+}
+
+const ALLOWED_MATERIAL_TYPES = new Set([
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+]);
+const MAX_MATERIAL_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Stateful, contract-faithful MSW handlers for the study material endpoints
+ * (`MaterialsController_list`, `MaterialsController_upload`,
+ * `MaterialsController_download`, `MaterialsController_remove`).
+ */
+export function createClassroomMaterialsStore(
+  options: ClassroomMaterialsStoreOptions = {},
+): ClassroomMaterialsStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomId =
+    options.classroomId ?? '00000000-0000-4000-8000-000000000010';
+  const authorId = options.authorId ?? '00000000-0000-4000-8000-000000000001';
+  const signedUrlBase =
+    options.signedUrlBase ?? 'https://files.example.test/signed';
+  const expiresInSeconds = options.expiresInSeconds ?? 120;
+  let items: ClassroomMaterialItem[] = [...(options.initialItems ?? [])];
+  let seq = items.length + 1;
+  const pending: Partial<Record<MaterialStoreOp, MaterialStoreFailure>> = {};
+
+  const fail = (failure: MswErrorResponseSpec | 'network'): Response =>
+    failure === 'network'
+      ? HttpResponse.error()
+      : createErrorEnvelopeResponse(failure.status, failure.body);
+
+  return {
+    read: () => [...items],
+    failNext(op, failure) {
+      pending[op] = failure;
+    },
+    handlers: [
+      http.get(`${baseUrl}/classrooms/:id/materials`, ({ params, request }) => {
+        const failure = pending.list;
+        pending.list = undefined;
+        if (failure !== undefined && failure !== 'drop-response') {
+          return fail(failure);
+        }
+        if (options.classroomId && params.id !== classroomId) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Classroom not found.',
+            correlationId: 'req-materials-list-404',
+          });
+        }
+        const url = new URL(request.url);
+        const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+        const pageSize = Math.min(
+          100,
+          Math.max(1, Number(url.searchParams.get('pageSize') ?? '20')),
+        );
+        const sort = url.searchParams.get('sort') ?? '-createdAt';
+        const sorted = [...items].sort((a, b) =>
+          sort === 'createdAt'
+            ? a.createdAt.localeCompare(b.createdAt)
+            : b.createdAt.localeCompare(a.createdAt),
+        );
+        const start = (page - 1) * pageSize;
+        return HttpResponse.json({
+          items: sorted.slice(start, start + pageSize),
+          page,
+          pageSize,
+          total: sorted.length,
+        });
+      }),
+      http.post(
+        `${baseUrl}/classrooms/:id/materials`,
+        async ({ params, request }) => {
+          const failure = pending.upload;
+          pending.upload = undefined;
+          if (failure !== undefined && failure !== 'drop-response') {
+            return fail(failure);
+          }
+          if (options.classroomId && params.id !== classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-materials-upload-404',
+            });
+          }
+          const formData = await request.formData();
+          const entry = formData.get('file');
+          if (
+            typeof entry !== 'object' ||
+            entry === null ||
+            !('size' in entry) ||
+            !('type' in entry)
+          ) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Debe adjuntar un archivo válido.',
+              correlationId: 'req-materials-upload-400-missing',
+            });
+          }
+          const fileName =
+            'name' in entry && typeof entry.name === 'string'
+              ? entry.name
+              : 'archivo';
+          if (!ALLOWED_MATERIAL_TYPES.has(entry.type)) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Tipo de archivo no permitido por el servidor.',
+              correlationId: 'req-materials-upload-400-type',
+            });
+          }
+          if (entry.size <= 0) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'El archivo no puede estar vacío.',
+              correlationId: 'req-materials-upload-400-empty',
+            });
+          }
+          if (entry.size > MAX_MATERIAL_BYTES) {
+            return createErrorEnvelopeResponse(413, {
+              code: 'BAD_REQUEST',
+              message: 'El archivo supera el límite de 10 MiB.',
+              correlationId: 'req-materials-upload-413',
+            });
+          }
+          const created: ClassroomMaterialItem = {
+            id: `00000000-0000-4000-8000-${String(1000 + seq).padStart(12, '0')}`,
+            classroomId: String(params.id ?? classroomId),
+            authorId,
+            filename: fileName,
+            contentType: entry.type as ClassroomMaterialItem['contentType'],
+            sizeBytes: entry.size,
+            createdAt: new Date(
+              Date.UTC(2026, 10, 18, 3, seq, 0),
+            ).toISOString(),
+          };
+          seq += 1;
+          items = [created, ...items];
+          return failure === 'drop-response'
+            ? HttpResponse.error()
+            : HttpResponse.json(created, { status: 201 });
+        },
+      ),
+      http.get(
+        `${baseUrl}/classrooms/:id/materials/:materialId/download`,
+        ({ params }) => {
+          const failure = pending.download;
+          pending.download = undefined;
+          if (failure !== undefined && failure !== 'drop-response') {
+            return fail(failure);
+          }
+          const found = items.find((item) => item.id === params.materialId);
+          if (!found) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Material not found.',
+              correlationId: 'req-materials-download-404',
+            });
+          }
+          return HttpResponse.json({
+            url: `${signedUrlBase}/${found.id}?sig=temp-${seq}`,
+            expiresInSeconds,
+          });
+        },
+      ),
+      http.delete(
+        `${baseUrl}/classrooms/:id/materials/:materialId`,
+        ({ params }) => {
+          const failure = pending.remove;
+          pending.remove = undefined;
+          if (failure !== undefined && failure !== 'drop-response') {
+            return fail(failure);
+          }
+          const index = items.findIndex(
+            (item) => item.id === params.materialId,
+          );
+          if (index === -1) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Material not found.',
+              correlationId: 'req-materials-remove-404',
+            });
+          }
+          items = items.filter((item) => item.id !== params.materialId);
+          return new HttpResponse(null, { status: 204 });
+        },
+      ),
+    ],
+  };
+}
+
 export interface CreateClassroomRosterHandlerOptions {
   readonly baseUrl?: string;
   readonly classroomId?: string;
