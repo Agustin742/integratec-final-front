@@ -2,7 +2,7 @@ import type { ComponentProps } from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
-export const buttonVariants = cva(
+const buttonVariants = cva(
   'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 py-2 font-display text-base font-semibold focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60',
   {
     variants: {
@@ -37,6 +37,26 @@ const bevelledVariants = new Set([
   'destructive',
 ]);
 
+type ButtonStyleOptions = VariantProps<typeof buttonVariants> & {
+  disabled?: boolean;
+  busy?: boolean;
+};
+
+// Full button look (variant, resin bevel, press motion). Shared by `Button`
+// and by links that must look like buttons, so both stay in sync.
+export function buttonStyles({
+  variant,
+  size,
+  disabled = false,
+  busy = false,
+}: ButtonStyleOptions = {}) {
+  return cn(
+    buttonVariants({ variant, size }),
+    !disabled && bevelledVariants.has(variant ?? 'default') && 'key-bevel',
+    !(disabled || busy) && 'motion-press',
+  );
+}
+
 export type ButtonProps = ComponentProps<'button'> &
   VariantProps<typeof buttonVariants> & { busy?: boolean };
 
@@ -52,7 +72,6 @@ export function Button({
   ...props
 }: ButtonProps) {
   const blocked = Boolean(disabled) || busy;
-  const bevelled = !disabled && bevelledVariants.has(variant ?? 'default');
 
   return (
     <button
@@ -69,9 +88,7 @@ export function Button({
         onClick?.(event);
       }}
       className={cn(
-        buttonVariants({ variant, size }),
-        bevelled && 'key-bevel',
-        !blocked && 'motion-press',
+        buttonStyles({ variant, size, disabled: Boolean(disabled), busy }),
         className,
       )}
     >

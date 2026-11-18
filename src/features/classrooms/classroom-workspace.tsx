@@ -19,7 +19,7 @@ import { useDocumentTitle } from '@/app/router/document-title';
 import { ErrorState, LoadingState } from '@/components/feedback/states';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button, buttonStyles } from '@/components/ui/button';
 import { useSessionCleanup, useSessionSnapshot } from '@/session/provider';
 import { Classroom2DLayout } from './classroom-2d-layout';
 import { Classroom3DStage } from './classroom-3d-stage';
@@ -250,19 +250,19 @@ function WorkspaceContext({
           <div className="flex min-w-0 flex-wrap items-start justify-between gap-4">
             <div className="flex min-w-0 items-start gap-3">
               <Link
-                to="/classrooms"
+                to="/"
                 aria-label={messages.backToList}
                 title={messages.backToList}
-                className={buttonVariants({ variant: 'ghost', size: 'icon' })}
+                className={buttonStyles({ variant: 'outline', size: 'icon' })}
               >
                 <svg
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth={2}
+                  strokeWidth={2.5}
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="size-5"
+                  className="size-6"
                   aria-hidden="true"
                   focusable="false"
                 >
