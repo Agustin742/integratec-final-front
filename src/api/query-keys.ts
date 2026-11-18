@@ -335,3 +335,94 @@ export function createClassroomMaterialsPredicate(
     );
   };
 }
+
+export type ActivitySortOrder = 'dueAt' | 'createdAt' | '-dueAt' | '-createdAt';
+export type ActivityStateFilter = 'DRAFT' | 'PUBLISHED';
+
+export interface ActivityListQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+  readonly sort?: ActivitySortOrder;
+  readonly state?: ActivityStateFilter;
+}
+
+export interface NormalizedActivityListQueryParams {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly sort: ActivitySortOrder;
+  readonly state: ActivityStateFilter | null;
+}
+
+/**
+ * Key of `GET /classrooms/{id}/activities`: paginated list of classroom
+ * activities scoped by `userId` and `classroomId` (`rules/state-management.md`).
+ */
+export function classroomActivitiesQueryKey(
+  userId: string,
+  classroomId: string,
+  params: ActivityListQueryParams = {},
+): ScopedQueryKey<NormalizedActivityListQueryParams> {
+  const normalizedParams = Object.freeze({
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+    sort: params.sort ?? 'dueAt',
+    state: params.state ?? null,
+  });
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'activities',
+    'list',
+    normalizedParams,
+  );
+}
+
+/**
+ * Predicate matching every activity list query entry owned by `userId` and
+ * `classroomId`.
+ */
+export function createClassroomActivitiesPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'activities' &&
+      segment.resource === 'list'
+    );
+  };
+}
+
+/**
+ * Key of `GET /classrooms/{id}/activities/{activityId}` scoped by `userId` and
+ * `classroomId` (`rules/state-management.md`).
+ */
+export function classroomActivityDetailQueryKey(
+  userId: string,
+  classroomId: string,
+  activityId: string,
+): ScopedQueryKey<{ readonly activityId: string }> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'activities',
+    'detail',
+    Object.freeze({
+      activityId: normalizeRequiredText(activityId, 'activityId'),
+    }),
+  );
+}
