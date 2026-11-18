@@ -4,6 +4,7 @@ import { LoadingState } from '@/components/feedback/states';
 import { BaseLayout } from '@/components/layout/base-layout';
 import { Button } from '@/components/ui/button';
 import { Toast, toast } from '@/components/ui/toast';
+import { NotificationCenter } from '@/features/notifications/notification-center';
 import { useSessionService, useSessionSnapshot } from '@/session/provider';
 import { messages } from '../messages';
 import { MAIN_CONTENT_ID } from './focus-on-navigation';
@@ -78,6 +79,7 @@ export function AppShell() {
                 >
                   {messages.shell.profileLink}
                 </NavLink>
+                <NotificationCenter />
                 <Button
                   type="button"
                   variant="secondary"
