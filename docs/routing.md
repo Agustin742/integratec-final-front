@@ -11,6 +11,7 @@ React Router (FD4) runs in data mode: `createBrowserRouter` with `RouterProvider
 | `/password-reset`                           | none (signed in or out) | `src/app/pages/password-reset-page`             |
 | `/invitations/accept`                       | none (signed in or out) | `src/app/pages/invitation-accept-page`          |
 | `/`                                         | `RequireAuth`           | `src/app/pages/home-page`                       |
+| `/profile`                                  | `RequireAuth`           | `src/app/pages/profile-page`                    |
 | `/classrooms/:classroomId`                  | `RequireAuth`           | `src/features/classrooms/classroom-workspace`   |
 | `/classrooms/:classroomId/panels/:panelKey` | `RequireAuth`           | `src/features/classrooms/classroom-panel-route` |
 | `/dev/ui`                                   | none, dev/showcase only | `src/app/ui-foundations`                        |
@@ -23,7 +24,7 @@ Every page is a lazy route module (`lazy: { Component }`), so its chunk loads wh
 Two pathless layout routes sit under the root route. Both mount the single toast host and a `main` landmark with the same id, and focus after navigation is handled once above them (`RouterRoot`), so moving between layouts (for example login to home) is still announced.
 
 - `AuthLayout` (`/login`, `/register`, `/password-reset`, `/invitations/accept`): a split screen with no sidebar. The brand panel (the only `h1`, the product name, a one-line value statement and a text placeholder where the 3D classroom model will go) comes first in the DOM, so on phones it stacks above the content and on wide screens it sits on the right. The form column is `[data-auth-slot]`: feature screens render their form inside it and inherit its width and surface.
-- `AppShell` (everything else, including the `*` catch-all): `BaseLayout` (skip link, banner with the only `h1`, `main`) and `<Outlet />`. It has no sidebar: navigation arrives with the features that need it, and an empty aside is not rendered. When `snapshot.status === 'authenticated'`, the banner displays the signed-in user's `displayName` and the `Cerrar sesión` action; signed-out views (including `*` 404) never render signed-in controls. The showcase at `/dev/ui` is reached by URL only; nothing links to it.
+- `AppShell` (everything else, including the `*` catch-all): `BaseLayout` (skip link, banner with the only `h1`, `main`) and `<Outlet />`. It has no sidebar: navigation arrives with the features that need it, and an empty aside is not rendered. When `snapshot.status === 'authenticated'`, the banner displays the signed-in user's `displayName`, the `Mi perfil` link to `/profile`, and the `Cerrar sesión` action; signed-out views (including `*` 404) never render signed-in controls. The showcase at `/dev/ui` is reached by URL only; nothing links to it.
 
 Pages use `h2` for their title. The not found, forbidden and error views share `StatusView` (a decorative scene from `src/components/illustrations/scenes.tsx`, title, explanation, actions) and take the width of whichever layout hosts them.
 
@@ -77,6 +78,32 @@ A transport failure after either join POST leaves enrollment **uncertain**: the 
 ![Student classroom join desktop screen (1280px)](./assets/classrooms/join-classroom-1280.png)
 
 ![Student classroom join mobile screen (360px)](./assets/classrooms/join-classroom-360.png)
+
+## Classroom directory and management
+
+The `/` protected route (`src/app/pages/home-page.tsx`, rendering `ClassroomListPage` from `src/features/classrooms/classroom-list-page.tsx` and `ClassroomFormDialog` from `src/features/classrooms/classroom-form.tsx`) serves as the authenticated classroom directory:
+
+- **Server-authoritative listing & states:** Fetches `GET /me/classrooms` through user-scoped TanStack Query keys (`classroomListQueryKey(userId, params)`) and distinguishes loading (`LoadingState`), empty (`EmptyState` offering `"Crear mi primera aula"` when creation has not been denied), initial failure (`ErrorState` with retry), and stale refresh failure (`StaleDataNotice` preserving confirmed data). Each classroom card displays the server-returned `myRole`, organizational path (`Escuela` or `Docente independiente`), and modality (`Modalidad escolar (con familias)` or `Educación de adultos`), plus an entry link to `/classrooms/:classroomId`.
+- **Capability gating & active context:** Creation and `"Configurar aula"` controls are offered only when server-returned `capabilities` include `configure_classroom`; `STUDENT` and `PARENT` views omit create/edit controls, and any forced `403 FORBIDDEN` response displays a clear forbidden alert and reconciles stale controls. When an account holds memberships across multiple organizational contexts (independent teacher and/or schools), an active context switcher filters the visible classrooms and discards unsaved dialog drafts on switch or account change.
+- **Creation, configuration & reconciliation:** `classroomFormSchema` enforces jitless Zod validation matching backend `VisibleText` limits (`name` 1–120, optional `subject` 1–200, `adultMode`, optional `schoolId` UUID when belonging to multiple schools) while explaining adult-mode rules on parent links. `useProtectedSubmit` blocks duplicate submissions and `useUnsavedChangesGuard` protects unsaved edits; uncertain outcomes (`5xx`, network failures, malformed `2xx`) keep user input intact without claiming rollback and automatically refetch `GET /me/classrooms` before retry.
+
+![Classroom list desktop screen (1280px)](./assets/classrooms/list-1280.png)
+
+![Classroom list mobile screen (360px)](./assets/classrooms/list-360.png)
+
+## Profile and base avatar (`/profile`)
+
+The `/profile` route (`src/app/pages/profile-page.tsx`, rendering `ProfileView` from `src/features/profile/profile-view.tsx`) is protected by `RequireAuth` and lets signed-in users update their display name and base avatar configuration (`HU-AUT-003` part 1/2):
+
+- **Authoritative load and cache isolation:** `useOwnProfile` reads `GET /users/me` under a user-scoped query key (`ownProfileQueryKey`), keeping loading, error-with-retry, and stale-data states distinct. Confirmed updates write back to the query cache and update `SessionController.applyConfirmedProfile` so the `AppShell` header reflects the new `displayName` immediately without a reload.
+- **Display name and base avatar forms:** `DisplayNameForm` (`PATCH /users/me/profile`) and `AvatarForm` (`PATCH /users/me/avatar`) use explicit save triggers, `useProtectedSubmit` duplicate-submit protection, and `useUnsavedChangesGuard` / `useBlocker` unsaved-draft protection. Avatar choices (`bodyId`, `hairId`, `topId`, `hairColor`, `clothingColor`) are driven strictly by the contract (`AvatarDto`) and rendered in a 2D/DOM `AvatarPreview` with distinct saved vs. unsaved-draft indicators.
+- **Rejections and uncertain writes:** `400` validation errors and `403` rejections preserve both the user's draft and the last confirmed server state. Network or unreadable write responses reconcile against `GET /users/me` before claiming success or repeating a write.
+- **Preview boundary:** The original SVG follows the [avatar art direction](../rules/art-direction.md#avatars) with a wide rounded-cube head, soft volume, readable hair/clothing silhouettes and no dark exterior outlines. It renders the same five contract fields; its fixed skin appearance is not an editable or persisted skin-tone option. The renderer can be replaced independently of the forms. The 3D preview/rendering belongs to part 2/2; equipping purchased items belongs to `HU-ESP-004`.
+- **Verification boundary:** Unit tests use an MSW profile store and the Playwright profile scenario intercepts API calls with in-memory server state. Reload checks demonstrate the frontend reloading confirmed values from a simulated server, not persistence in a real database or on another device. Live-backend, cross-session and cross-device persistence remain integration checks pending backend availability.
+
+![Profile and base avatar desktop screen (1280px)](./assets/profile/profile-1280.png)
+
+![Profile and base avatar mobile screen (360px)](./assets/profile/profile-360.png)
 
 ## Guards
 

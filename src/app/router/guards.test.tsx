@@ -9,6 +9,7 @@ import { render } from '@/test/render';
 import { messages } from '../messages';
 import { fakeSession } from './fake-session';
 import { createAppRoutes } from './routes';
+import { waitForRoute } from './wait-for-route.test-helper';
 
 const authenticated: SessionSnapshot = {
   status: 'authenticated',
@@ -88,6 +89,7 @@ const login = () =>
 
 test('redirects an unauthenticated visitor to login and keeps the return target', async () => {
   const { router } = await renderAt('/', { status: 'unauthenticated' });
+  await act(() => waitForRoute(router, '/login'));
 
   await login();
   expect(router.state.location.pathname).toBe('/login');

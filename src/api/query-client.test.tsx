@@ -10,7 +10,13 @@ import {
   shouldRetryMutation,
   shouldRetryQuery,
 } from './query-client';
-import { createScopedQueryKey, createUserScopePredicate } from './query-keys';
+import {
+  classroomDetailQueryKey,
+  classroomListQueryKey,
+  createClassroomListPredicate,
+  createScopedQueryKey,
+  createUserScopePredicate,
+} from './query-keys';
 
 describe('createScopedQueryKey and cache isolation', () => {
   test('always includes normalized userId, classroomId, and linkedChildId in the key', () => {
@@ -118,6 +124,41 @@ describe('createScopedQueryKey and cache isolation', () => {
 
     expect(queryClient.getQueryData(userAKey)).toBeUndefined();
     expect(queryClient.getQueryData(parentChild1Key)).toEqual({ average: 9 });
+  });
+
+  test('isolates classroom list keys per userId and matches only that user list entries', () => {
+    const queryClient = createAppQueryClient();
+    const userAList1 = classroomListQueryKey('teacher-a', {
+      page: 1,
+      pageSize: 20,
+    });
+    const userAList2 = classroomListQueryKey('teacher-a', {
+      page: 2,
+      pageSize: 20,
+    });
+    const userADetail = classroomDetailQueryKey('teacher-a', 'classroom-1');
+    const userBList1 = classroomListQueryKey('teacher-b', {
+      page: 1,
+      pageSize: 20,
+    });
+
+    queryClient.setQueryData(userAList1, { items: ['a1'] });
+    queryClient.setQueryData(userAList2, { items: ['a2'] });
+    queryClient.setQueryData(userADetail, { id: 'classroom-1' });
+    queryClient.setQueryData(userBList1, { items: ['b1'] });
+
+    expect(queryClient.getQueryData(userBList1)).toEqual({ items: ['b1'] });
+
+    queryClient.removeQueries({
+      predicate: createClassroomListPredicate('teacher-a'),
+    });
+
+    expect(queryClient.getQueryData(userAList1)).toBeUndefined();
+    expect(queryClient.getQueryData(userAList2)).toBeUndefined();
+    expect(queryClient.getQueryData(userADetail)).toEqual({
+      id: 'classroom-1',
+    });
+    expect(queryClient.getQueryData(userBList1)).toEqual({ items: ['b1'] });
   });
 });
 

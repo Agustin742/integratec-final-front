@@ -12,6 +12,8 @@
     "skipLibCheck": true,
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true
   },

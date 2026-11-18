@@ -83,6 +83,8 @@ test('blocks physical pointer activation of background actions behind modals', a
       name: copy.showToast,
       includeHidden: true,
     });
+    // Measure an on-screen target in the active modal layout, not its prior position.
+    await background.scrollIntoViewIfNeeded();
     const target = await background.boundingBox();
     const modal = await dialog.boundingBox();
     expect(target).not.toBeNull();

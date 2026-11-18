@@ -1,5 +1,7 @@
 # Classroom context foundation
 
+The protected directory at `/` ([routing](./routing.md#classroom-directory-and-management)) lists the classrooms returned by `GET /me/classrooms` and links each classroom card to `/classrooms/:classroomId`.
+
 `/classrooms/:classroomId` is a protected, context-only entry. It displays the server's classroom name and resolved role, without panel links or classroom tools. A returned parent context gets the same neutral metadata, not a new parent classroom experience. The production panel entry catalog now follows the [approved #26 scope reconciliation](./classroom-panels.md#approved-scope-reconciliation); panel business functionality remains outside this workspace foundation.
 
 ## Data and lifecycle
@@ -56,6 +58,6 @@ Synthetic component tests cover loading, server name/parent metadata, exact Outl
 
 ## Deferred
 
-Panel business content, 2D/3D navigation/layout/objects, and parent tools are not delivered. Panel registration and nested URL opening are provided; the human-approved minimum entries explicitly identify their content as pending. B/SSE invalidation is consumed, but this slice promises no globally instantaneous propagation. Login return destinations remain restricted to `/`.
+Panel business content beyond the delivered `members` staff roster (`#33`), 2D/3D navigation/layout/objects, and parent tools are not delivered. Panel registration and nested URL opening are provided; the remaining eight minimum entries explicitly identify their content as pending. B/SSE invalidation is consumed, but this slice promises no globally instantaneous propagation. Login return destinations remain restricted to `/`.
 
 See [routing](./routing.md), [state ownership](../rules/state-management.md), and [classroom authority](../rules/classrooms-and-roles.md).
