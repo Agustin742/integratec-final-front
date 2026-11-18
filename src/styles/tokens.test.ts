@@ -138,3 +138,19 @@ test('defines a tactile depth system with offset, lavender or brown shadows only
   for (const key of ['primary', 'secondary', 'destructive', 'sand'])
     expect(value(`--key-${key}`)).toMatch(/^#[\da-f]{6}$/i);
 });
+
+test('defines scrollbar tokens whose thumb is discoverable on cream and pale cream', () => {
+  expect(value('--scrollbar-track')).toBe('transparent');
+  for (const background of ['background', 'card']) {
+    for (const thumb of ['--scrollbar-thumb', '--scrollbar-thumb-hover']) {
+      const colors = [
+        luminance(value(thumb)),
+        luminance(value(`--${background}`)),
+      ];
+      expect(
+        (Math.max(...colors) + 0.05) / (Math.min(...colors) + 0.05),
+        `${thumb} on ${background}`,
+      ).toBeGreaterThanOrEqual(3);
+    }
+  }
+});

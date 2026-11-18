@@ -6,11 +6,12 @@ Run component checks with `pnpm test` and a read-only browser smoke with `pnpm e
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm test
+# Affected tests only; CI runs the full suite (see README "Local verification before pushing").
+pnpm vitest run --changed origin/develop --reporter=dot
 pnpm lint
-pnpm format:check
 pnpm typecheck
 pnpm build
+pnpm security:check
 # First use only: download Chromium into ignored node_modules, not a global cache.
 PLAYWRIGHT_BROWSERS_PATH=0 pnpm exec playwright install chromium
 PLAYWRIGHT_BROWSERS_PATH=0 pnpm e2e

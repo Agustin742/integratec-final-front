@@ -2,7 +2,7 @@
 
 The protected directory at `/` ([routing](./routing.md#classroom-directory-and-management)) lists the classrooms returned by `GET /me/classrooms` and links each classroom card to `/classrooms/:classroomId`.
 
-`/classrooms/:classroomId` is a protected, context-only entry. It displays the server's classroom name and resolved role, without panel links or classroom tools. A returned parent context gets the same neutral metadata, not a new parent classroom experience. The production panel entry catalog now follows the [approved #26 scope reconciliation](./classroom-panels.md#approved-scope-reconciliation); panel business functionality remains outside this workspace foundation.
+`/classrooms/:classroomId` is a protected workspace entry. For non-parent accounts, it hosts the lazy 3D classroom viewport (`Classroom3DStage`), a one-click `3D` / `Modo 2D Clásico` toggle (`#34`), and the accessible 2D Classic Mode panel launcher (`Classroom2DLayout`). A returned `PARENT` role keeps the neutral metadata view without 3D canvas or 2D classroom panels (`rules/classrooms-and-roles.md`). The production panel entry catalog follows the [approved #26 scope reconciliation](./classroom-panels.md#approved-scope-reconciliation); panel business functionality remains outside this workspace foundation.
 
 ## Data and lifecycle
 
@@ -52,12 +52,21 @@ immediately. This channel is not guaranteed distributed immediate delivery;
 REST reconciliation and server authorization on every protected operation remain
 necessary. A hint removes stale content as soon as the client observes it.
 
+## Classic 2D mode switch (#34)
+
+- **State & open decision:** `useClassroomModeStore` (`src/features/classrooms/classroom-mode-store.ts`) stores `{ ownerUserId, mode }` in an in-memory Zustand store keyed by authenticated `userId` (`'3d'` default). Per `#34` and [classroom rules](../rules/classrooms-and-roles.md#3d-world-and-classic-2d-mode), server-side preference persistence remains an open decision; this implementation does not invent a backend field and avoids cross-account browser persistence.
+- **Isolation & cleanup:** Switching accounts (`useSessionSnapshot`) synchronously drops any previous user's preference via `syncClassroomModeOwner`, and logout/session teardown clears the store through `useSessionCleanup(resetClassroomModeStore)` registered by `AppShell`, so logging out from any protected route (not only the workspace) resets it. If the lazy 3D chunk fails to load, a local boundary shows the world fallback inside the stage and the 2D switch stays available.
+- **Back control:** An icon-only `Link` (left arrow, `aria-label` "Volver a mis aulas") at the start of the header returns to the classroom list at `/` for every role.
+- **Keyboard shortcut & focus:** Non-parent views provide a header toggle button (`outline` variant, so it reads as a view control and not as a primary header action; `aria-keyshortcuts="Alt+M"`, with a visible `aria-hidden` "Atajo: Alt+M" hint beside it so sighted users can discover the shortcut without double announcement; no redundant mode badge, the active section heading names the mode) and `Alt+M` window listener that ignores repeat keys, extra modifiers, editable controls (`input`, `textarea`, `select`, `contentEditable`), and open modal dialogs. Switching moves focus to the active `<h3>` view heading (`tabIndex={-1}`); initial classroom entry never steals focus.
+- **Canvas disposal & server parity:** Switching to `2D Classic Mode` unmounts `Classroom3DStage` (zero `<canvas>` elements mounted) while preserving classroom context and `<Outlet>`. Panel buttons in `Classroom2DLayout` are named exactly by the panel title (`aria-label`; the visible "Abrir panel" cue is `aria-hidden`) and filter the [F16 catalog](./classroom-panels.md) strictly by `canOpenPanel(key)` (`availablePanels`), keeping the 2D layout empty when the server grants none.
+- **UI evidence (`#34`):** Captured at [1280px](./assets/classroom-workspace/mode-2d-1280.png) and [360px](./assets/classroom-workspace/mode-2d-360.png).
+
 ## Verification boundary
 
-Synthetic component tests cover loading, server name/parent metadata, exact Outlet control values, shared capability cache, delayed classroom/account switches, cancellation, logout, non-disclosing failures, refresh failures and retry. Router and capability regression checks remain required. Mock results are not live-backend authorization proof; desktop/mobile render, keyboard/focus/overflow checks and full configured checks must be recorded separately.
+Synthetic component tests cover loading, server name/parent metadata, exact Outlet control values, shared capability cache, delayed classroom/account switches, cancellation, logout, non-disclosing failures, refresh failures and retry, plus 3D ↔ 2D toggling, `Alt+M` input/dialog arbitration, per-account mode isolation, and parent exclusion. Router and capability regression checks remain required. Mock results are not live-backend authorization proof; desktop/mobile render, keyboard/focus/overflow checks and full configured checks must be recorded separately.
 
 ## Deferred
 
-Panel business content beyond the delivered `members` staff roster (`#33`), 2D/3D navigation/layout/objects, and parent tools are not delivered. Panel registration and nested URL opening are provided; the remaining eight minimum entries explicitly identify their content as pending. B/SSE invalidation is consumed, but this slice promises no globally instantaneous propagation. Login return destinations remain restricted to `/`.
+Panel business content beyond the delivered `members` staff roster (`#33`), full in-scene 3D furniture/interactions, and parent tools are not delivered. Panel registration, nested URL opening, and accessible 2D Classic Mode navigation (`#34`) are provided; the remaining eight minimum entries explicitly identify their content as pending. B/SSE invalidation is consumed, but this slice promises no globally instantaneous propagation. Login return destinations remain restricted to `/`.
 
 See [routing](./routing.md), [state ownership](../rules/state-management.md), and [classroom authority](../rules/classrooms-and-roles.md).

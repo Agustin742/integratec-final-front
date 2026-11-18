@@ -125,3 +125,6 @@ student activity inbox (`ActivitiesPanel`, `e2e/activities-inbox.spec.ts`) at
 [360px](./assets/classrooms/activities-inbox-360.png). Pending entries show
 pending functionality rather than fabricated data; verification results and
 synthetic boundaries are recorded in the contributor trackers and `e2e/` specs.
+Accessible Classic 2D panel navigation backed by the same `ClassroomPanelsProvider`
+contract and `availablePanels` server list is documented in
+[classroom workspace #34](./classroom-workspace.md#classic-2d-mode-switch-34).
