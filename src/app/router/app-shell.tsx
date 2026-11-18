@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Outlet } from 'react-router';
+import { NavLink, Outlet } from 'react-router';
 import { LoadingState } from '@/components/feedback/states';
 import { BaseLayout } from '@/components/layout/base-layout';
 import { Button } from '@/components/ui/button';
@@ -80,6 +80,12 @@ export function AppShell() {
                     {snapshot.user.displayName}
                   </span>
                 </p>
+                <NavLink
+                  to="/profile"
+                  className="inline-flex min-h-11 items-center rounded-sm px-1 text-sm font-semibold text-primary underline underline-offset-4 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
+                >
+                  {messages.shell.profileLink}
+                </NavLink>
                 <Button
                   type="button"
                   variant="secondary"

@@ -34,6 +34,7 @@ import { toast } from '@/components/ui/toast';
 import { messages } from '../messages';
 import { fakeSession } from './fake-session';
 import { createAppRoutes } from './routes';
+import { waitForRoute } from './wait-for-route.test-helper';
 
 function renderAt(
   path: string,
@@ -83,6 +84,20 @@ test('does not steal focus on the first render', async () => {
 
 test('does not steal focus when the first load is redirected to login', async () => {
   const router = renderAt('/', { signedIn: false });
+  // Flush the initial lazy route first so its guard can start the redirect.
+  await act(async () => {
+    if (!router.state.initialized) {
+      await new Promise<void>((resolve) => {
+        const unsubscribe = router.subscribe((state) => {
+          if (state.initialized) {
+            unsubscribe();
+            resolve();
+          }
+        });
+      });
+    }
+  });
+  await act(() => waitForRoute(router, '/login'));
   await heading(messages.pages.login.title);
 
   expect(router.state.location.pathname).toBe('/login');

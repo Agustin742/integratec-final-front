@@ -1,5 +1,7 @@
 # Classroom context foundation
 
+The protected directory at `/` ([routing](./routing.md#classroom-directory-and-management)) lists the classrooms returned by `GET /me/classrooms` and links each classroom card to `/classrooms/:classroomId`.
+
 `/classrooms/:classroomId` is a protected workspace entry. For non-parent accounts, it hosts the lazy 3D classroom viewport (`Classroom3DStage`), a one-click `3D` / `Modo 2D Clásico` toggle (`#34`), and the accessible 2D Classic Mode panel launcher (`Classroom2DLayout`). A returned `PARENT` role keeps the neutral metadata view without 3D canvas or 2D classroom panels (`rules/classrooms-and-roles.md`). The production panel entry catalog follows the [approved #26 scope reconciliation](./classroom-panels.md#approved-scope-reconciliation); panel business functionality remains outside this workspace foundation.
 
 ## Data and lifecycle
@@ -64,6 +66,6 @@ Synthetic component tests cover loading, server name/parent metadata, exact Outl
 
 ## Deferred
 
-Full in-scene 3D furniture/interactions, panel business content, and parent tools are not delivered in `#34`. Panel registration, nested URL opening, and accessible 2D Classic Mode navigation are provided; the human-approved minimum entries explicitly identify their content as pending. B/SSE invalidation is consumed, but this slice promises no globally instantaneous propagation. Login return destinations remain restricted to `/`.
+Panel business content beyond the delivered `members` staff roster (`#33`), full in-scene 3D furniture/interactions, and parent tools are not delivered. Panel registration, nested URL opening, and accessible 2D Classic Mode navigation (`#34`) are provided; the remaining eight minimum entries explicitly identify their content as pending. B/SSE invalidation is consumed, but this slice promises no globally instantaneous propagation. Login return destinations remain restricted to `/`.
 
 See [routing](./routing.md), [state ownership](../rules/state-management.md), and [classroom authority](../rules/classrooms-and-roles.md).

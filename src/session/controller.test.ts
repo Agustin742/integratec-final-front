@@ -543,4 +543,92 @@ describe('session lifecycle public boundary', () => {
     expect(controller.getSnapshot()).toEqual({ status: 'unauthenticated' });
     expect(h.storage.getItem(storageKey)).toBeNull();
   });
+
+  test('applyConfirmedProfile updates only the matching authenticated user', async () => {
+    const h = harness((request) => {
+      const path = new URL(request.url).pathname;
+      if (path === '/auth/login') return json(tokens);
+      if (path === '/users/me') return json(profile);
+      return json({}, 404);
+    });
+    const { controller } = createSession(h);
+
+    // Ignored when not authenticated
+    controller.applyConfirmedProfile(profile);
+    expect(controller.getSnapshot()).toEqual({ status: 'initializing' });
+
+    await controller.login(login);
+    expect(controller.getSnapshot()).toEqual({
+      status: 'authenticated',
+      user: profile,
+    });
+
+    // Updates when user id matches and payload is valid
+    const updated = { ...profile, displayName: 'Nuevo Nombre' };
+    controller.applyConfirmedProfile(updated);
+    expect(controller.getSnapshot()).toEqual({
+      status: 'authenticated',
+      user: updated,
+    });
+
+    // Ignored for another account id
+    controller.applyConfirmedProfile({
+      ...updated,
+      id: '00000000-0000-4000-8000-000000000099',
+      displayName: 'Otra Cuenta',
+    });
+    expect(controller.getSnapshot()).toEqual({
+      status: 'authenticated',
+      user: updated,
+    });
+  });
+
+  test('getAccessToken and refreshAccessToken expose bounded F08 token renewal for realtime joins (#23)', async () => {
+    let refreshCalls = 0;
+    let shouldFailRefresh = false;
+    const rotated = {
+      accessToken: 'rotated-access-token',
+      refreshToken: 'rotated-refresh-token',
+      tokenType: 'Bearer' as const,
+      expiresIn: 900,
+    };
+    const h = harness((request) => {
+      const path = new URL(request.url).pathname;
+      if (path === '/auth/login') return json(tokens);
+      if (path === '/users/me') return json(profile);
+      if (path === '/auth/refresh') {
+        refreshCalls += 1;
+        if (shouldFailRefresh) {
+          return json(
+            { error: { code: 'UNAUTHORIZED', message: 'revoked' } },
+            401,
+          );
+        }
+        return json(rotated);
+      }
+      return json({}, 404);
+    });
+    const { controller } = createSession(h);
+
+    expect(controller.getAccessToken()).toBeUndefined();
+    expect(await controller.refreshAccessToken()).toBeUndefined();
+
+    await controller.login(login);
+    expect(controller.getAccessToken()).toBe(tokens.accessToken);
+
+    const [first, second] = await Promise.all([
+      controller.refreshAccessToken(),
+      controller.refreshAccessToken(),
+    ]);
+    expect(refreshCalls).toBe(1);
+    expect(first).toBe(rotated.accessToken);
+    expect(second).toBe(rotated.accessToken);
+    expect(controller.getAccessToken()).toBe(rotated.accessToken);
+
+    shouldFailRefresh = true;
+    const failed = await controller.refreshAccessToken();
+    expect(failed).toBeUndefined();
+    expect(controller.getAccessToken()).toBeUndefined();
+    expect(controller.getSnapshot()).toEqual({ status: 'unauthenticated' });
+  });
 });

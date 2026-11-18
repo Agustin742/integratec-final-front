@@ -3,6 +3,7 @@ import {
   useEffect,
   useLayoutEffect,
   useRef,
+  useState,
   type RefObject,
 } from 'react';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
@@ -10,6 +11,7 @@ import type { components } from '@/api/schema.generated';
 import { NotFoundPage } from '@/app/pages/not-found-page';
 import { useDocumentTitle } from '@/app/router/document-title';
 import { ErrorState, LoadingState } from '@/components/feedback/states';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useSessionCleanup, useSessionSnapshot } from '@/session/provider';
@@ -19,6 +21,8 @@ import {
   resetClassroomModeStore,
   useClassroomViewMode,
 } from './classroom-mode-store';
+import { joinMessages } from './join-messages';
+import { readClassroomJoinOutcome } from './join-schema';
 import { classroomMessages as messages } from './messages';
 import { useClassroomContext } from './use-classroom-capabilities';
 import { useClassroomContextEvents } from './use-classroom-context-events';
@@ -97,6 +101,42 @@ function WorkspaceContext({
         replace: true,
       });
   };
+  // One-shot join banner: latch the outcome from router state, then clear the
+  // state (replace) so reloads and back/forward never replay it or retain ids.
+  const incomingOutcome = readClassroomJoinOutcome(location.state, classroomId);
+  const [latched, setLatched] = useState(() => ({
+    classroomId,
+    stateKey: location.key,
+    outcome: incomingOutcome,
+  }));
+  if (
+    incomingOutcome &&
+    (latched.stateKey !== location.key || latched.classroomId !== classroomId)
+  ) {
+    setLatched({
+      classroomId,
+      stateKey: location.key,
+      outcome: incomingOutcome,
+    });
+  } else if (latched.classroomId !== classroomId) {
+    setLatched({ classroomId, stateKey: location.key, outcome: null });
+  }
+  const joinOutcome =
+    latched.classroomId === classroomId ? latched.outcome : null;
+  const clearedState = useRef<string | null>(null);
+  const hasIncomingOutcome = incomingOutcome !== null;
+  useEffect(() => {
+    if (!hasIncomingOutcome || clearedState.current === location.key) return;
+    clearedState.current = location.key;
+    void navigate(
+      {
+        pathname: location.pathname,
+        search: location.search,
+        hash: location.hash,
+      },
+      { replace: true, state: null },
+    );
+  }, [hasIncomingOutcome, location, navigate]);
   const context = useClassroomContext(classroomId);
   useClassroomContextEvents(classroomId);
   const snapshot = useSessionSnapshot();
@@ -234,6 +274,34 @@ function WorkspaceContext({
             )}
           </div>
         </header>
+        {joinOutcome && (
+          <Alert
+            variant={joinOutcome.alreadyMember ? 'info' : 'success'}
+            role="status"
+            aria-live="polite"
+            data-testid="classroom-join-outcome"
+          >
+            <AlertTitle as="h3">
+              {joinOutcome.alreadyMember
+                ? joinMessages.outcome.alreadyMemberTitle
+                : joinMessages.outcome.joinedTitle}
+            </AlertTitle>
+            <AlertDescription>
+              {joinOutcome.role === 'TEACHER'
+                ? joinOutcome.alreadyMember
+                  ? joinMessages.outcome.teacherAlreadyMemberBody
+                  : joinMessages.outcome.teacherJoinedBody
+                : joinOutcome.alreadyMember
+                  ? joinMessages.outcome.alreadyMemberBody
+                  : joinMessages.outcome.joinedBody}{' '}
+              {joinOutcome.desk
+                ? joinMessages.outcome.formatAssignedDesk(
+                    joinOutcome.desk.deskIndex,
+                  )
+                : joinMessages.outcome.noDeskAssigned}
+            </AlertDescription>
+          </Alert>
+        )}
         {!isParent &&
           (mode === '2d' ? (
             <Classroom2DLayout

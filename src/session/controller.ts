@@ -68,6 +68,14 @@ export interface SessionController {
   subscribe(listener: () => void): () => void;
   registerCleanup(cleanup: () => void): () => void;
   releasePrivateState(): void;
+  /**
+   * Adopts a profile the server just confirmed for the signed-in user so the
+   * shell never shows stale identity. Ignored for another account or when no
+   * session is authenticated (a late response must not restore private data).
+   */
+  applyConfirmedProfile(profile: OwnProfile): void;
+  getAccessToken(): string | undefined;
+  refreshAccessToken(): Promise<string | undefined>;
   initialize(): Promise<void>;
   login(input: LoginInput): Promise<LoginResult>;
   logout(): Promise<{ serverConfirmed: boolean; cleanupFailed: boolean }>;
@@ -265,12 +273,44 @@ export function createSession(options: SessionOptions = {}): SessionService {
       };
     },
     releasePrivateState,
+    applyConfirmedProfile(profile) {
+      if (snapshot.status !== 'authenticated') return;
+      if (snapshot.user.id !== profile.id) return;
+      const result = profileSchema.safeParse(profile);
+      if (!result.success) return;
+      publish({
+        status: 'authenticated',
+        user: Object.freeze({
+          ...result.data,
+          avatar: Object.freeze(result.data.avatar),
+        }),
+      });
+    },
     registerCleanup(cleanup) {
       const owned = () => cleanup();
       cleanups.add(owned);
       return () => {
         cleanups.delete(owned);
       };
+    },
+    getAccessToken() {
+      return snapshot.status === 'authenticated'
+        ? credentials?.accessToken
+        : undefined;
+    },
+    async refreshAccessToken() {
+      if (snapshot.status !== 'authenticated' || !credentials?.refreshToken) {
+        return undefined;
+      }
+      const expectedEpoch = epoch;
+      try {
+        await renew(expectedEpoch, revision, 'expiry');
+        return epoch === expectedEpoch && snapshot.status === 'authenticated'
+          ? credentials?.accessToken
+          : undefined;
+      } catch {
+        return undefined;
+      }
     },
     initialize() {
       if (initializing) return initializing;

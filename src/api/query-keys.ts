@@ -111,3 +111,227 @@ export function classroomDetailQueryKey(
 ): ScopedQueryKey {
   return createScopedQueryKey({ userId, classroomId }, 'classrooms', 'detail');
 }
+
+export type ClassroomSortOrder = 'createdAt' | '-createdAt' | 'name' | '-name';
+
+export interface ClassroomListQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+  readonly sort?: ClassroomSortOrder;
+}
+
+export interface NormalizedClassroomListQueryParams {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly sort: ClassroomSortOrder;
+}
+
+function clampListParam(
+  value: number | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  if (value === undefined || !Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.max(min, Math.min(max, Math.trunc(value)));
+}
+
+/**
+ * Key of `GET /me/classrooms`: paginated list of accessible classrooms for one
+ * authenticated user, isolated per `userId` (`rules/state-management.md`).
+ */
+export function classroomListQueryKey(
+  userId: string,
+  params: ClassroomListQueryParams = {},
+): ScopedQueryKey<NormalizedClassroomListQueryParams> {
+  const normalizedParams = Object.freeze({
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+    sort: params.sort ?? '-createdAt',
+  });
+  return createScopedQueryKey(
+    { userId },
+    'classrooms',
+    'list',
+    normalizedParams,
+  );
+}
+
+/**
+ * Predicate matching every classroom list query entry owned by `userId`.
+ */
+export function createClassroomListPredicate(
+  userId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.domain === 'classrooms' &&
+      segment.resource === 'list'
+    );
+  };
+}
+
+export type ClassroomRosterStateFilter = 'ACTIVE' | 'INACTIVE';
+
+export interface ClassroomRosterQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+  readonly state?: ClassroomRosterStateFilter;
+  readonly q?: string;
+}
+
+export interface NormalizedClassroomRosterQueryParams {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly state: ClassroomRosterStateFilter | null;
+  readonly q: string;
+}
+
+/**
+ * Key of `GET /classrooms/{id}/roster`: paginated student roster scoped by
+ * `userId` and `classroomId` (`rules/state-management.md`).
+ */
+export function classroomRosterQueryKey(
+  userId: string,
+  classroomId: string,
+  params: ClassroomRosterQueryParams = {},
+): ScopedQueryKey<NormalizedClassroomRosterQueryParams> {
+  const normalizedParams = Object.freeze({
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+    state:
+      params.state === 'ACTIVE' || params.state === 'INACTIVE'
+        ? params.state
+        : null,
+    q: (params.q ?? '').trim().slice(0, 100),
+  });
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'classrooms',
+    'roster',
+    normalizedParams,
+  );
+}
+
+/**
+ * Predicate matching every classroom roster query entry owned by `userId` and
+ * `classroomId`.
+ */
+export function createClassroomRosterPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'classrooms' &&
+      segment.resource === 'roster'
+    );
+  };
+}
+
+/**
+ * Key of `GET /users/me`: the caller's own profile and base avatar. Scoped by
+ * user, so another account never reads it and `createUserScopePredicate`
+ * evicts it on logout.
+ */
+export function ownProfileQueryKey(userId: string): ScopedQueryKey {
+  return createScopedQueryKey({ userId }, 'profile', 'own');
+}
+
+export type MaterialSortOrder = 'createdAt' | '-createdAt';
+
+export interface MaterialListQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+  readonly sort?: MaterialSortOrder;
+}
+
+export interface NormalizedMaterialListQueryParams {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly sort: MaterialSortOrder;
+}
+
+/**
+ * Key of `GET /classrooms/{id}/materials`: paginated list of active study
+ * materials for one classroom, scoped by both `userId` and `classroomId`
+ * (`rules/state-management.md`).
+ */
+export function classroomMaterialsQueryKey(
+  userId: string,
+  classroomId: string,
+  params: MaterialListQueryParams = {},
+): ScopedQueryKey<NormalizedMaterialListQueryParams> {
+  const normalizedParams = Object.freeze({
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+    sort: params.sort ?? '-createdAt',
+  });
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'materials',
+    'list',
+    normalizedParams,
+  );
+}
+
+/**
+ * Predicate matching every material list query entry owned by `userId` and
+ * `classroomId`.
+ */
+export function createClassroomMaterialsPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'materials' &&
+      segment.resource === 'list'
+    );
+  };
+}

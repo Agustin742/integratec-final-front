@@ -1,5 +1,7 @@
 import type { components } from '@/api/schema.generated';
 import { EmptyState } from '@/components/feedback/states';
+import { MaterialPanel } from '../materials/material-panel';
+import { ClassroomRosterPanel } from '../classroom-roster-panel';
 import { classroomMessages as messages } from '../messages';
 import type { PanelDescriptor } from './classroom-panels';
 
@@ -22,12 +24,20 @@ function entry(key: PanelKey): PanelDescriptor & { key: PanelKey } {
 // Pet is reserved by the backend and intentionally has no registered component.
 export const classroomPanelCatalog = [
   entry('activities'),
-  entry('material'),
+  {
+    key: 'material',
+    title: messages.panels.material,
+    component: MaterialPanel,
+  },
   entry('grades'),
   entry('chat'),
   entry('notices'),
   entry('shop'),
   entry('bot'),
-  entry('members'),
+  {
+    key: 'members',
+    title: messages.panels.members,
+    component: ClassroomRosterPanel,
+  },
   entry('settings'),
 ] as const;

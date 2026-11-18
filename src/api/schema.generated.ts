@@ -439,6 +439,54 @@ export interface paths {
         patch: operations["NotificationsController_read"];
         trace?: never;
     };
+    "/classrooms/{id}/announcements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List announcements
+         * @description Every classroom member reads the bulletin board chronologically (newest first, `id` tiebreaker); nobody but the author and school Owner/Admin may edit or remove. Linked parents are denied (403) while the parent-visibility decision is open. Removed announcements are never listed.
+         */
+        get: operations["AnnouncementsController_list"];
+        put?: never;
+        /**
+         * Publish an announcement
+         * @description Teacher-level staff only. `@Name` tokens are resolved against the classroom roster (at most 20 per announcement) and one in-app notification per enrolled student and mentioned member is recorded in the same transaction, so notices are delivered only after the publication commits.
+         */
+        post: operations["AnnouncementsController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/announcements/{announcementId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove an announcement
+         * @description Teacher-level staff only. Logical deletion (`deletedAt`): authors may remove their own, school Owner/Admin any; rows are never physically removed.
+         */
+        delete: operations["AnnouncementsController_remove"];
+        options?: never;
+        head?: never;
+        /**
+         * Edit an announcement
+         * @description Teacher-level staff only. Authors may edit their own; school Owner/Admin may edit any. Mentions in the new content are re-resolved; only newly mentioned members are notified.
+         */
+        patch: operations["AnnouncementsController_update"];
+        trace?: never;
+    };
     "/activities/{activityId}/submissions": {
         parameters: {
             query?: never;
@@ -599,6 +647,158 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/submissions/{submissionId}/grade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a submission grade
+         * @description Readable by classroom staff (`OWNER`, `ADMIN`, `TEACHER`, preserved even if the student later leaves), the active owning student, and active linked parents outside adult mode. Never exposes file storage keys or signed download URLs. Classmate students receive `403`; ungraded submissions, deleted activities, unlinked/adult-mode parents, and out-of-scope callers receive `404`.
+         */
+        get: operations["SubmissionGradesController_getGrade"];
+        put?: never;
+        /**
+         * Grade a file submission
+         * @description Classroom staff (`OWNER`, `ADMIN`, or assigned `TEACHER`) only. Assigns a 0-100 score and visible feedback (`1-5000` characters) to an ungraded `FILE` submission, computes server-weighted points (`round(score * typeWeight * activity.weightMultiplier)`), credits the points ledger atomically when points > 0, and records a student-only `grade_posted` notification. Returns `409` if already graded or not a `FILE` activity, `403` for classroom students or linked parents, and `404` for out-of-scope actors.
+         */
+        post: operations["SubmissionGradesController_grade"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Regrade an existing submission grade
+         * @description Classroom staff (`OWNER`, `ADMIN`, or assigned `TEACHER`) only. Uses optimistic concurrency (`version`) to update score and feedback, appends a `GradeRevision` row, applies a compensating ledger entry (or initial earning from 0) when weighted points change, and records a student-only `grade_posted` notification. Returns `409` on stale `version` or if a negative delta would drive student points below zero.
+         */
+        patch: operations["SubmissionGradesController_regrade"];
+        trace?: never;
+    };
+    "/classrooms/{id}/submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List classroom submissions for staff grading
+         * @description Classroom staff (`OWNER`, `ADMIN`, or assigned `TEACHER`) only. Returns a paginated grading queue across non-deleted classroom activities (preserving submissions of deactivated students), optionally filtered by `activityId` and derived `state` (`submitted` or `graded`). Ordered by `submittedAt` ascending by default (supports `submittedAt`, `gradedAt`, and `-` descending prefix) with `id` ascending tiebreaker.
+         */
+        get: operations["ClassroomSubmissionsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List active study materials
+         * @description Staff and current students only. Offset pagination; sort is createdAt or -createdAt (default), with ID in the same direction as tiebreaker. Parents have no material permission.
+         */
+        get: operations["MaterialsController_list"];
+        put?: never;
+        /**
+         * Upload one private study material
+         * @description Teacher-level staff only. One nonempty PDF/PNG/JPEG, at most 10 MiB. Leading byte signature, declared MIME and filename extension must agree; no scanning or complete content parsing. Filename: 1–120 ASCII letters, digits, spaces, dots, underscores, parentheses or hyphens, starting with a letter or digit. No other multipart fields.
+         */
+        post: operations["MaterialsController_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/materials/{materialId}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Issue a short-lived signed download URL
+         * @description Current staff or student membership required. Uses the existing configured storage URL TTL. Already issued links remain usable until expiry even after logical removal or membership revocation. Treat the URL as a secret bearer capability.
+         */
+        get: operations["MaterialsController_download"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/materials/{materialId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Logically remove study material
+         * @description Teacher-level staff only. Retains author, metadata, removal actor/time and private object; hides it from lists and blocks new signed URLs. Repeated removal returns 404.
+         */
+        delete: operations["MaterialsController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/me/equipment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read the authenticated student's classroom-scoped equipment state
+         * @description Returns one equipped purchase per slot (head, face, back, desk_decor) or null when the slot is empty. Classroom-scoped: purchases and equipment never cross classrooms.
+         */
+        get: operations["EquipmentController_getEquipment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/me/equipment/{slot}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Equip a purchased item in a slot, or unequip the slot
+         * @description Atomically saves `EquippedItem` for the authenticated active student after validating the slot (404), the shop item (404), its kind/slot compatibility (409), and classroom-scoped ownership against StudentPurchase (403). Body `{ shopItemId: string | null }`; null (or an absent field) unequips the slot. Idempotent.
+         */
+        put: operations["EquipmentController_setSlot"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/classrooms/{id}/roster": {
         parameters: {
             query?: never;
@@ -742,6 +942,54 @@ export interface paths {
          * @description Teacher-level staff only. Moves DRAFT to PUBLISHED (one way) and records one `activity_published` notification per active student in the same transaction, so notices are delivered only after the publish commits. `dueAt` must still be in the future and multiple-choice activities need valid questions (400).
          */
         post: operations["ActivitiesController_publish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/activities/{activityId}/forum/threads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List query threads
+         * @description Enrolled students and teaching staff only. Paginated, newest first by default (`sort=createdAt` or `-createdAt`); `id` is the tiebreaker. Each item carries the first post body (the question) and the reply count. Students only see threads of published activities.
+         */
+        get: operations["ActivityForumController_listThreads"];
+        put?: never;
+        /**
+         * Create a query thread
+         * @description Enrolled students and teaching staff only. Creates a thread scoped to the activity; the first post is the question. Bodies are trimmed and bounded (2000 chars).
+         */
+        post: operations["ActivityForumController_createThread"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/activities/{activityId}/forum/threads/{threadId}/posts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the posts of one thread
+         * @description Enrolled students and teaching staff only. Paginated, oldest first by default (`sort=createdAt` or `-createdAt`); `id` is the tiebreaker.
+         */
+        get: operations["ActivityForumController_listPosts"];
+        put?: never;
+        /**
+         * Reply inside a thread
+         * @description Enrolled students and teaching staff only. When a teacher-level member replies in someone else's thread, one `activity_forum_reply` notification request is recorded for the thread author in the same transaction, so the notice is delivered only after the reply commits.
+         */
+        post: operations["ActivityForumController_createPost"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1529,7 +1777,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "activity_published" | "grade_posted" | "announcement" | "mention";
+            kind: "activity_published" | "grade_posted" | "announcement" | "mention" | "activity_forum_reply";
             /**
              * Format: uuid
              * @description Navigation only; source endpoint authorizes detail access independently.
@@ -1547,6 +1795,34 @@ export interface components {
         NotificationsReadResultDto: {
             /** @description Number of previously unread, currently visible notices changed by this request. */
             updated: number;
+        };
+        CreateAnnouncementDto: {
+            /** @description Single-line notice title. */
+            title: string;
+            /** @description Plain text body; `@Name` tokens matching active classroom member display names become mentions (at most 20 per announcement). */
+            content: string;
+        };
+        AnnouncementDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            classroomId: string;
+            /** Format: uuid */
+            authorId: string;
+            title: string;
+            content: string;
+            /** @description Classroom members resolved from @mentions in the content. */
+            mentionedUserIds: string[];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        UpdateAnnouncementDto: {
+            /** @description Single-line notice title. */
+            title?: string;
+            /** @description Plain text body; `@Name` tokens matching active classroom member display names become mentions (at most 20 per announcement). */
+            content?: string;
         };
         CreateSubmissionBodyDto: {
             /** @description 1-5 files of at most 10 MB each. Allowed content (detected from the bytes): PDF, PNG, JPEG, DOCX. */
@@ -1582,7 +1858,7 @@ export interface components {
              * @description Derived state of the work.
              * @enum {string}
              */
-            status: "submitted";
+            status: "submitted" | "graded";
             files: components["schemas"]["SubmissionFileResponseDto"][];
         };
         SubmissionFileDownloadDto: {
@@ -1622,7 +1898,7 @@ export interface components {
              * @description Derived state of the work.
              * @enum {string}
              */
-            status: "submitted";
+            status: "submitted" | "graded";
             files: components["schemas"]["SubmissionFileDownloadDto"][];
         };
         /** @enum {string} */
@@ -1761,6 +2037,163 @@ export interface components {
             balance: number;
             /** @description True when the response replays an earlier purchase for the same Idempotency-Key. */
             replayed: boolean;
+        };
+        GradeSubmissionDto: {
+            /**
+             * @description Numeric grade on a 0-100 scale.
+             * @example 85
+             */
+            score: number;
+            /**
+             * @description Visible teacher feedback for the student (trimmed, 1-5000 characters).
+             * @example Clear structure and complete reasoning.
+             */
+            feedback: string;
+        };
+        GradeResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            submissionId: string;
+            /** Format: uuid */
+            activityId: string;
+            /** Format: uuid */
+            studentId: string;
+            /** Format: uuid */
+            graderId: string;
+            score: number;
+            feedback: string;
+            /** @description Server-computed weighted points currently awarded for this grade. */
+            pointsAwarded: number;
+            /**
+             * Format: uuid
+             * @description Id of the initial earning ledger entry. It is never replaced by later regrade entries (even after a regrade to 0 points), and is null only when the first award was 0 points and no later regrade has credited points.
+             */
+            pointTransactionId: string | null;
+            version: number;
+            /** Format: date-time */
+            gradedAt: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        RegradeSubmissionDto: {
+            /**
+             * @description Numeric grade on a 0-100 scale.
+             * @example 85
+             */
+            score: number;
+            /**
+             * @description Visible teacher feedback for the student (trimmed, 1-5000 characters).
+             * @example Clear structure and complete reasoning.
+             */
+            feedback: string;
+            /**
+             * @description Expected current grade version for optimistic concurrency control.
+             * @example 1
+             */
+            version: number;
+        };
+        GradingQueueGradeDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            graderId: string;
+            score: number;
+            feedback: string;
+            pointsAwarded: number;
+            version: number;
+            /** Format: date-time */
+            gradedAt: string;
+        };
+        /** @enum {string} */
+        ActivityType: "TP" | "EXAM";
+        GradingQueueItemDto: {
+            /**
+             * Format: uuid
+             * @description Submission UUID.
+             */
+            id: string;
+            /** Format: uuid */
+            activityId: string;
+            activityTitle: string;
+            activityType: components["schemas"]["ActivityType"];
+            /** Format: uuid */
+            studentId: string;
+            studentDisplayName: string;
+            /** Format: date-time */
+            submittedAt: string;
+            isLate: boolean;
+            /** @enum {string} */
+            status: "submitted" | "graded";
+            fileCount: number;
+            grade: components["schemas"]["GradingQueueGradeDto"] | null;
+        };
+        MaterialDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            classroomId: string;
+            /**
+             * Format: uuid
+             * @description Original author, retained after logical removal.
+             */
+            authorId: string;
+            /** @example lesson.pdf */
+            filename: string;
+            /** @enum {string} */
+            contentType: "application/pdf" | "image/png" | "image/jpeg";
+            sizeBytes: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        MaterialDownloadDto: {
+            /**
+             * Format: uri
+             * @description Private bearer capability: do not log or persist this temporary URL.
+             */
+            url: string;
+            /** @description Configured URL lifetime. */
+            expiresInSeconds: number;
+        };
+        /** @enum {string} */
+        EquippedSlotName: "head" | "face" | "back" | "desk_decor";
+        EquippedSlotDto: {
+            slot: components["schemas"]["EquippedSlotName"];
+            /** Format: uuid */
+            shopItemId: string;
+            /** @example cap_blue */
+            shopItemCode: string;
+            /** @example Blue Classroom Cap */
+            shopItemName: string;
+            kind: components["schemas"]["ShopItemKind"];
+        };
+        EquipmentStateDto: {
+            /** Format: uuid */
+            classroomId: string;
+            /** Format: uuid */
+            studentId: string;
+            /**
+             * @description Equipped purchase per slot; null when the slot is empty.
+             * @example {
+             *       "head": null,
+             *       "face": null,
+             *       "back": null,
+             *       "desk_decor": null
+             *     }
+             */
+            slots: {
+                [key: string]: components["schemas"]["EquippedSlotDto"];
+            };
+        };
+        EquipItemDto: {
+            /**
+             * Format: uuid
+             * @description UUID of the purchased shop item to equip in the slot, or null to unequip the slot.
+             * @example 00000000-0000-4000-8000-000000000101
+             */
+            shopItemId?: string | null;
         };
         RosterGuardianDto: {
             /** Format: uuid */
@@ -2072,6 +2505,49 @@ export interface components {
             weightMultiplier: number;
             /** @description Replaces all questions and options. Only for MULTIPLE_CHOICE activities, and only until the first submission exists (then 409). */
             questions?: components["schemas"]["QuestionInputDto"][];
+        };
+        CreateForumThreadDto: {
+            body: string;
+        };
+        ForumPostDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            threadId: string;
+            /** Format: uuid */
+            authorId: string;
+            /** @description Plain text; the server trims and bounds it. */
+            body: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ForumThreadDetailDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            activityId: string;
+            /** Format: uuid */
+            authorId: string;
+            /** @description Only the posts created by this request. */
+            posts: components["schemas"]["ForumPostDto"][];
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ForumThreadSummaryDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            activityId: string;
+            /** Format: uuid */
+            authorId: string;
+            /** @description Body of the first post (the original question). */
+            firstPostBody: string;
+            replyCount: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CreateForumPostDto: {
+            body: string;
         };
         /** @enum {string} */
         ClassroomPanelKey: "activities" | "material" | "grades" | "chat" | "notices" | "shop" | "bot" | "members" | "settings" | "pet";
@@ -3279,6 +3755,257 @@ export interface operations {
             };
         };
     };
+    AnnouncementsController_list: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Announcements without edit rights. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["AnnouncementDto"][];
+                        /** @example 1 */
+                        page: number;
+                        /** @example 20 */
+                        pageSize: number;
+                        /**
+                         * @description Item count across all pages.
+                         * @example 42
+                         */
+                        total: number;
+                    };
+                };
+            };
+            /** @description Invalid query parameters. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom but no announcement access (for example a linked parent). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent or out-of-scope classroom or announcement. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    AnnouncementsController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAnnouncementDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnouncementDto"];
+                };
+            };
+            /** @description Validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom but insufficient role (for example a student). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent or out-of-scope classroom or announcement. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    AnnouncementsController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Announcement UUID */
+                announcementId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Not the author (or Owner/Admin). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent or out-of-scope classroom or announcement. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    AnnouncementsController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Announcement UUID */
+                announcementId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAnnouncementDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnouncementDto"];
+                };
+            };
+            /** @description Validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Not the author (or Owner/Admin). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent or out-of-scope classroom or announcement. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
     SubmissionsController_create: {
         parameters: {
             query?: never;
@@ -3832,6 +4559,677 @@ export interface operations {
                 };
             };
             /** @description Per-user purchase rate limit exceeded. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    SubmissionGradesController_getGrade: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Submission UUID */
+                submissionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GradeResponseDto"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Classmate student attempting to read another student grade. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Submission or grade not found, deleted activity, or out-of-scope actor. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    SubmissionGradesController_grade: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Submission UUID */
+                submissionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GradeSubmissionDto"];
+            };
+        };
+        responses: {
+            /** @description Grade created and points credited. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GradeResponseDto"];
+                };
+            };
+            /** @description Invalid score (outside 0-100 or above the activity maxScore), blank/control-character feedback, or extra body fields. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom/child submission, but caller lacks teacher authority. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Submission not found, deleted activity, or out-of-scope actor. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Submission already graded or activity format is not FILE. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    SubmissionGradesController_regrade: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Submission UUID */
+                submissionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegradeSubmissionDto"];
+            };
+        };
+        responses: {
+            /** @description Grade updated and revision appended. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GradeResponseDto"];
+                };
+            };
+            /** @description Invalid score (outside 0-100, or changed above the activity maxScore), feedback, version, or extra body fields. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom/child submission, but caller lacks teacher authority. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Submission or grade not found, deleted activity, or out-of-scope actor. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Stale grade version, non-FILE activity, or insufficient points balance for delta. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ClassroomSubmissionsController_list: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+                /** @description Optional filter by an active activity of this classroom. */
+                activityId?: string;
+                /** @description Optional filter by derived submission state (`submitted` or `graded`). */
+                state?: "submitted" | "graded";
+                /** @description Field to order by; prefix with "-" for descending. Default `submittedAt` ascending; `id` ascending is the deterministic tiebreaker. */
+                sort?: "submittedAt" | "gradedAt" | "-submittedAt" | "-gradedAt";
+            };
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated grading queue for classroom staff. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["GradingQueueItemDto"][];
+                        /** @example 1 */
+                        page: number;
+                        /** @example 20 */
+                        pageSize: number;
+                        /**
+                         * @description Item count across all pages.
+                         * @example 42
+                         */
+                        total: number;
+                    };
+                };
+            };
+            /** @description Invalid pagination, filter, or sort parameters. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom, but caller lacks teacher authority. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Classroom or filtered activity not found, or caller is out of scope. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    MaterialsController_list: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+                /** @description Field to order by; prefix with "-" for descending. Allowed fields and the default order are listed per endpoint. */
+                sort?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active classroom material metadata; no storage keys. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["MaterialDto"][];
+                        /** @example 1 */
+                        page: number;
+                        /** @example 20 */
+                        pageSize: number;
+                        /**
+                         * @description Item count across all pages.
+                         * @example 42
+                         */
+                        total: number;
+                    };
+                };
+            };
+            /** @description Invalid pagination or sort. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom, insufficient role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, absent, removed or out-of-scope resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    MaterialsController_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaterialDto"];
+                };
+            };
+            /** @description Invalid file, filename, type, fields or count. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom, insufficient role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, absent, removed or out-of-scope resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description File exceeds 10 MiB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Upload outcome uncertain; refresh before retrying. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    MaterialsController_download: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Material UUID */
+                materialId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaterialDownloadDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom, insufficient role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, absent, removed or out-of-scope resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    MaterialsController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Material UUID */
+                materialId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom, insufficient role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, absent, removed or out-of-scope resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    EquipmentController_getEquipment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current equipment state with one entry per known slot. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EquipmentStateDto"];
+                };
+            };
+            /** @description Missing or invalid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom, but caller is not an active enrolled student (staff and non-adult parents). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Malformed, nonexistent, or inaccessible classroom; unknown equipment slot; or unknown shop item. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    EquipmentController_setSlot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Equipment slot name */
+                slot: components["schemas"]["EquippedSlotName"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EquipItemDto"];
+            };
+        };
+        responses: {
+            /** @description Full equipment state after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EquipmentStateDto"];
+                };
+            };
+            /** @description Invalid slot value, invalid shopItemId, or extra body fields. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing or invalid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom, but caller is not an active enrolled student (staff and non-adult parents). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Malformed, nonexistent, or inaccessible classroom; unknown equipment slot; or unknown shop item. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Shop item kind does not fit the requested slot or the item is not equipable. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Per-user equipment change rate limit exceeded. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -4482,6 +5880,296 @@ export interface operations {
             };
             /** @description Activity is already published. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ActivityForumController_listThreads: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+                /** @description Sort order (`createdAt` or `-createdAt`). */
+                sort?: "createdAt" | "-createdAt";
+            };
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Activity UUID */
+                activityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of query threads. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ForumThreadSummaryDto"][];
+                        /** @example 1 */
+                        page: number;
+                        /** @example 20 */
+                        pageSize: number;
+                        /**
+                         * @description Item count across all pages.
+                         * @example 42
+                         */
+                        total: number;
+                    };
+                };
+            };
+            /** @description Invalid query parameters. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom but insufficient role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent or out-of-scope classroom, activity or thread. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ActivityForumController_createThread: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Activity UUID */
+                activityId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateForumThreadDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForumThreadDetailDto"];
+                };
+            };
+            /** @description Validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom but insufficient role (for example a parent). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent or out-of-scope classroom, activity or thread. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ActivityForumController_listPosts: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+                /** @description Sort order (`createdAt` or `-createdAt`). */
+                sort?: "createdAt" | "-createdAt";
+            };
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Activity UUID */
+                activityId: string;
+                /** @description Thread UUID */
+                threadId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of thread posts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ForumPostDto"][];
+                        /** @example 1 */
+                        page: number;
+                        /** @example 20 */
+                        pageSize: number;
+                        /**
+                         * @description Item count across all pages.
+                         * @example 42
+                         */
+                        total: number;
+                    };
+                };
+            };
+            /** @description Invalid query parameters. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom but insufficient role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent or out-of-scope classroom, activity or thread. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ActivityForumController_createPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Activity UUID */
+                activityId: string;
+                /** @description Thread UUID */
+                threadId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateForumPostDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForumPostDto"];
+                };
+            };
+            /** @description Validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom but insufficient role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent or out-of-scope classroom, activity or thread. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

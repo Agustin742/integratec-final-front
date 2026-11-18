@@ -127,6 +127,13 @@ export function createAppRoutes({
                           (await import('../pages/home-page')).HomePage,
                       },
                     },
+                    {
+                      path: 'profile',
+                      lazy: {
+                        Component: async () =>
+                          (await import('../pages/profile-page')).ProfilePage,
+                      },
+                    },
                     ...protectedRoutes,
                     {
                       path: 'classrooms/:classroomId',
