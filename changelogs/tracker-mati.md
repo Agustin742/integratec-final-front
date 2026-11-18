@@ -1,5 +1,13 @@
 # Tracker — Mati
 
+## 2026-11-18 — Implement student points wallet balance and movement history (#45)
+
+- **Status:** in-progress
+- **Area / files:** `src/api/`, `src/test/msw/`, planned wallet feature module; branch `feat/45-points-wallet` in worktree `odd/worktrees/45-points-wallet`
+- **Change:** Started issue #45 (HU-GAM-001): server-computed student balance indicator and paginated movement-history wallet panel; verified dependencies #26, #19, and backend `integratec-final-back#31` closed; created feature plan `odd/tasks/45-points-wallet.md` (untracked) and moved the Kanban-front card toward In progress.
+- **Reason:** Deliver the MVP-core points wallet story per `rules/points-and-shop.md`, `rules/state-management.md`, `rules/api-contracts.md`, and the issue acceptance criteria.
+- **Next step:** Map integration points, implement contract hooks, indicator, and panel with RED→GREEN tests, then run full local checks before the PR.
+
 ## 2026-11-18 — Study material manager with upload progress and signed downloads (#40)
 
 - **Status:** completed

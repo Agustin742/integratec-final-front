@@ -1398,4 +1398,123 @@ export function createClassroomRosterStore(
   };
 }
 
+export type StudentWalletPayload = components['schemas']['StudentWalletDto'];
+export type PointMovementPayload = components['schemas']['PointMovementDto'];
+
+export interface CreateStudentWalletHandlerOptions {
+  readonly baseUrl?: string;
+  readonly status?: number;
+  readonly error?: ErrorBodyPayload;
+  readonly response?: Partial<StudentWalletPayload>;
+  readonly onRequest?: (request: Request) => void | Promise<void>;
+}
+
+/** Synthetic `ErrorBody` matching the status, so failure tests stay valid. */
+function syntheticWalletErrorBody(status: number): ErrorBodyPayload {
+  if (status === 400) {
+    return {
+      code: 'BAD_REQUEST',
+      message: 'Invalid pagination parameters.',
+      correlationId: 'corr-wallet-400',
+    };
+  }
+  if (status === 401) {
+    return {
+      code: 'UNAUTHENTICATED',
+      message: 'Missing or invalid session.',
+      correlationId: 'corr-wallet-401',
+    };
+  }
+  if (status === 403) {
+    return {
+      code: 'FORBIDDEN',
+      message: 'Caller is not an active enrolled student in this classroom.',
+      correlationId: 'corr-wallet-403',
+    };
+  }
+  if (status === 404) {
+    return {
+      code: 'NOT_FOUND',
+      message: 'Classroom not found.',
+      correlationId: 'corr-wallet-404',
+    };
+  }
+  return {
+    code: 'INTERNAL_ERROR',
+    message: 'Wallet request failed.',
+    correlationId: `corr-wallet-${status}`,
+  };
+}
+
+const WALLET_MOVEMENTS: readonly PointMovementPayload[] = [
+  {
+    id: '00000000-0000-4000-8000-000000000301',
+    entryKind: 'EARNING',
+    amount: 50,
+    sourceType: 'submission_grade',
+    sourceId: '00000000-0000-4000-8000-000000000311',
+    reason: 'Activity graded: Fractions Quiz',
+    actorId: '00000000-0000-4000-8000-000000000321',
+    createdAt: '2026-11-10T12:00:00.000Z',
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000302',
+    entryKind: 'DEBIT',
+    amount: -20,
+    sourceType: 'shop_purchase',
+    sourceId: '00000000-0000-4000-8000-000000000312',
+    reason: 'Shop purchase: Blue Classroom Cap',
+    actorId: null,
+    createdAt: '2026-11-12T15:30:00.000Z',
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000303',
+    entryKind: 'COMPENSATION',
+    amount: 5,
+    sourceType: 'grade_revision',
+    sourceId: '00000000-0000-4000-8000-000000000313',
+    reason: 'Regrade adjustment: Fractions Quiz',
+    actorId: '00000000-0000-4000-8000-000000000321',
+    createdAt: '2026-11-14T09:15:00.000Z',
+  },
+];
+
+/**
+ * Contract-faithful MSW handler for `GET /classrooms/{id}/points`
+ * (`PointsController_getOwnWallet`): the caller's own server-computed balance
+ * and one page of movements. Works before the backend implementation lands.
+ */
+export function createStudentWalletHandler(
+  classroomId: string,
+  options: CreateStudentWalletHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  return http.get(
+    `${baseUrl}/classrooms/${classroomId}/points`,
+    async ({ request }) => {
+      await options.onRequest?.(request);
+
+      const status = options.status ?? 200;
+      if (status >= 400) {
+        return createErrorEnvelopeResponse(
+          status,
+          options.error ?? syntheticWalletErrorBody(status),
+        );
+      }
+
+      const payload: StudentWalletPayload = {
+        classroomId,
+        studentId: 'student-test-1',
+        balance: 130,
+        items: [...WALLET_MOVEMENTS],
+        page: 1,
+        pageSize: 20,
+        total: 3,
+        ...options.response,
+      };
+      return HttpResponse.json(payload, { status });
+    },
+  );
+}
+
 export const defaultHandlers: readonly HttpHandler[] = [createHealthHandler()];
