@@ -54,13 +54,14 @@ AWS Amplify Hosting ([issue #22](https://github.com/Agustin742/integratec-final-
 
 - **Committed root [`customHttp.yml`](../customHttp.yml):** Tracked at the repository root with the safe test placeholder origins (`https://api.example.invalid` and `wss://realtime.example.invalid`) so the header schema is versioned and reviewable in Git without polluting local working trees when a developer's `.env` uses `http://localhost:3000`.
 - **Build-time output (`dist/customHttp.yml`):** During `pnpm build`, the `validate-public-config-and-security-headers` plugin in [`vite.config.ts`](../vite.config.ts) renders `dist/customHttp.yml` using the active environment's validated `VITE_API_BASE_URL` and `VITE_REALTIME_URL` origins and runs `validateBuiltHtmlAndHeaders` (including `parseCustomHttpYaml` and exact `connect-src` origin verification) before the build succeeds.
-- **Explicit Amplify Hosting handoff (`pnpm security:sync` + `pnpm security:check --require-root-match`):** Because AWS Amplify Hosting reads `customHttp.yml` from the repository root, the Amplify Hosting build specification (`amplify.yml` in #22) must run:
+- **Explicit Amplify Hosting handoff (`pnpm security:sync` + `pnpm security:check --require-root-match`):** Because AWS Amplify Hosting reads `customHttp.yml` from the repository root, the Amplify Hosting build specification ([`amplify.yml`](../amplify.yml), issue #22) runs, in this order:
   ```sh
   pnpm security:sync
   pnpm build
   pnpm security:check --require-root-match
   ```
   `pnpm security:sync` (`node scripts/security/check-security-build.mjs --sync-root`) overwrites the repository-root `customHttp.yml` in the ephemeral Amplify build container with the exact `connect-src` origins from the environment's `VITE_API_BASE_URL` and `VITE_REALTIME_URL`, and `pnpm security:check --require-root-match` fails the build if the root `customHttp.yml`, `dist/customHttp.yml`, or `dist/index.html` diverges from the active `PublicConfig`.
+- **Where the origins come from:** The `VITE_*` values are set as environment variables on the Amplify branch by the backend repository's Terraform, never committed here. `amplify.yml` defines no custom headers and no secrets; the root `customHttp.yml` stays committed with placeholder origins and is only rewritten inside the ephemeral build container.
 
 ## WebAssembly decoder directive (F15 coordination)
 

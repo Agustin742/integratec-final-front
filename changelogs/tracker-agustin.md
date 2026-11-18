@@ -1,5 +1,13 @@
 # Tracker — Agustin
 
+## 2026-11-17 — Amplify Hosting build spec (#22, task T1)
+
+- **Status:** in-progress
+- **Area / files:** `amplify.yml`, `.gitignore`, `scripts/ci/test_checks.py`, `docs/security.md`, `docs/routing.md`, `docs/ci.md`, `docs/development.md`, `docs/technical-justification.md`, `rules/deployment-and-operations.md`, `README.md`
+- **Change:** Added the Amplify build specification (pinned Node and pnpm, frozen install, `security:sync`, `build`, `security:check --require-root-match`, artifacts from `dist/`, project-local pnpm store cache) with a regression test for its contract. Docs now state `us-east-2`, the keyless GitHub App connection made once in the console, and that the backend Terraform owns the app, connected branch, branch variables and SPA rewrite rule.
+- **Reason:** The frontend is not published yet; Amplify needs a versioned build spec, and the docs still described `sa-east-1` and GitHub OIDC.
+- **Next step:** Connect the app from the Amplify console (T2), then import it into backend Terraform (T3). Nothing is deployed yet.
+
 ## 2026-11-11 — Visual pass: split auth layout and illustrated error views (#20, task 6)
 
 - **Status:** in-progress (feature complete, pending pull request)

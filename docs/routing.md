@@ -116,4 +116,4 @@ The app is served at the domain root (no `basename`) and uses browser history, s
 - Target: `/index.html`
 - Type: `200 (Rewrite)`
 
-The rule is not in `customHttp.yml` (that file only holds response headers); it is configured on the hosting side and is owned by issue #22. Until it is in place, a hard load of any route other than `/` returns the host's 404.
+The rule is not in `customHttp.yml` (that file only holds response headers); it is configured on the hosting side: the Amplify app's rewrite rule is managed in the backend repository's Terraform (issue #22), so keep this expression and that configuration identical. Until it is in place, a hard load of any route other than `/` returns the host's 404.

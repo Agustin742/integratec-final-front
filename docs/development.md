@@ -42,6 +42,7 @@
 | `scripts/api-sync/sync-contracts.mjs`       | Contract synchronization resolver and generator (`pnpm api:sync`)                        |
 | `scripts/security/check-security-build.mjs` | Post-build HTML and Amplify `customHttp.yml` security verifier (`pnpm security:check`)   |
 | `customHttp.yml`                            | AWS Amplify Hosting custom HTTP security headers specification (FD1)                     |
+| `amplify.yml`                               | AWS Amplify Hosting build specification (pnpm install, security sync, build, check)      |
 | `vite.config.ts`                            | Build/dev configuration validation, security header emission, and React integration      |
 
 Add feature UI, integration, and tests together when their issues start. Do not pre-create hypothetical feature scaffolding. Routing, guards, error boundaries, the skip link, focus and title management, and the hosting rewrite deep links need are in [routing](routing.md). Follow [frontend conventions](../rules/frontend-conventions.md) and [architecture boundaries](../rules/architecture.md).
