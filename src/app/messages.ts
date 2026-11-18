@@ -27,6 +27,9 @@ export const messages = {
       description:
         'Acá vas a ver tus aulas y tu actividad. Pantalla en construcción.',
     },
+    profile: {
+      title: 'Mi perfil',
+    },
     notFound: {
       title: 'Página no encontrada',
       description: 'La dirección que buscás no existe o fue movida.',
@@ -67,6 +70,7 @@ export const messages = {
   },
   shell: {
     signedInAsPrefix: 'Sesión activa:',
+    profileLink: 'Mi perfil',
     logoutAction: 'Cerrar sesión',
     loggingOutAction: 'Cerrando sesión...',
     logoutConfirmedTitle: 'Sesión cerrada',

@@ -4,12 +4,14 @@ Frontend [#18](https://github.com/Agustin742/integratec-final-front/issues/18) c
 
 ## Backend contract
 
-| Operation            | Request                                 | Successful response                                                       |
-| -------------------- | --------------------------------------- | ------------------------------------------------------------------------- |
-| `POST /auth/login`   | Email and password                      | `200`: accessToken, refreshToken, tokenType `Bearer`, expiresIn (seconds) |
-| `POST /auth/refresh` | JSON refreshToken; no Bearer            | `200`: replacement token pair                                             |
-| `POST /auth/logout`  | Access token as Bearer; no refresh body | `204`: session revoked                                                    |
-| `GET /users/me`      | Access token as Bearer                  | `200`: OwnProfileDto                                                      |
+| Operation                 | Request                                   | Successful response                                                       |
+| ------------------------- | ----------------------------------------- | ------------------------------------------------------------------------- |
+| `POST /auth/login`        | Email and password                        | `200`: accessToken, refreshToken, tokenType `Bearer`, expiresIn (seconds) |
+| `POST /auth/refresh`      | JSON refreshToken; no Bearer              | `200`: replacement token pair                                             |
+| `POST /auth/logout`       | Access token as Bearer; no refresh body   | `204`: session revoked                                                    |
+| `GET /users/me`           | Access token as Bearer                    | `200`: OwnProfileDto                                                      |
+| `PATCH /users/me/profile` | Access token as Bearer; `{ displayName }` | `200`: updated OwnProfileDto                                              |
+| `PATCH /users/me/avatar`  | Access token as Bearer; full base Avatar  | `200`: parsed Avatar                                                      |
 
 Backend dependencies [#18](https://github.com/Agustin742/integratec-final-back/issues/18) and [#20](https://github.com/Agustin742/integratec-final-back/issues/20) are closed. Backend `main` is not the current integration contract. Types are generated, never copied by hand:
 
@@ -69,6 +71,25 @@ failure flag, including automatic invalidation. It never exposes caught errors.
 Each registration returns its own unregister function, even when callbacks are
 identical. Cleanup callbacks must be synchronous; their owners release any async
 resources without delaying local removal. One throwing owner does not skip others.
+
+## Own-profile updates (#29)
+
+`src/features/profile/` reuses the same controller and typed client.
+`saveDisplayName` and `saveAvatar` call `PATCH /users/me/profile` and
+`PATCH /users/me/avatar`, then parse every response with the jitless
+`profileSchema`/`avatarSchema`. A 2xx response that fails parsing is treated as
+an uncertain write, never as success. Rejected `403`/`400` responses keep the
+draft and the last confirmed state; a network-level failure is reported as
+outcome-uncertain and the screen reconciles with `GET /users/me` before
+claiming success or repeating the potentially completed write.
+
+`SessionController.applyConfirmedProfile(profile)` adopts the server-confirmed
+profile so the shell never renders stale identity. It is ignored unless the
+snapshot is `authenticated`, the profile id matches the signed-in user, and
+`profileSchema` parses; the adopted user and avatar are frozen. The own-profile
+query key (`ownProfileQueryKey(userId)` in `src/api/query-keys.ts`) is scoped
+by user, and the existing user-scope predicate evicts it at logout, so no other
+account reads or retains it.
 
 ## React ownership and safe redirects
 
@@ -187,8 +208,9 @@ remains application-owned; its pending identity initialization is shared on remo
   passes `null` as the body when reconstructing null-body HTTP status responses (`204`,
   `205`, `304`), preventing `TypeError` failures in browsers where empty streams expose a
   non-null `ReadableStream` on endpoints such as `POST /auth/password-reset/confirm`.
-- `AppShell` renders the signed-in user's `displayName` and `Cerrar sesión` button only
-  when `snapshot.status === 'authenticated'`. `SessionController.logout()` is
+- `AppShell` renders the signed-in user's `displayName`, the `Mi perfil` link to
+  `/profile`, and the `Cerrar sesión` button only when
+  `snapshot.status === 'authenticated'`. `SessionController.logout()` is
   single-flight (concurrent invocations share the active `POST /auth/logout` call instead
   of aborting server revocation, while a subsequent `login()` supersedes any still-pending
   logout epoch so `serverConfirmed` resolves `false`), and `AppShell` ignores duplicate

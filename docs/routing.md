@@ -11,6 +11,7 @@ React Router (FD4) runs in data mode: `createBrowserRouter` with `RouterProvider
 | `/password-reset`                           | none (signed in or out) | `src/app/pages/password-reset-page`             |
 | `/invitations/accept`                       | none (signed in or out) | `src/app/pages/invitation-accept-page`          |
 | `/`                                         | `RequireAuth`           | `src/app/pages/home-page`                       |
+| `/profile`                                  | `RequireAuth`           | `src/app/pages/profile-page`                    |
 | `/classrooms/:classroomId`                  | `RequireAuth`           | `src/features/classrooms/classroom-workspace`   |
 | `/classrooms/:classroomId/panels/:panelKey` | `RequireAuth`           | `src/features/classrooms/classroom-panel-route` |
 | `/dev/ui`                                   | none, dev/showcase only | `src/app/ui-foundations`                        |
@@ -23,7 +24,7 @@ Every page is a lazy route module (`lazy: { Component }`), so its chunk loads wh
 Two pathless layout routes sit under the root route. Both mount the single toast host and a `main` landmark with the same id, and focus after navigation is handled once above them (`RouterRoot`), so moving between layouts (for example login to home) is still announced.
 
 - `AuthLayout` (`/login`, `/register`, `/password-reset`, `/invitations/accept`): a split screen with no sidebar. The brand panel (the only `h1`, the product name, a one-line value statement and a text placeholder where the 3D classroom model will go) comes first in the DOM, so on phones it stacks above the content and on wide screens it sits on the right. The form column is `[data-auth-slot]`: feature screens render their form inside it and inherit its width and surface.
-- `AppShell` (everything else, including the `*` catch-all): `BaseLayout` (skip link, banner with the only `h1`, `main`) and `<Outlet />`. It has no sidebar: navigation arrives with the features that need it, and an empty aside is not rendered. When `snapshot.status === 'authenticated'`, the banner displays the signed-in user's `displayName` and the `Cerrar sesión` action; signed-out views (including `*` 404) never render signed-in controls. The showcase at `/dev/ui` is reached by URL only; nothing links to it.
+- `AppShell` (everything else, including the `*` catch-all): `BaseLayout` (skip link, banner with the only `h1`, `main`) and `<Outlet />`. It has no sidebar: navigation arrives with the features that need it, and an empty aside is not rendered. When `snapshot.status === 'authenticated'`, the banner displays the signed-in user's `displayName`, the `Mi perfil` link to `/profile`, and the `Cerrar sesión` action; signed-out views (including `*` 404) never render signed-in controls. The showcase at `/dev/ui` is reached by URL only; nothing links to it.
 
 Pages use `h2` for their title. The not found, forbidden and error views share `StatusView` (a decorative scene from `src/components/illustrations/scenes.tsx`, title, explanation, actions) and take the width of whichever layout hosts them.
 
@@ -63,6 +64,20 @@ Successful confirmation calls the existing session controller logout path, synch
 ![Password reset desktop screen (1280px)](./assets/auth/password-reset-1280.png)
 
 ![Password reset mobile screen (360px)](./assets/auth/password-reset-360.png)
+
+## Profile and base avatar (`/profile`)
+
+The `/profile` route (`src/app/pages/profile-page.tsx`, rendering `ProfileView` from `src/features/profile/profile-view.tsx`) is protected by `RequireAuth` and lets signed-in users update their display name and base avatar configuration (`HU-AUT-003` part 1/2):
+
+- **Authoritative load and cache isolation:** `useOwnProfile` reads `GET /users/me` under a user-scoped query key (`ownProfileQueryKey`), keeping loading, error-with-retry, and stale-data states distinct. Confirmed updates write back to the query cache and update `SessionController.applyConfirmedProfile` so the `AppShell` header reflects the new `displayName` immediately without a reload.
+- **Display name and base avatar forms:** `DisplayNameForm` (`PATCH /users/me/profile`) and `AvatarForm` (`PATCH /users/me/avatar`) use explicit save triggers, `useProtectedSubmit` duplicate-submit protection, and `useUnsavedChangesGuard` / `useBlocker` unsaved-draft protection. Avatar choices (`bodyId`, `hairId`, `topId`, `hairColor`, `clothingColor`) are driven strictly by the contract (`AvatarDto`) and rendered in a 2D/DOM `AvatarPreview` with distinct saved vs. unsaved-draft indicators.
+- **Rejections and uncertain writes:** `400` validation errors and `403` rejections preserve both the user's draft and the last confirmed server state. Network or unreadable write responses reconcile against `GET /users/me` before claiming success or repeating a write.
+- **Preview boundary:** The original SVG follows the [avatar art direction](../rules/art-direction.md#avatars) with a wide rounded-cube head, soft volume, readable hair/clothing silhouettes and no dark exterior outlines. It renders the same five contract fields; its fixed skin appearance is not an editable or persisted skin-tone option. The renderer can be replaced independently of the forms. The 3D preview/rendering belongs to part 2/2; equipping purchased items belongs to `HU-ESP-004`.
+- **Verification boundary:** Unit tests use an MSW profile store and the Playwright profile scenario intercepts API calls with in-memory server state. Reload checks demonstrate the frontend reloading confirmed values from a simulated server, not persistence in a real database or on another device. Live-backend, cross-session and cross-device persistence remain integration checks pending backend availability.
+
+![Profile and base avatar desktop screen (1280px)](./assets/profile/profile-1280.png)
+
+![Profile and base avatar mobile screen (360px)](./assets/profile/profile-360.png)
 
 ## Guards
 
