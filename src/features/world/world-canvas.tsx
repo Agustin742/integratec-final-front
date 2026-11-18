@@ -65,7 +65,9 @@ export function WorldCanvas({ children, label, scopeKey }: WorldCanvasProps) {
 
   useEffect(() => {
     return () => {
-      clearAssetCache();
+      clearAssetCache(
+        scopeKey === undefined ? { disposeDecoders: true } : { scopeKey },
+      );
     };
   }, [scopeKey]);
 

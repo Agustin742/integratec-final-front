@@ -6,6 +6,7 @@ import {
   MeshStandardMaterial,
   Texture,
   WebGLRenderTarget,
+  type WebGLRenderer,
 } from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -14,6 +15,7 @@ import {
   DRACO_DECODER_PATH,
   KTX2_TRANSCODER_PATH,
   clearAssetCache,
+  configureKtx2RendererSupport,
   createConfiguredGltfLoader,
   disposeObject3D,
   getAssetCacheSize,
@@ -55,7 +57,12 @@ describe('asset-cache & GlbAsset', () => {
     vi.restoreAllMocks();
   });
 
-  it('configures GLTFLoader with same-origin Draco and KTX2 decoder paths', () => {
+  it('configures GLTFLoader with same-origin Draco, KTX2, and meshopt decoders', () => {
+    const fakeRenderer = {
+      capabilities: { isWebGL2: true },
+      extensions: { has: () => false, get: () => null },
+    } as unknown as WebGLRenderer;
+    configureKtx2RendererSupport(fakeRenderer);
     const loader = createConfiguredGltfLoader();
     expect(DRACO_DECODER_PATH).toBe('/decoders/draco/');
     expect(KTX2_TRANSCODER_PATH).toBe('/decoders/basis/');
@@ -80,20 +87,42 @@ describe('asset-cache & GlbAsset', () => {
     expect(getAssetCacheSize()).toBe(1);
   });
 
-  it('isolates a failing GLB behind a placeholder without breaking sibling scene content', async () => {
+  it('allows explicit forceRetry after a transient rejection', async () => {
+    const { gltf } = createSyntheticGltf();
+    let attempt = 0;
+    const loadAsync = vi.fn(async () => {
+      attempt += 1;
+      if (attempt === 1) {
+        throw new Error('Transient 503');
+      }
+      return gltf;
+    });
+    setGlbLoaderForTests({ loadAsync });
+
+    await expect(loadGlbAsset('/models/transient.glb')).rejects.toThrow(
+      'Transient 503',
+    );
+    expect(getAssetCacheSize()).toBe(1);
+
+    const recovered = await loadGlbAsset('/models/transient.glb', {
+      forceRetry: true,
+    });
+    expect(recovered).toBe(gltf);
+    expect(loadAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('isolates a failing GLB behind a placeholder while keeping sibling scene content alive', async () => {
     const consoleErrorSpy = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});
     const { gltf } = createSyntheticGltf();
-
-    setGlbLoaderForTests({
-      loadAsync: vi.fn(async (url: string) => {
-        if (url === '/models/broken.glb') {
-          throw new Error('Corrupt GLB');
-        }
-        return gltf;
-      }),
+    const loadAsync = vi.fn(async (url: string) => {
+      if (url === '/models/broken.glb') {
+        throw new Error('Corrupt GLB');
+      }
+      return gltf;
     });
+    setGlbLoaderForTests({ loadAsync });
 
     await act(async () => {
       render(
@@ -113,27 +142,38 @@ describe('asset-cache & GlbAsset', () => {
     await waitFor(() => {
       expect(screen.getByTestId('asset-placeholder')).toBeInTheDocument();
     });
+    expect(loadAsync).toHaveBeenCalledWith('/models/ok.glb');
     expect(screen.getByTestId('sibling-scene')).toHaveTextContent(
       'Escena activa',
     );
     expect(consoleErrorSpy).toHaveBeenCalled();
   });
 
-  it('disposes geometries, materials, textures, and render targets when clearing the cache', async () => {
-    const { gltf, geometry, material, texture } = createSyntheticGltf();
-    const geomDispose = vi.spyOn(geometry, 'dispose');
-    const matDispose = vi.spyOn(material, 'dispose');
-    const texDispose = vi.spyOn(texture, 'dispose');
+  it('disposes only the cleared scopeKey and disposes geometries, materials, textures, and render targets', async () => {
+    const assetA = createSyntheticGltf();
+    const assetB = createSyntheticGltf();
+    const disposeGeomA = vi.spyOn(assetA.geometry, 'dispose');
+    const disposeMatA = vi.spyOn(assetA.material, 'dispose');
+    const disposeTexA = vi.spyOn(assetA.texture, 'dispose');
+    const disposeGeomB = vi.spyOn(assetB.geometry, 'dispose');
 
-    setGlbLoaderForTests({ loadAsync: vi.fn(async () => gltf) });
-    await loadGlbAsset('/models/chair.glb');
-    expect(getAssetCacheSize()).toBe(1);
+    setGlbLoaderForTests({
+      loadAsync: vi.fn(async (url: string) =>
+        url === '/models/a.glb' ? assetA.gltf : assetB.gltf,
+      ),
+    });
 
-    clearAssetCache();
-    expect(getAssetCacheSize()).toBe(0);
-    expect(geomDispose).toHaveBeenCalledTimes(1);
-    expect(matDispose).toHaveBeenCalledTimes(1);
-    expect(texDispose).toHaveBeenCalledTimes(1);
+    await loadGlbAsset('/models/a.glb', { scopeKey: 'class-a' });
+    await loadGlbAsset('/models/b.glb', { scopeKey: 'class-b' });
+    expect(getAssetCacheSize()).toBe(2);
+
+    clearAssetCache({ scopeKey: 'class-a' });
+    expect(getAssetCacheSize('class-a')).toBe(0);
+    expect(getAssetCacheSize('class-b')).toBe(1);
+    expect(disposeGeomA).toHaveBeenCalledTimes(1);
+    expect(disposeMatA).toHaveBeenCalledTimes(1);
+    expect(disposeTexA).toHaveBeenCalledTimes(1);
+    expect(disposeGeomB).not.toHaveBeenCalled();
 
     const renderTarget = new WebGLRenderTarget(64, 64);
     const rtDispose = vi.spyOn(renderTarget, 'dispose');

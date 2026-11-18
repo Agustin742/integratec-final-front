@@ -10,7 +10,7 @@ This guide defines how GLB/glTF assets are compressed, loaded, cached, disposed,
   - `MeshoptDecoder` bundled from `three/examples/jsm/libs/meshopt_decoder.module.js`.
 - **CSP compatibility**: `src/config/security-headers.ts` allows `'wasm-unsafe-eval'` in `script-src` and `blob:` in `worker-src` so same-origin Draco and KTX2 WebAssembly decoders run without enabling JavaScript `eval()`.
 - **Caching & isolation**: `loadGlbAsset()` / `readCachedGlbAsset()` deduplicate fetches and parses per URL. `<GlbAsset />` (`src/features/world/glb-asset.tsx`) wraps each asset in its own `Suspense` and error boundary so a failing GLB renders a placeholder without breaking the rest of the scene.
-- **Disposal**: `disposeObject3D()` and `clearAssetCache()` release geometries, materials, textures, and render targets when `WorldCanvas` unmounts, when `scopeKey` (classroom) changes, or when `SessionController` triggers logout cleanup.
+- **Disposal**: `disposeObject3D()` and `clearAssetCache()` release geometries, materials, textures, and skeletons when `WorldCanvas` unmounts, when `scopeKey` (classroom) changes, or when `ClassroomWorkspace` runs its `SessionController` logout cleanup (which also disposes shared Draco/KTX2 decoders). Individual `WebGLRenderTarget` instances are disposed via `disposeObject3D(renderTarget)`.
 
 ## Authoring & Compression Pipeline
 

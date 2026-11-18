@@ -27,3 +27,7 @@ export declare function checkAssetBudgets(options?: {
 export declare function formatAssetBudgetReport(
   result: AssetBudgetResult,
 ): string;
+
+export declare function parseCliArgs(argv: readonly string[]): {
+  readonly modelsDir: string | undefined;
+};

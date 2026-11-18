@@ -1,29 +1,23 @@
 import { readdirSync, statSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { basename, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const AVATAR_GLB_MAX_BYTES = 1024 * 1024; // 1 MiB (FD8)
 export const SCENE_GLB_MAX_BYTES = 8 * 1024 * 1024; // 8 MiB (FD8)
 
-function isModelFile(filename) {
-  const lower = filename.toLowerCase();
-  return lower.endsWith('.glb') || lower.endsWith('.gltf');
+function isGlbFile(filename) {
+  return filename.toLowerCase().endsWith('.glb');
 }
 
-function collectModelFiles(dir) {
+function collectGlbFiles(dir) {
   const results = [];
-  let entries;
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return results;
-  }
+  const entries = readdirSync(dir, { withFileTypes: true });
 
   for (const entry of entries) {
     const fullPath = join(dir, entry.name);
     if (entry.isDirectory()) {
-      results.push(...collectModelFiles(fullPath));
-    } else if (entry.isFile() && isModelFile(entry.name)) {
+      results.push(...collectGlbFiles(fullPath));
+    } else if (entry.isFile() && isGlbFile(entry.name)) {
       results.push(fullPath);
     }
   }
@@ -32,11 +26,12 @@ function collectModelFiles(dir) {
 
 function isSceneAsset(relativePath) {
   const normalized = relativePath.replace(/\\/g, '/').toLowerCase();
+  const file = basename(normalized);
   return (
     normalized.startsWith('scenes/') ||
     normalized.includes('/scenes/') ||
-    normalized.includes('classroom') ||
-    normalized.includes('scene')
+    file.startsWith('classroom') ||
+    file.startsWith('scene')
   );
 }
 
@@ -47,11 +42,27 @@ function formatSize(bytes) {
 }
 
 export function checkAssetBudgets(options = {}) {
-  const modelsDir = resolve(options.modelsDir ?? 'public/models');
+  const rawDir = options.modelsDir ?? 'public/models';
+  if (typeof rawDir !== 'string' || rawDir.trim() === '') {
+    throw new Error('[assets:check] --dir must be a non-empty directory path.');
+  }
+  const modelsDir = resolve(rawDir);
+  let stats;
+  try {
+    stats = statSync(modelsDir);
+  } catch {
+    throw new Error(`[assets:check] Models directory not found: ${modelsDir}`);
+  }
+  if (!stats.isDirectory()) {
+    throw new Error(
+      `[assets:check] Models path is not a directory: ${modelsDir}`,
+    );
+  }
+
   const avatarMaxBytes = options.avatarMaxBytes ?? AVATAR_GLB_MAX_BYTES;
   const sceneMaxBytes = options.sceneMaxBytes ?? SCENE_GLB_MAX_BYTES;
 
-  const files = collectModelFiles(modelsDir);
+  const files = collectGlbFiles(modelsDir);
   const items = [];
   let sceneTotalBytes = 0;
 
@@ -88,9 +99,7 @@ export function checkAssetBudgets(options = {}) {
 export function formatAssetBudgetReport(result) {
   const lines = [];
   if (result.items.length === 0) {
-    lines.push(
-      `[assets:check] No .glb/.gltf files found under ${result.modelsDir}.`,
-    );
+    lines.push(`[assets:check] No .glb files found under ${result.modelsDir}.`);
     return lines.join('\n');
   }
 
@@ -124,12 +133,25 @@ export function formatAssetBudgetReport(result) {
   return lines.join('\n');
 }
 
-function parseCliArgs(argv) {
+export function parseCliArgs(argv) {
   let modelsDir;
   for (let i = 0; i < argv.length; i += 1) {
-    if (argv[i] === '--dir' && argv[i + 1]) {
-      modelsDir = argv[i + 1];
+    const arg = argv[i];
+    if (arg === '--dir') {
+      const value = argv[i + 1];
+      if (!value || value.startsWith('--')) {
+        throw new Error('[assets:check] Missing value for --dir.');
+      }
+      modelsDir = value;
       i += 1;
+    } else if (arg.startsWith('--dir=')) {
+      const value = arg.slice('--dir='.length);
+      if (!value) {
+        throw new Error('[assets:check] Missing value for --dir=.');
+      }
+      modelsDir = value;
+    } else {
+      throw new Error(`[assets:check] Unknown argument: ${arg}`);
     }
   }
   return { modelsDir };
@@ -140,13 +162,18 @@ const isEntrypoint =
   pathToFileURL(resolve(process.argv[1])).href === import.meta.url;
 
 if (isEntrypoint) {
-  const { modelsDir } = parseCliArgs(process.argv.slice(2));
-  const result = checkAssetBudgets({ modelsDir });
-  const report = formatAssetBudgetReport(result);
-  if (result.ok) {
-    console.log(report);
-  } else {
-    console.error(report);
+  try {
+    const { modelsDir } = parseCliArgs(process.argv.slice(2));
+    const result = checkAssetBudgets({ modelsDir });
+    const report = formatAssetBudgetReport(result);
+    if (result.ok) {
+      console.log(report);
+    } else {
+      console.error(report);
+      process.exitCode = 1;
+    }
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   }
 }

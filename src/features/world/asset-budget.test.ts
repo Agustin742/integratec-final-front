@@ -7,6 +7,7 @@ import {
   SCENE_GLB_MAX_BYTES,
   checkAssetBudgets,
   formatAssetBudgetReport,
+  parseCliArgs,
 } from '../../../scripts/assets/check-asset-budget.mjs';
 
 describe('checkAssetBudgets', () => {
@@ -66,5 +67,18 @@ describe('checkAssetBudgets', () => {
     expect(result.sceneTotalOk).toBe(false);
     const report = formatAssetBudgetReport(result);
     expect(report).toContain('FAIL (scene) scenes/classroom-full.glb');
+  });
+
+  it('rejects missing directories and invalid CLI arguments', () => {
+    expect(() =>
+      checkAssetBudgets({
+        modelsDir: join(tmpdir(), 'nonexistent-models-dir-25'),
+      }),
+    ).toThrow(/Models directory not found/);
+    expect(() => parseCliArgs(['--dir'])).toThrow(/Missing value for --dir/);
+    expect(() => parseCliArgs(['--unknown'])).toThrow(/Unknown argument/);
+    expect(parseCliArgs(['--dir=custom/models'])).toEqual({
+      modelsDir: 'custom/models',
+    });
   });
 });

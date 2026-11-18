@@ -70,10 +70,10 @@ function WorkspaceContext({
   };
   const context = useClassroomContext(classroomId);
   useClassroomContextEvents(classroomId);
-  useSessionCleanup(() => clearAssetCache());
+  useSessionCleanup(() => clearAssetCache({ disposeDecoders: true }));
   useEffect(() => {
     return () => {
-      clearAssetCache();
+      clearAssetCache({ scopeKey: classroomId });
     };
   }, [classroomId]);
   useDocumentTitle(

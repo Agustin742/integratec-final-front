@@ -1,8 +1,10 @@
 import { Component, Suspense, useMemo, type ReactNode } from 'react';
+import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { readCachedGlbAsset } from './asset-cache';
 
 export interface GlbAssetProps {
   readonly url: string;
+  readonly scopeKey?: string;
   readonly fallback?: ReactNode;
   readonly errorFallback?: ReactNode;
   readonly onError?: (error: unknown) => void;
@@ -34,24 +36,35 @@ class AssetErrorBoundary extends Component<
   }
 }
 
-function DefaultAssetPlaceholder() {
+function DefaultAssetPlaceholder({
+  position,
+  rotation,
+  scale,
+}: Pick<GlbAssetProps, 'position' | 'rotation' | 'scale'>) {
   return (
-    <mesh name="glb-asset-placeholder">
-      <boxGeometry args={[0.8, 0.8, 0.8]} />
-      <meshStandardMaterial color="#E9C99B" roughness={0.95} />
-    </mesh>
+    <group position={position} rotation={rotation} scale={scale}>
+      <mesh name="glb-asset-placeholder" position={[0, 0.4, 0]}>
+        <boxGeometry args={[0.8, 0.8, 0.8]} />
+        <meshStandardMaterial color="#E9C99B" roughness={0.95} />
+      </mesh>
+    </group>
   );
 }
 
 function LoadedGlbModel({
   url,
+  scopeKey,
   position,
   rotation,
   scale,
-}: Pick<GlbAssetProps, 'url' | 'position' | 'rotation' | 'scale'>) {
-  const gltf = readCachedGlbAsset(url);
-  // Clone scene graph per instance while sharing cached geometries/materials.
-  const instance = useMemo(() => gltf.scene.clone(true), [gltf]);
+}: Pick<
+  GlbAssetProps,
+  'url' | 'scopeKey' | 'position' | 'rotation' | 'scale'
+>) {
+  const gltf = readCachedGlbAsset(url, { scopeKey });
+  // Use SkeletonUtils.clone so SkinnedMesh bones rebind per instance while
+  // sharing cached geometries and materials.
+  const instance = useMemo(() => cloneSkeleton(gltf.scene), [gltf]);
   return (
     <primitive
       object={instance}
@@ -69,18 +82,32 @@ function LoadedGlbModel({
  */
 export function GlbAsset({
   url,
+  scopeKey,
   fallback = null,
-  errorFallback = <DefaultAssetPlaceholder />,
+  errorFallback,
   onError,
   position,
   rotation,
   scale,
 }: GlbAssetProps) {
+  const resolvedErrorFallback = errorFallback ?? (
+    <DefaultAssetPlaceholder
+      position={position}
+      rotation={rotation}
+      scale={scale}
+    />
+  );
+
   return (
-    <AssetErrorBoundary key={url} fallback={errorFallback} onError={onError}>
+    <AssetErrorBoundary
+      key={`${scopeKey ?? ''}:${url}`}
+      fallback={resolvedErrorFallback}
+      onError={onError}
+    >
       <Suspense fallback={fallback}>
         <LoadedGlbModel
           url={url}
+          scopeKey={scopeKey}
           position={position}
           rotation={rotation}
           scale={scale}
