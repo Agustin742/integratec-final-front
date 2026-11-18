@@ -1,5 +1,16 @@
 # Tracker — Mati
 
+## 2026-11-18 — One-click switch between 3D classroom and accessible 2D Classic Mode (#34)
+
+- **Status:** in-progress
+- **Area / files:** `package.json`, `pnpm-lock.yaml`, `docs/threat-model.md`, `src/features/classrooms/`, `e2e/classroom-workspace.spec.ts`, `docs/classroom-workspace.md`, `docs/classroom-panels.md`, `docs/assets/classroom-workspace/`, `changelogs/tracker-mati.md`
+- **Change:** Implemented [issue #34](https://github.com/Agustin742/integratec-final-front/issues/34) (`HU-ESP-003`) on `feat/34-classroom-2d-3d-mode-switch` from `develop` (`1a4c9af`):
+  1. Installed `zustand@5.1.0`, added per-user in-memory `useClassroomModeStore` (`classroom-mode-store.ts`, resetting cleanly on logout and account switches while documenting client-vs-server persistence as an open decision), centralized `es-AR` view-mode strings (`messages.ts`), added `TM-008`–`TM-009` to `docs/threat-model.md`, and verified 5 unit tests (`982727f`).
+  2. Implemented lazy `Classroom3DStage`, accessible `Classroom2DLayout` backed by `canOpenPanel(key)`, and `WorkspaceContext` header toggle + `Alt+M` shortcut arbitration + `PARENT` exclusion in `classroom-workspace.tsx` with 6 RTL tests (`25b47d3`).
+  3. Extended `e2e/classroom-workspace.spec.ts` with desktop (`1280px`) and mobile (`360px`) 3D ↔ 2D switching, `<canvas>` disposal, keyboard/Escape focus return, `200%` CSS zoom, parent exclusion, and responsive captures under `docs/assets/classroom-workspace/`, and updated `docs/classroom-workspace.md` and `docs/classroom-panels.md`.
+- **Reason:** Provide a per-user `3D` / `2D Classic Mode` switch with keyboard shortcut (`Alt+M`), accessible panel navigation gated strictly by server `availablePanels`, complete 3D canvas disposal in 2D mode, and parent exclusion from 3D classrooms (`rules/classrooms-and-roles.md`, `rules/state-management.md`, `rules/ui-and-accessibility.md`, `rules/3d-world-and-camera.md`, `rules/movement-and-interactions.md`).
+- **Next step:** Run full Step 6 profile verification and blind `rdd-auditor` review before Mandatory Pause #2.
+
 ## 2026-11-16 — Complete the classroom panel entry catalog (#26)
 
 - **Status:** completed (approved implementation published in PR #80; integration remains In review)
