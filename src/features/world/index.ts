@@ -1,4 +1,5 @@
 export { WorldCanvas, type WorldCanvasProps } from './world-canvas';
+export { WarmLighting } from './world-lighting';
 export { WorldReference } from './world-reference';
 export { GlbAsset, type GlbAssetProps } from './glb-asset';
 export {

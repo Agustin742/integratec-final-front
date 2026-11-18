@@ -23,6 +23,8 @@ import { AvatarModel } from './avatar-model';
 
 const frame = vi.hoisted(() => ({
   callback: null as null | ((state: unknown, delta: number) => void),
+  invalidate: vi.fn(),
+  frameloop: 'demand' as 'demand' | 'never',
 }));
 const composed = vi.hoisted(() => [] as unknown[]);
 
@@ -30,7 +32,15 @@ vi.mock('@react-three/fiber', () => ({
   useFrame: (callback: (state: unknown, delta: number) => void) => {
     frame.callback = callback;
   },
+  useThree: (select?: (state: unknown) => unknown) => {
+    const state = { invalidate: frame.invalidate, frameloop: frame.frameloop };
+    return select ? select(state) : state;
+  },
 }));
+
+/** What R3F hands to a `useFrame` callback: the root state with `invalidate`. */
+const tick = (delta: number) =>
+  frame.callback?.({ invalidate: frame.invalidate }, delta);
 vi.mock('./compose-avatar', async (original) => {
   const actual = await original<typeof import('./compose-avatar')>();
   return {
@@ -124,6 +134,8 @@ describe('AvatarModel', () => {
   beforeEach(() => {
     composed.length = 0;
     frame.callback = null;
+    frame.frameloop = 'demand';
+    frame.invalidate.mockClear();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
@@ -217,13 +229,28 @@ describe('AvatarModel', () => {
     expect(lastComposed().dispose).not.toHaveBeenCalled();
   });
 
-  it('advances the named clip every frame', async () => {
+  it('advances the named clip every frame and keeps the demand loop alive', async () => {
     useLoader([], ['Idle', 'Walk']);
     mockReducedMotion(false);
     const update = vi.spyOn(AnimationMixer.prototype, 'update');
     await mount(<AvatarModel avatar={avatar} animation="Idle" />);
-    act(() => frame.callback?.({}, 0.1));
+    frame.invalidate.mockClear();
+    act(() => tick(0.1));
     expect(update).toHaveBeenCalledWith(0.1);
+    expect(frame.invalidate).toHaveBeenCalledTimes(1);
+  });
+
+  it('requests a frame when the loop resumes from never to demand', async () => {
+    useLoader([], ['Idle']);
+    mockReducedMotion(false);
+    frame.frameloop = 'never';
+    const view = await mount(<AvatarModel avatar={avatar} animation="Idle" />);
+    frame.invalidate.mockClear();
+    frame.frameloop = 'demand';
+    await act(async () => {
+      view.rerender(<AvatarModel avatar={{ ...avatar }} animation="Idle" />);
+    });
+    expect(frame.invalidate).toHaveBeenCalled();
   });
 
   it('stays static when the clip does not exist', async () => {
@@ -231,16 +258,22 @@ describe('AvatarModel', () => {
     mockReducedMotion(false);
     const update = vi.spyOn(AnimationMixer.prototype, 'update');
     await mount(<AvatarModel avatar={avatar} animation="Idle" />);
-    act(() => frame.callback?.({}, 0.1));
+    frame.invalidate.mockClear();
+    act(() => tick(0.1));
     expect(update).not.toHaveBeenCalled();
+    expect(frame.invalidate).not.toHaveBeenCalled();
   });
 
-  it('does not animate under prefers-reduced-motion', async () => {
+  it('poses the first frame once and never advances under prefers-reduced-motion', async () => {
     useLoader([], ['Idle']);
     mockReducedMotion(true);
     const update = vi.spyOn(AnimationMixer.prototype, 'update');
     await mount(<AvatarModel avatar={avatar} animation="Idle" />);
-    act(() => frame.callback?.({}, 0.1));
-    expect(update).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledWith(0);
+    frame.invalidate.mockClear();
+    act(() => tick(0.1));
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(frame.invalidate).not.toHaveBeenCalled();
   });
 });

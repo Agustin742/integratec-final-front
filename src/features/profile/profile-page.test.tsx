@@ -28,6 +28,18 @@ import { render } from '@/test/render';
 import '@/app/pages/profile-page';
 import { profileMessages } from './messages';
 
+// jsdom has no WebGL: the page behaves as on a device without 3D, so these
+// tests cover the form with the 2D preview. The 3D wiring has its own tests.
+vi.mock('./avatar-preview-3d', async () => {
+  const { useEffect } = await import('react');
+  return {
+    AvatarPreview3D: ({ onUnavailable }: { onUnavailable: () => void }) => {
+      useEffect(() => onUnavailable(), [onUnavailable]);
+      return null;
+    },
+  };
+});
+
 beforeAll(() => {
   mswServer.listen({ onUnhandledFrame: 'error' });
 });

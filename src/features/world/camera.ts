@@ -39,3 +39,40 @@ export function frameCamera(
   camera.zoom = 1;
   camera.updateProjectionMatrix();
 }
+
+/**
+ * Bounds of one standing avatar (meters, Y up, feet at 0) with room for hair
+ * volume and swinging arms. Measured from the body and hair GLB position
+ * accessors, not from a rendered check; widen them here if a part overflows.
+ */
+export const AVATAR_FRAME = {
+  bottom: -0.05,
+  top: 1.8,
+  halfWidth: 0.8,
+} as const;
+
+/** Front view that fits the whole avatar, head to feet, in any host aspect. */
+export function frameAvatarCamera(
+  camera: OrthographicCamera,
+  width: number,
+  height: number,
+): void {
+  if (width <= 0 || height <= 0) return;
+  const centerY = (AVATAR_FRAME.bottom + AVATAR_FRAME.top) / 2;
+  camera.position.set(0, centerY, 10);
+  camera.up.set(0, 1, 0);
+  camera.lookAt(0, centerY, 0);
+  camera.updateMatrixWorld(true);
+  const aspect = width / height;
+  const halfHeight = (AVATAR_FRAME.top - AVATAR_FRAME.bottom) / 2;
+  const fittedHeight =
+    Math.max(halfHeight, AVATAR_FRAME.halfWidth / aspect) * 1.08;
+  camera.top = fittedHeight;
+  camera.bottom = -fittedHeight;
+  camera.right = fittedHeight * aspect;
+  camera.left = -camera.right;
+  camera.near = 0.1;
+  camera.far = 50;
+  camera.zoom = 1;
+  camera.updateProjectionMatrix();
+}

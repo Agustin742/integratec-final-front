@@ -1,4 +1,4 @@
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import {
   Component,
   Suspense,
@@ -173,21 +173,38 @@ function LoadedAvatar({
   }, [skippedKey, composed]);
 
   const reducedMotion = usePrefersReducedMotion();
+  const invalidate = useThree((state) => state.invalidate);
+  const frameloop = useThree((state) => state.frameloop);
   const mixerRef = useRef<AnimationMixer | null>(null);
   useEffect(() => {
-    if (!animation || reducedMotion) return;
+    if (!animation) return;
     const clip = AnimationClip.findByName(bodyGltf.animations, animation);
     if (!clip) return;
     const mixer = new AnimationMixer(composed.root);
     mixer.clipAction(clip).play();
-    mixerRef.current = mixer;
+    // Pose the first frame instead of the bind pose (a T-pose); only motion
+    // that is allowed keeps advancing it.
+    mixer.update(0);
+    mixerRef.current = reducedMotion ? null : mixer;
+    invalidate();
     return () => {
       mixer.stopAllAction();
       mixer.uncacheRoot(composed.root);
       mixerRef.current = null;
     };
-  }, [animation, reducedMotion, bodyGltf, composed]);
-  useFrame((_, delta) => mixerRef.current?.update(delta));
+  }, [animation, reducedMotion, bodyGltf, composed, invalidate]);
+  // A `demand` loop stops once nothing invalidates it (hidden tab, offscreen
+  // host), so an active clip asks for its next frame and for the first frame
+  // after the loop resumes.
+  useEffect(() => {
+    if (mixerRef.current && frameloop === 'demand') invalidate();
+  }, [frameloop, invalidate]);
+  useFrame((state, delta) => {
+    const mixer = mixerRef.current;
+    if (!mixer) return;
+    mixer.update(delta);
+    state.invalidate();
+  });
 
   return (
     <primitive
