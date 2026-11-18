@@ -4,6 +4,7 @@ import type { components } from '@/api/schema.generated';
 import { NotFoundPage } from '@/app/pages/not-found-page';
 import { useDocumentTitle } from '@/app/router/document-title';
 import { ErrorState, LoadingState } from '@/components/feedback/states';
+import { WalletIndicator } from '@/features/points/wallet-indicator';
 import { classroomMessages as messages } from './messages';
 import { useClassroomContext } from './use-classroom-capabilities';
 import { useClassroomContextEvents } from './use-classroom-context-events';
@@ -121,6 +122,11 @@ function WorkspaceContext({
           <p className="text-sm text-muted-foreground">
             {messages.role}: {messages.roles[classroom.myRole]}
           </p>
+          {/* The server context decides who sees their own wallet (S2.4); no
+              client role string is trusted here. */}
+          {classroom.myRole === 'STUDENT' && (
+            <WalletIndicator classroomId={classroomId} />
+          )}
         </header>
         <Outlet
           key={location.key}

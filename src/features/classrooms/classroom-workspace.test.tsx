@@ -15,6 +15,7 @@ import type { components } from '@/api/schema.generated';
 import { messages } from '@/app/messages';
 import { fakeSession } from '@/app/router/fake-session';
 import { createAppRoutes } from '@/app/router/routes';
+import { pointsMessages } from '@/features/points/messages';
 import { SessionProvider } from '@/session/provider';
 import { profile } from '@/session/test-fixtures';
 import { expectAccessible } from '@/test/accessibility';
@@ -240,5 +241,64 @@ test.each([403, 404, 500, 'network'] as const)(
       fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
       await screen.findByRole('heading', { name: 'Classroom a' });
     }
+  },
+);
+
+const walletResponse = (): Response =>
+  Response.json({
+    classroomId: 'a',
+    studentId: profile.id,
+    balance: 130,
+    items: [],
+    page: 1,
+    pageSize: 20,
+    total: 0,
+  });
+
+test('a student workspace renders the wallet indicator and queries the wallet endpoint', async () => {
+  const pointsUrls: string[] = [];
+  const fetch = vi.fn((input: RequestInfo | URL) => {
+    const url = new URL((input as Request).url);
+    if (url.pathname.endsWith('/points')) {
+      pointsUrls.push(url.toString());
+      return Promise.resolve(walletResponse());
+    }
+    return Promise.resolve(
+      Response.json({ ...detail('a'), myRole: 'STUDENT' }),
+    );
+  });
+  const { container } = setup(fetch);
+
+  const trigger = await screen.findByRole('button', {
+    name: pointsMessages.wallet.indicator.accessibleName('130 puntos'),
+  });
+  expect(trigger).toHaveTextContent('130 puntos');
+  await waitFor(() => expect(pointsUrls.length).toBeGreaterThan(0));
+  await expectAccessible(container);
+});
+
+test.each(['TEACHER', 'PARENT'] as const)(
+  'a %s workspace renders no wallet indicator and never queries the wallet',
+  async (myRole) => {
+    const pointsUrls: string[] = [];
+    const fetch = vi.fn((input: RequestInfo | URL) => {
+      const url = new URL((input as Request).url);
+      if (url.pathname.endsWith('/points')) {
+        pointsUrls.push(url.toString());
+      }
+      return Promise.resolve(Response.json({ ...detail('a'), myRole }));
+    });
+    setup(fetch);
+
+    await screen.findByRole('heading', { name: 'Classroom a' });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(
+      screen.queryByRole('button', {
+        name: /Ver movimientos de puntos/,
+      }),
+    ).not.toBeInTheDocument();
+    expect(pointsUrls).toHaveLength(0);
   },
 );
