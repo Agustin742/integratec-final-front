@@ -1,5 +1,6 @@
 import type { components } from '@/api/schema.generated';
 import { EmptyState } from '@/components/feedback/states';
+import { ClassroomRosterPanel } from '../classroom-roster-panel';
 import { classroomMessages as messages } from '../messages';
 import type { PanelDescriptor } from './classroom-panels';
 
@@ -28,6 +29,10 @@ export const classroomPanelCatalog = [
   entry('notices'),
   entry('shop'),
   entry('bot'),
-  entry('members'),
+  {
+    key: 'members',
+    title: messages.panels.members,
+    component: ClassroomRosterPanel,
+  },
   entry('settings'),
 ] as const;
