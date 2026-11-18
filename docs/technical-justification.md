@@ -139,13 +139,14 @@ The backend repository records decisions D1-D12 in its `docs/technical-justifica
 ### FD5. Hosting
 
 - **Question:** Where and how is the static build hosted?
-- **Decision:** AWS Amplify Hosting in `sa-east-1`, consistent with D5. The deploy pipeline authenticates to AWS per D6 (GitHub OIDC).
+- **Decision:** AWS Amplify Hosting, consistent with D5. Region and credential model were superseded on 2026-11-04 (see the update below): `us-east-2`, built through the Amplify GitHub App with no AWS credentials in GitHub.
 - **Rationale:** Keeps the frontend in the same region and under the same credential model as the backend.
 - **Alternatives:** S3 + CloudFront configured manually; other static hosts (see "AWS Amplify Hosting" above).
 - **Trade-offs:** Less control than a hand-built distribution; tied to AWS.
 - **Verified:** AWS Amplify Hosting is available in `sa-east-1` (Sao Paulo), per the AWS documentation "AWS Amplify endpoints and quotas" (https://docs.aws.amazon.com/general/latest/gr/amplify.html), checked on 2026-11-02. Availability only; cost and quotas are not assessed here.
 - **Approval:** Approved by Agustin (decision owner) on 2026-11-02.
 - **Update (2026-11-04):** The AWS account uses the AWS "new sign-up experience", which assigns `us-east-2` by country and denies other Regions and the creation of the GitHub OIDC provider through AWS-managed policies (backend D5 and D6 updates). Hosting moves to Amplify Hosting in `us-east-2`; the region and credential decision above is superseded. Deployment uses Amplify Hosting's own GitHub connection: the Amplify GitHub App gets read-only access to the selected repository and Amplify builds and deploys the connected branch, so no AWS credentials are stored in GitHub. Creating the app from the Amplify console needs no token; creating it through the CLI, CloudFormation, or an SDK requires a GitHub personal access token at creation time, which **MUST NOT** be committed. Verified on 2026-11-04: Amplify is available in `us-east-2` ("AWS Amplify endpoints and quotas", https://docs.aws.amazon.com/general/latest/gr/amplify.html) and the GitHub App connection is documented in "Setting up Amplify access to GitHub repositories" (https://docs.aws.amazon.com/amplify/latest/userguide/setting-up-GitHub-access.html). Cost and Free Tier limits are not assessed. Approved by Agustin (decision owner) on 2026-11-04.
+- **Update (2026-11-17, issue #22):** The Amplify app is connected once from the Amplify console through the Amplify GitHub App (keyless; no personal access token), then imported into the backend repository's Terraform, which owns the app, the connected branch, the branch environment variables and the SPA rewrite rule. This repository owns only [`amplify.yml`](../amplify.yml) and `customHttp.yml`. The deployed branch is `develop` until both repositories move to `main`; the environment is set by `VITE_APP_ENV` in the Amplify branch environment, not inferred from the branch name.
 
 ### FD6. Repository layout
 

@@ -115,5 +115,21 @@ class DocumentationTests(unittest.TestCase):
                                      (0, 'Documentation checks passed (1 files).\n', ''))
 
 
+class AmplifyBuildSpecTests(unittest.TestCase):
+    def test_build_spec_contract(self):
+        spec = (ROOT / 'amplify.yml').read_text(encoding='utf-8')
+        package = (ROOT / 'package.json').read_text(encoding='utf-8')
+        pinned = package.split('"packageManager": "pnpm@', 1)[1].split('"', 1)[0]
+        self.assertIn('version: 1', spec)
+        self.assertIn(f'pnpm@{pinned}', spec)
+        self.assertIn('nvm use', spec)
+        self.assertIn('pnpm install --frozen-lockfile', spec)
+        self.assertIn('baseDirectory: dist', spec)
+        steps = ['pnpm security:sync', 'pnpm build', 'pnpm security:check --require-root-match']
+        positions = [spec.index(step) for step in steps]
+        self.assertEqual(positions, sorted(positions))
+        self.assertNotIn('customHeaders', spec)
+
+
 if __name__ == '__main__':
     unittest.main()
