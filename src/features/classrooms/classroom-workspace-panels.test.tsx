@@ -31,6 +31,7 @@ function setup(
   availablePanels: unknown = ['grades'],
   path = '/classrooms/a',
   productionCatalog = false,
+  capabilities: readonly string[] = [],
 ) {
   let availability = availablePanels;
   let status = 200;
@@ -60,7 +61,10 @@ function setup(
             releaseRead = resolve;
           });
         const url = new URL(request.url);
-        if (url.pathname.endsWith('/roster')) {
+        if (
+          url.pathname.endsWith('/roster') ||
+          url.pathname.endsWith('/invitations')
+        ) {
           return Response.json({
             items: [],
             page: 1,
@@ -86,7 +90,7 @@ function setup(
               createdAt: '2026-01-01T00:00:00.000Z',
               updatedAt: '2026-01-01T00:00:00.000Z',
               myRole: 'TEACHER',
-              capabilities: [],
+              capabilities,
               availablePanels: availability,
             });
       },
@@ -172,6 +176,23 @@ test('default catalog opens members by URL with the roster panel and closes clea
   expect(view.router.state.historyAction).toBe('REPLACE');
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(document.activeElement).toHaveTextContent('Classroom a');
+});
+
+test('default catalog opens members with tabs when invite_members is granted', async () => {
+  setup(['members'], '/classrooms/a/panels/members', true, ['invite_members']);
+  const dialog = await screen.findByRole('dialog', { name: 'Integrantes' });
+  const rosterTab = await screen.findByRole('tab', { name: 'Nómina' });
+  const invitationsTab = screen.getByRole('tab', {
+    name: 'Invitaciones y código',
+  });
+  expect(rosterTab).toHaveAttribute('aria-selected', 'true');
+  expect(dialog).toHaveTextContent('Nómina de estudiantes');
+
+  fireEvent.mouseDown(invitationsTab);
+  fireEvent.click(invitationsTab);
+  expect(
+    await screen.findByRole('heading', { name: 'Código de acceso al aula' }),
+  ).toBeVisible();
 });
 
 test.each(pendingCatalogCases)(
