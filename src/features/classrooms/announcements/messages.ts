@@ -78,6 +78,8 @@ export const announcementMessages = {
         'El anuncio o el aula ya no existen o dejaron de ser accesibles.',
       uncertain:
         'No pudimos confirmar si el servidor guardó el cambio. Actualizamos el tablón para verificarlo antes de reintentar.',
+      uncertainCreate:
+        'No pudimos confirmar si se publicó. Revisá el tablón antes de volver a publicar para no duplicar el aviso.',
     },
   },
 } as const;

@@ -279,7 +279,7 @@ describe('NoticeBoardPanel', () => {
     expect(container.querySelector('b')).toBeNull();
   });
 
-  it('preserves draft input on failed submit and reconciles uncertain 5xx/dropped writes', async () => {
+  it('clears the draft and confirms publication when a dropped create response was committed', async () => {
     const store = createClassroomAnnouncementsStore({
       classroomId: CLASSROOM_ID,
       authorId: profile.id,
@@ -299,25 +299,63 @@ describe('NoticeBoardPanel', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Publicar anuncio' }));
 
+    expect(await screen.findByText('Anuncio publicado')).toBeInTheDocument();
     expect(
-      await screen.findByText(/No pudimos confirmar si el servidor guardó/),
-    ).toBeInTheDocument();
+      screen.queryByText(/No pudimos confirmar si se publicó/),
+    ).not.toBeInTheDocument();
 
-    // Draft stays editable
+    expect(screen.getByLabelText('Título')).toHaveValue('');
+    expect(screen.getByLabelText('Contenido')).toHaveValue('');
+
+    const list = await screen.findByRole('list', {
+      name: 'Anuncios publicados en el aula',
+    });
+    expect(within(list).getAllByText('Aviso con corte de red')).toHaveLength(1);
+    expect(store.getItems()).toHaveLength(1);
+  });
+
+  it('keeps the draft and warns about duplicates when a failed create was not committed', async () => {
+    const store = createClassroomAnnouncementsStore({
+      classroomId: CLASSROOM_ID,
+      authorId: profile.id,
+    });
+    mswServer.use(...store.handlers);
+
+    renderNoticeBoardPanel({ role: 'TEACHER' });
+    await screen.findByRole('heading', { name: 'Todavía no hay anuncios' });
+
+    store.failNext('create', {
+      status: 500,
+      body: {
+        code: 'INTERNAL_ERROR',
+        message: 'Server error',
+        correlationId: 'req-create-500',
+      },
+    });
+
+    fireEvent.change(screen.getByLabelText('Título'), {
+      target: { value: 'Aviso que no se guardó' },
+    });
+    fireEvent.change(screen.getByLabelText('Contenido'), {
+      target: { value: 'Contenido que no se pierde.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Publicar anuncio' }));
+
+    expect(
+      await screen.findByText(/No pudimos confirmar si se publicó/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Anuncio publicado')).not.toBeInTheDocument();
+
     expect(screen.getByLabelText('Título')).toHaveValue(
-      'Aviso con corte de red',
+      'Aviso que no se guardó',
     );
     expect(screen.getByLabelText('Contenido')).toHaveValue(
       'Contenido que no se pierde.',
     );
-
-    // Reconciliation refetched the persisted announcement from the server
-    const list = await screen.findByRole('list', {
-      name: 'Anuncios publicados en el aula',
-    });
     expect(
-      within(list).getByText('Aviso con corte de red'),
+      await screen.findByRole('heading', { name: 'Todavía no hay anuncios' }),
     ).toBeInTheDocument();
+    expect(store.getItems()).toHaveLength(0);
   });
 
   it('allows school admin to edit/remove another teacher announcement while regular teacher cannot', async () => {

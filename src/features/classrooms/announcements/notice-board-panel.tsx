@@ -143,6 +143,44 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
     }
   }
 
+  async function handleUncertainCreate(values: {
+    readonly title: string;
+    readonly content: string;
+  }): Promise<boolean> {
+    setPage(1);
+    if (userId === null) return false;
+    const params = { page: 1, pageSize: PAGE_SIZE };
+    let first: { readonly items: readonly AnnouncementDto[] };
+    try {
+      first = await queryClient.fetchQuery({
+        queryKey: classroomAnnouncementsQueryKey(userId, classroomId, params),
+        queryFn: ({ signal }) =>
+          listClassroomAnnouncements(client, classroomId, params, { signal }),
+        staleTime: 0,
+      });
+    } catch {
+      return false;
+    }
+    void queryClient.invalidateQueries({
+      predicate: createClassroomAnnouncementsPredicate(userId, classroomId),
+    });
+    const match = first.items.find(
+      (item) =>
+        item.authorId === userId &&
+        item.title === values.title &&
+        item.content === values.content,
+    );
+    if (!match) return false;
+    setActionNotice({
+      kind: 'success',
+      title: announcementMessages.form.publishedNoticeTitle,
+      description: announcementMessages.form.publishedNoticeDescription(
+        match.title,
+      ),
+    });
+    return true;
+  }
+
   function handleEditTargetMissing() {
     setEditingAnnouncement(null);
     setActionNotice({
@@ -344,6 +382,7 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
           onReconcileRequired={(resetPage) => {
             void reconcileAnnouncements(resetPage);
           }}
+          onUncertainCreate={handleUncertainCreate}
           onCancelEdit={() => {
             setEditingAnnouncement(null);
             headingRef.current?.focus();

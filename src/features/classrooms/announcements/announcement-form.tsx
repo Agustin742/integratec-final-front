@@ -38,6 +38,11 @@ export interface AnnouncementFormProps {
   readonly onEditTargetMissing?: () => void;
   readonly onSuccess: (saved: AnnouncementDto, mode: 'create' | 'edit') => void;
   readonly onReconcileRequired: (resetPage: boolean) => void;
+  /** Reconciles after an uncertain create; resolves true when the draft was found published. */
+  readonly onUncertainCreate: (values: {
+    readonly title: string;
+    readonly content: string;
+  }) => Promise<boolean>;
   readonly onCancelEdit?: () => void;
 }
 
@@ -49,6 +54,7 @@ export function AnnouncementForm({
   onEditTargetMissing,
   onSuccess,
   onReconcileRequired,
+  onUncertainCreate,
   onCancelEdit,
 }: AnnouncementFormProps) {
   const { client } = useSessionService();
@@ -118,7 +124,25 @@ export function AnnouncementForm({
           return;
         }
         if (isUncertainAnnouncementError(error)) {
-          onReconcileRequired(!isEdit);
+          if (isEdit) {
+            onReconcileRequired(false);
+          } else {
+            const published = await onUncertainCreate({
+              title: values.title,
+              content: values.content,
+            });
+            if (published) {
+              form.reset({ title: '', content: '' });
+              return;
+            }
+            throw new ApiError({
+              kind: 'unexpected',
+              status: null,
+              code: null,
+              userMessage:
+                announcementMessages.form.serverErrors.uncertainCreate,
+            });
+          }
         }
         if (error instanceof ApiError) {
           throw error;
