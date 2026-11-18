@@ -1,5 +1,13 @@
 # Tracker — Agustin
 
+## 2026-11-18 — Local verification scope
+
+- **Status:** completed
+- **Area / files:** `README.md`, `docs/testing.md`
+- **Change:** Local checks before pushing now run only the affected tests (`pnpm vitest run --changed origin/develop`) plus lint, typecheck, build and `security:check`. The full test suite runs in the CI `checks` job.
+- **Reason:** Full local runs were slow and timed out randomly under load, and CI already runs the full suite on every pull request.
+- **Next step:** None.
+
 ## 2026-11-18 — Review and fixes on PR #86 (#34, 3D / 2D Classic Mode switch)
 
 - **Status:** completed (pending merge of PR #86)
