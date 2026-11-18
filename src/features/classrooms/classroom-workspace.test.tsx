@@ -54,14 +54,21 @@ function setup(fetch: typeof globalThis.fetch, path = '/classrooms/a') {
     { status: 'authenticated', user: profile },
     createApiClient({
       baseUrl: 'https://api.example.invalid',
-      fetch: (input, init) =>
-        (input as Request).url.endsWith('/context-events')
+      fetch: (input, init) => {
+        const url = (input as Request).url;
+        if (url.includes('/notifications')) {
+          return Promise.resolve(
+            Response.json({ items: [], page: 1, pageSize: 20, total: 0 }),
+          );
+        }
+        return url.endsWith('/context-events')
           ? Promise.resolve(
               new Response(new ReadableStream(), {
                 headers: { 'content-type': 'text/event-stream' },
               }),
             )
-          : fetch(input, init),
+          : fetch(input, init);
+      },
     }),
   );
   const queryClient = createAppQueryClient({
@@ -142,7 +149,16 @@ test('exposes exact persisted context through Outlet and shares the capability c
   expect(
     queryClient.getQueryData(classroomDetailQueryKey(profile.id, 'a')),
   ).toEqual(detail('a'));
-  expect(queryClient.getQueryCache().getAll()).toHaveLength(1);
+  expect(
+    queryClient
+      .getQueryCache()
+      .getAll()
+      .filter(
+        (query) =>
+          (query.queryKey[0] as { domain?: string } | undefined)?.domain ===
+          'classrooms',
+      ),
+  ).toHaveLength(1);
 });
 
 test('switching A to B aborts A, never flashes its name, and ignores its late response', async () => {
