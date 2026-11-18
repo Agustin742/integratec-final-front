@@ -11,24 +11,26 @@ import { tokenPairSchema, type TokenPair } from './storage';
 
 export type LoginInput = components['schemas']['LoginRequestDto'];
 export type OwnProfile = components['schemas']['OwnProfileDto'];
+export type OwnAvatar = components['schemas']['AvatarDto'];
+export const avatarSchema = z.object({
+  bodyId: z.enum(['male', 'female']),
+  hairId: z.enum(['afro', 'dreads', 'original']),
+  topId: z.enum(['hoodie', 'tank', 'tshirt']),
+  hairColor: z.enum(['#6C4D48', '#AF6D63', '#E5AD58', '#353849', '#C77DAA']),
+  clothingColor: z.enum([
+    '#5B4F96',
+    '#75B7DA',
+    '#F2C85C',
+    '#EFA5AE',
+    '#7EBA8B',
+    '#F4E6D2',
+  ]),
+}) satisfies z.ZodType<OwnAvatar>;
 export const profileSchema = z.object({
   id: z.string().min(1),
   email: z.email(),
   displayName: z.string().min(1),
-  avatar: z.object({
-    bodyId: z.enum(['male', 'female']),
-    hairId: z.enum(['afro', 'dreads', 'original']),
-    topId: z.enum(['hoodie', 'tank', 'tshirt']),
-    hairColor: z.enum(['#6C4D48', '#AF6D63', '#E5AD58', '#353849', '#C77DAA']),
-    clothingColor: z.enum([
-      '#5B4F96',
-      '#75B7DA',
-      '#F2C85C',
-      '#EFA5AE',
-      '#7EBA8B',
-      '#F4E6D2',
-    ]),
-  }),
+  avatar: avatarSchema,
 }) satisfies z.ZodType<OwnProfile>;
 
 // Never propagate raw fetch exceptions, validation payloads or server diagnostics from auth.

@@ -56,6 +56,38 @@ The **Summarize frontend checks** step uses `if: always()` and writes a five-row
 
 Run commands from the repository root after the [frozen-install quick start](../README.md#local-development). The README retains local Python, documentation, whitespace and actionlint commands, including handling new files and promotion targets. Local success alone does not prove GitHub execution or configured branch protection.
 
+## Deployment record
+
+The first production deployment is hosted on AWS Amplify Hosting. Deployment is not part of GitHub Actions; see [`amplify.yml`](../amplify.yml) and [Security](security.md) for the build and header contract.
+
+| Item | Value |
+| --- | --- |
+| Environment | `production` (`VITE_APP_ENV`) |
+| Amplify app, region | `d61i488hxxotx`, `us-east-2` |
+| Branch, stage | `develop`, `PRODUCTION` (auto build on) |
+| Public URL | `https://develop.d61i488hxxotx.amplifyapp.com` |
+| API base | `https://16-59-248-180.sslip.io/api` |
+| Realtime | `wss://16-59-248-180.sslip.io/realtime` |
+| Current deployment | job `2` (manual `RELEASE`), `SUCCEED`, 2026-11-17 23:07:29 to 23:09:50 (-03:00) |
+| Commit | `2277ea1` (tip of `develop` at build time; Amplify reports only `HEAD`, so the SHA is inferred) |
+| First deployment | job `1`, `SUCCEED`, 2026-11-17 22:03:40 to 22:04:56 (-03:00), same `develop` tip |
+
+Job data comes from `aws amplify list-jobs` and `get-job`; the branch settings from `get-branch`.
+
+How deploys happen:
+
+- A push to `develop` triggers an Amplify auto build.
+- The `VITE_*` variables are owned by the backend Terraform. Changing them there does not rebuild the app; run a manual `aws amplify start-job --app-id d61i488hxxotx --branch-name develop --job-type RELEASE` afterwards (job 2 was started this way to pick up the API and realtime path fix).
+
+Smoke results observed on 2026-11-17:
+
+- `/` returns 200 with all security headers present.
+- The deployed bundle contains the API and realtime URLs above.
+- The deep link `/password-reset` returns 200 `text/html` (SPA rewrite).
+- CORS preflight `OPTIONS /api/auth/login` from the Amplify origin returns 204 with `Access-Control-Allow-Origin` set to that origin; a foreign origin gets no such header.
+- `POST /api/auth/login` with `{}` returns 400, so the request reaches API validation.
+- Not verified yet: a real login with credentials.
+
 ## Observed evidence and boundaries
 
 The original implementation [commit `1901373`](https://github.com/Agustin742/integratec-final-front/commit/190137373c469b56b3c5d20a02fb334e66d3a2c2), published in [draft PR #64](https://github.com/Agustin742/integratec-final-front/pull/64), passed [Ubuntu run 42036290907](https://github.com/Agustin742/integratec-final-front/actions/runs/42036290907) on Node **22.23.4**: all five application checks, Python **8/8**, documentation **50 files**, actionlint **1.7.7**, component tests **2/2**, and build **16 modules**. This evidence applies to that source commit, not automatically to later documentation commits.

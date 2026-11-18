@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-17 — Amplify Hosting live (#22, tasks T2 to T5)
+
+- **Status:** in-progress (pending pull request)
+- **Area / files:** `docs/ci.md`, `changelogs/tracker-agustin.md`
+- **Change:** The frontend is published at `https://develop.d61i488hxxotx.amplifyapp.com` from Amplify app `d61i488hxxotx` (`us-east-2`, branch `develop`, stage `PRODUCTION`). The app was connected once from the Amplify console through the GitHub App (no tokens), then imported into the backend Terraform (back PR #108). The backend CORS origin and the password reset URL point to it (`/password-reset` route), and back PR #109 fixed the API and realtime base URLs to include the Caddy paths (`/api`, `/realtime`). `docs/ci.md` now holds the deployment record: environment, job ids, commit, URLs, how deploys happen and the smoke results.
+- **Reason:** Issue #22 requires a public HTTPS URL and a deployment record naming the environment and commit.
+- **Open points:** A real login smoke is not done. Promotion to `main` and the #58 pipeline are pending.
+- **Next step:** Close #22 after this pull request merges.
+
 ## 2026-11-17 — Amplify Hosting build spec (#22, task T1)
 
 - **Status:** in-progress

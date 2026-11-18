@@ -68,6 +68,12 @@ export interface SessionController {
   subscribe(listener: () => void): () => void;
   registerCleanup(cleanup: () => void): () => void;
   releasePrivateState(): void;
+  /**
+   * Adopts a profile the server just confirmed for the signed-in user so the
+   * shell never shows stale identity. Ignored for another account or when no
+   * session is authenticated (a late response must not restore private data).
+   */
+  applyConfirmedProfile(profile: OwnProfile): void;
   initialize(): Promise<void>;
   login(input: LoginInput): Promise<LoginResult>;
   logout(): Promise<{ serverConfirmed: boolean; cleanupFailed: boolean }>;
@@ -265,6 +271,19 @@ export function createSession(options: SessionOptions = {}): SessionService {
       };
     },
     releasePrivateState,
+    applyConfirmedProfile(profile) {
+      if (snapshot.status !== 'authenticated') return;
+      if (snapshot.user.id !== profile.id) return;
+      const result = profileSchema.safeParse(profile);
+      if (!result.success) return;
+      publish({
+        status: 'authenticated',
+        user: Object.freeze({
+          ...result.data,
+          avatar: Object.freeze(result.data.avatar),
+        }),
+      });
+    },
     registerCleanup(cleanup) {
       const owned = () => cleanup();
       cleanups.add(owned);

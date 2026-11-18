@@ -183,3 +183,12 @@ export function createClassroomListPredicate(
     );
   };
 }
+
+/**
+ * Key of `GET /users/me`: the caller's own profile and base avatar. Scoped by
+ * user, so another account never reads it and `createUserScopePredicate`
+ * evicts it on logout.
+ */
+export function ownProfileQueryKey(userId: string): ScopedQueryKey {
+  return createScopedQueryKey({ userId }, 'profile', 'own');
+}

@@ -543,4 +543,43 @@ describe('session lifecycle public boundary', () => {
     expect(controller.getSnapshot()).toEqual({ status: 'unauthenticated' });
     expect(h.storage.getItem(storageKey)).toBeNull();
   });
+
+  test('applyConfirmedProfile updates only the matching authenticated user', async () => {
+    const h = harness((request) => {
+      const path = new URL(request.url).pathname;
+      if (path === '/auth/login') return json(tokens);
+      if (path === '/users/me') return json(profile);
+      return json({}, 404);
+    });
+    const { controller } = createSession(h);
+
+    // Ignored when not authenticated
+    controller.applyConfirmedProfile(profile);
+    expect(controller.getSnapshot()).toEqual({ status: 'initializing' });
+
+    await controller.login(login);
+    expect(controller.getSnapshot()).toEqual({
+      status: 'authenticated',
+      user: profile,
+    });
+
+    // Updates when user id matches and payload is valid
+    const updated = { ...profile, displayName: 'Nuevo Nombre' };
+    controller.applyConfirmedProfile(updated);
+    expect(controller.getSnapshot()).toEqual({
+      status: 'authenticated',
+      user: updated,
+    });
+
+    // Ignored for another account id
+    controller.applyConfirmedProfile({
+      ...updated,
+      id: '00000000-0000-4000-8000-000000000099',
+      displayName: 'Otra Cuenta',
+    });
+    expect(controller.getSnapshot()).toEqual({
+      status: 'authenticated',
+      user: updated,
+    });
+  });
 });
