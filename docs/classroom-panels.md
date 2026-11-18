@@ -88,7 +88,7 @@ controller and default entry catalog. Denied keys share a
 not-found presentation. Close replaces the nested URL with the workspace URL;
 revocation and scope changes discard the intent and draft without reopening.
 
-Product components beyond the staff `members` roster (`#33`), study `material` manager (`#40`), and 2D/3D consumers remain separate stories; this infrastructure does not implement their contents. Backend
+Product components beyond the staff `members` roster (`#33`), study `material` manager (`#40`), `notices` announcement board (`#49`), and 2D/3D consumers remain separate stories; this infrastructure does not implement their contents. Backend
 [B (#93)](https://github.com/Agustin742/integratec-final-back/pull/93) is consumed by
 one workspace-owned authenticated fetch stream. Connection, invalidation hints
 (including the initial hint), and EOF reset the shared context query and reload
@@ -115,9 +115,12 @@ The public-route browser check captures the pending entry at
 [1280px](./assets/classroom-panels/entry-1280.png) and
 [360px](./assets/classroom-panels/entry-360.png), the `#33` staff roster panel at
 [1280px](./assets/classrooms/roster-1280.png) and
-[360px](./assets/classrooms/roster-360.png), and the `#40` study material
+[360px](./assets/classrooms/roster-360.png), the `#40` study material
 manager (`MaterialPanel`, `e2e/study-materials.spec.ts`) at
 [1280px](./assets/classrooms/study-materials-1280.png) and
-[360px](./assets/classrooms/study-materials-360.png). Pending entries show
+[360px](./assets/classrooms/study-materials-360.png), and the `#49`
+announcements notice board (`NoticeBoardPanel`, `e2e/announcements.spec.ts`) at
+[1280px](./assets/classrooms/announcements-1280.png) and
+[360px](./assets/classrooms/announcements-360.png). Pending entries show
 pending functionality rather than fabricated data; verification results and
 synthetic boundaries are recorded in the contributor trackers and `e2e/` specs.

@@ -1,5 +1,17 @@
 # Tracker — Mati
 
+## 2026-11-18 — Implement announcements notice board panel and teacher form (#49)
+
+- **Status:** in-progress (ready for blind RDD audit and PR approval)
+- **Area / files:** `src/api/query-keys.ts`, `src/features/classrooms/announcements/`, `src/features/classrooms/panels/classroom-panel-catalog.tsx`, `src/features/classrooms/classroom-workspace-panels.test.tsx`, `src/test/msw/handlers.ts`, `e2e/announcements.spec.ts`, `docs/threat-model.md`, `docs/classroom-panels.md`, `docs/assets/classrooms/announcements-*.png`, `changelogs/tracker-mati.md`
+- **Change:** Implemented [issue #49](https://github.com/Agustin742/integratec-final-front/issues/49) (`HU-COM-001`) on `feat/49-announcements-notice-board`:
+  1. Added user- and classroom-scoped `classroomAnnouncementsQueryKey` / `createClassroomAnnouncementsPredicate` (`src/api/query-keys.ts`), jitless Zod schemas (`src/features/classrooms/announcements/announcement-schema.ts`), typed REST CRUD service with `5xx`/network uncertainty classification (`src/features/classrooms/announcements/announcement-service.ts`), centralized `es-AR` copy (`src/features/classrooms/announcements/messages.ts`), stateful contract-faithful MSW store (`src/test/msw/handlers.ts`), and service unit tests (`announcement-service.test.ts`).
+  2. Implemented `AnnouncementForm` (create/edit with `useProtectedSubmit`, draft preservation on error, and server-outcome reconciliation), `AnnouncementList` (chronological safe plain-text rendering without `dangerouslySetInnerHTML`, mention count badge, author/`manage_school` edit & inline delete confirmation with focus management), and `NoticeBoardPanel` wired into `classroomPanelCatalog` (`notices`), plus RTL tests (`notice-board-panel.test.tsx`) and updated `classroom-workspace-panels.test.tsx`.
+  3. Added Playwright E2E coverage (`e2e/announcements.spec.ts`), captured `1280px` and `360px` screenshots under `docs/assets/classrooms/`, and updated `docs/threat-model.md` (`TM-022`–`TM-024`) and `docs/classroom-panels.md`.
+- **Reason:** Let teachers publish, edit, and remove classroom announcements and let members read them chronologically (`rules/communication-and-notifications.md`, `rules/security.md`, `rules/forms-and-validation.md`, `rules/ui-and-accessibility.md`, `rules/state-management.md`).
+- **Verification:** On Node `22.23.4` and pnpm `10.34.9`: `pnpm lint`, `pnpm typecheck`, `pnpm test` (65 files, 698 tests passed), `pnpm build` (`451` modules), `pnpm security:check`, `pnpm format:check`, and focused Playwright `e2e/announcements.spec.ts` (`4/4` desktop and mobile passed with zero CSP violations, zero page errors, and zero horizontal overflow). Unavailable locally on Windows: `python3` CI scripts (`scripts/ci/check_docs.py`, `scripts/ci/test_*.py`; run in Ubuntu CI).
+- **Next step:** Run blind `rdd-auditor` and await explicit user approval before pushing or opening the PR against `develop`.
+
 ## 2026-11-18 — Study material manager with upload progress and signed downloads (#40)
 
 - **Status:** completed
