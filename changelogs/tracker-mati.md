@@ -1,5 +1,19 @@
 # Tracker — Mati
 
+## 2026-11-18 — Build the Colyseus realtime client wrapper with token join and reconnect handling (#23)
+
+- **Status:** completed
+- **Area / files:** `package.json`, `pnpm-lock.yaml`, `tsconfig.json`, `scripts/api-sync/`, `src/realtime/`, `src/session/`, `docs/realtime-client.md`, `docs/threat-model.md`, `changelogs/tracker-mati.md`
+- **Change:** Implemented [issue #23](https://github.com/Agustin742/integratec-final-front/issues/23) on `feat/23-colyseus-realtime-client` from `develop` (`3f42be5`):
+  1. Extended `scripts/api-sync/sync-contracts.mjs` to sync `Avatar.ts` alongside `ClassroomState.ts` (`avatar.generated.ts`, `room-state.generated.ts`, `contracts.generated.ts`), installed exact `@colyseus/sdk@0.18.9` and `@colyseus/schema@5.0.43`, enabled `experimentalDecorators` / `useDefineForClassFields: false` in `tsconfig.json`, and added `TM-015`–`TM-017` to `docs/threat-model.md` (`049ff12`).
+  2. Added `getAccessToken()` and bounded `refreshAccessToken()` (`F08`) to `src/session/controller.ts`, and implemented `createClassroomRealtimeClient` (`src/realtime/client.ts`) with `client.auth.token` Bearer transport (`FD3`), connection state machine (`connecting`, `connected`, `reconnecting`, `rejected`, `lost-access`, `disconnected`), honest `presenceUncertain`, single retry on `401`, epoch cleanup, and stale/duplicate/malformed message guards (`67d1b1d`).
+  3. Added `useClassroomRealtime` (`src/realtime/use-classroom-realtime.ts`), barrel exports (`src/realtime/index.ts`), `docs/realtime-client.md`, and mount/unmount + classroom/user switch tests (`263617d`).
+  4. Applied blind audit fixes (`465636b`): required close-reason text on shared Colyseus `4001`/`4002` codes (`F-01`), committed `seq`/`eventId` guards only after Zod payload validation succeeds (`F-02`), and keyed hook snapshot ownership by `sessionUserId` (`F-03`).
+- **Reason:** Provide one lifecycle-safe realtime connection layer for presence, chat, and notifications with Bearer token join (`FD3`), bounded refresh-and-rejoin (`F08`), honest connection uncertainty, and strict isolation on logout, account switch, or classroom switch (`rules/realtime-and-presence.md`, `rules/state-management.md`, `rules/authentication-and-session.md`, `rules/api-contracts.md`).
+- **Verification:** `pnpm lint`, `pnpm typecheck`, `pnpm test` (59 files, 660/660 tests passed, including `client.test.ts` 6/6, `use-classroom-realtime.test.tsx` 3/3, `controller.test.ts` 34/34, `sync-contracts.test.ts` 13/13), `pnpm format:check`, `pnpm build`, `pnpm security:check`, and `git diff --check origin/develop..HEAD --` passed on Windows / Node `v22.23.4`. Playwright E2E was not run (pure client/hook wrapper with no DOM route changes). Local `python3` is unavailable on Windows; Markdown links/anchors checked via Node (`0` errors) and Python CI checks run in Ubuntu CI.
+- **Audit:** APPROVED · `465636b` · lenses: risk, resilience, readability, reliability · blockers fixed: 1 (`F-01`) + 1 warning (`F-02`) + 1 suggestion (`F-03`) · follow-ups: none.
+- **Next step:** Push `feat/23-colyseus-realtime-client` and open the PR to `develop` once approved.
+
 ## 2026-11-18 — PR #84 review fixes (unmount submitting reset and 403 create reconciliation) (#30)
 
 - **Status:** completed (pushed to `feat/30-classrooms-list-and-create` on [PR #84](https://github.com/Agustin742/integratec-final-front/pull/84)).
