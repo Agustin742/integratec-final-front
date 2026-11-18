@@ -39,6 +39,13 @@ Course declaration of AI use in the development process (see [course requirement
 - **Observed checks:** Parent full suite 477/477 and independent focused 55/55 passed before the height-only correction; desktop/mobile zoom checks then passed 2/2. Final check results and historical failures are recorded in the contributor tracker. Mock API checks are not live-backend proof.
 - **Human responsibility:** The scope decision is approved; code explanation, team review, PR approval and merge remain human responsibilities. Agent verification is not human approval.
 
+## Profile preview refinement (#29, PR #82)
+
+- **Human scope decision:** The contributor approved a bounded refinement of the existing 2D preview, correction of the unsupported skin-tone claim and explicit mock-vs-integration evidence. No 3D renderer, avatar contract or persistence behavior is added.
+- **Assistance and correction:** el Gentleman in Pi compared the PR screenshots and SVG with the agreed art direction. The initial oval head and heavy outlines were replaced with an original rounded-cube human silhouette, soft shading and distinct existing hair/clothing choices.
+- **Fixture correction:** After global verification exposed readiness races, the contributor authorized a test-only extension. A deferred redirect regression first failed because initial route initialization was mistaken for destination readiness. The fixtures now wait for the requested route's idle navigation state and for the classroom request to exist before resolving it. A browser fixture also measures its physical background-click target after modal activation rather than relying on a stale off-screen position. Original UI/focus/pointer assertions and configured timeouts remain unchanged; the final checks passed 623/623 unit tests and 72/72 browser scenarios.
+- **Verification boundary:** Rendering is checked visually on desktop/mobile; automated checks and their observed results are recorded in the contributor tracker. Mock reload evidence does not prove real backend or cross-device persistence. Team review of the refined result remains a human responsibility.
+
 ## Data handling
 
 Secrets, credentials, and real personal data are not submitted to AI tools, per [Responsible AI usage](../rules/ai-usage.md#data-handling).

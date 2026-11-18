@@ -113,6 +113,8 @@ test('loads the public protected route with server name and neutral parent role 
     ),
   );
   expect(screen.queryByText('Classroom a')).not.toBeInTheDocument();
+  // Loading can render before the query effect has dispatched its request.
+  await waitFor(() => expect(pending()).toHaveLength(1));
   pending()[0].resolve(response('a'));
   expect(
     await screen.findByRole('heading', { level: 2, name: 'Classroom a' }),
