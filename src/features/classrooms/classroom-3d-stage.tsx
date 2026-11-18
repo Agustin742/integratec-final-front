@@ -1,4 +1,13 @@
-import { lazy, Suspense, useState, type RefObject } from 'react';
+import {
+  Component,
+  lazy,
+  Suspense,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react';
+import { worldMessages } from '../world/messages';
+import { WorldFallback } from '../world/world-fallback';
 import { classroomMessages } from './messages';
 
 export interface Classroom3DStageProps {
@@ -9,6 +18,24 @@ const loadWorldCanvas = () =>
   import('../world').then((module) => ({
     default: module.WorldCanvas,
   }));
+
+/**
+ * Local boundary: a failed 3D chunk load or render error shows the truthful
+ * world fallback inside the stage, so the workspace header and its 2D Classic
+ * Mode switch stay available instead of the route error page replacing them.
+ */
+class StageBoundary extends Component<
+  { children: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? <WorldFallback /> : this.props.children;
+  }
+}
 
 /**
  * 3D isometric classroom viewport for non-parent members (`#34`,
@@ -40,9 +67,11 @@ export function Classroom3DStage({ headingRef }: Classroom3DStageProps) {
       </div>
 
       {supportsBrowserObservers ? (
-        <Suspense fallback={null}>
-          <LazyWorldCanvas label={classroomMessages.viewMode.canvasLabel} />
-        </Suspense>
+        <StageBoundary>
+          <Suspense fallback={<p role="status">{worldMessages.loading}</p>}>
+            <LazyWorldCanvas label={classroomMessages.viewMode.canvasLabel} />
+          </Suspense>
+        </StageBoundary>
       ) : (
         <div
           role="region"

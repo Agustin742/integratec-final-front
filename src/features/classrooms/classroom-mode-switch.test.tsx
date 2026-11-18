@@ -17,7 +17,10 @@ import { SessionProvider } from '@/session/provider';
 import { profile } from '@/session/test-fixtures';
 import { expectAccessible } from '@/test/accessibility';
 import { render } from '@/test/render';
-import { resetClassroomModeStore } from './classroom-mode-store';
+import {
+  getClassroomMode,
+  resetClassroomModeStore,
+} from './classroom-mode-store';
 import { ClassroomWorkspace } from './classroom-workspace';
 import { classroomMessages } from './messages';
 
@@ -96,6 +99,14 @@ function setupWorkspace(
   const queryClient = createAppQueryClient({
     defaultOptions: { queries: { retry: false } },
   });
+  // Collect owner cleanups so a test can replay the controller's logout release.
+  const cleanups = new Set<() => void>();
+  session.service.controller.registerCleanup = (cleanup) => {
+    cleanups.add(cleanup);
+    return () => cleanups.delete(cleanup);
+  };
+  const runSessionCleanups = () =>
+    act(() => cleanups.forEach((cleanup) => cleanup()));
   const router = createMemoryRouter(
     createAppRoutes({
       protectedRoutes: [
@@ -117,7 +128,7 @@ function setupWorkspace(
     </ApiQueryProvider>,
   );
 
-  return { ...view, session, queryClient, router };
+  return { ...view, session, queryClient, router, runSessionCleanups };
 }
 
 describe('ClassroomWorkspace 3D / 2D Classic Mode switch (#34)', () => {
@@ -405,6 +416,37 @@ describe('ClassroomWorkspace 3D / 2D Classic Mode switch (#34)', () => {
         name: classroomMessages.viewMode.stage3dHeading,
       }),
     ).toBeVisible();
+  });
+
+  test('S3: logout from a non-classroom route still clears the same user preference', async () => {
+    const { router, runSessionCleanups } = setupWorkspace({
+      path: '/classrooms/a',
+    });
+
+    await screen.findByRole('heading', { level: 2, name: 'Aula a' });
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: classroomMessages.viewMode.switchTo2d,
+      }),
+    );
+    await screen.findByRole('heading', {
+      level: 3,
+      name: classroomMessages.viewMode.mode2dHeading,
+    });
+
+    // Leave the workspace so only the app shell owns the cleanup.
+    await act(() => router.navigate('/'));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('heading', { level: 2, name: 'Aula a' }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(getClassroomMode(profile.id)).toBe('2d');
+
+    // Replays what the session controller runs on logout.
+    runSessionCleanups();
+
+    expect(getClassroomMode(profile.id)).toBe('3d');
   });
 
   test('never offers 3D stage, 2D classroom panels, or mode switch to PARENT accounts', async () => {
