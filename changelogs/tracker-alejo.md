@@ -1,5 +1,14 @@
 # Tracker — Alejo
 
+## 2026-11-19 — Point the workflow profile tracker line at the acting participant
+
+- **Status:** in-progress (branch `docs/agents-tracker-line` off `origin/develop` `746cffa`, PR to `develop` in progress)
+- **Area / files:** `AGENTS.md` (Workflow profile), `changelogs/tracker-alejo.md`
+- **Change:** Replaced the fixed `- Tracker: changelogs/tracker-mati.md` line in the `AGENTS.md` workflow profile with a pointer to the acting participant's own tracker (`changelogs/tracker-<name>.md`, linked to the changelog guide), removing the assumption that Mati is always the one working. The rest of `AGENTS.md` ("Track your work" section, line 25) already required the acting participant's tracker, so only this stale line named a fixed person.
+- **Reason:** The named-tracker line misdirected any work not done by Mati (e.g. my entries belong in `changelogs/tracker-alejo.md`); user-reported and confirmed as wrong.
+- **Verification:** Read-only grep confirmed `tracker-mati.md` no longer appears in `AGENTS.md`; no other project doc repeats the fixed-tracker assumption (`changelogs/README.md` already defines per-participant trackers).
+- **Next step:** Commit on a `docs/`-style branch or fold into the next docs commit (user decision; not committed yet).
+
 ## 2026-11-18 — Implement student report card and teacher tracking metrics panel (#46)
 
 - **Status:** in-progress (PR #100 open against `develop`, review fixes applied)
