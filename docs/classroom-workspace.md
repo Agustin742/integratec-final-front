@@ -32,15 +32,22 @@ Bearer authorization and bounded 401 refresh/GET replay; neither native
 bypass JSON buffering through an abortable, per-chunk session-epoch fence.
 Ordinary REST responses retain their previous buffering and authentication behavior.
 
-| Signal                                                                         | Client behavior                                                                                                                                                                              |
-| ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Connect/reconnect                                                              | Reset and reload the complete shared REST context after stream registration.                                                                                                                 |
-| `classroom.context-invalidated` with `{ classroomId }`, including initial hint | Cancel obsolete REST, discard private context/panels/capabilities, and reload. No revision, event ID, or replay semantics. Duplicates simply reconcile again.                                |
-| EOF, transport/framing failure, or renewal                                     | Reload REST; retry after exponential delays from 1 second, capped at 30 seconds. Setup 503 is retryable; 401/403/404 stop this subscription's retries. REST remains the rendering authority. |
-| Classroom/user change, session cleanup, unmount                                | Abort connection/reader and clear renewal/retry timers. Old reads cannot restore current context.                                                                                            |
+| Signal                                                                                         | Client behavior                                                                                                                                                                              |
+| ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Connect/reconnect                                                                              | Reconcile (refetch, keep mounted) the shared REST context after stream registration.                                                                                                         |
+| `classroom.context-invalidated` with `{ classroomId }`, after the first hint of the connection | Cancel obsolete REST, discard private context/panels/capabilities, and reload. No revision, event ID, or replay semantics. Duplicates simply reconcile again.                                |
+| EOF, transport/framing failure, or renewal                                                     | Reload REST; retry after exponential delays from 1 second, capped at 30 seconds. Setup 503 is retryable; 401/403/404 stop this subscription's retries. REST remains the rendering authority. |
+| Classroom/user change, session cleanup, unmount                                                | Abort connection/reader and clear renewal/retry timers. Old reads cannot restore current context.                                                                                            |
 
-Comments (backend heartbeat every 15 seconds) carry no context. The client renews
-a connection at 60 seconds, tolerates chunked LF/CRLF/CR frames, discards incomplete
+The first hint of every connection is the backend's registration hint: it carries
+no change and is already covered by the post-connect reconcile, so it only keeps the
+workspace mounted (no reset, no 3D stage unmount). Every later hint on the same
+connection is a real invalidation and resets. The client renews a connection after
+50 seconds (`CONTEXT_RENEWAL_MS`, below the backend 60 second lifetime) so the
+lifetime-expiry hint is not received in normal operation.
+
+Comments (backend heartbeat every 15 seconds) carry no context. The client
+tolerates chunked LF/CRLF/CR frames, discards incomplete
 EOF frames, and bounds an individual frame to 64 KiB. Malformed/foreign hints cause
 conservative REST reconciliation, not permission grants. Capability consumers only
 read the existing TanStack Query cache and do not create subscriptions.

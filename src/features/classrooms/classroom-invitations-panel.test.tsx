@@ -634,12 +634,16 @@ describe('ClassroomInvitationsPanel (#32)', () => {
     // Trigger SSE revocation + capability removal.
     capabilities = ['participate_activities'];
     holdRead = true;
+    // The first hint of a connection is the registration hint and never resets;
+    // the second one is the real invalidation.
+    const hintFrame = new TextEncoder().encode(
+      `event: classroom.context-invalidated\ndata: {"classroomId":"${classroomId}"}\n\n`,
+    );
     await act(async () => {
-      stream?.enqueue(
-        new TextEncoder().encode(
-          `event: classroom.context-invalidated\ndata: {"classroomId":"${classroomId}"}\n\n`,
-        ),
-      );
+      stream?.enqueue(hintFrame);
+    });
+    await act(async () => {
+      stream?.enqueue(hintFrame);
     });
 
     await waitFor(() =>
