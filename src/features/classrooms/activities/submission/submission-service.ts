@@ -265,9 +265,7 @@ function submitWithSession(
   // replayed attempt; the signal listener alone would miss an already-aborted
   // signal because the event fired before the listener attached.
   if (options.signal?.aborted) {
-    return Promise.reject(
-      new DOMException('Submission aborted', 'AbortError'),
-    );
+    return Promise.reject(new DOMException('Submission aborted', 'AbortError'));
   }
   const accessToken = session.getAccessToken();
   return new Promise<SubmissionResponseDto>((resolve, reject) => {

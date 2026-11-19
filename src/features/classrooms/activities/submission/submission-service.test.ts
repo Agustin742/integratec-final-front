@@ -518,13 +518,16 @@ describe('submission-service', () => {
         },
       });
 
-      const error = await submitActivityFiles(port, ACTIVITY_ID, [
-        makePdfFile(),
-      ], {
-        baseUrl: TEST_API_BASE_URL,
-        idempotencyKey: IDEMPOTENCY_KEY,
-        signal: controller.signal,
-      }).catch((cause: unknown) => cause);
+      const error = await submitActivityFiles(
+        port,
+        ACTIVITY_ID,
+        [makePdfFile()],
+        {
+          baseUrl: TEST_API_BASE_URL,
+          idempotencyKey: IDEMPOTENCY_KEY,
+          signal: controller.signal,
+        },
+      ).catch((cause: unknown) => cause);
 
       expect(error).toBeInstanceOf(DOMException);
       expect((error as DOMException).name).toBe('AbortError');
