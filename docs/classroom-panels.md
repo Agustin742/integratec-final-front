@@ -3,14 +3,17 @@
 The classroom workspace mounts the reusable panel provider with backend A's
 `availablePanels`, **not action authorization**. The default production catalog
 registers nine panel entries with centralized titles: `activities` renders
-`ActivitiesPanel` ([`#41`](https://github.com/Agustin742/integratec-final-front/issues/41)),
+`ActivitiesPanel` ([`#41`](https://github.com/Agustin742/integratec-final-front/issues/41)
+activity inbox and detail navigation unified with
+[`#39`](https://github.com/Agustin742/integratec-final-front/issues/39)
+teacher editor, multiple-choice builder, one-way publish flow, and deactivation — see the [activities feature doc](./classroom-activities.md)),
 `material` renders `MaterialPanel` ([`#40`](https://github.com/Agustin742/integratec-final-front/issues/40)),
-`notices` renders `NoticeBoardPanel` ([`#49`](https://github.com/Agustin742/integratec-final-front/issues/49))
+`notices` renders `NoticeBoardPanel` ([`#49`](https://github.com/Agustin742/integratec-final-front/issues/49)),
 and `members` renders `ClassroomMembersPanel`
 ([`HU-AUL-003`](https://github.com/Agustin742/integratec-final-front/issues/33)
 `ClassroomRosterPanel` and capability-gated [`HU-AUL-002`](https://github.com/Agustin742/integratec-final-front/issues/32)
 `ClassroomInvitationsPanel` for `invite_members`-authorized email invitations and one-time classroom join codes), while the remaining
-six entries display the shared, honest “Funcionalidad pendiente” state until
+five entries display the shared, honest “Funcionalidad pendiente” state until
 their respective stories land.
 
 ## Approved scope reconciliation
@@ -24,7 +27,7 @@ the issue; team acceptance of the reconciled criterion remains part of PR review
 
 | Registered key | Title                                                |
 | -------------- | ---------------------------------------------------- |
-| `activities`   | Actividades (`ActivitiesPanel`, `#41`)               |
+| `activities`   | Actividades (`ActivitiesPanel`, `#41` + `#39`)       |
 | `material`     | Material (`MaterialPanel`, `#40`)                    |
 | `grades`       | Calificaciones                                       |
 | `chat`         | Chat                                                 |
@@ -111,6 +114,8 @@ keep the pending note (part 2/2 out of scope), and teacher review stays
 `HU-ACT-004`.
 
 Product components beyond `activities` inbox (`#41`), the staff `members` roster (`#33`), capability-gated invitations/join-code tab (`#32`), study `material` manager (`#40`), `notices` announcement board (`#49`), and 2D/3D consumers remain separate stories; this infrastructure does not implement their contents. Note for `#41` (human-approved scope reconciliation on `2026-11-18`): because backend `Agustin742/integratec-final-back#29` is still open, `ActivitySummaryDto` and `StudentActivityResponseDto` do not yet expose a server-derived student work status (`Pending`/`Submitted`/`Graded`/`Overdue`) or `canSubmit` flag, so `ActivitiesPanel` and `ActivityDetailPage` render only server-confirmed metadata and deadlines in the school `timeZone` without deriving overdue state from the browser clock (`rules/activities-and-grading.md`, `rules/data-and-time.md`), deferring student status/overdue/`canSubmit` UI until `back#29` lands. Backend
+
+Product components beyond the unified `activities` panel (`#41` inbox + `#39` teacher editor, [doc](./classroom-activities.md)), the staff `members` roster (`#33`), capability-gated invitations/join-code tab (`#32`), study `material` manager (`#40`), `notices` announcement board (`#49`), and 2D/3D consumers remain separate stories; this infrastructure does not implement their contents. Note for `#41` (human-approved scope reconciliation on `2026-11-18`): because backend `Agustin742/integratec-final-back#29` is still open, `ActivitySummaryDto` and `StudentActivityResponseDto` do not yet expose a server-derived student work status (`Pending`/`Submitted`/`Graded`/`Overdue`) or `canSubmit` flag, so `ActivitiesPanel` and `ActivityDetailPage` render only server-confirmed metadata and deadlines in the school `timeZone` without deriving overdue state from the browser clock (`rules/activities-and-grading.md`, `rules/data-and-time.md`), deferring student status/overdue/`canSubmit` UI until `back#29` lands. Backend
 [B (#93)](https://github.com/Agustin742/integratec-final-back/pull/93) is consumed by
 one workspace-owned authenticated fetch stream. Connection, invalidation hints
 (including the initial hint), and EOF reset the shared context query and reload

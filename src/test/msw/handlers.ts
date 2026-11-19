@@ -3589,6 +3589,429 @@ export function createClassroomSubmissionsStore(
   };
 }
 
+export type TeacherActivityPayload =
+  components['schemas']['TeacherActivityResponseDto'];
+export type StudentActivityPayload =
+  components['schemas']['StudentActivityResponseDto'];
+export type ActivitySummaryPayload =
+  components['schemas']['ActivitySummaryDto'];
+export type CreateActivityRequestPayload =
+  components['schemas']['CreateActivityDto'];
+export type UpdateActivityRequestPayload =
+  components['schemas']['UpdateActivityDto'];
+export type PaginatedClassroomActivitiesPayload =
+  operations['ActivitiesController_list']['responses'][200]['content']['application/json'];
+
+function orderActivitySummaries(
+  items: readonly ActivitySummaryPayload[],
+  sort: string | null,
+): readonly ActivitySummaryPayload[] {
+  const descending = sort !== null && sort.startsWith('-');
+  const field = descending ? (sort as string).slice(1) : sort;
+  const comparable = [...items].sort((a, b) => {
+    if (field === 'createdAt') {
+      const byCreatedAt = a.createdAt.localeCompare(b.createdAt);
+      return byCreatedAt !== 0 ? byCreatedAt : a.id.localeCompare(b.id);
+    }
+    const byDueAt = a.dueAt.localeCompare(b.dueAt);
+    return byDueAt !== 0 ? byDueAt : a.id.localeCompare(b.id);
+  });
+  return descending ? [...comparable].reverse() : comparable;
+}
+
+export interface CreateClassroomActivitiesListHandlerOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly items?: readonly ActivitySummaryPayload[];
+  readonly page?: number;
+  readonly pageSize?: number;
+  readonly total?: number;
+  readonly error?: MswErrorResponseSpec | 'network';
+  readonly resolveResponse?: (args: {
+    readonly classroomId: string;
+    readonly page: number;
+    readonly pageSize: number;
+    readonly sort: string | null;
+    readonly state: 'DRAFT' | 'PUBLISHED' | null;
+    readonly request: Request;
+  }) => Response | void | Promise<Response | void>;
+  readonly onRequest?: (request: Request) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `GET /classrooms/{id}/activities`
+ * (`ActivitiesController_list`): paginated summaries without questions.
+ */
+export function createClassroomActivitiesListHandler(
+  options: CreateClassroomActivitiesListHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomSegment = options.classroomId ?? ':id';
+  return http.get(
+    `${baseUrl}/classrooms/${classroomSegment}/activities`,
+    async ({ params, request }) => {
+      await options.onRequest?.(request);
+
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+
+      const url = new URL(request.url);
+      const parsedPage = Number(
+        url.searchParams.get('page') ?? options.page ?? 1,
+      );
+      const parsedPageSize = Number(
+        url.searchParams.get('pageSize') ?? options.pageSize ?? 20,
+      );
+      const page =
+        Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+      const pageSize =
+        Number.isFinite(parsedPageSize) && parsedPageSize > 0
+          ? parsedPageSize
+          : 20;
+      const rawSort = url.searchParams.get('sort');
+      const sort =
+        rawSort === 'createdAt' ||
+        rawSort === '-createdAt' ||
+        rawSort === '-dueAt' ||
+        rawSort === null
+          ? rawSort
+          : 'dueAt';
+      const rawState = url.searchParams.get('state');
+      const state =
+        rawState === 'DRAFT' || rawState === 'PUBLISHED' ? rawState : null;
+
+      if (options.resolveResponse) {
+        const resolvedClassroomId =
+          options.classroomId ?? String(params.id ?? '');
+        const resolved = await options.resolveResponse({
+          classroomId: resolvedClassroomId,
+          page,
+          pageSize,
+          sort,
+          state,
+          request,
+        });
+        if (resolved !== undefined) {
+          return resolved instanceof Response
+            ? resolved
+            : HttpResponse.json(resolved, { status: 200 });
+        }
+      }
+
+      const filtered = (options.items ?? []).filter(
+        (item) => state === null || item.state === state,
+      );
+      const ordered = orderActivitySummaries(filtered, sort);
+      const start = (page - 1) * pageSize;
+      const payload: PaginatedClassroomActivitiesPayload = {
+        items: ordered.slice(start, start + pageSize),
+        page,
+        pageSize,
+        total: options.total ?? filtered.length,
+      };
+      return HttpResponse.json(payload, { status: 200 });
+    },
+  );
+}
+
+export interface CreateActivityDetailHandlerOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly activityId?: string;
+  /** Teacher view payload (includes `isCorrect` on every option). */
+  readonly activity?: TeacherActivityPayload;
+  /** Student view payload (never includes `isCorrect`). */
+  readonly student?: StudentActivityPayload;
+  readonly error?: MswErrorResponseSpec | 'network';
+  readonly resolveResponse?: (args: {
+    readonly classroomId: string;
+    readonly activityId: string;
+    readonly request: Request;
+  }) => Response | void | Promise<Response | void>;
+  readonly onRequest?: (request: Request) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `GET /classrooms/{id}/activities/{activityId}`
+ * (`ActivitiesController_get`): teacher view for staff, student view for
+ * students, decided by whichever payload the test provides.
+ */
+export function createActivityDetailHandler(
+  options: CreateActivityDetailHandlerOptions,
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomSegment = options.classroomId ?? ':id';
+  const activitySegment = options.activityId ?? ':activityId';
+  return http.get(
+    `${baseUrl}/classrooms/${classroomSegment}/activities/${activitySegment}`,
+    async ({ params, request }) => {
+      await options.onRequest?.(request);
+
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+
+      if (options.resolveResponse) {
+        const resolved = await options.resolveResponse({
+          classroomId: options.classroomId ?? String(params.id ?? ''),
+          activityId: options.activityId ?? String(params.activityId ?? ''),
+          request,
+        });
+        if (resolved instanceof Response) {
+          return resolved;
+        }
+      }
+
+      const payload =
+        options.student !== undefined ? options.student : options.activity;
+      return HttpResponse.json(payload, { status: 200 });
+    },
+  );
+}
+
+export interface CreateCreateActivityHandlerOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly activity?: TeacherActivityPayload;
+  readonly error?: MswErrorResponseSpec | 'network';
+  readonly resolveResponse?: (args: {
+    readonly classroomId: string;
+    readonly request: Request;
+    readonly body: CreateActivityRequestPayload;
+  }) => Response | void | Promise<Response | void>;
+  readonly onRequest?: (
+    request: Request,
+    body: CreateActivityRequestPayload,
+  ) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `POST /classrooms/{id}/activities`
+ * (`ActivitiesController_create`): echoes the created draft activity.
+ */
+export function createCreateActivityHandler(
+  options: CreateCreateActivityHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomSegment = options.classroomId ?? ':id';
+  return http.post(
+    `${baseUrl}/classrooms/${classroomSegment}/activities`,
+    async ({ params, request }) => {
+      const body = (await request.json()) as CreateActivityRequestPayload;
+      await options.onRequest?.(request, body);
+
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+
+      if (options.resolveResponse) {
+        const resolved = await options.resolveResponse({
+          classroomId: options.classroomId ?? String(params.id ?? ''),
+          request,
+          body,
+        });
+        if (resolved instanceof Response) {
+          return resolved;
+        }
+      }
+
+      return HttpResponse.json(options.activity, { status: 201 });
+    },
+  );
+}
+
+export interface CreateUpdateActivityHandlerOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly activityId?: string;
+  readonly activity?: TeacherActivityPayload;
+  readonly error?: MswErrorResponseSpec | 'network';
+  readonly resolveResponse?: (args: {
+    readonly classroomId: string;
+    readonly activityId: string;
+    readonly request: Request;
+    readonly body: UpdateActivityRequestPayload;
+  }) => Response | void | Promise<Response | void>;
+  readonly onRequest?: (
+    request: Request,
+    body: UpdateActivityRequestPayload,
+  ) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `PATCH /classrooms/{id}/activities/{activityId}`
+ * (`ActivitiesController_update`): `409` represents "questions can no longer
+ * change because a submission exists".
+ */
+export function createUpdateActivityHandler(
+  options: CreateUpdateActivityHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomSegment = options.classroomId ?? ':id';
+  const activitySegment = options.activityId ?? ':activityId';
+  return http.patch(
+    `${baseUrl}/classrooms/${classroomSegment}/activities/${activitySegment}`,
+    async ({ params, request }) => {
+      const body = (await request.json()) as UpdateActivityRequestPayload;
+      await options.onRequest?.(request, body);
+
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+
+      if (options.resolveResponse) {
+        const resolved = await options.resolveResponse({
+          classroomId: options.classroomId ?? String(params.id ?? ''),
+          activityId: options.activityId ?? String(params.activityId ?? ''),
+          request,
+          body,
+        });
+        if (resolved instanceof Response) {
+          return resolved;
+        }
+      }
+
+      return HttpResponse.json(options.activity, { status: 200 });
+    },
+  );
+}
+
+export interface CreatePublishActivityHandlerOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly activityId?: string;
+  readonly activity?: TeacherActivityPayload;
+  readonly error?: MswErrorResponseSpec | 'network';
+  readonly resolveResponse?: (args: {
+    readonly classroomId: string;
+    readonly activityId: string;
+    readonly request: Request;
+  }) => Response | void | Promise<Response | void>;
+  readonly onRequest?: (request: Request) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `POST /classrooms/{id}/activities/{activityId}/publish`
+ * (`ActivitiesController_publish`): `400` for not publishable (past `dueAt`,
+ * invalid questions) and `409` for already published.
+ */
+export function createPublishActivityHandler(
+  options: CreatePublishActivityHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomSegment = options.classroomId ?? ':id';
+  const activitySegment = options.activityId ?? ':activityId';
+  return http.post(
+    `${baseUrl}/classrooms/${classroomSegment}/activities/${activitySegment}/publish`,
+    async ({ params, request }) => {
+      await options.onRequest?.(request);
+
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+
+      if (options.resolveResponse) {
+        const resolved = await options.resolveResponse({
+          classroomId: options.classroomId ?? String(params.id ?? ''),
+          activityId: options.activityId ?? String(params.activityId ?? ''),
+          request,
+        });
+        if (resolved instanceof Response) {
+          return resolved;
+        }
+      }
+
+      return HttpResponse.json(options.activity, { status: 200 });
+    },
+  );
+}
+
+export interface CreateDeactivateActivityHandlerOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly activityId?: string;
+  readonly error?: MswErrorResponseSpec | 'network';
+  readonly resolveResponse?: (args: {
+    readonly classroomId: string;
+    readonly activityId: string;
+    readonly request: Request;
+  }) => Response | void | Promise<Response | void>;
+  readonly onRequest?: (request: Request) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `DELETE /classrooms/{id}/activities/{activityId}`
+ * (`ActivitiesController_deactivate`): logical deactivation; `409` means the
+ * activity has submissions and cannot be deleted.
+ */
+export function createDeactivateActivityHandler(
+  options: CreateDeactivateActivityHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomSegment = options.classroomId ?? ':id';
+  const activitySegment = options.activityId ?? ':activityId';
+  return http.delete(
+    `${baseUrl}/classrooms/${classroomSegment}/activities/${activitySegment}`,
+    async ({ params, request }) => {
+      await options.onRequest?.(request);
+
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+
+      if (options.resolveResponse) {
+        const resolved = await options.resolveResponse({
+          classroomId: options.classroomId ?? String(params.id ?? ''),
+          activityId: options.activityId ?? String(params.activityId ?? ''),
+          request,
+        });
+        if (resolved instanceof Response) {
+          return resolved;
+        }
+      }
+
+      return new HttpResponse(null, { status: 204 });
+    },
+  );
+}
+
 export interface NotificationStoreItem {
   readonly id: string;
   readonly kind:

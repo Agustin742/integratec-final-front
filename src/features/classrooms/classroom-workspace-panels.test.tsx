@@ -1,4 +1,10 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { createMemoryRouter, Link } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { expect, test } from 'vitest';
@@ -65,6 +71,14 @@ function setup(
           url.pathname.endsWith('/roster') ||
           url.pathname.endsWith('/invitations')
         ) {
+          return Response.json({
+            items: [],
+            page: 1,
+            pageSize: 20,
+            total: 0,
+          });
+        }
+        if (url.pathname.endsWith('/activities')) {
           return Response.json({
             items: [],
             page: 1,
@@ -163,6 +177,22 @@ const pendingCatalogCases = [
   ['settings', 'Configuración'],
 ] as const;
 
+test('default catalog opens activities by URL with ActivitiesPanel and closes cleanly', async () => {
+  const view = setup(['activities'], '/classrooms/a/panels/activities', true);
+  const dialog = await screen.findByRole('dialog', { name: 'Actividades' });
+  expect(dialog).toHaveTextContent('Trabajos prácticos y exámenes del aula.');
+  expect(
+    await within(dialog).findByText('Todavía no hay actividades'),
+  ).toBeVisible();
+  expect(dialog).not.toHaveTextContent('Funcionalidad pendiente');
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+  await screen.findByRole('button', { name: 'Open grades' });
+  expect(view.router.state.location.pathname).toBe('/classrooms/a');
+  expect(view.router.state.historyAction).toBe('REPLACE');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(document.activeElement).toHaveTextContent('Classroom a');
+});
+
 test('default catalog opens members by URL with the roster panel and closes cleanly', async () => {
   const view = setup(['members'], '/classrooms/a/panels/members', true);
   const dialog = await screen.findByRole('dialog', { name: 'Integrantes' });
@@ -224,19 +254,6 @@ test('default catalog opens material by URL with MaterialPanel and closes cleanl
   expect(document.activeElement).toHaveTextContent('Classroom a');
 });
 
-test('default catalog opens activities by URL with ActivitiesPanel and closes cleanly', async () => {
-  const view = setup(['activities'], '/classrooms/a/panels/activities', true);
-  const dialog = await screen.findByRole('dialog', { name: 'Actividades' });
-  expect(dialog).toHaveTextContent('Actividades');
-  expect(dialog).not.toHaveTextContent('Funcionalidad pendiente');
-  fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
-  await screen.findByRole('button', { name: 'Open grades' });
-  expect(view.router.state.location.pathname).toBe('/classrooms/a');
-  expect(view.router.state.historyAction).toBe('REPLACE');
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  expect(document.activeElement).toHaveTextContent('Classroom a');
-});
-
 test('default catalog opens notices by URL with NoticeBoardPanel and closes cleanly', async () => {
   const view = setup(['notices'], '/classrooms/a/panels/notices', true);
   const dialog = await screen.findByRole('dialog', { name: 'Avisos' });
@@ -249,7 +266,6 @@ test('default catalog opens notices by URL with NoticeBoardPanel and closes clea
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(document.activeElement).toHaveTextContent('Classroom a');
 });
-
 test.each([
   [[], 'grades'],
   [['pet'], 'pet'],
