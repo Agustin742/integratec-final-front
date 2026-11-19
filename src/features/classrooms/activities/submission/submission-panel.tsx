@@ -64,9 +64,14 @@ function preCheckFiles(files: readonly File[]): string | null {
     return submissionMessages.validation.count;
   }
   for (const file of files) {
-    const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
+    const dotIndex = file.name.lastIndexOf('.');
+    const extension =
+      dotIndex > 0 ? file.name.slice(dotIndex + 1).toLowerCase() : '';
     if (!ALLOWED_EXTENSIONS.has(extension)) {
       return submissionMessages.validation.type;
+    }
+    if (file.size < 1) {
+      return submissionMessages.validation.empty;
     }
     if (file.size > MAX_SUBMISSION_FILE_BYTES) {
       return submissionMessages.validation.size;
@@ -109,12 +114,12 @@ function SubmissionFileList({
   return (
     <ul
       aria-label={copy.filesLabel}
-      className="min-w-0 space-y-2 rounded-xl border border-edge bg-card p-3"
+      className="min-w-0 space-y-2 rounded-xl border border-border bg-card p-3"
     >
       {ordered.map((file) => (
         <li
           key={file.id}
-          className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-edge/60 pb-2 last:border-b-0 last:pb-0"
+          className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2 last:border-b-0 last:pb-0"
         >
           <div className="min-w-0 space-y-0.5">
             <p className="text-sm font-medium text-foreground wrap-anywhere">
@@ -152,9 +157,11 @@ export function SubmissionPanel({ activity }: SubmissionPanelProps) {
   const snapshot = useSessionSnapshot();
   const userId = snapshot.status === 'authenticated' ? snapshot.user.id : null;
 
-  // One idempotency key per mounted attempt, reused across retries so the
-  // server reconciles instead of storing a duplicate.
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  // One idempotency key per selected-files attempt, rotated when selection changes
+  // and reused across retries so the server reconciles instead of duplicating.
+  const [idempotencyKey, setIdempotencyKey] = useState(() =>
+    crypto.randomUUID(),
+  );
   const [selectedFiles, setSelectedFiles] = useState<readonly File[]>([]);
   const [phase, setPhase] = useState<PanelPhase>({ kind: 'idle' });
   const [formError, setFormError] = useState<string | null>(null);
@@ -170,6 +177,7 @@ export function SubmissionPanel({ activity }: SubmissionPanelProps) {
   const headingId = useId();
   const inputId = useId();
   const hintId = useId();
+  const formErrorId = useId();
 
   const { client, controller: sessionPort } = useSessionService();
   const isFileActivity = activity.format === 'FILE';
@@ -196,10 +204,17 @@ export function SubmissionPanel({ activity }: SubmissionPanelProps) {
   }, []);
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    if (phase.kind === 'uploading' || phase.kind === 'reconciling') return;
+    if (
+      phase.kind === 'uploading' ||
+      phase.kind === 'reconciling' ||
+      phase.kind === 'unverifiable'
+    ) {
+      return;
+    }
     const picked = event.target.files ? Array.from(event.target.files) : [];
     if (picked.length === 0) return;
     setSelectedFiles(picked);
+    setIdempotencyKey(crypto.randomUUID());
     setFormError(null);
     setNotice(null);
     setPhase({ kind: 'idle' });
@@ -207,8 +222,15 @@ export function SubmissionPanel({ activity }: SubmissionPanelProps) {
   }
 
   function removeFile(file: File) {
-    if (phase.kind === 'uploading' || phase.kind === 'reconciling') return;
+    if (
+      phase.kind === 'uploading' ||
+      phase.kind === 'reconciling' ||
+      phase.kind === 'unverifiable'
+    ) {
+      return;
+    }
     setSelectedFiles((current) => current.filter((item) => item !== file));
+    setIdempotencyKey(crypto.randomUUID());
     setFormError(null);
   }
 
@@ -333,7 +355,14 @@ export function SubmissionPanel({ activity }: SubmissionPanelProps) {
   const readOwnError =
     ownSubmission.error instanceof ApiError ? ownSubmission.error : null;
 
-  if (readOwnError !== null && readOwnError.status !== 404) {
+  const isReconcilePhase =
+    phase.kind === 'reconciling' || phase.kind === 'unverifiable';
+
+  if (
+    readOwnError !== null &&
+    readOwnError.status !== 404 &&
+    (!isReconcilePhase || readOwnError.status === 403)
+  ) {
     return (
       <ErrorState
         headingLevel="h3"
@@ -402,9 +431,11 @@ export function SubmissionPanel({ activity }: SubmissionPanelProps) {
   const windowInfo = describeWindow(activity);
   const isUploading = phase.kind === 'uploading';
   const isReconciling = phase.kind === 'reconciling';
+  const isUnverifiable = phase.kind === 'unverifiable';
   const submitDisabled =
     isUploading ||
     isReconciling ||
+    isUnverifiable ||
     windowInfo.blocked ||
     selectedFiles.length === 0;
   const percent = progress ?? 0;
@@ -427,7 +458,7 @@ export function SubmissionPanel({ activity }: SubmissionPanelProps) {
       </div>
 
       {formError !== null ? (
-        <Alert variant="destructive" role="alert">
+        <Alert id={formErrorId} variant="destructive" role="alert">
           <AlertDescription>{formError}</AlertDescription>
         </Alert>
       ) : null}
@@ -522,8 +553,11 @@ export function SubmissionPanel({ activity }: SubmissionPanelProps) {
           type="file"
           multiple
           accept=".pdf,.png,.jpg,.jpeg,.docx"
-          aria-describedby={hintId}
-          disabled={isUploading || isReconciling}
+          aria-describedby={
+            formError !== null ? `${hintId} ${formErrorId}` : hintId
+          }
+          aria-invalid={formError !== null || undefined}
+          disabled={isUploading || isReconciling || isUnverifiable}
           onChange={handleFileChange}
           className="block w-full text-sm text-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-2 file:font-medium file:text-secondary-foreground focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
         />
@@ -547,7 +581,7 @@ export function SubmissionPanel({ activity }: SubmissionPanelProps) {
                   {formatFileSize(file.size)}
                 </p>
               </div>
-              {!isUploading && !isReconciling ? (
+              {!isUploading && !isReconciling && !isUnverifiable ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -564,11 +598,7 @@ export function SubmissionPanel({ activity }: SubmissionPanelProps) {
       ) : null}
 
       {isUploading ? (
-        <div
-          role="status"
-          aria-live="polite"
-          className="space-y-2 rounded-xl border border-border bg-card p-3"
-        >
+        <div className="space-y-2 rounded-xl border border-border bg-card p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-medium text-foreground">
               {copy.uploadingLabel}
@@ -593,7 +623,7 @@ export function SubmissionPanel({ activity }: SubmissionPanelProps) {
             className="h-2 w-full overflow-hidden rounded-full bg-secondary"
           >
             <div
-              className="h-full rounded-full bg-primary transition-width"
+              className="h-full rounded-full bg-primary transition-[width] motion-reduce:transition-none"
               style={{ width: `${percent}%` }}
             />
           </div>

@@ -17,6 +17,7 @@ import {
   type SubmissionStoreItem,
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
+import { submissionDownloadDtoSchema } from './submission-schema';
 import {
   isUncertainSubmissionError,
   MAX_SUBMISSION_FILE_BYTES,
@@ -736,6 +737,86 @@ describe('submission-service', () => {
         'd.pdf',
         'e.png',
       ]);
+    });
+
+    it('rejects empty (0-byte) files and extensionless filenames named after an allowed extension', async () => {
+      const { port } = makeSession();
+
+      const emptyError = await submitActivityFiles(
+        port,
+        ACTIVITY_ID,
+        [new File([], 'vacio.pdf', { type: 'application/pdf' })],
+        { baseUrl: TEST_API_BASE_URL, idempotencyKey: IDEMPOTENCY_KEY },
+      ).catch((cause: unknown) => cause);
+      expect(emptyError).toBeInstanceOf(ApiError);
+
+      const extensionlessError = await submitActivityFiles(
+        port,
+        ACTIVITY_ID,
+        [new File([PDF_BYTES], 'pdf', { type: 'application/pdf' })],
+        { baseUrl: TEST_API_BASE_URL, idempotencyKey: IDEMPOTENCY_KEY },
+      ).catch((cause: unknown) => cause);
+      expect(extensionlessError).toBeInstanceOf(ApiError);
+    });
+
+    it('treats abort during 401 refresh as AbortError even when refresh returns undefined', async () => {
+      const store = makeStore();
+      mswServer.use(...store.handlers);
+      store.failNext('create', {
+        status: 401,
+        body: {
+          code: 'UNAUTHENTICATED',
+          message: 'Expired',
+          correlationId: 'req-abort-refresh-undef',
+        },
+      });
+      const controller = new AbortController();
+      const port: SubmissionSessionPort = {
+        getAccessToken: () => 'expired-token',
+        refreshAccessToken: async () => {
+          controller.abort();
+          return undefined;
+        },
+      };
+
+      const error = await submitActivityFiles(
+        port,
+        ACTIVITY_ID,
+        [makePdfFile()],
+        {
+          baseUrl: TEST_API_BASE_URL,
+          idempotencyKey: IDEMPOTENCY_KEY,
+          signal: controller.signal,
+        },
+      ).catch((cause: unknown) => cause);
+
+      expect(error).toBeInstanceOf(DOMException);
+      expect((error as DOMException).name).toBe('AbortError');
+    });
+  });
+
+  describe('submissionDownloadDtoSchema', () => {
+    it('rejects non-http(s) signed downloadUrl schemes', () => {
+      const parsed = submissionDownloadDtoSchema.safeParse({
+        id: '00000000-0000-4000-8000-000000006601',
+        activityId: ACTIVITY_ID,
+        submittedAt: '2026-11-18T12:00:00Z',
+        isLate: false,
+        status: 'submitted',
+        files: [
+          {
+            id: '00000000-0000-4000-8000-000000006602',
+            originalName: 'tp1.pdf',
+            contentType: 'application/pdf',
+            sizeBytes: 120,
+            position: 0,
+            downloadUrl: 'javascript:alert(1)',
+            downloadUrlExpiresAt: '2026-11-18T12:05:00Z',
+          },
+        ],
+      });
+
+      expect(parsed.success).toBe(false);
     });
   });
 });

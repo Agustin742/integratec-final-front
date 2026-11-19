@@ -99,9 +99,14 @@ function validateSubmissionInput(
     throw validationFailure(submissionMessages.validation.count);
   }
   for (const file of files) {
-    const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
+    const dotIndex = file.name.lastIndexOf('.');
+    const extension =
+      dotIndex > 0 ? file.name.slice(dotIndex + 1).toLowerCase() : '';
     if (!ALLOWED_EXTENSIONS.has(extension)) {
       throw validationFailure(submissionMessages.validation.type);
+    }
+    if (file.size < 1) {
+      throw validationFailure(submissionMessages.validation.empty);
     }
     if (file.size > MAX_SUBMISSION_FILE_BYTES) {
       throw validationFailure(submissionMessages.validation.size);
@@ -317,6 +322,10 @@ function submitWithSession(
         void session
           .refreshAccessToken()
           .then((refreshed) => {
+            if (options.signal?.aborted) {
+              reject(new DOMException('Submission aborted', 'AbortError'));
+              return;
+            }
             if (refreshed === undefined) {
               reject(mapXhrError(xhr));
               return;
@@ -327,6 +336,10 @@ function submitWithSession(
             );
           })
           .catch(() => {
+            if (options.signal?.aborted) {
+              reject(new DOMException('Submission aborted', 'AbortError'));
+              return;
+            }
             reject(mapXhrError(xhr));
           });
         return;

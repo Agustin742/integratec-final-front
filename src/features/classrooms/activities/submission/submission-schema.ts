@@ -35,13 +35,25 @@ export const submissionResponseDtoSchema: z.ZodType<SubmissionResponseDto> =
     files: z.array(submissionFileSchema),
   });
 
+const safeHttpUrlSchema = z
+  .string()
+  .url()
+  .refine((value) => {
+    try {
+      const protocol = new URL(value).protocol;
+      return protocol === 'https:' || protocol === 'http:';
+    } catch {
+      return false;
+    }
+  }, 'Download URL must use http or https');
+
 export const submissionDownloadDtoSchema: z.ZodType<SubmissionDownloadResponseDto> =
   z.object({
     ...submissionBaseFields,
     files: z.array(
       submissionFileSchema.extend({
         /** Short-lived signed URL. Never logged, shared, or persisted. */
-        downloadUrl: z.string().min(1),
+        downloadUrl: safeHttpUrlSchema,
         /** ISO 8601 UTC instant after which `downloadUrl` stops working. */
         downloadUrlExpiresAt: z.string().datetime({ offset: true }),
       }),

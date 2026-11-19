@@ -593,4 +593,107 @@ describe('SubmissionPanel (#42 T3)', () => {
     ).not.toBeInTheDocument();
     await expectAccessible(container);
   });
+
+  test('rotates Idempotency-Key when changing file selection and supports removeFile', async () => {
+    const store = makeStore();
+    mswServer.use(...store.handlers);
+    store.failNext('create', {
+      status: 409,
+      body: {
+        code: 'CONFLICT',
+        message: 'Submission window closed.',
+        details: [{ field: 'dueAt', messages: ['Submission window closed.'] }],
+        correlationId: 'req-window-closed',
+      },
+    });
+    const tracker = trackCreateRequests();
+    renderPanel(makeActivityDto());
+
+    const input = await screen.findByLabelText(COPY.form.fileInputLabel);
+    selectFiles([makePdfFile('uno.pdf'), makePdfFile('dos.pdf')]);
+    expect(screen.getByText('uno.pdf')).toBeVisible();
+    expect(screen.getByText('dos.pdf')).toBeVisible();
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: COPY.form.removeFileLabel('dos.pdf'),
+      }),
+    );
+    expect(screen.queryByText('dos.pdf')).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: COPY.form.submitLabel }),
+    );
+    expect(
+      await screen.findByText(submissionMessages.serverErrors.windowClosed),
+    ).toBeVisible();
+
+    // Change selection -> must rotate Idempotency-Key and clear form error.
+    selectFiles([makePdfFile('nuevo.pdf')]);
+    expect(
+      screen.queryByText(submissionMessages.serverErrors.windowClosed),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: COPY.form.submitLabel }),
+    );
+    expect(await screen.findByText(COPY.statusLabels.submitted)).toBeVisible();
+    expect(tracker.requests).toHaveLength(2);
+    expect(tracker.requests[1]?.idempotencyKey).not.toBe(
+      tracker.requests[0]?.idempotencyKey,
+    );
+    expect(store.getItems()).toHaveLength(1);
+    expect(input).not.toBeInTheDocument();
+  });
+
+  test('unverifiable reconciliation blocks file changes until Volver a verificar succeeds', async () => {
+    const store = makeStore();
+    mswServer.use(...store.handlers);
+    store.failNext('create', 'network');
+    renderPanel(makeActivityDto());
+
+    const input = await screen.findByLabelText(COPY.form.fileInputLabel);
+    selectFiles([makePdfFile()]);
+    store.failNext('readOwn', {
+      status: 503,
+      body: {
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Down',
+        correlationId: 'req-read-503',
+      },
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: COPY.form.submitLabel }),
+    );
+
+    expect(await screen.findByText(COPY.uncertainUnverified)).toBeVisible();
+    expect(input).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: COPY.form.submitLabel }),
+    ).toBeDisabled();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: COPY.verifyAgainAction }),
+    );
+    expect(await screen.findByText(COPY.uncertainNothingStored)).toBeVisible();
+    expect(screen.getByLabelText(COPY.form.fileInputLabel)).toBeEnabled();
+  });
+
+  test('marks the file input aria-invalid when a pre-check validation fails', async () => {
+    const store = makeStore();
+    mswServer.use(...store.handlers);
+    renderPanel(makeActivityDto());
+
+    const input = await screen.findByLabelText(COPY.form.fileInputLabel);
+    selectFiles([new File([], 'vacio.pdf', { type: 'application/pdf' })]);
+    fireEvent.click(
+      screen.getByRole('button', { name: COPY.form.submitLabel }),
+    );
+
+    expect(
+      await screen.findByText(submissionMessages.validation.empty),
+    ).toBeVisible();
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input.getAttribute('aria-describedby')).toContain(' ');
+  });
 });

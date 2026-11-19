@@ -4,6 +4,7 @@ export const submissionMessages = {
   validation: {
     count: 'Elegí entre 1 y 5 archivos para tu entrega.',
     type: 'Uno de los archivos no es un PDF, PNG, JPEG o DOCX válido.',
+    empty: 'Los archivos seleccionados no pueden estar vacíos.',
     size: 'Cada archivo puede pesar hasta 10 MB.',
     idempotencyKey:
       'No se pudo identificar el envío. Reintentá en unos segundos.',
