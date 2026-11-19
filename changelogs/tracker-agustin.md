@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-19 — 3D classroom scene and local avatar navigation (front #36)
+
+- **Status:** in-progress (branch `feat/36-classroom-scene`, cut from `feat/35-avatar-3d-preview` because the scene reuses `AvatarModel`; no PR yet)
+- **Area / files:** `src/features/world/movement/`, `src/features/world/input/`, `src/features/world/classroom/`, `src/features/world/camera.ts`, `src/features/world/world-canvas.tsx`, `src/lib/input-arbitration.ts`, `src/features/classrooms/classroom-3d-stage.tsx`, `src/features/classrooms/classroom-workspace.tsx`, `docs/classroom-workspace.md`
+- **Change:** The 3D classroom view now shows a placeholder room built from the shared `CLASSROOM_LAYOUT` (desks match server collisions) with the user's own avatar. It moves locally with W/A/S/D or arrows and by clicking or tapping the floor (grid A* path, no false arrival on unreachable targets), with Walk/Idle clips, a destination marker and `Escape` to cancel. Input arbitration is shared with the `Alt+M` shortcut. The movement intent is exposed for `#37`.
+- **Reason:** First visible step of HU-ESP-001: users can see and move their avatar in the classroom before realtime presence lands.
+- **Verification:** Per-task affected tests, lint, typecheck, build and `security:check`; RDD reviews of each task commit approved. Look and feel still need a visual check in a real browser.
+- **Next step:** Visual check, then open the PR to `develop`; `#37` sends the intent to the room.
+
 ## 2026-11-18 — 3D avatar preview and shared avatar component (front #35)
 
 - **Status:** in-progress (branch `feat/35-avatar-3d-preview`, no PR yet)

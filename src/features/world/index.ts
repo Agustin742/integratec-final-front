@@ -1,4 +1,9 @@
 export { WorldCanvas, type WorldCanvasProps } from './world-canvas';
+export { ClassroomScene } from './classroom/classroom-scene';
+export {
+  ClassroomWorld,
+  type ClassroomWorldProps,
+} from './classroom/classroom-world';
 export { WarmLighting } from './world-lighting';
 export { WorldReference } from './world-reference';
 export { GlbAsset, type GlbAssetProps } from './glb-asset';
@@ -24,3 +29,16 @@ export {
   type ComposedAvatar,
 } from './avatar/compose-avatar';
 export { AvatarModel, type AvatarModelProps } from './avatar/avatar-model';
+export {
+  DEFAULT_CELL_SIZE,
+  INPUT_DEADZONE,
+  directionToward,
+  findPath,
+  isWalkable,
+  stepAvatar,
+  type Direction,
+  type FindPathOptions,
+  type PathFollow,
+  type Pose,
+  type Waypoint,
+} from './movement';

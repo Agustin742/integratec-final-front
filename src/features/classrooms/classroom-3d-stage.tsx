@@ -22,10 +22,10 @@ type ClearAssetCacheFn = (options?: {
 
 let loadedClearAssetCache: ClearAssetCacheFn | null = null;
 
-const loadWorldCanvas = () =>
+const loadClassroomWorld = () =>
   import('../world').then((module) => {
     loadedClearAssetCache = module.clearAssetCache;
-    return { default: module.WorldCanvas };
+    return { default: module.ClassroomWorld };
   });
 
 /**
@@ -67,7 +67,7 @@ export function Classroom3DStage({
   headingRef,
   scopeKey,
 }: Classroom3DStageProps) {
-  const [LazyWorldCanvas] = useState(() => lazy(loadWorldCanvas));
+  const [LazyClassroomWorld] = useState(() => lazy(loadClassroomWorld));
   const supportsBrowserObservers = typeof ResizeObserver !== 'undefined';
 
   return (
@@ -92,7 +92,7 @@ export function Classroom3DStage({
       {supportsBrowserObservers ? (
         <StageBoundary>
           <Suspense fallback={<p role="status">{worldMessages.loading}</p>}>
-            <LazyWorldCanvas
+            <LazyClassroomWorld
               label={classroomMessages.viewMode.canvasLabel}
               scopeKey={scopeKey}
             />
