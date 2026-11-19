@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import {
   isEditableTarget,
   isInteractionBlocked,
+  usesArrowNavigation,
 } from '@/lib/input-arbitration';
 import type { Direction } from '../movement';
 import { createKeyboardState } from './keyboard-direction';
@@ -59,6 +60,8 @@ export function useKeyboardDirection({
         clear();
         return;
       }
+      if (event.code.startsWith('Arrow') && usesArrowNavigation(event.target))
+        return;
       if (!state.press(event.code)) return;
       event.preventDefault();
       callbacks.current.onPress?.();

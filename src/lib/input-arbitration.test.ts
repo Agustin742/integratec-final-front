@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, test } from 'vitest';
-import { isEditableTarget, isInteractionBlocked } from './input-arbitration';
+import {
+  isEditableTarget,
+  isInteractionBlocked,
+  usesArrowNavigation,
+} from './input-arbitration';
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -55,5 +59,38 @@ describe('isInteractionBlocked', () => {
     expect(isInteractionBlocked()).toBe(true);
     mount('<div aria-modal="false"></div>');
     expect(isInteractionBlocked()).toBe(false);
+  });
+});
+
+describe('usesArrowNavigation', () => {
+  test.each([
+    '<div role="tablist"><button id="t" role="tab"></button></div>',
+    '<div role="menu"><div id="t" role="menuitem"></div></div>',
+    '<div role="menubar"><div id="t" tabindex="0"></div></div>',
+    '<div role="listbox"><div id="t" role="option"></div></div>',
+    '<div id="t" role="slider"></div>',
+    '<div role="radiogroup"><div id="t" role="radio"></div></div>',
+    '<div role="grid"><div id="t" tabindex="0"></div></div>',
+    '<div role="tree"><div id="t" tabindex="0"></div></div>',
+    '<div id="t" role="combobox"></div>',
+    '<div id="t" role="spinbutton"></div>',
+    '<input id="t" type="range" />',
+    '<select id="t"></select>',
+  ])('is true inside %s', (html) => {
+    document.body.innerHTML = html;
+    expect(usesArrowNavigation(document.querySelector('#t'))).toBe(true);
+  });
+
+  test('is true when the focused element is a widget even if the target is body', () => {
+    document.body.innerHTML = '<div id="t" role="slider" tabindex="0"></div>';
+    (document.querySelector('#t') as HTMLElement).focus();
+    expect(usesArrowNavigation(document.body)).toBe(true);
+  });
+
+  test('is false for plain elements, body and null', () => {
+    document.body.innerHTML = '<button id="t">ok</button>';
+    expect(usesArrowNavigation(document.querySelector('#t'))).toBe(false);
+    expect(usesArrowNavigation(document.body)).toBe(false);
+    expect(usesArrowNavigation(null)).toBe(false);
   });
 });

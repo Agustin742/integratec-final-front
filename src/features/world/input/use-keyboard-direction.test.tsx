@@ -75,6 +75,21 @@ describe('useKeyboardDirection', () => {
     },
   );
 
+  test('ignores arrow keys, but not WASD, inside focused navigation widgets', () => {
+    const { onChange, onPress } = setup();
+    document.body.innerHTML =
+      '<div role="tablist"><button id="t" role="tab"></button></div>';
+    const tab = document.querySelector('#t') as HTMLElement;
+    tab.focus();
+    const arrow = key('keydown', 'ArrowRight', {}, tab);
+    expect(arrow.defaultPrevented).toBe(false);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onPress).not.toHaveBeenCalled();
+    const wasd = key('keydown', 'KeyD', {}, tab);
+    expect(wasd.defaultPrevented).toBe(true);
+    expect(onChange).toHaveBeenCalled();
+  });
+
   test('ignores keydown that another handler already prevented', () => {
     const { onChange } = setup();
     const el = document.createElement('div');
