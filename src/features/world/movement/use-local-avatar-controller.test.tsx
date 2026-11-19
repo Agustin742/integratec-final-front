@@ -82,3 +82,14 @@ describe('useLocalAvatarController', () => {
     expect(result.current.getIntent()).toEqual({ x: 0, z: 0 });
   });
 });
+
+describe('useLocalAvatarController hasDestination', () => {
+  test('reports an active destination until it is cleared', () => {
+    const { result } = setup();
+    expect(result.current.hasDestination()).toBe(false);
+    expect(result.current.setDestination({ x: 6, z: 5 })).toBe(true);
+    expect(result.current.hasDestination()).toBe(true);
+    act(() => result.current.clearDestination());
+    expect(result.current.hasDestination()).toBe(false);
+  });
+});

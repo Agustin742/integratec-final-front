@@ -2,6 +2,7 @@ import {
   Component,
   Suspense,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -39,6 +40,8 @@ export interface WorldCanvasProps {
   role?: 'region' | 'img';
   /** Sizing classes for the canvas box; defaults to the classroom height. */
   canvasClassName?: string;
+  /** Visually hidden text that describes the canvas (for example its controls). */
+  description?: string;
   /** Replaces the loading announcement; `null` hides it. */
   loading?: ReactNode;
   /**
@@ -89,9 +92,11 @@ export function WorldCanvas({
   framing = 'classroom',
   role = 'region',
   canvasClassName,
+  description,
   loading,
   onUnavailable,
 }: WorldCanvasProps) {
+  const descriptionId = useId();
   const host = useRef<HTMLDivElement>(null);
   const creationErrors = useRef(new Set<unknown>());
   const [failed, setFailed] = useState(false);
@@ -203,9 +208,15 @@ export function WorldCanvas({
         ref={host}
         role={role}
         aria-label={label}
+        aria-describedby={description ? descriptionId : undefined}
         aria-busy={!failed && !canvas}
         className="min-w-0"
       >
+        {description && (
+          <p id={descriptionId} className="sr-only">
+            {description}
+          </p>
+        )}
         {failed ? (
           <WorldFallback />
         ) : (

@@ -25,6 +25,8 @@ export interface LocalAvatarApi {
   /** Live movement intent in the `AvatarInput` shape. */
   readonly intentRef: { readonly current: AvatarInput };
   getIntent: () => AvatarInput;
+  /** Whether a click destination is still being walked to. */
+  hasDestination: () => boolean;
   /** Returns false, changing nothing, when the point is unwalkable, unreachable or input is disabled. */
   setDestination: (point: Waypoint) => boolean;
   clearDestination: () => void;
@@ -78,6 +80,10 @@ export function useLocalAvatarController({
   });
 
   const getIntent = useCallback(() => controller.intent, [controller]);
+  const hasDestination = useCallback(
+    () => controller.hasDestination,
+    [controller],
+  );
   const setDestination = useCallback(
     (point: Waypoint) =>
       latest.current.enabled && controller.setDestination(point),
@@ -93,6 +99,7 @@ export function useLocalAvatarController({
     poseRef: api.poseRef,
     intentRef: api.intentRef,
     getIntent,
+    hasDestination,
     setDestination,
     clearDestination,
     step,

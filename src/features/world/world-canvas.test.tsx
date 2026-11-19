@@ -412,3 +412,18 @@ test('reports unavailability when the renderer cannot be created', () => {
   render(<WorldCanvas label="Preview" onUnavailable={onUnavailable} />);
   expect(onUnavailable).toHaveBeenCalledTimes(1);
 });
+
+test('associates an optional visually hidden description with the canvas host', () => {
+  render(
+    <WorldCanvas label="Technical world" description="Usá las flechas." />,
+  );
+  const region = screen.getByRole('region', { name: 'Technical world' });
+  expect(region).toHaveAccessibleDescription('Usá las flechas.');
+  expect(screen.getByText('Usá las flechas.')).toHaveClass('sr-only');
+});
+
+test('adds no description when none is given', () => {
+  render(<WorldCanvas label="Technical world" />);
+  const region = screen.getByRole('region', { name: 'Technical world' });
+  expect(region).not.toHaveAttribute('aria-describedby');
+});
