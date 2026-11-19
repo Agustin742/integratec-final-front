@@ -487,6 +487,50 @@ export interface paths {
         patch: operations["AnnouncementsController_update"];
         trace?: never;
     };
+    "/classrooms/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read classroom chat history
+         * @description Current students and staff only; parents denied. Latest first (createdAt DESC, id DESC). Students omit hidden rows and their mentions; staff retain full text and audit. Visible rows have null hiddenAt/hiddenById. Count, items and mentions share a repeatable-read snapshot. Only page/pageSize queries are accepted.
+         */
+        get: operations["ChatController_list"];
+        put?: never;
+        /**
+         * Send a classroom chat message
+         * @description Current students and teaching staff only; parents denied. Muted classrooms reject students but allow staff. Message, resolved mentions and notification requests commit atomically before any future broadcast (#48). At most 5 sends per rolling 10 seconds per user/classroom, including staff and hidden messages. Only body is accepted; author and time are server-assigned.
+         */
+        post: operations["ChatController_send"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/messages/{messageId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Hide a classroom chat message (teacher moderation)
+         * @description Current classroom staff only (Owner, Admin or Teacher); students and parents denied. Logical moderation: the server sets the hiddenAt/hiddenById audit pair atomically and the row is never deleted. Repeating moderation returns 204 without overwriting the original actor/time. Independent of the send rate limit. No unhide operation exists.
+         */
+        delete: operations["ChatController_hide"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/activities/{activityId}/submissions": {
         parameters: {
             query?: never;
@@ -799,6 +843,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/gamification/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Own study streak and earned badges
+         * @description Own recipient only; computed by the server in America/Argentina/Buenos_Aires. Badges are ordered by unlock time (awardedAt ASC, id ASC). No sort override.
+         */
+        get: operations["GamificationController_getMySummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/classrooms/{id}/roster": {
         parameters: {
             query?: never;
@@ -885,7 +949,7 @@ export interface paths {
         };
         /**
          * List activities
-         * @description Staff see drafts and published (filter with `state`); students see published only (their `state` filter is ignored). Linked parents are not part of the activity matrix (403). Deactivated activities are never listed. Sortable by `dueAt` (default, ascending) or `createdAt`; `id` is the tiebreaker.
+         * @description Staff see drafts and published (filter with `state`); students see published only (their `state` filter is ignored). Linked parents are not part of the activity matrix (403). Deactivated activities are never listed. Sortable by `dueAt` (default, ascending) or `createdAt`; `id` is the tiebreaker. Student list items add own work `status` (graded > submitted > overdue > pending) and `canSubmit` (FILE only). `status` filters before pagination/count for students; staff receive 400 for this query. Overdue means no submission and server time strictly after dueAt, regardless of allowLate.
          */
         get: operations["ActivitiesController_list"];
         put?: never;
@@ -1042,7 +1106,7 @@ export interface paths {
         };
         /**
          * Read the authenticated student's own daily activity metrics
-         * @description Raw per-UTC-day signals for the caller only: connected seconds, submissions and classroom-channel messages. No composite level is computed (gap 17 stays open); messageCount stays 0 until chat ships.
+         * @description Raw per-UTC-day signals for the caller only: connected seconds, submissions and classroom-channel messages. No composite level is computed (gap 17 stays open); messageCount counts classroom chat messages sent that day.
          */
         get: operations["StudentMetricsController_myDailyMetrics"];
         put?: never;
@@ -1837,14 +1901,17 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "activity_published" | "grade_posted" | "announcement" | "mention" | "activity_forum_reply";
+            kind: "activity_published" | "grade_posted" | "announcement" | "mention" | "activity_forum_reply" | "badge_awarded";
             /**
              * Format: uuid
              * @description Navigation only; source endpoint authorizes detail access independently.
              */
             resourceId: string;
-            /** Format: uuid */
-            classroomId: string;
+            /**
+             * Format: uuid
+             * @description Null for classroom-free notices such as badge awards.
+             */
+            classroomId: Record<string, never> | null;
             /** Format: uuid */
             studentId: string | null;
             /** Format: date-time */
@@ -1883,6 +1950,48 @@ export interface components {
             title?: string;
             /** @description Plain text body; `@Name` tokens matching active classroom member display names become mentions (at most 20 per announcement). */
             content?: string;
+        };
+        ChatHistoryMessageDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            classroomId: string;
+            /** Format: uuid */
+            authorId: string;
+            /** @description Trimmed plain text, never interpreted as HTML. */
+            body: string;
+            /** @description Distinct resolved active classroom members. */
+            mentionedUserIds: string[];
+            /**
+             * Format: date-time
+             * @description Server-assigned UTC creation instant.
+             */
+            createdAt: string;
+            /** Format: date-time */
+            hiddenAt: string | null;
+            /** Format: uuid */
+            hiddenById: string | null;
+        };
+        SendMessageDto: {
+            /** @description Plain text; 1–2000 characters after trimming. Unsafe control characters are rejected. @Name resolves active classroom members, at most 20 distinct users. */
+            body: string;
+        };
+        ChatMessageDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            classroomId: string;
+            /** Format: uuid */
+            authorId: string;
+            /** @description Trimmed plain text, never interpreted as HTML. */
+            body: string;
+            /** @description Distinct resolved active classroom members. */
+            mentionedUserIds: string[];
+            /**
+             * Format: date-time
+             * @description Server-assigned UTC creation instant.
+             */
+            createdAt: string;
         };
         CreateSubmissionBodyDto: {
             /** @description 1-5 files of at most 10 MB each. Allowed content (detected from the bytes): PDF, PNG, JPEG, DOCX. */
@@ -2255,6 +2364,28 @@ export interface components {
              */
             shopItemId?: string | null;
         };
+        StreakSummaryDto: {
+            /** @description Consecutive qualifying local days whose chain is still alive (the last one is today or yesterday). A bare login never changes it. */
+            currentStreak: number;
+            /** @description Longest qualifying-day chain ever reached. */
+            bestStreak: number;
+            /** @description Local calendar day (YYYY-MM-DD) of the last qualifying activity in America/Argentina/Buenos_Aires; null when none was recorded yet. */
+            lastQualifyingDay: string | null;
+        };
+        EarnedBadgeDto: {
+            /** Format: uuid */
+            id: string;
+            /** @description Stable catalog code of the badge. */
+            code: string;
+            name: string;
+            description: string;
+            /** Format: date-time */
+            awardedAt: string;
+        };
+        GamificationSummaryDto: {
+            streak: components["schemas"]["StreakSummaryDto"];
+            badges: components["schemas"]["EarnedBadgeDto"][];
+        };
         RosterGuardianDto: {
             /** Format: uuid */
             id: string;
@@ -2477,6 +2608,59 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        StudentActivitySummaryDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            classroomId: string;
+            /** @enum {string} */
+            type: "TP" | "EXAM";
+            /** @enum {string} */
+            format: "FILE" | "MULTIPLE_CHOICE";
+            /** @enum {string} */
+            state: "DRAFT" | "PUBLISHED";
+            title: string;
+            description: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 UTC.
+             */
+            opensAt: string | null;
+            /**
+             * Format: date-time
+             * @description ISO 8601 UTC.
+             */
+            dueAt: string;
+            allowLate: boolean;
+            maxScore: number;
+            /**
+             * @description Number, not a decimal string.
+             * @example 1.5
+             */
+            weightMultiplier: number;
+            /**
+             * Format: date-time
+             * @description ISO 8601 UTC.
+             */
+            publishedAt: string | null;
+            /**
+             * @description School IANA time zone for rendering the instants above.
+             * @example America/Argentina/Buenos_Aires
+             */
+            timeZone: string;
+            questionCount: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /**
+             * @description Own work: graded > submitted > overdue > pending. Independent of Activity.state.
+             * @enum {string}
+             */
+            status: "pending" | "submitted" | "graded" | "overdue";
+            /** @description Supported FILE submission, no prior submission, opensAt reached, and not past dueAt unless allowLate. Server-time snapshot, rechecked on submission. */
+            canSubmit: boolean;
+        };
         StudentOptionDto: {
             /** Format: uuid */
             id: string;
@@ -2651,9 +2835,9 @@ export interface components {
             day: string;
             /** @description Aggregated connected seconds reported by the realtime server. */
             connectedSeconds: number;
-            /** @description Submissions created that day. */
+            /** @description Raw submission events recorded that day, including to activities deleted later. */
             submissionCount: number;
-            /** @description Classroom-channel participation events that day. Always 0 until chat (RF-COM-002) ships. */
+            /** @description Classroom-channel participation that day: classroom chat messages sent (RF-COM-002). */
             messageCount: number;
         };
         StudentMetricSummaryDto: {
@@ -2666,13 +2850,13 @@ export interface components {
             displayName: string;
             /** @description Sum of connected seconds across all recorded UTC days. */
             connectedSeconds: number;
-            /** @description Sum of submission counts across all recorded UTC days. */
+            /** @description Raw submission events summed over all recorded UTC days, kept as history: it includes submissions to activities deleted later, so it can exceed gradedCount + ungradedCount. */
             submissionCount: number;
             /** @description Sum of message counts across all recorded UTC days. */
             messageCount: number;
-            /** @description Submissions with a grade in this classroom. */
+            /** @description Submissions with a grade to non-deleted activities of this classroom. */
             gradedCount: number;
-            /** @description Submissions without a grade yet in this classroom. */
+            /** @description Submissions without a grade yet to non-deleted activities of this classroom. */
             ungradedCount: number;
         };
         /** @enum {string} */
@@ -4132,6 +4316,200 @@ export interface operations {
             };
         };
     };
+    ChatController_list: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ChatHistoryMessageDto"][];
+                        /** @example 1 */
+                        page: number;
+                        /** @example 20 */
+                        pageSize: number;
+                        /**
+                         * @description Item count across all pages.
+                         * @example 42
+                         */
+                        total: number;
+                    };
+                };
+            };
+            /** @description Invalid pagination or unsupported query. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Parent role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent or inaccessible classroom. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ChatController_send: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendMessageDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessageDto"];
+                };
+            };
+            /** @description Invalid body, excess mentions or unknown fields. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Parent role or student in muted classroom. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent or inaccessible classroom. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Five messages already admitted in the rolling ten-second window, or another send for the same user and classroom is in flight. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ChatController_hide: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Message UUID inside this classroom */
+                messageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Message hidden, or already hidden by a first moderation. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Student or parent role in a visible classroom. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent or inaccessible classroom, or unknown/foreign/invalid message UUID in it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
     SubmissionsController_create: {
         parameters: {
             query?: never;
@@ -5366,6 +5744,35 @@ export interface operations {
             };
         };
     };
+    GamificationController_getMySummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Own streak summary and earned badges. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GamificationSummaryDto"];
+                };
+            };
+            /** @description Missing or invalid session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
     ClassroomRosterController_list: {
         parameters: {
             query?: {
@@ -5632,6 +6039,8 @@ export interface operations {
                 sort?: "dueAt" | "createdAt" | "-dueAt" | "-createdAt";
                 /** @description Staff only. Students always receive published activities only and may not filter drafts. */
                 state?: "DRAFT" | "PUBLISHED";
+                /** @description Student-only work status; filters before pagination/count. Staff receive 400 (property status should not exist). */
+                status?: "pending" | "submitted" | "graded" | "overdue";
             };
             header?: never;
             path: {
@@ -5642,14 +6051,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Activities without questions. */
+            /** @description Activities without questions. Staff receive summaries; students receive inbox items. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        items: components["schemas"]["ActivitySummaryDto"][];
+                        items: (components["schemas"]["ActivitySummaryDto"] | components["schemas"]["StudentActivitySummaryDto"])[];
                         /** @example 1 */
                         page: number;
                         /** @example 20 */
