@@ -335,7 +335,6 @@ export function createClassroomMaterialsPredicate(
     );
   };
 }
-
 export type InvitationStateFilter =
   'PENDING' | 'USED' | 'REVOKED' | 'EXPIRED' | 'ALL';
 
@@ -423,6 +422,8 @@ export interface ActivityListQueryParams {
   readonly state?: ActivityStateFilter;
 }
 
+export type ClassroomActivitiesQueryParams = ActivityListQueryParams;
+
 export interface NormalizedActivityListQueryParams {
   readonly page: number;
   readonly pageSize: number;
@@ -439,11 +440,20 @@ export function classroomActivitiesQueryKey(
   classroomId: string,
   params: ActivityListQueryParams = {},
 ): ScopedQueryKey<NormalizedActivityListQueryParams> {
+  const sort: ActivitySortOrder =
+    params.sort === 'createdAt' ||
+    params.sort === '-dueAt' ||
+    params.sort === '-createdAt'
+      ? params.sort
+      : 'dueAt';
   const normalizedParams = Object.freeze({
     page: clampListParam(params.page, 1, 1, 10_000),
     pageSize: clampListParam(params.pageSize, 20, 1, 100),
-    sort: params.sort ?? 'dueAt',
-    state: params.state ?? null,
+    sort,
+    state:
+      params.state === 'DRAFT' || params.state === 'PUBLISHED'
+        ? params.state
+        : null,
   });
   return createScopedQueryKey(
     { userId, classroomId },
@@ -454,8 +464,41 @@ export function classroomActivitiesQueryKey(
 }
 
 /**
- * Predicate matching every activity list query entry owned by `userId` and
- * `classroomId`.
+ * Predicate matching every classroom activity list query entry owned by
+ * `userId` and `classroomId` (excluding detail queries).
+ */
+export function createClassroomActivitiesListPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'activities' &&
+      segment.resource === 'list'
+    );
+  };
+}
+
+/**
+ * Predicate matching every classroom activity query entry (list and detail)
+ * owned by `userId` and `classroomId`, so confirmed writes and access-revocation
+ * cleanups reconcile all affected activity views at once.
  */
 export function createClassroomActivitiesPredicate(
   userId: string,
@@ -480,7 +523,7 @@ export function createClassroomActivitiesPredicate(
       segment.scope?.userId === normalizedUserId &&
       segment.scope?.classroomId === normalizedClassroomId &&
       segment.domain === 'activities' &&
-      segment.resource === 'list'
+      (segment.resource === 'list' || segment.resource === 'detail')
     );
   };
 }
