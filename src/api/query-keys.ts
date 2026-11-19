@@ -744,3 +744,174 @@ export function createNotificationsPredicate(
     );
   };
 }
+
+export type GradingQueueStateFilter = 'submitted' | 'graded';
+export type GradingQueueSortOrder =
+  'submittedAt' | 'gradedAt' | '-submittedAt' | '-gradedAt';
+
+export interface GradingQueueQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+  readonly activityId?: string;
+  readonly state?: GradingQueueStateFilter;
+  readonly sort?: GradingQueueSortOrder;
+}
+
+export interface NormalizedGradingQueueQueryParams {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly activityId: string;
+  readonly state: GradingQueueStateFilter | '';
+  readonly sort: GradingQueueSortOrder;
+}
+
+function normalizeGradingQueueState(
+  value: GradingQueueStateFilter | undefined,
+): GradingQueueStateFilter | '' {
+  return value === 'submitted' || value === 'graded' ? value : '';
+}
+
+function normalizeGradingQueueSort(
+  value: GradingQueueSortOrder | undefined,
+): GradingQueueSortOrder {
+  if (
+    value === 'submittedAt' ||
+    value === 'gradedAt' ||
+    value === '-submittedAt' ||
+    value === '-gradedAt'
+  ) {
+    return value;
+  }
+  return 'submittedAt';
+}
+
+/**
+ * Key of `GET /classrooms/{id}/submissions`: paginated teacher grading queue
+ * scoped by `userId` and `classroomId` (`rules/state-management.md`).
+ */
+export function classroomSubmissionsQueueQueryKey(
+  userId: string,
+  classroomId: string,
+  params: GradingQueueQueryParams = {},
+): ScopedQueryKey<NormalizedGradingQueueQueryParams> {
+  const normalizedParams = Object.freeze({
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+    activityId: (params.activityId ?? '').trim(),
+    state: normalizeGradingQueueState(params.state),
+    sort: normalizeGradingQueueSort(params.sort),
+  });
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'submissions',
+    'queue',
+    normalizedParams,
+  );
+}
+
+/**
+ * Key of `GET /submissions/{submissionId}` (short-lived signed file URLs)
+ * scoped by `userId` and `classroomId`.
+ */
+export function submissionDetailQueryKey(
+  userId: string,
+  classroomId: string,
+  submissionId: string,
+): ScopedQueryKey<{ readonly submissionId: string }> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'submissions',
+    'detail',
+    Object.freeze({
+      submissionId: normalizeRequiredText(submissionId, 'submissionId'),
+    }),
+  );
+}
+
+/**
+ * Key of `GET /submissions/{submissionId}/grade` scoped by `userId` and
+ * `classroomId`.
+ */
+export function submissionGradeQueryKey(
+  userId: string,
+  classroomId: string,
+  submissionId: string,
+): ScopedQueryKey<{ readonly submissionId: string }> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'grades',
+    'detail',
+    Object.freeze({
+      submissionId: normalizeRequiredText(submissionId, 'submissionId'),
+    }),
+  );
+}
+
+/**
+ * Predicate matching every teacher grading queue query entry owned by `userId`
+ * and `classroomId`.
+ */
+export function createClassroomSubmissionsQueuePredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'submissions' &&
+      segment.resource === 'queue'
+    );
+  };
+}
+
+/**
+ * Predicate matching every classroom grading/submission query entry owned by
+ * `userId` and `classroomId`, for write reconciliation and access revocation.
+ */
+export function createClassroomGradesPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    if (
+      segment.scope?.userId !== normalizedUserId ||
+      segment.scope?.classroomId !== normalizedClassroomId
+    ) {
+      return false;
+    }
+    return (
+      (segment.domain === 'submissions' &&
+        (segment.resource === 'queue' || segment.resource === 'detail')) ||
+      (segment.domain === 'grades' && segment.resource === 'detail')
+    );
+  };
+}
