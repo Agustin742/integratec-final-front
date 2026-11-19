@@ -1459,3 +1459,66 @@ export function classroomDirectoryMembersQueryKey(
     normalizedParams,
   );
 }
+
+export interface ChatHistoryQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+}
+
+export interface NormalizedChatHistoryQueryParams {
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+/**
+ * Key of `GET /classrooms/{id}/messages`: paginated classroom chat history
+ * (`ChatController_list`) scoped by `userId` and `classroomId`, so switching
+ * either one reads an isolated cache entry (`rules/state-management.md`).
+ */
+export function classroomChatHistoryQueryKey(
+  userId: string,
+  classroomId: string,
+  params: ChatHistoryQueryParams = {},
+): ScopedQueryKey<NormalizedChatHistoryQueryParams> {
+  const normalizedParams = Object.freeze({
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+  });
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'chat',
+    'history',
+    normalizedParams,
+  );
+}
+
+/**
+ * Predicate matching every classroom chat query entry owned by `userId` and
+ * `classroomId`, so confirmed sends, moderation hides and the classroom
+ * context revalidation seam reconcile all affected chat views at once.
+ */
+export function createClassroomChatPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'chat'
+    );
+  };
+}

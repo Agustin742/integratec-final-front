@@ -6320,3 +6320,580 @@ export function createActivityForumStore(
     ],
   };
 }
+
+export type ChatMessagePayload = components['schemas']['ChatMessageDto'];
+export type ChatHistoryMessagePayload =
+  components['schemas']['ChatHistoryMessageDto'];
+export type SendMessageRequestPayload = components['schemas']['SendMessageDto'];
+export type PaginatedChatHistoryPayload =
+  operations['ChatController_list']['responses'][200]['content']['application/json'];
+
+export interface ChatStoreMessage {
+  readonly id: string;
+  readonly authorId: string;
+  readonly body: string;
+  readonly mentionedUserIds: readonly string[];
+  readonly createdAt: string;
+  readonly hiddenAt: string | null;
+  readonly hiddenById: string | null;
+}
+
+export type ChatStoreRole =
+  'OWNER' | 'ADMIN' | 'TEACHER' | 'STUDENT' | 'PARENT';
+
+export type ChatStoreOp = 'list' | 'send' | 'hide';
+
+export type ChatStoreFailure =
+  MswErrorResponseSpec | 'network' | 'drop-response' | 'malformed-2xx';
+
+export interface ClassroomChatStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId: string;
+  readonly currentUserId?: string;
+  readonly role?: ChatStoreRole;
+  readonly chatMuted?: boolean;
+  readonly initialMessages?: readonly ChatStoreMessage[];
+  /**
+   * Display-name to userId directory used to resolve `@Name` mentions on send,
+   * mirroring the server-side resolution of active classroom members.
+   */
+  readonly mentionDirectory?: Readonly<Record<string, string>>;
+  readonly writeDelayMs?: number;
+}
+
+export interface ClassroomChatStore {
+  readonly handlers: readonly HttpHandler[];
+  getMessages: () => readonly ChatStoreMessage[];
+  setRole: (role: ChatStoreRole) => void;
+  setCurrentUserId: (userId: string) => void;
+  failNext: (op: ChatStoreOp, failure: ChatStoreFailure) => void;
+  resetRateLimit: () => void;
+  getCounts: () => Record<ChatStoreOp, number>;
+}
+
+const CHAT_SEND_RATE_LIMIT_MAX = 5;
+const CHAT_SEND_RATE_LIMIT_WINDOW_MS = 10_000;
+const CHAT_MENTIONED_USERS_MAX = 20;
+const CHAT_MESSAGE_BODY_MAX_LENGTH = 2000;
+
+function isChatStaffRole(role: ChatStoreRole): boolean {
+  return role === 'OWNER' || role === 'ADMIN' || role === 'TEACHER';
+}
+
+/**
+ * Stateful contract-faithful MSW store for the classroom chat REST contract
+ * (`HU-COM-002`, backend `#38`): `GET`/`POST /classrooms/{id}/messages` and
+ * `DELETE /classrooms/{id}/messages/{messageId}`.
+ *
+ * Contract behavior mirrored from `src/api/schema.generated.ts`:
+ * - History is latest first (`createdAt DESC`, `id DESC`); students omit hidden
+ *   rows while staff retain them with the moderation audit; parents are denied.
+ * - Send rejects parents, muted students, invalid bodies, unknown fields and
+ *   more than 20 distinct mentions; it enforces 5 admitted sends per rolling
+ *   10 seconds per user/classroom with a `429`.
+ * - Hide is staff-only logical moderation: idempotent `204` that never
+ *   overwrites the original audit pair.
+ *
+ * `'network'` failures simulate the request never reaching the server;
+ * `'drop-response'`/`'malformed-2xx'` simulate a write that landed but whose
+ * confirmation was lost or unparseable (outcome-uncertain).
+ */
+export function createClassroomChatStore(
+  options: ClassroomChatStoreOptions,
+): ClassroomChatStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  let currentUserId =
+    options.currentUserId ?? '00000000-0000-4000-8000-000000007001';
+  let currentRole: ChatStoreRole = options.role ?? 'STUDENT';
+  const chatMuted = options.chatMuted ?? false;
+  const mentionDirectory: Readonly<Record<string, string>> =
+    options.mentionDirectory ?? {};
+  let messages: ChatStoreMessage[] = [...(options.initialMessages ?? [])];
+  let admittedSendAts: number[] = [];
+  let seq = 100;
+
+  const pending: Partial<Record<ChatStoreOp, ChatStoreFailure>> = {};
+  const counts: Record<ChatStoreOp, number> = {
+    list: 0,
+    send: 0,
+    hide: 0,
+  };
+
+  const consumeFailure = (op: ChatStoreOp): ChatStoreFailure | undefined => {
+    const failure = pending[op];
+    pending[op] = undefined;
+    return failure;
+  };
+
+  const respondFailure = (failure: ChatStoreFailure): Response => {
+    if (failure === 'network' || failure === 'drop-response') {
+      return HttpResponse.error();
+    }
+    if (failure === 'malformed-2xx') {
+      return HttpResponse.json({ broken: true }, { status: 200 });
+    }
+    return createErrorEnvelopeResponse(failure.status, failure.body);
+  };
+
+  const checkListAccess = (classroomId: string): Response | null => {
+    if (classroomId !== options.classroomId) {
+      return createErrorEnvelopeResponse(404, {
+        code: 'NOT_FOUND',
+        message: 'Classroom not found.',
+        correlationId: 'req-chat-list-404',
+      });
+    }
+    if (currentRole === 'PARENT') {
+      return createErrorEnvelopeResponse(403, {
+        code: 'FORBIDDEN',
+        message: 'Parents cannot access the classroom chat.',
+        correlationId: 'req-chat-parent-403',
+      });
+    }
+    return null;
+  };
+
+  /**
+   * Mirrors `ChatController_list`: only `page`/`pageSize` are accepted.
+   * Non-positive or non-integer values yield `400` ("Invalid pagination or
+   * unsupported query"); `pageSize` above 100 is clamped like every other
+   * paginated store because the contract documents no explicit maximum.
+   */
+  const parseChatPagination = (
+    url: URL,
+  ): { ok: true; page: number; pageSize: number } | { ok: false } => {
+    for (const key of url.searchParams.keys()) {
+      if (key !== 'page' && key !== 'pageSize') {
+        return { ok: false };
+      }
+    }
+
+    const rawPage = url.searchParams.get('page');
+    let page = 1;
+    if (rawPage !== null) {
+      const parsed = Number(rawPage);
+      if (!Number.isInteger(parsed) || parsed < 1) {
+        return { ok: false };
+      }
+      page = parsed;
+    }
+
+    const rawPageSize = url.searchParams.get('pageSize');
+    let pageSize = 20;
+    if (rawPageSize !== null) {
+      const parsed = Number(rawPageSize);
+      if (!Number.isInteger(parsed) || parsed < 1) {
+        return { ok: false };
+      }
+      pageSize = Math.min(parsed, 100);
+    }
+
+    return { ok: true, page, pageSize };
+  };
+
+  /**
+   * Mirrors `SendMessageDto`: plain text, 1-2000 characters after trimming,
+   * unsafe control characters rejected (multiline `\n`, `\r`, `\t` allowed),
+   * and only the `body` field accepted.
+   */
+  const validateChatBody = (
+    payload: unknown,
+  ): { ok: true; body: string } | { ok: false; response: Response } => {
+    if (
+      typeof payload !== 'object' ||
+      payload === null ||
+      Array.isArray(payload)
+    ) {
+      return {
+        ok: false,
+        response: createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Invalid body.',
+          correlationId: 'req-chat-send-400',
+        }),
+      };
+    }
+    const unknownFields = Object.keys(payload).filter((key) => key !== 'body');
+    if (unknownFields.length > 0) {
+      return {
+        ok: false,
+        response: createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Unknown fields are not accepted.',
+          details: [
+            {
+              field: unknownFields[0],
+              messages: ['Unexpected property'],
+            },
+          ],
+          correlationId: 'req-chat-send-400-unknown',
+        }),
+      };
+    }
+
+    const raw = (payload as { body?: unknown }).body;
+    if (typeof raw !== 'string') {
+      return {
+        ok: false,
+        response: createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Invalid body.',
+          details: [{ field: 'body', messages: ['Body must be a string'] }],
+          correlationId: 'req-chat-send-400-type',
+        }),
+      };
+    }
+    if (
+      [...raw].some((char) => {
+        const code = char.charCodeAt(0);
+        return (
+          (code <= 0x1f && code !== 0x09 && code !== 0x0a && code !== 0x0d) ||
+          (code >= 0x7f && code <= 0x9f)
+        );
+      })
+    ) {
+      return {
+        ok: false,
+        response: createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Invalid control characters.',
+          details: [
+            { field: 'body', messages: ['Disallowed control characters'] },
+          ],
+          correlationId: 'req-chat-send-400-ctrl',
+        }),
+      };
+    }
+    const trimmed = raw.trim();
+    if (trimmed.length < 1 || trimmed.length > CHAT_MESSAGE_BODY_MAX_LENGTH) {
+      return {
+        ok: false,
+        response: createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Invalid length.',
+          details: [
+            {
+              field: 'body',
+              messages: [
+                `Length must be between 1 and ${CHAT_MESSAGE_BODY_MAX_LENGTH}`,
+              ],
+            },
+          ],
+          correlationId: 'req-chat-send-400-len',
+        }),
+      };
+    }
+    return { ok: true, body: trimmed };
+  };
+
+  /**
+   * Resolves `@Name` tokens against the store directory, mirroring the
+   * server-side resolution into distinct active classroom member ids.
+   * More than 20 distinct users is a definite `400` rejection.
+   */
+  const resolveChatMentions = (
+    trimmedBody: string,
+  ):
+    | { ok: true; mentionedUserIds: string[] }
+    | { ok: false; response: Response } => {
+    const mentioned: string[] = [];
+    for (const [displayName, userId] of Object.entries(mentionDirectory)) {
+      if (
+        trimmedBody.includes(`@${displayName}`) &&
+        !mentioned.includes(userId)
+      ) {
+        mentioned.push(userId);
+      }
+    }
+    if (mentioned.length > CHAT_MENTIONED_USERS_MAX) {
+      return {
+        ok: false,
+        response: createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Too many mentions.',
+          details: [
+            {
+              field: 'body',
+              messages: [`At most ${CHAT_MENTIONED_USERS_MAX} distinct users`],
+            },
+          ],
+          correlationId: 'req-chat-send-400-mentions',
+        }),
+      };
+    }
+    return { ok: true, mentionedUserIds: mentioned };
+  };
+
+  return {
+    getMessages: () => [...messages],
+    setRole: (role) => {
+      currentRole = role;
+    },
+    setCurrentUserId: (userId) => {
+      currentUserId = userId;
+    },
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    resetRateLimit: () => {
+      admittedSendAts = [];
+    },
+    getCounts: () => ({ ...counts }),
+    handlers: [
+      http.get(`${baseUrl}/classrooms/:id/messages`, ({ params, request }) => {
+        counts.list += 1;
+        const failure = consumeFailure('list');
+        if (failure !== undefined) {
+          return respondFailure(failure);
+        }
+
+        const denied = checkListAccess(String(params.id ?? ''));
+        if (denied) return denied;
+
+        const pagination = parseChatPagination(new URL(request.url));
+        if (!pagination.ok) {
+          return createErrorEnvelopeResponse(400, {
+            code: 'VALIDATION_FAILED',
+            message: 'Invalid pagination or unsupported query.',
+            correlationId: 'req-chat-list-400',
+          });
+        }
+
+        // Students omit hidden rows entirely (count included); staff retain
+        // the full history with the moderation audit.
+        const visible =
+          currentRole === 'STUDENT'
+            ? messages.filter((m) => m.hiddenAt === null)
+            : messages;
+
+        const sorted = [...visible].sort((a, b) => {
+          const diff = Date.parse(b.createdAt) - Date.parse(a.createdAt);
+          return diff !== 0 ? diff : b.id.localeCompare(a.id);
+        });
+
+        const start = (pagination.page - 1) * pagination.pageSize;
+        const items: ChatHistoryMessagePayload[] = sorted
+          .slice(start, start + pagination.pageSize)
+          .map((m) => ({
+            id: m.id,
+            classroomId: options.classroomId,
+            authorId: m.authorId,
+            body: m.body,
+            mentionedUserIds: [...m.mentionedUserIds],
+            createdAt: m.createdAt,
+            hiddenAt: m.hiddenAt,
+            hiddenById: m.hiddenById,
+          }));
+
+        return HttpResponse.json({
+          items,
+          page: pagination.page,
+          pageSize: pagination.pageSize,
+          total: sorted.length,
+        });
+      }),
+      http.post(
+        `${baseUrl}/classrooms/:id/messages`,
+        async ({ params, request }) => {
+          counts.send += 1;
+          if (options.writeDelayMs) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, options.writeDelayMs),
+            );
+          }
+          const failure = consumeFailure('send');
+          if (
+            failure !== undefined &&
+            failure !== 'drop-response' &&
+            failure !== 'malformed-2xx'
+          ) {
+            return respondFailure(failure);
+          }
+
+          // Compute the server decision first: when the injected failure is a
+          // transport-level loss ('drop-response'/'malformed-2xx'), the caller
+          // must not observe the verdict, so the decision only decides whether
+          // the write landed in the store.
+          type ChatSendOutcome =
+            | { readonly kind: 'admitted'; readonly created: ChatStoreMessage }
+            | { readonly kind: 'rejected'; readonly response: Response };
+
+          let outcome: ChatSendOutcome;
+          if (String(params.id ?? '') !== options.classroomId) {
+            outcome = {
+              kind: 'rejected',
+              response: createErrorEnvelopeResponse(404, {
+                code: 'NOT_FOUND',
+                message: 'Classroom not found.',
+                correlationId: 'req-chat-send-404',
+              }),
+            };
+          } else if (currentRole === 'PARENT') {
+            outcome = {
+              kind: 'rejected',
+              response: createErrorEnvelopeResponse(403, {
+                code: 'FORBIDDEN',
+                message: 'Parents cannot access the classroom chat.',
+                correlationId: 'req-chat-parent-403',
+              }),
+            };
+          } else if (currentRole === 'STUDENT' && chatMuted) {
+            outcome = {
+              kind: 'rejected',
+              response: createErrorEnvelopeResponse(403, {
+                code: 'FORBIDDEN',
+                message: 'The classroom chat is muted for students.',
+                correlationId: 'req-chat-send-403-muted',
+              }),
+            };
+          } else {
+            const payload = await request.json().catch(() => null);
+            const validated = validateChatBody(payload);
+            if (!validated.ok) {
+              outcome = { kind: 'rejected', response: validated.response };
+            } else {
+              const mentions = resolveChatMentions(validated.body);
+              if (!mentions.ok) {
+                outcome = { kind: 'rejected', response: mentions.response };
+              } else {
+                const now = Date.now();
+                admittedSendAts = admittedSendAts.filter(
+                  (at) => now - at < CHAT_SEND_RATE_LIMIT_WINDOW_MS,
+                );
+                if (admittedSendAts.length >= CHAT_SEND_RATE_LIMIT_MAX) {
+                  outcome = {
+                    kind: 'rejected',
+                    response: createErrorEnvelopeResponse(429, {
+                      code: 'TOO_MANY_REQUESTS',
+                      message:
+                        'Five messages already admitted in the rolling ten-second window.',
+                      correlationId: 'req-chat-send-429',
+                    }),
+                  };
+                } else {
+                  seq += 1;
+                  const createdAt = new Date(
+                    Date.parse('2026-11-19T03:00:00.000Z') + seq * 1000,
+                  ).toISOString();
+                  const created: ChatStoreMessage = {
+                    id: `00000000-0000-4000-8000-60000000${String(seq).padStart(4, '0')}`,
+                    authorId: currentUserId,
+                    body: validated.body,
+                    mentionedUserIds: [...mentions.mentionedUserIds],
+                    createdAt,
+                    hiddenAt: null,
+                    hiddenById: null,
+                  };
+                  messages = [...messages, created];
+                  admittedSendAts = [...admittedSendAts, now];
+                  outcome = { kind: 'admitted', created };
+                }
+              }
+            }
+          }
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+          if (failure === 'malformed-2xx') {
+            return HttpResponse.json({ broken: true }, { status: 201 });
+          }
+          if (outcome.kind === 'rejected') {
+            return outcome.response;
+          }
+
+          const response: ChatMessagePayload = {
+            id: outcome.created.id,
+            classroomId: options.classroomId,
+            authorId: outcome.created.authorId,
+            body: outcome.created.body,
+            mentionedUserIds: [...outcome.created.mentionedUserIds],
+            createdAt: outcome.created.createdAt,
+          };
+          return HttpResponse.json(response, { status: 201 });
+        },
+      ),
+      http.delete(
+        `${baseUrl}/classrooms/:id/messages/:messageId`,
+        async ({ params }) => {
+          counts.hide += 1;
+          if (options.writeDelayMs) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, options.writeDelayMs),
+            );
+          }
+          const failure = consumeFailure('hide');
+          if (
+            failure !== undefined &&
+            failure !== 'drop-response' &&
+            failure !== 'malformed-2xx'
+          ) {
+            return respondFailure(failure);
+          }
+
+          // Compute the moderation decision first: when the injected failure is
+          // a transport-level loss, the caller must not observe the verdict;
+          // the decision only decides whether the hide landed in the store.
+          const classroomMismatch =
+            String(params.id ?? '') !== options.classroomId;
+          const denied = !isChatStaffRole(currentRole);
+          const message = classroomMismatch
+            ? undefined
+            : messages.find((m) => m.id === String(params.messageId ?? ''));
+
+          if (
+            !classroomMismatch &&
+            !denied &&
+            message !== undefined &&
+            message.hiddenAt === null
+          ) {
+            // Idempotent moderation: repeating it returns 204 without
+            // overwriting the original audit pair.
+            messages = messages.map((m) =>
+              m.id === message.id
+                ? {
+                    ...m,
+                    hiddenAt: '2026-11-19T04:00:00.000Z',
+                    hiddenById: currentUserId,
+                  }
+                : m,
+            );
+          }
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+          if (failure === 'malformed-2xx') {
+            // The contract promises `204 No Content`; a 2xx with a body is the
+            // unparseable-confirmation simulation for this endpoint.
+            return HttpResponse.json({ broken: true }, { status: 200 });
+          }
+
+          if (classroomMismatch) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-chat-hide-404',
+            });
+          }
+          if (denied) {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Only classroom staff can moderate the chat.',
+              correlationId: 'req-chat-hide-403',
+            });
+          }
+          if (message === undefined) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Message not found in this classroom.',
+              correlationId: 'req-chat-hide-404-message',
+            });
+          }
+
+          return new HttpResponse(null, { status: 204 });
+        },
+      ),
+    ],
+  };
+}
