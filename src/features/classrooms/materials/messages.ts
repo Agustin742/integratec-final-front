@@ -95,5 +95,39 @@ export const materialMessages = {
       notFound: 'Este material ya fue quitado o no está disponible.',
       unexpected: 'Ocurrió un error inesperado al quitar el material.',
     },
+    bot: {
+      sectionLabel: 'Asistente de estudio (IA)',
+      switchLabel: (filename: string) =>
+        `Habilitar «${filename}» para el asistente de estudio`,
+      enabledHint: 'Disponible como fuente para el asistente del aula.',
+      disabledHint: 'No incluido en las fuentes del asistente.',
+      updatingHint: 'Guardando cambio en el servidor…',
+      statuses: {
+        disabled: 'Desactivado para el bot',
+        pending: 'Indexando…',
+        ready: 'Listo para el bot',
+        failed: 'Error de indexación',
+      },
+      loadErrorNotice:
+        'No pudimos consultar qué materiales tiene habilitados el asistente. Podés reintentar.',
+      retryLoadAction: 'Reintentar estado del asistente',
+      confirmedEnabledTitle: 'Material habilitado para el asistente',
+      confirmedEnabledDescription: (filename: string) =>
+        `El servidor confirmó la habilitación de «${filename}» para el asistente de estudio.`,
+      confirmedDisabledTitle: 'Material deshabilitado para el asistente',
+      confirmedDisabledDescription: (filename: string) =>
+        `«${filename}» dejó de estar disponible para el asistente de estudio.`,
+      toggleErrorTitle: 'No pudimos actualizar el asistente',
+      toggleErrors: {
+        forbidden:
+          'No tenés permiso para configurar el asistente de estudio en esta aula.',
+        notFound:
+          'No encontramos este material o el aula ya no está disponible.',
+        uncertain:
+          'No pudimos confirmar si el cambio se guardó en el servidor. Verificá el estado actual antes de reintentar.',
+        unexpected:
+          'Ocurrió un error inesperado al actualizar el estado del material para el asistente.',
+      },
+    },
   },
 } as const;
