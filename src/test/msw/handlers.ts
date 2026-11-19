@@ -947,15 +947,26 @@ export interface ClassroomMaterialItem {
   readonly createdAt: string;
 }
 
-export type MaterialStoreOp = 'list' | 'upload' | 'download' | 'remove';
+export type MaterialStoreOp =
+  'list' | 'upload' | 'download' | 'remove' | 'botList' | 'botToggle';
 export type MaterialStoreFailure =
   MswErrorResponseSpec | 'network' | 'drop-response';
+
+export interface BotMaterialStateEntry {
+  readonly materialId: string;
+  readonly classroomId: string;
+  readonly botEnabled: boolean;
+  readonly indexingStatus: 'disabled' | 'pending' | 'ready' | 'failed';
+  readonly indexingError?: string | null;
+  readonly updatedAt: string;
+}
 
 export interface ClassroomMaterialsStoreOptions {
   readonly baseUrl?: string;
   readonly classroomId?: string;
   readonly authorId?: string;
   readonly initialItems?: readonly ClassroomMaterialItem[];
+  readonly initialBotStates?: readonly BotMaterialStateEntry[];
   readonly signedUrlBase?: string;
   readonly expiresInSeconds?: number;
 }
@@ -963,6 +974,14 @@ export interface ClassroomMaterialsStoreOptions {
 export interface ClassroomMaterialsStore {
   readonly handlers: readonly HttpHandler[];
   read(): readonly ClassroomMaterialItem[];
+  readBotStates(): readonly BotMaterialStateEntry[];
+  setBotState(
+    materialId: string,
+    state: Pick<
+      BotMaterialStateEntry,
+      'botEnabled' | 'indexingStatus' | 'indexingError'
+    >,
+  ): void;
   failNext(op: MaterialStoreOp, failure: MaterialStoreFailure): void;
 }
 
@@ -989,6 +1008,9 @@ export function createClassroomMaterialsStore(
     options.signedUrlBase ?? 'https://files.example.test/signed';
   const expiresInSeconds = options.expiresInSeconds ?? 120;
   let items: ClassroomMaterialItem[] = [...(options.initialItems ?? [])];
+  const botStates = new Map<string, BotMaterialStateEntry>(
+    (options.initialBotStates ?? []).map((entry) => [entry.materialId, entry]),
+  );
   let seq = items.length + 1;
   const pending: Partial<Record<MaterialStoreOp, MaterialStoreFailure>> = {};
 
@@ -999,6 +1021,17 @@ export function createClassroomMaterialsStore(
 
   return {
     read: () => [...items],
+    readBotStates: () => [...botStates.values()],
+    setBotState(materialId, state) {
+      botStates.set(materialId, {
+        materialId,
+        classroomId,
+        botEnabled: state.botEnabled,
+        indexingStatus: state.indexingStatus,
+        indexingError: state.indexingError ?? null,
+        updatedAt: '2026-11-19T01:30:00.000Z',
+      });
+    },
     failNext(op, failure) {
       pending[op] = failure;
     },
@@ -1149,7 +1182,72 @@ export function createClassroomMaterialsStore(
             });
           }
           items = items.filter((item) => item.id !== params.materialId);
+          botStates.delete(String(params.materialId));
           return new HttpResponse(null, { status: 204 });
+        },
+      ),
+      http.get(`${baseUrl}/classrooms/:id/bot/materials`, ({ params }) => {
+        const failure = pending.botList;
+        pending.botList = undefined;
+        if (failure !== undefined && failure !== 'drop-response') {
+          return fail(failure);
+        }
+        if (options.classroomId && params.id !== classroomId) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Classroom not found.',
+            correlationId: 'req-bot-materials-list-404',
+          });
+        }
+        return HttpResponse.json({
+          items: [...botStates.values()],
+        });
+      }),
+      http.put(
+        `${baseUrl}/classrooms/:id/bot/materials/:materialId`,
+        async ({ params, request }) => {
+          const failure = pending.botToggle;
+          pending.botToggle = undefined;
+          if (failure !== undefined && failure !== 'drop-response') {
+            return fail(failure);
+          }
+          if (options.classroomId && params.id !== classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-bot-materials-toggle-404',
+            });
+          }
+          const materialId = String(params.materialId);
+          const found = items.find((item) => item.id === materialId);
+          if (!found) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Material not found.',
+              correlationId: 'req-bot-materials-toggle-404',
+            });
+          }
+          const body = (await request.json().catch(() => null)) as {
+            enabled?: unknown;
+          } | null;
+          if (!body || typeof body.enabled !== 'boolean') {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'enabled must be a boolean.',
+              correlationId: 'req-bot-materials-toggle-400',
+            });
+          }
+          seq += 1;
+          const nextEntry: BotMaterialStateEntry = {
+            materialId,
+            classroomId: found.classroomId,
+            botEnabled: body.enabled,
+            indexingStatus: body.enabled ? 'pending' : 'disabled',
+            indexingError: null,
+            updatedAt: '2026-11-19T01:30:00.000Z',
+          };
+          botStates.set(materialId, nextEntry);
+          return HttpResponse.json(nextEntry);
         },
       ),
     ],
@@ -4763,6 +4861,528 @@ export function createClassroomGradingStore(
   };
 }
 
+export type ShopStoreItemKind =
+  'CLASSROOM_ITEM' | 'AVATAR_ACCESSORY' | 'DESK_UPGRADE' | 'PET_ACCESSORY';
+
+export interface ShopStoreCatalogItem {
+  readonly id: string;
+  readonly code: string;
+  readonly name: string;
+  readonly description: string;
+  readonly kind: ShopStoreItemKind;
+  readonly price: number;
+  readonly isImplemented: boolean;
+  readonly ownedByStudent?: boolean;
+  readonly ownedByClassroom?: boolean;
+  readonly metadata?: Record<string, unknown>;
+  readonly createdAt: string;
+}
+
+export interface ShopStorePurchase {
+  readonly id: string;
+  readonly classroomId: string;
+  readonly studentId: string;
+  readonly shopItemId: string;
+  readonly shopItemCode: string;
+  readonly shopItemName: string;
+  readonly shopItemKind: ShopStoreItemKind;
+  readonly pointTransactionId: string;
+  readonly pricePaid: number;
+  readonly createdAt: string;
+}
+
+export type ShopStoreOp = 'items' | 'purchases' | 'purchase' | 'wallet';
+
+export type ShopStoreFailure =
+  MswErrorResponseSpec | 'network' | 'drop-response' | 'malformed-2xx';
+
+export interface ClassroomShopStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId: string;
+  readonly studentId?: string;
+  readonly role?: string;
+  readonly initialBalance?: number;
+  readonly initialItems?: readonly ShopStoreCatalogItem[];
+  readonly initialPurchases?: readonly ShopStorePurchase[];
+  readonly purchaseDelayMs?: number;
+}
+
+export interface ClassroomShopStore {
+  readonly handlers: readonly HttpHandler[];
+  getBalance: () => number;
+  setBalance: (balance: number) => void;
+  setRole: (role: string) => void;
+  removeItem: (shopItemId: string) => void;
+  markOwnedExternally: (shopItemId: string) => void;
+  failNext: (op: ShopStoreOp, failure: ShopStoreFailure) => void;
+  getCounts: () => Record<ShopStoreOp, number>;
+  getReceivedIdempotencyKeys: () => readonly string[];
+}
+
+/**
+ * Stateful contract-faithful MSW store for classroom shop (`HU-GAM-003`,
+ * backend `#34`) plus synchronized `GET /classrooms/:id/points` wallet view.
+ */
+export function createClassroomShopStore(
+  options: ClassroomShopStoreOptions,
+): ClassroomShopStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const studentId = options.studentId ?? '00000000-0000-4000-8000-000000007001';
+  let currentRole = options.role ?? 'STUDENT';
+  let balance = options.initialBalance ?? 250;
+  let items: ShopStoreCatalogItem[] = [...(options.initialItems ?? [])];
+  let purchases: ShopStorePurchase[] = [...(options.initialPurchases ?? [])];
+  let purchaseSeq = 100;
+
+  const idempotencyRecords = new Map<
+    string,
+    {
+      readonly shopItemId: string;
+      readonly purchase: ShopStorePurchase;
+      readonly classroomItem: {
+        readonly id: string;
+        readonly classroomId: string;
+        readonly shopItemId: string;
+        readonly purchaseId: string;
+        readonly state: 'ACTIVE';
+        readonly createdAt: string;
+      } | null;
+      readonly balanceAfter: number;
+    }
+  >();
+
+  const pending: Partial<Record<ShopStoreOp, ShopStoreFailure>> = {};
+  const counts: Record<ShopStoreOp, number> = {
+    items: 0,
+    purchases: 0,
+    purchase: 0,
+    wallet: 0,
+  };
+  const receivedKeys: string[] = [];
+
+  const consumeFailure = (op: ShopStoreOp): ShopStoreFailure | undefined => {
+    const failure = pending[op];
+    pending[op] = undefined;
+    return failure;
+  };
+
+  const respondFailure = (failure: ShopStoreFailure): Response => {
+    if (failure === 'network' || failure === 'drop-response') {
+      return HttpResponse.error();
+    }
+    if (failure === 'malformed-2xx') {
+      return HttpResponse.json({ broken: true }, { status: 200 });
+    }
+    return createErrorEnvelopeResponse(failure.status, failure.body);
+  };
+
+  const toCatalogDto = (item: ShopStoreCatalogItem) => {
+    const ownedByStudent = Boolean(item.ownedByStudent);
+    const ownedByClassroom = Boolean(item.ownedByClassroom);
+    const isPurchasable =
+      item.isImplemented &&
+      !ownedByStudent &&
+      !(item.kind === 'CLASSROOM_ITEM' && ownedByClassroom);
+    return {
+      id: item.id,
+      code: item.code,
+      name: item.name,
+      description: item.description,
+      kind: item.kind,
+      price: item.price,
+      isImplemented: item.isImplemented,
+      isPurchasable,
+      ownedByStudent,
+      ownedByClassroom,
+      metadata: item.metadata ?? {},
+      createdAt: item.createdAt,
+    };
+  };
+
+  return {
+    getBalance: () => balance,
+    setBalance: (next) => {
+      balance = Math.max(0, next);
+    },
+    setRole: (role) => {
+      currentRole = role;
+    },
+    removeItem: (shopItemId) => {
+      items = items.filter((item) => item.id !== shopItemId);
+    },
+    markOwnedExternally: (shopItemId) => {
+      items = items.map((item) =>
+        item.id === shopItemId
+          ? {
+              ...item,
+              ownedByStudent: true,
+              ownedByClassroom:
+                item.kind === 'CLASSROOM_ITEM' ? true : item.ownedByClassroom,
+            }
+          : item,
+      );
+    },
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    getCounts: () => ({ ...counts }),
+    getReceivedIdempotencyKeys: () => [...receivedKeys],
+    handlers: [
+      http.get(`${baseUrl}/classrooms/:id/points`, ({ params }) => {
+        counts.wallet += 1;
+        const failure = consumeFailure('wallet');
+        if (failure !== undefined) {
+          return respondFailure(failure);
+        }
+        if (String(params.id ?? '') !== options.classroomId) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Classroom not found.',
+            correlationId: 'req-shop-wallet-404',
+          });
+        }
+        if (currentRole !== 'STUDENT') {
+          return createErrorEnvelopeResponse(403, {
+            code: 'FORBIDDEN',
+            message: 'Student role required.',
+            correlationId: 'req-shop-wallet-403',
+          });
+        }
+        return HttpResponse.json({
+          classroomId: options.classroomId,
+          studentId,
+          balance,
+          items: purchases.map((p) => ({
+            id: p.pointTransactionId,
+            entryKind: 'DEBIT',
+            amount: -p.pricePaid,
+            sourceType: 'SHOP_PURCHASE',
+            sourceId: p.id,
+            reason: `Compra en tienda: ${p.shopItemName}`,
+            actorId: studentId,
+            createdAt: p.createdAt,
+          })),
+          page: 1,
+          pageSize: 20,
+          total: purchases.length,
+        });
+      }),
+      http.get(
+        `${baseUrl}/classrooms/:id/shop/items`,
+        ({ params, request }) => {
+          counts.items += 1;
+          const failure = consumeFailure('items');
+          if (failure !== undefined) {
+            return respondFailure(failure);
+          }
+          if (String(params.id ?? '') !== options.classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-shop-items-404',
+            });
+          }
+          if (currentRole !== 'STUDENT') {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Student role required.',
+              correlationId: 'req-shop-items-403',
+            });
+          }
+
+          const url = new URL(request.url);
+          const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+          const pageSize = Math.min(
+            100,
+            Math.max(1, Number(url.searchParams.get('pageSize') ?? '20')),
+          );
+          const kind = url.searchParams.get('kind') ?? '';
+          const sort = url.searchParams.get('sort') ?? 'createdAt';
+          const allowedSorts = new Set([
+            'createdAt',
+            '-createdAt',
+            'defaultPrice',
+            '-defaultPrice',
+            'name',
+            '-name',
+          ]);
+          if (!allowedSorts.has(sort)) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid sort parameter.',
+              details: [{ field: 'sort', messages: ['Invalid sort field'] }],
+              correlationId: 'req-shop-items-400',
+            });
+          }
+
+          let filtered = [...items];
+          if (kind) {
+            filtered = filtered.filter((item) => item.kind === kind);
+          }
+
+          const sorted = filtered.sort((a, b) => {
+            if (sort === 'defaultPrice') {
+              return a.price - b.price || a.id.localeCompare(b.id);
+            }
+            if (sort === '-defaultPrice') {
+              return b.price - a.price || a.id.localeCompare(b.id);
+            }
+            if (sort === 'name') {
+              return a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+            }
+            if (sort === '-name') {
+              return b.name.localeCompare(a.name) || a.id.localeCompare(b.id);
+            }
+            if (sort === '-createdAt') {
+              return (
+                Date.parse(b.createdAt) - Date.parse(a.createdAt) ||
+                a.id.localeCompare(b.id)
+              );
+            }
+            return (
+              Date.parse(a.createdAt) - Date.parse(b.createdAt) ||
+              a.id.localeCompare(b.id)
+            );
+          });
+
+          const start = (page - 1) * pageSize;
+          return HttpResponse.json({
+            items: sorted.slice(start, start + pageSize).map(toCatalogDto),
+            page,
+            pageSize,
+            total: sorted.length,
+          });
+        },
+      ),
+      http.get(
+        `${baseUrl}/classrooms/:id/shop/purchases`,
+        ({ params, request }) => {
+          counts.purchases += 1;
+          const failure = consumeFailure('purchases');
+          if (failure !== undefined) {
+            return respondFailure(failure);
+          }
+          if (String(params.id ?? '') !== options.classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-shop-purchases-404',
+            });
+          }
+          if (currentRole !== 'STUDENT') {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Student role required.',
+              correlationId: 'req-shop-purchases-403',
+            });
+          }
+
+          const url = new URL(request.url);
+          const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+          const pageSize = Math.min(
+            100,
+            Math.max(1, Number(url.searchParams.get('pageSize') ?? '20')),
+          );
+          const sorted = [...purchases].sort(
+            (a, b) =>
+              Date.parse(b.createdAt) - Date.parse(a.createdAt) ||
+              a.id.localeCompare(b.id),
+          );
+          const start = (page - 1) * pageSize;
+          return HttpResponse.json({
+            items: sorted.slice(start, start + pageSize),
+            page,
+            pageSize,
+            total: sorted.length,
+          });
+        },
+      ),
+      http.post(
+        `${baseUrl}/classrooms/:id/shop/purchase`,
+        async ({ params, request }) => {
+          counts.purchase += 1;
+          if (options.purchaseDelayMs) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, options.purchaseDelayMs),
+            );
+          }
+
+          const key = request.headers.get('Idempotency-Key')?.trim() ?? '';
+          if (key) {
+            receivedKeys.push(key);
+          }
+
+          const failure = consumeFailure('purchase');
+          if (
+            failure !== undefined &&
+            failure !== 'drop-response' &&
+            failure !== 'malformed-2xx'
+          ) {
+            return respondFailure(failure);
+          }
+
+          if (String(params.id ?? '') !== options.classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-shop-purchase-404',
+            });
+          }
+          if (currentRole !== 'STUDENT') {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Student role required.',
+              correlationId: 'req-shop-purchase-403',
+            });
+          }
+          if (!key || key.length > 128) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Idempotency-Key header is required.',
+              details: [
+                {
+                  field: 'idempotency-key',
+                  messages: ['Idempotency-Key header is required'],
+                },
+              ],
+              correlationId: 'req-shop-purchase-400-key',
+            });
+          }
+
+          const body = (await request.json()) as Record<string, unknown>;
+          const extraKeys = Object.keys(body).filter((k) => k !== 'shopItemId');
+          if (
+            extraKeys.length > 0 ||
+            typeof body.shopItemId !== 'string' ||
+            body.shopItemId.trim().length === 0
+          ) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid purchase payload.',
+              details: [
+                { field: 'shopItemId', messages: ['Invalid shopItemId'] },
+              ],
+              correlationId: 'req-shop-purchase-400-body',
+            });
+          }
+
+          const shopItemId = body.shopItemId;
+          const existingRecord = idempotencyRecords.get(key);
+          if (existingRecord) {
+            if (existingRecord.shopItemId !== shopItemId) {
+              return createErrorEnvelopeResponse(409, {
+                code: 'CONFLICT',
+                message: 'Conflict.',
+                correlationId: 'req-shop-purchase-409-key-mismatch',
+              });
+            }
+            return HttpResponse.json(
+              {
+                purchase: existingRecord.purchase,
+                classroomItem: existingRecord.classroomItem,
+                balance,
+                replayed: true,
+              },
+              { status: 200 },
+            );
+          }
+
+          const item = items.find((entry) => entry.id === shopItemId);
+          if (!item) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Item not found.',
+              correlationId: 'req-shop-purchase-404-item',
+            });
+          }
+
+          if (
+            !item.isImplemented ||
+            item.ownedByStudent ||
+            (item.kind === 'CLASSROOM_ITEM' && item.ownedByClassroom) ||
+            balance < item.price
+          ) {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message: 'Conflict.',
+              correlationId: 'req-shop-purchase-409',
+            });
+          }
+
+          purchaseSeq += 1;
+          const now = '2026-11-19T02:30:00.000Z';
+          const purchaseId = `00000000-0000-4000-8000-20000000${String(purchaseSeq).padStart(4, '0')}`;
+          const txId = `00000000-0000-4000-8000-30000000${String(purchaseSeq).padStart(4, '0')}`;
+
+          balance -= item.price;
+          items = items.map((entry) =>
+            entry.id === item.id
+              ? {
+                  ...entry,
+                  ownedByStudent: true,
+                  ownedByClassroom:
+                    entry.kind === 'CLASSROOM_ITEM'
+                      ? true
+                      : entry.ownedByClassroom,
+                }
+              : entry,
+          );
+
+          const purchase: ShopStorePurchase = {
+            id: purchaseId,
+            classroomId: options.classroomId,
+            studentId,
+            shopItemId: item.id,
+            shopItemCode: item.code,
+            shopItemName: item.name,
+            shopItemKind: item.kind,
+            pointTransactionId: txId,
+            pricePaid: item.price,
+            createdAt: now,
+          };
+          purchases = [purchase, ...purchases];
+
+          const classroomItem =
+            item.kind === 'CLASSROOM_ITEM'
+              ? {
+                  id: `00000000-0000-4000-8000-40000000${String(purchaseSeq).padStart(4, '0')}`,
+                  classroomId: options.classroomId,
+                  shopItemId: item.id,
+                  purchaseId,
+                  state: 'ACTIVE' as const,
+                  createdAt: now,
+                }
+              : null;
+
+          idempotencyRecords.set(key, {
+            shopItemId,
+            purchase,
+            classroomItem,
+            balanceAfter: balance,
+          });
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+          if (failure === 'malformed-2xx') {
+            return HttpResponse.json({ broken: true }, { status: 201 });
+          }
+
+          return HttpResponse.json(
+            {
+              purchase,
+              classroomItem,
+              balance,
+              replayed: false,
+            },
+            { status: 201 },
+          );
+        },
+      ),
+    ],
+  };
+}
+
 export const defaultHandlers: readonly HttpHandler[] = [
   createHealthHandler(),
   http.get(`${TEST_API_BASE_URL}/notifications`, () =>
@@ -5091,4 +5711,163 @@ export function createOwnStreakAndBadgesHandler(
     }
     return HttpResponse.json(payload);
   });
+}
+
+export type BotStoreOp = 'status' | 'ask';
+
+export interface BotStoreCitation {
+  readonly materialId: string;
+  readonly filename: string;
+  readonly excerpt?: string | null;
+}
+
+export interface ClassroomBotStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly initialAvailable?: boolean;
+  readonly initialReason?:
+    'exam_in_progress' | 'no_materials' | 'disabled' | null;
+  readonly initialMessage?: string | null;
+  readonly onAsk?: (question: string) =>
+    | {
+        readonly answer: string;
+        readonly outcome?: 'answered' | 'out_of_scope' | 'guided_only';
+        readonly citations?: readonly BotStoreCitation[];
+      }
+    | Promise<{
+        readonly answer: string;
+        readonly outcome?: 'answered' | 'out_of_scope' | 'guided_only';
+        readonly citations?: readonly BotStoreCitation[];
+      }>;
+}
+
+export interface ClassroomBotStore {
+  readonly handlers: readonly HttpHandler[];
+  setExamLocked(locked: boolean, message?: string | null): void;
+  failNext(op: BotStoreOp, failure: MswErrorResponseSpec | 'network'): void;
+}
+
+/**
+ * Stateful, contract-faithful MSW store for `HU-BOT-002` (`GET /bot/status`,
+ * `POST /bot/messages`).
+ */
+export function createClassroomBotStore(
+  options: ClassroomBotStoreOptions = {},
+): ClassroomBotStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomId =
+    options.classroomId ?? '00000000-0000-4000-8000-000000000010';
+  let available = options.initialAvailable ?? true;
+  let reason: 'exam_in_progress' | 'no_materials' | 'disabled' | null =
+    options.initialReason ?? null;
+  let message: string | null = options.initialMessage ?? null;
+  let seq = 1;
+  const pending: Partial<Record<BotStoreOp, MswErrorResponseSpec | 'network'>> =
+    {};
+
+  const fail = (failure: MswErrorResponseSpec | 'network'): Response =>
+    failure === 'network'
+      ? HttpResponse.error()
+      : createErrorEnvelopeResponse(failure.status, failure.body);
+
+  return {
+    setExamLocked(locked, nextMessage) {
+      available = !locked;
+      reason = locked ? 'exam_in_progress' : null;
+      message = locked
+        ? (nextMessage ??
+          'El asistente está pausado porque tenés un examen en curso.')
+        : null;
+    },
+    failNext(op, failure) {
+      pending[op] = failure;
+    },
+    handlers: [
+      http.get(`${baseUrl}/classrooms/:id/bot/status`, ({ params }) => {
+        const failure = pending.status;
+        pending.status = undefined;
+        if (failure) {
+          return fail(failure);
+        }
+        if (options.classroomId && params.id !== classroomId) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Classroom not found.',
+            correlationId: 'req-bot-status-404',
+          });
+        }
+        return HttpResponse.json({
+          available,
+          reason,
+          message,
+        });
+      }),
+      http.post(
+        `${baseUrl}/classrooms/:id/bot/messages`,
+        async ({ params, request }) => {
+          const failure = pending.ask;
+          pending.ask = undefined;
+          if (failure) {
+            return fail(failure);
+          }
+          if (options.classroomId && params.id !== classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-bot-ask-404',
+            });
+          }
+          if (!available && reason === 'exam_in_progress') {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message:
+                message ??
+                'El asistente está pausado porque tenés un examen en curso.',
+              correlationId: 'req-bot-exam-409',
+            });
+          }
+          const body = (await request.json().catch(() => null)) as {
+            question?: unknown;
+          } | null;
+          const question =
+            typeof body?.question === 'string' ? body.question.trim() : '';
+          if (!question) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'question is required.',
+              correlationId: 'req-bot-ask-400',
+            });
+          }
+          const custom = options.onAsk ? await options.onAsk(question) : null;
+          if (!available && reason === 'exam_in_progress') {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message:
+                message ??
+                'El asistente está pausado porque tenés un examen en curso.',
+              correlationId: 'req-bot-exam-inflight-409',
+            });
+          }
+          const id = `bot-msg-${seq}`;
+          seq += 1;
+          return HttpResponse.json({
+            id,
+            answer:
+              custom?.answer ??
+              'Revisá la definición de fracciones equivalentes en el apunte de la unidad.',
+            outcome: custom?.outcome ?? 'answered',
+            citations: custom?.citations ?? [
+              {
+                materialId: '00000000-0000-4000-8000-000000001001',
+                filename: 'guia-unidad-1.pdf',
+                excerpt:
+                  'Dos fracciones son equivalentes cuando representan la misma parte.',
+              },
+            ],
+            createdAt: '2026-11-19T02:25:00.000Z',
+          });
+        },
+      ),
+    ],
+  };
 }

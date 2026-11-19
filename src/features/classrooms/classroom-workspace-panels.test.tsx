@@ -189,8 +189,7 @@ function setup(
 }
 const pendingCatalogCases = [
   ['chat', 'Chat'],
-  ['shop', 'Tienda'],
-  ['bot', 'Asistente de estudio'],
+
   ['settings', 'Configuración'],
 ] as const;
 
@@ -238,6 +237,21 @@ test('default catalog opens members with tabs when invite_members is granted', a
   expect(
     await screen.findByRole('heading', { name: 'Código de acceso al aula' }),
   ).toBeVisible();
+});
+
+test('default catalog opens shop by URL with ShopPanel and closes cleanly', async () => {
+  const view = setup(['shop'], '/classrooms/a/panels/shop', true);
+  const dialog = await screen.findByRole('dialog', { name: 'Tienda' });
+  expect(
+    await within(dialog).findByText('Tienda disponible solo para estudiantes'),
+  ).toBeVisible();
+  expect(dialog).not.toHaveTextContent('Funcionalidad pendiente');
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+  await screen.findByRole('button', { name: 'Open grades' });
+  expect(view.router.state.location.pathname).toBe('/classrooms/a');
+  expect(view.router.state.historyAction).toBe('REPLACE');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(document.activeElement).toHaveTextContent('Classroom a');
 });
 
 test('default catalog opens grades with teacher grading queue when publish_content is granted', async () => {
