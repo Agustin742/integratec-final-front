@@ -495,6 +495,44 @@ describe('submission-service', () => {
       );
     });
 
+    it('honors a cancellation that lands during the token refresh window', async () => {
+      const store = makeStore();
+      mswServer.use(...store.handlers);
+      const controller = new AbortController();
+      let refreshCount = 0;
+      const port: SubmissionSessionPort = {
+        getAccessToken: () => 'synthetic-access',
+        refreshAccessToken: async () => {
+          refreshCount += 1;
+          // The user cancels while the refresh is resolving.
+          controller.abort();
+          return 'synthetic-refreshed';
+        },
+      };
+      store.failNext('create', {
+        status: 401,
+        body: {
+          code: 'UNAUTHENTICATED',
+          message: 'Authentication required.',
+          correlationId: 'req-submissions-create-401',
+        },
+      });
+
+      const error = await submitActivityFiles(port, ACTIVITY_ID, [
+        makePdfFile(),
+      ], {
+        baseUrl: TEST_API_BASE_URL,
+        idempotencyKey: IDEMPOTENCY_KEY,
+        signal: controller.signal,
+      }).catch((cause: unknown) => cause);
+
+      expect(error).toBeInstanceOf(DOMException);
+      expect((error as DOMException).name).toBe('AbortError');
+      expect(refreshCount).toBe(1);
+      // The 401 attempt stored nothing and the replay was never sent.
+      expect(store.getItems()).toHaveLength(0);
+    });
+
     it('rejects an aborted upload as an expected cancellation', async () => {
       const store = makeStore();
       mswServer.use(...store.handlers);

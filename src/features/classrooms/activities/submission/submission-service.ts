@@ -261,6 +261,14 @@ function submitWithSession(
   options: SubmitFilesOptions,
   attempt: number,
 ): Promise<SubmissionResponseDto> {
+  // A cancellation that lands while a 401 refresh is resolving must stop the
+  // replayed attempt; the signal listener alone would miss an already-aborted
+  // signal because the event fired before the listener attached.
+  if (options.signal?.aborted) {
+    return Promise.reject(
+      new DOMException('Submission aborted', 'AbortError'),
+    );
+  }
   const accessToken = session.getAccessToken();
   return new Promise<SubmissionResponseDto>((resolve, reject) => {
     const xhr = new XMLHttpRequest();

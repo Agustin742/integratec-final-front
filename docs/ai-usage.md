@@ -6,11 +6,11 @@ Course declaration of AI use in the development process (see [course requirement
 
 ## Tools used
 
-| Tool                                   | Tasks supported                                                                                                  |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Claude Code                            | Drafting and reviewing project documentation and rules in this repository                                        |
-| el Gentleman in Pi                     | Approved #26 panel entry catalog, test-first implementation, automated checks and independent agent verification |
-| _Pending: to be completed by the team_ | _Pending: to be completed by the team_                                                                           |
+| Tool                                   | Tasks supported                                                                                                                                                                                 |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code                            | Drafting and reviewing project documentation and rules in this repository                                                                                                                       |
+| el Gentleman in Pi                     | Approved #26 panel entry catalog, test-first implementation, automated checks and independent agent verification; #42 student file submission slice (idempotent service, panel, MSW store, E2E) |
+| _Pending: to be completed by the team_ | _Pending: to be completed by the team_                                                                                                                                                          |
 
 ## Successful case
 
