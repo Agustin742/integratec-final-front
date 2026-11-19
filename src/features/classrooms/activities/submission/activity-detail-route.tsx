@@ -1,4 +1,5 @@
 import { ActivityDetailPage } from '../activity-detail-page';
+import { ActivityForumPanel } from '../forum/activity-forum-panel';
 import { SubmissionPanel } from './submission-panel';
 import type { ActivityDetailDto } from '../activity-schema';
 
@@ -6,12 +7,20 @@ function renderSubmissionTab(activity: ActivityDetailDto) {
   return <SubmissionPanel activity={activity} />;
 }
 
+function renderForumTab(activity: ActivityDetailDto) {
+  return <ActivityForumPanel activity={activity} />;
+}
+
 /**
- * Route entry for the student activity detail (#42): the shared detail page
- * with the submission tab filled by the file-submission panel. The classroom
- * and activity ids come from the route params, exactly as the detail page
- * resolves them.
+ * Route entry for the activity detail route: fills the submission slot (#42)
+ * and the per-activity query forum slot (#52) while keeping classroom and
+ * activity ids sourced strictly from route params.
  */
 export function ActivityDetailRoute() {
-  return <ActivityDetailPage renderSubmissionTab={renderSubmissionTab} />;
+  return (
+    <ActivityDetailPage
+      renderSubmissionTab={renderSubmissionTab}
+      renderForumTab={renderForumTab}
+    />
+  );
 }
