@@ -62,6 +62,9 @@ function setup(fetch: typeof globalThis.fetch, path = '/classrooms/a') {
             Response.json({ items: [], page: 1, pageSize: 20, total: 0 }),
           );
         }
+        if (url.includes('/users/me/daily-review')) {
+          return Promise.resolve(Response.json({ status: 'not_due' }));
+        }
         return url.endsWith('/context-events')
           ? Promise.resolve(
               new Response(new ReadableStream(), {
