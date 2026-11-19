@@ -10,10 +10,10 @@ import { FormField } from '@/components/forms/form-primitives';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { classroomMessages } from '../messages';
 import type { ActivityEditorFormInput } from './activity-editor-schema';
+import { activityMessages } from './messages';
 
-const messages = classroomMessages.activities.editor.questions;
+const messages = activityMessages.editor.questions;
 
 /** Form API of the activity editor, independent of the create/edit output. */
 export type ActivityEditorFormApi = UseFormReturn<
@@ -119,7 +119,7 @@ function rootQuestionsError(
   return typeof message === 'string' && message !== '' ? message : null;
 }
 
-/** Per-question `options` error: the exactly-one-correct contract rule. */
+/** Per-question `options` error: option count bounds or exactly-one-correct rule. */
 function questionOptionsError(
   errors: FieldErrors<ActivityEditorFormInput>,
   index: number,
@@ -129,8 +129,8 @@ function questionOptionsError(
     return null;
   }
   // React Hook Form nests array-field errors as an object with numeric keys
-  // (not a real array), and an array-level error (the exactly-one-correct
-  // rule) lands under a `root` key beside the element errors.
+  // (not a real array), and an array-level error lands under a `root` key
+  // beside the element errors.
   const options = (questionErrors as Record<number, unknown>)[index] as
     | { options?: { root?: { message?: unknown }; message?: unknown } }
     | undefined;
@@ -201,33 +201,30 @@ function QuestionFields({
         <Button
           type="button"
           variant="outline"
-          size="sm"
+          size="icon"
           aria-label={messages.moveQuestionUp(position)}
           disabled={disabled || onMoveUp === undefined}
           onClick={onMoveUp}
-          className="min-h-11"
         >
           <span aria-hidden="true">↑</span>
         </Button>
         <Button
           type="button"
           variant="outline"
-          size="sm"
+          size="icon"
           aria-label={messages.moveQuestionDown(position)}
           disabled={disabled || onMoveDown === undefined}
           onClick={onMoveDown}
-          className="min-h-11"
         >
           <span aria-hidden="true">↓</span>
         </Button>
         <Button
           type="button"
           variant="destructive"
-          size="sm"
+          size="icon"
           aria-label={messages.removeQuestion(position)}
           disabled={disabled}
           onClick={onRemove}
-          className="min-h-11"
         >
           <span aria-hidden="true">✕</span>
         </Button>
@@ -296,11 +293,10 @@ function QuestionFields({
                 <Button
                   type="button"
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   aria-label={messages.removeOption(optionPosition)}
                   disabled={disabled}
                   onClick={() => remove(optionIndex)}
-                  className="min-h-11 shrink-0"
                 >
                   <span aria-hidden="true">✕</span>
                 </Button>
@@ -308,22 +304,20 @@ function QuestionFields({
                   <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
+                    size="icon"
                     aria-label={messages.moveOptionUp(optionPosition)}
                     disabled={disabled || optionIndex === 0}
                     onClick={() => move(optionIndex, optionIndex - 1)}
-                    className="min-h-11"
                   >
                     <span aria-hidden="true">↑</span>
                   </Button>
                   <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
+                    size="icon"
                     aria-label={messages.moveOptionDown(optionPosition)}
                     disabled={disabled || optionIndex === fields.length - 1}
                     onClick={() => move(optionIndex, optionIndex + 1)}
-                    className="min-h-11"
                   >
                     <span aria-hidden="true">↓</span>
                   </Button>

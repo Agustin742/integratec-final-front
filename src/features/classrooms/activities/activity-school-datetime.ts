@@ -25,8 +25,22 @@ export interface SchoolTimeZoneOptions {
   readonly timeZone?: string;
 }
 
-function schoolTimeZone(timeZone?: string): string {
-  return timeZone ?? DEFAULT_SCHOOL_TIME_ZONE;
+/**
+ * Resolves a valid IANA school time zone, safely falling back to
+ * `DEFAULT_SCHOOL_TIME_ZONE` whenever the input is empty or invalid so
+ * `Intl.DateTimeFormat` never throws `RangeError`.
+ */
+export function resolveSchoolTimeZone(timeZone?: string): string {
+  const candidate = timeZone?.trim();
+  if (!candidate) {
+    return DEFAULT_SCHOOL_TIME_ZONE;
+  }
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: candidate });
+    return candidate;
+  } catch {
+    return DEFAULT_SCHOOL_TIME_ZONE;
+  }
 }
 
 function pad(value: number): string {
@@ -61,15 +75,16 @@ function zoneOffsetMs(instant: Date, timeZone: string): number {
 
 /**
  * Converts a school-zone datetime-local string into an ISO 8601 UTC instant
- * (`...Z`). Throws for malformed strings and for wall-clock times that do not
- * exist in the zone (DST gap), because silently shifting a nonexistent local
- * time would produce a misleading deadline.
+ * (`...Z`). Throws for malformed strings, impossible calendar dates (e.g.,
+ * `2026-02-30`), and wall-clock times that do not exist in the zone (DST gap),
+ * because silently shifting a nonexistent local time would produce a misleading
+ * deadline.
  */
 export function datetimeLocalToInstantUtc(
   datetimeLocal: string,
   options: SchoolTimeZoneOptions = {},
 ): string {
-  const timeZone = schoolTimeZone(options.timeZone);
+  const timeZone = resolveSchoolTimeZone(options.timeZone);
   const match = DATETIME_LOCAL_PATTERN.exec(datetimeLocal.trim());
   if (!match) {
     throw new Error(
@@ -90,10 +105,27 @@ export function datetimeLocalToInstantUtc(
     );
   }
 
+  // Reject impossible calendar dates or times (such as 2026-02-30 or 25:00)
+  // before applying time-zone offsets.
+  const wallAsUtc = Date.UTC(year, month - 1, day, hour, minute, second);
+  const calendarCheck = new Date(wallAsUtc);
+  if (
+    Number.isNaN(calendarCheck.getTime()) ||
+    calendarCheck.getUTCFullYear() !== year ||
+    calendarCheck.getUTCMonth() + 1 !== month ||
+    calendarCheck.getUTCDate() !== day ||
+    calendarCheck.getUTCHours() !== hour ||
+    calendarCheck.getUTCMinutes() !== minute ||
+    calendarCheck.getUTCSeconds() !== second
+  ) {
+    throw new Error(
+      `Invalid datetime-local value "${datetimeLocal}": calendar date or time is out of range.`,
+    );
+  }
+
   // Treat the wall clock as UTC first, then remove the zone's real offset.
   // The second pass corrects for DST transitions around the target instant.
-  const wallAsUtc = Date.UTC(year, month - 1, day, hour, minute, second);
-  const firstOffset = zoneOffsetMs(new Date(wallAsUtc), timeZone);
+  const firstOffset = zoneOffsetMs(calendarCheck, timeZone);
   let utcMs = wallAsUtc - firstOffset;
   const secondOffset = zoneOffsetMs(new Date(utcMs), timeZone);
   if (secondOffset !== firstOffset) {
@@ -130,7 +162,7 @@ export function instantToDatetimeLocal(
   isoInstant: string,
   options: SchoolTimeZoneOptions = {},
 ): string {
-  const timeZone = schoolTimeZone(options.timeZone);
+  const timeZone = resolveSchoolTimeZone(options.timeZone);
   const instant = new Date(isoInstant);
   if (Number.isNaN(instant.getTime())) {
     throw new Error(`Invalid ISO 8601 instant "${isoInstant}".`);
@@ -157,7 +189,7 @@ export function instantToDatetimeLocal(
 
 /**
  * Returns `true` when `datetimeLocal` is a valid school-zone wall-clock value
- * that converts into a real instant (rejects DST gaps).
+ * that converts into a real instant (rejects impossible dates and DST gaps).
  */
 export function isValidSchoolDatetimeLocal(
   datetimeLocal: string,

@@ -5,7 +5,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
-import { createMemoryRouter } from 'react-router';
+import { createMemoryRouter, Link } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { expect, test } from 'vitest';
 import { createApiClient } from '@/api/client';
@@ -37,6 +37,7 @@ function setup(
   availablePanels: unknown = ['grades'],
   path = '/classrooms/a',
   productionCatalog = false,
+  capabilities: readonly string[] = [],
 ) {
   let availability = availablePanels;
   let status = 200;
@@ -66,7 +67,10 @@ function setup(
             releaseRead = resolve;
           });
         const url = new URL(request.url);
-        if (url.pathname.endsWith('/roster')) {
+        if (
+          url.pathname.endsWith('/roster') ||
+          url.pathname.endsWith('/invitations')
+        ) {
           return Response.json({
             items: [],
             page: 1,
@@ -100,7 +104,7 @@ function setup(
               createdAt: '2026-01-01T00:00:00.000Z',
               updatedAt: '2026-01-01T00:00:00.000Z',
               myRole: 'TEACHER',
-              capabilities: [],
+              capabilities,
               availablePanels: availability,
             });
       },
@@ -174,14 +178,12 @@ const pendingCatalogCases = [
   ['settings', 'Configuración'],
 ] as const;
 
-test('default catalog opens activities by URL with the activities panel and closes cleanly', async () => {
+test('default catalog opens activities by URL with ActivitiesPanel and closes cleanly', async () => {
   const view = setup(['activities'], '/classrooms/a/panels/activities', true);
   const dialog = await screen.findByRole('dialog', { name: 'Actividades' });
-  expect(dialog).toHaveTextContent(
-    'Consultá los trabajos prácticos y exámenes',
-  );
+  expect(dialog).toHaveTextContent('Trabajos prácticos y exámenes del aula.');
   expect(
-    await within(dialog).findByText('Todavía no hay actividades publicadas'),
+    await within(dialog).findByText('Todavía no hay actividades'),
   ).toBeVisible();
   expect(dialog).not.toHaveTextContent('Funcionalidad pendiente');
   fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
@@ -203,6 +205,23 @@ test('default catalog opens members by URL with the roster panel and closes clea
   expect(view.router.state.historyAction).toBe('REPLACE');
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(document.activeElement).toHaveTextContent('Classroom a');
+});
+
+test('default catalog opens members with tabs when invite_members is granted', async () => {
+  setup(['members'], '/classrooms/a/panels/members', true, ['invite_members']);
+  const dialog = await screen.findByRole('dialog', { name: 'Integrantes' });
+  const rosterTab = await screen.findByRole('tab', { name: 'Nómina' });
+  const invitationsTab = screen.getByRole('tab', {
+    name: 'Invitaciones y código',
+  });
+  expect(rosterTab).toHaveAttribute('aria-selected', 'true');
+  expect(dialog).toHaveTextContent('Nómina de estudiantes');
+
+  fireEvent.mouseDown(invitationsTab);
+  fireEvent.click(invitationsTab);
+  expect(
+    await screen.findByRole('heading', { name: 'Código de acceso al aula' }),
+  ).toBeVisible();
 });
 
 test.each(pendingCatalogCases)(
@@ -490,3 +509,92 @@ test.each(['classroom', 'user'] as const)(
     expect(screen.getByRole('textbox')).toHaveValue('');
   },
 );
+
+test('clicking an outgoing Link inside an open panel navigates cleanly without bouncing back to the classroom', async () => {
+  function OutgoingLinkPanel() {
+    return (
+      <Link to="/classrooms/a/activities/act-1">Open activity detail</Link>
+    );
+  }
+  const outgoingPanels = [
+    {
+      key: 'activities',
+      title: 'Outgoing activities',
+      component: OutgoingLinkPanel,
+    },
+  ] as const;
+
+  const session = fakeSession(
+    { status: 'authenticated', user: profile },
+    createApiClient({
+      baseUrl: 'https://api.example.invalid',
+      fetch: async (input) => {
+        const request = input as Request;
+        if (request.url.endsWith('/context-events')) {
+          return new Response(new ReadableStream<Uint8Array>({ start() {} }), {
+            headers: { 'content-type': 'text/event-stream' },
+          });
+        }
+        return Response.json({
+          id: 'a',
+          name: 'Classroom a',
+          subject: null,
+          schoolId: null,
+          independentTeacherId: null,
+          adultMode: false,
+          chatMuted: false,
+          collaborationLocked: false,
+          gamesDisabled: false,
+          deskCount: 0,
+          pet: null,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          myRole: 'STUDENT',
+          capabilities: ['participate_activities'],
+          availablePanels: ['activities'],
+        });
+      },
+    }),
+  );
+
+  const queryClient = createAppQueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  const router = createMemoryRouter(
+    [
+      {
+        path: '/classrooms/:classroomId',
+        element: <ClassroomWorkspace panels={outgoingPanels} />,
+        children: [
+          { index: true, Component: Consumer },
+          { path: 'panels/:panelKey', Component: ClassroomPanelRoute },
+        ],
+      },
+      {
+        path: '/classrooms/:classroomId/activities/:activityId',
+        element: <h2>Activity detail destination</h2>,
+      },
+    ],
+    { initialEntries: ['/classrooms/a/panels/activities'] },
+  );
+
+  render(
+    <ApiQueryProvider client={queryClient}>
+      <SessionProvider service={session.service}>
+        <RouterProvider router={router} />
+      </SessionProvider>
+    </ApiQueryProvider>,
+  );
+
+  await screen.findByRole('dialog', { name: 'Outgoing activities' });
+  fireEvent.click(screen.getByRole('link', { name: 'Open activity detail' }));
+
+  expect(
+    await screen.findByRole('heading', { name: 'Activity detail destination' }),
+  ).toBeInTheDocument();
+  await act(async () => {
+    await Promise.resolve();
+  });
+  expect(router.state.location.pathname).toBe('/classrooms/a/activities/act-1');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});

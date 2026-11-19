@@ -5,34 +5,43 @@ import {
   type TypedApiClient,
 } from '@/api/client';
 import { ApiError, mapApiError, mapNetworkError } from '@/api/errors';
-import type { ClassroomActivitiesQueryParams } from '@/api/query-keys';
-import { classroomMessages } from '../messages';
+import type { ActivityListQueryParams } from '@/api/query-keys';
 import {
   isAbortError,
-  isUncertainWriteError,
   type ClassroomServiceOptions,
 } from '../classroom-service';
 import {
-  paginatedClassroomActivitiesSchema,
-  studentActivityResponseSchema,
+  activityDetailDtoSchema,
+  paginatedActivityListSchema,
   teacherActivityResponseSchema,
+  type ActivityDetailDto,
   type CreateActivityDto,
-  type PaginatedClassroomActivitiesDto,
-  type StudentActivityResponseDto,
+  type PaginatedActivityListDto,
   type TeacherActivityResponseDto,
   type UpdateActivityDto,
   type UpdateActivityPayload,
 } from './activity-schema';
+import { activityMessages } from './messages';
 
-export { isAbortError, isUncertainWriteError };
+export { isAbortError };
 
-export type ClassroomActivityView =
-  | { readonly kind: 'teacher'; readonly activity: TeacherActivityResponseDto }
-  | { readonly kind: 'student'; readonly activity: StudentActivityResponseDto };
+export interface ActivityServiceOptions {
+  readonly signal?: AbortSignal;
+}
 
 type ActivityWriteOptions = ClassroomServiceOptions;
 
 const uncertainWriteErrors = new WeakSet<ApiError>();
+
+/**
+ * Type guard narrowing an `ActivityDetailDto` to the staff-only
+ * `TeacherActivityResponseDto` (which carries `createdById` and `isCorrect`).
+ */
+export function isTeacherActivityDetail(
+  activity: ActivityDetailDto,
+): activity is TeacherActivityResponseDto {
+  return 'createdById' in activity;
+}
 
 /**
  * Returns `true` when an activity write failed with an outcome-uncertain result
@@ -52,6 +61,9 @@ export function isUncertainActivityWriteError(error: unknown): boolean {
   );
 }
 
+/** Alias preserving caller imports from `activity-service`. */
+export const isUncertainWriteError = isUncertainActivityWriteError;
+
 function markUncertain(error: ApiError): ApiError {
   uncertainWriteErrors.add(error);
   return error;
@@ -68,12 +80,27 @@ function translateActivityWriteError(
   baseError: ApiError,
   messages: ActivityWriteErrorMessages,
 ): ApiError {
+  // Endpoints without form fields (such as `POST .../publish`) map any 400 —
+  // including backend `400 VALIDATION_FAILED` with `details` — to their
+  // endpoint-specific `badRequest` explanation before generic form validation.
+  if (baseError.status === 400 && messages.badRequest !== undefined) {
+    return new ApiError({
+      kind: 'bad-request',
+      status: baseError.status,
+      code: baseError.code,
+      userMessage: messages.badRequest,
+      details: baseError.details,
+      fieldErrors: {},
+      correlationId: baseError.correlationId,
+    });
+  }
+
   if (baseError.kind === 'validation') {
     return new ApiError({
       kind: 'validation',
       status: baseError.status,
       code: baseError.code,
-      userMessage: classroomMessages.activities.write.validation,
+      userMessage: activityMessages.write.validation,
       details: baseError.details,
       fieldErrors: baseError.fieldErrors,
       correlationId: baseError.correlationId,
@@ -116,18 +143,6 @@ function translateActivityWriteError(
     });
   }
 
-  if (baseError.status === 400 && messages.badRequest !== undefined) {
-    return new ApiError({
-      kind: 'bad-request',
-      status: baseError.status,
-      code: baseError.code,
-      userMessage: messages.badRequest,
-      details: baseError.details,
-      fieldErrors: {},
-      correlationId: baseError.correlationId,
-    });
-  }
-
   if (
     baseError.kind === 'network' ||
     (baseError.status !== null && baseError.status >= 500) ||
@@ -139,7 +154,7 @@ function translateActivityWriteError(
         kind: baseError.kind,
         status: baseError.status,
         code: baseError.code,
-        userMessage: classroomMessages.activities.write.uncertain,
+        userMessage: activityMessages.write.uncertain,
         details: baseError.details,
         fieldErrors: {},
         correlationId: baseError.correlationId,
@@ -168,7 +183,7 @@ async function executeActivityWrite(
         kind: 'network',
         status: networkError.status,
         code: networkError.code,
-        userMessage: classroomMessages.activities.write.uncertain,
+        userMessage: activityMessages.write.uncertain,
         details: networkError.details,
         fieldErrors: {},
         correlationId: networkError.correlationId,
@@ -193,7 +208,7 @@ async function executeActivityWrite(
         kind: 'unexpected',
         status: result.response.status,
         code: null,
-        userMessage: classroomMessages.activities.write.uncertain,
+        userMessage: activityMessages.write.uncertain,
         correlationId: headerCorrelationId,
       }),
     );
@@ -203,35 +218,38 @@ async function executeActivityWrite(
 }
 
 /**
- * Fetches paginated activities of one classroom (`GET /classrooms/{id}/activities`)
- * and validates the payload shape with a jitless Zod schema. Students always
- * receive published activities only, decided by the server.
+ * Lists classroom activities (`GET /classrooms/{id}/activities`) and validates
+ * the response payload with a jitless Zod schema. Students always receive
+ * published activities only, decided by the server.
  */
 export async function listClassroomActivities(
   client: TypedApiClient,
   classroomId: string,
-  params: ClassroomActivitiesQueryParams = {},
-  options: ClassroomServiceOptions = {},
-): Promise<PaginatedClassroomActivitiesDto> {
+  params: ActivityListQueryParams = {},
+  options: ActivityServiceOptions = {},
+): Promise<PaginatedActivityListDto> {
   const query: {
-    page: number;
-    pageSize: number;
-    sort: 'dueAt' | 'createdAt' | '-dueAt' | '-createdAt';
+    page?: number;
+    pageSize?: number;
+    sort?: 'dueAt' | 'createdAt' | '-dueAt' | '-createdAt';
     state?: 'DRAFT' | 'PUBLISHED';
   } = {
-    page: params.page ?? 1,
-    pageSize: params.pageSize ?? 20,
-    sort: params.sort ?? 'dueAt',
+    page: params.page,
+    pageSize: params.pageSize,
+    sort: params.sort,
   };
   if (params.state === 'DRAFT' || params.state === 'PUBLISHED') {
     query.state = params.state;
   }
 
-  let payload: unknown;
+  let raw: unknown;
   try {
-    payload = await requestApi(() =>
+    raw = await requestApi(() =>
       client.GET('/classrooms/{id}/activities', {
-        params: { path: { id: classroomId }, query },
+        params: {
+          path: { id: classroomId },
+          query,
+        },
         signal: options.signal,
       }),
     );
@@ -245,7 +263,7 @@ export async function listClassroomActivities(
           kind: 'forbidden',
           status: error.status,
           code: error.code,
-          userMessage: classroomMessages.activities.list.forbidden,
+          userMessage: activityMessages.forbiddenDescription,
           details: error.details,
           fieldErrors: {},
           correlationId: error.correlationId,
@@ -256,7 +274,7 @@ export async function listClassroomActivities(
           kind: 'not-found',
           status: error.status,
           code: error.code,
-          userMessage: classroomMessages.activities.list.notFound,
+          userMessage: activityMessages.notFoundDescription,
           details: error.details,
           fieldErrors: {},
           correlationId: error.correlationId,
@@ -266,34 +284,33 @@ export async function listClassroomActivities(
     throw error;
   }
 
-  const parsed = paginatedClassroomActivitiesSchema.safeParse(payload);
+  const parsed = paginatedActivityListSchema.safeParse(raw);
   if (!parsed.success) {
     throw new ApiError({
       kind: 'unexpected',
       status: 200,
       code: null,
-      userMessage: classroomMessages.activities.list.errorDescription,
+      userMessage: activityMessages.errorDescription,
     });
   }
-
   return parsed.data;
 }
 
 /**
- * Fetches one activity (`GET /classrooms/{id}/activities/{activityId}`).
- * The response shape is role-dependent: staff receive the teacher view with
- * correct answers, students receive the student view without them
- * (`ActivitiesController_get` in `schema.generated.ts`).
+ * Fetches one classroom activity detail (`GET /classrooms/{id}/activities/{activityId}`).
+ * The response shape is role-dependent: staff receive `TeacherActivityResponseDto`
+ * (including `createdById` and `isCorrect`), while students receive
+ * `StudentActivityResponseDto` (never including `createdById` or `isCorrect`).
  */
 export async function getClassroomActivity(
   client: TypedApiClient,
   classroomId: string,
   activityId: string,
-  options: ClassroomServiceOptions = {},
-): Promise<ClassroomActivityView> {
-  let payload: unknown;
+  options: ActivityServiceOptions = {},
+): Promise<ActivityDetailDto> {
+  let raw: unknown;
   try {
-    payload = await requestApi(() =>
+    raw = await requestApi(() =>
       client.GET('/classrooms/{id}/activities/{activityId}', {
         params: {
           path: { id: classroomId, activityId },
@@ -311,7 +328,7 @@ export async function getClassroomActivity(
           kind: 'forbidden',
           status: error.status,
           code: error.code,
-          userMessage: classroomMessages.activities.detail.forbidden,
+          userMessage: activityMessages.detail.forbiddenDescription,
           details: error.details,
           fieldErrors: {},
           correlationId: error.correlationId,
@@ -322,7 +339,7 @@ export async function getClassroomActivity(
           kind: 'not-found',
           status: error.status,
           code: error.code,
-          userMessage: classroomMessages.activities.detail.notFound,
+          userMessage: activityMessages.detail.notFoundDescription,
           details: error.details,
           fieldErrors: {},
           correlationId: error.correlationId,
@@ -332,22 +349,16 @@ export async function getClassroomActivity(
     throw error;
   }
 
-  const teacherParsed = teacherActivityResponseSchema.safeParse(payload);
-  if (teacherParsed.success) {
-    return { kind: 'teacher', activity: teacherParsed.data };
+  const parsed = activityDetailDtoSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new ApiError({
+      kind: 'unexpected',
+      status: 200,
+      code: null,
+      userMessage: activityMessages.errorDescription,
+    });
   }
-
-  const studentParsed = studentActivityResponseSchema.safeParse(payload);
-  if (studentParsed.success) {
-    return { kind: 'student', activity: studentParsed.data };
-  }
-
-  throw new ApiError({
-    kind: 'unexpected',
-    status: 200,
-    code: null,
-    userMessage: classroomMessages.activities.detail.errorDescription,
-  });
+  return parsed.data;
 }
 
 /**
@@ -368,8 +379,8 @@ export function createClassroomActivity(
         signal: options.signal,
       }),
     {
-      forbidden: classroomMessages.activities.write.forbidden,
-      notFound: classroomMessages.activities.write.notFound,
+      forbidden: activityMessages.write.forbidden,
+      notFound: activityMessages.write.notFound,
     },
   );
 }
@@ -394,9 +405,9 @@ export function updateClassroomActivity(
         signal: options.signal,
       }),
     {
-      forbidden: classroomMessages.activities.write.forbidden,
-      notFound: classroomMessages.activities.write.notFound,
-      conflict: classroomMessages.activities.write.updateQuestionsLocked,
+      forbidden: activityMessages.write.forbidden,
+      notFound: activityMessages.write.notFound,
+      conflict: activityMessages.write.updateQuestionsLocked,
     },
   );
 }
@@ -419,10 +430,10 @@ export function publishClassroomActivity(
         signal: options.signal,
       }),
     {
-      forbidden: classroomMessages.activities.write.forbidden,
-      notFound: classroomMessages.activities.write.notFound,
-      badRequest: classroomMessages.activities.write.publishNotPublishable,
-      conflict: classroomMessages.activities.write.publishAlreadyPublished,
+      forbidden: activityMessages.write.forbidden,
+      notFound: activityMessages.write.notFound,
+      badRequest: activityMessages.write.publishNotPublishable,
+      conflict: activityMessages.write.publishAlreadyPublished,
     },
   );
 }
@@ -451,9 +462,9 @@ export async function deactivateClassroomActivity(
     }
     if (error instanceof ApiError) {
       throw translateActivityWriteError(error, {
-        forbidden: classroomMessages.activities.write.forbidden,
-        notFound: classroomMessages.activities.write.notFound,
-        conflict: classroomMessages.activities.write.deactivateHasSubmissions,
+        forbidden: activityMessages.write.forbidden,
+        notFound: activityMessages.write.notFound,
+        conflict: activityMessages.write.deactivateHasSubmissions,
       });
     }
     throw markUncertain(
@@ -461,7 +472,7 @@ export async function deactivateClassroomActivity(
         kind: 'network',
         status: null,
         code: null,
-        userMessage: classroomMessages.activities.write.deactivateUnexpected,
+        userMessage: activityMessages.write.deactivateUnexpected,
         cause: error,
       }),
     );

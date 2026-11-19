@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { DEFAULT_SCHOOL_TIME_ZONE } from '@/lib/dates';
-import { classroomMessages } from '../messages';
 import {
+  activityDescriptionSchema,
   activityTitleSchema,
   createActivityPayloadSchema,
   questionInputSchema,
@@ -14,6 +14,7 @@ import {
   datetimeLocalToInstantUtc,
   instantToDatetimeLocal,
 } from './activity-school-datetime';
+import { activityMessages } from './messages';
 
 // Keep Zod v4 compatible with the strict Content-Security-Policy (FD1).
 z.config({ jitless: true });
@@ -35,10 +36,11 @@ export interface ActivityEditorQuestionInput {
  * Raw editor form values: datetime-local strings entered in the school time
  * zone, numeric fields as the text the inputs hold, and the questions builder
  * rows. Cross-field contract rules (EXAM-only `opensAt` strictly before
- * `dueAt`, required/forbidden questions per format, exactly one correct option
- * per question, weight decimals) are not restated here: the editor schema
- * converts the raw values and pipes them through the existing payload schemas
- * from `activity-schema.ts`, which stay the single source of those rules.
+ * `dueAt`, required/forbidden questions per format, option bounds and exactly
+ * one correct option per question, integer `0..100` score, `0.5..3` weight
+ * decimals) are not restated here: the editor schema converts the raw values
+ * and pipes them through the payload schemas from `activity-schema.ts`, which
+ * remain the single source of those rules.
  */
 export interface ActivityEditorFormInput {
   readonly type: ActivityTypeValue;
@@ -61,12 +63,13 @@ export interface ActivityEditorSchemaOptions {
   readonly originalOpensAt?: string | null;
 }
 
-const editorMessages = classroomMessages.activities.editor;
+const editorMessages = activityMessages.editor;
 
 /**
  * Numeric entry sanitation only: turns the text a number input holds into a
  * finite number or fails with an editor-level required message. Business
- * bounds (positive score, weight decimals) come from the payload schemas.
+ * bounds (integer score `0..100`, weight `0.5..3` with `<= 2` decimals) come
+ * from the payload schemas.
  */
 function numericEntrySchema(message: string) {
   return z
@@ -84,7 +87,7 @@ function numericEntrySchema(message: string) {
 /**
  * datetime-local entry: `required` decides whether an empty value fails with
  * `requiredMessage`; non-empty values must convert into a real school-zone
- * instant (rejects malformed strings and DST gaps).
+ * instant (rejects malformed strings, impossible calendar dates, and DST gaps).
  */
 function datetimeLocalEntrySchema(
   requiredMessage: string | null,
@@ -102,7 +105,7 @@ function datetimeLocalEntrySchema(
     } catch {
       ctx.addIssue({
         code: 'custom',
-        message: classroomMessages.activities.validation.instantInvalid,
+        message: activityMessages.validation.instantInvalid,
       });
     }
   });
@@ -112,12 +115,11 @@ function editorInputSchema(options: ActivityEditorSchemaOptions) {
   return z.object({
     type: z.enum(['TP', 'EXAM']),
     format: z.enum(['FILE', 'MULTIPLE_CHOICE']),
-    // Field-level contract rules are the same schemas the payload schemas use,
-    // so a blank submit surfaces title, prompt, label and exactly-one-correct
-    // errors together with the editor-level required messages instead of only
-    // after every other field parses.
+    // Field-level contract rules reuse the payload schemas so a blank submit
+    // surfaces title, description, prompt, label, option count and
+    // exactly-one-correct errors alongside editor-level required messages.
     title: activityTitleSchema,
-    description: z.string(),
+    description: activityDescriptionSchema,
     opensAt: datetimeLocalEntrySchema(null, options),
     dueAt: datetimeLocalEntrySchema(
       editorMessages.validation.dueAtRequired,
@@ -218,7 +220,7 @@ function delegateToPayloadSchema<Output>(
 }
 
 /**
- * Create-mode editor schema: raw form values -> ISO payload -> the existing
+ * Create-mode editor schema: raw form values -> ISO payload ->
  * `createActivityPayloadSchema`, which owns every cross-field contract rule.
  */
 export function createActivityEditorSchema(
@@ -236,7 +238,7 @@ export function createActivityEditorSchema(
 }
 
 /**
- * Edit-mode editor schema: same raw shape, delegating to the existing
+ * Edit-mode editor schema: same raw shape, delegating to
  * `updateActivityPayloadSchema`. Type and format are immutable after creation
  * and never leave the form, so they are not revalidated.
  */
@@ -273,7 +275,7 @@ export function createActivityEditorDefaults(): ActivityEditorFormInput {
 /**
  * Edit-mode defaults from the server-confirmed teacher view. Instants become
  * school-zone datetime-local strings; question and option identities are
- * dropped because PATCH replaces the whole set.
+ * dropped because PATCH replaces the whole set when modified.
  */
 export function activityEditorDefaultsFromDetail(
   activity: TeacherActivityResponseDto,

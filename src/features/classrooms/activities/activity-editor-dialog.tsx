@@ -1,9 +1,13 @@
-import { useId, type BaseSyntheticEvent } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import type { BaseSyntheticEvent } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Controller, useWatch, type UseFormReturn } from 'react-hook-form';
 import { ApiError } from '@/api/errors';
-import { classroomActivityDetailQueryKey } from '@/api/query-keys';
+import {
+  classroomActivityDetailQueryKey,
+  createClassroomActivitiesListPredicate,
+} from '@/api/query-keys';
+import { ErrorState, LoadingState } from '@/components/feedback/states';
 import {
   FormField,
   FormRootError,
@@ -11,7 +15,6 @@ import {
   useUnsavedChangesGuard,
   useZodForm,
 } from '@/components/forms/form-primitives';
-import { ErrorState, LoadingState } from '@/components/feedback/states';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -20,24 +23,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { DEFAULT_SCHOOL_TIME_ZONE, formatInstant } from '@/lib/dates';
-import { useSessionService, useSessionSnapshot } from '@/session/provider';
+import { DEFAULT_SCHOOL_TIME_ZONE } from '@/lib/dates';
 import { cn } from '@/lib/utils';
-import { classroomMessages } from '../messages';
-import {
-  createClassroomActivity,
-  getClassroomActivity,
-  isAbortError,
-  isUncertainWriteError,
-  updateClassroomActivity,
-} from './activity-service';
-import {
-  toCreateActivityDto,
-  toUpdateActivityDto,
-  type CreateActivityPayload,
-  type TeacherActivityResponseDto,
-  type UpdateActivityValidatedPayload,
-} from './activity-schema';
+import { useSessionService, useSessionSnapshot } from '@/session/provider';
 import {
   activityEditorDefaultsFromDetail,
   createActivityEditorDefaults,
@@ -45,10 +33,30 @@ import {
   updateActivityEditorSchema,
   type ActivityEditorFormInput,
 } from './activity-editor-schema';
+import {
+  ACTIVITY_LIMITS,
+  toCreateActivityDto,
+  toUpdateActivityDto,
+  type CreateActivityPayload,
+  type QuestionInputDto,
+  type TeacherActivityResponseDto,
+  type UpdateActivityPayload,
+  type UpdateActivityValidatedPayload,
+} from './activity-schema';
 import { datetimeLocalToInstantUtc } from './activity-school-datetime';
+import {
+  createClassroomActivity,
+  getClassroomActivity,
+  isAbortError,
+  isTeacherActivityDetail,
+  isUncertainWriteError,
+  updateClassroomActivity,
+} from './activity-service';
+import { formatActivityDeadline } from './format-activity-deadline';
+import { activityMessages } from './messages';
 import { MultipleChoiceBuilder } from './multiple-choice-builder';
 
-const messages = classroomMessages.activities.editor;
+const messages = activityMessages.editor;
 
 export type ActivityEditorFormOutput =
   CreateActivityPayload | UpdateActivityValidatedPayload;
@@ -86,6 +94,62 @@ function focusIfUsable(element: HTMLElement | null | undefined): boolean {
   }
   element.focus();
   return document.activeElement === element;
+}
+
+/**
+ * Safely formats a lingering `opensAt` datetime-local value when the teacher
+ * switches `EXAM -> TP`; never throws during render on malformed values,
+ * impossible dates, or DST gaps.
+ */
+function formatLingeringOpensAt(
+  datetimeLocal: string,
+  timeZone: string,
+): string {
+  try {
+    const instant = datetimeLocalToInstantUtc(datetimeLocal, { timeZone });
+    return formatActivityDeadline(instant, timeZone);
+  } catch {
+    return datetimeLocal;
+  }
+}
+
+/**
+ * Compares the normalized editor questions against the initially loaded
+ * server questions so `PATCH` can omit `questions` when unchanged (avoiding
+ * unnecessary backend `409 Conflict` locks on published activities that
+ * already have submissions).
+ */
+function areQuestionsEqual(
+  current: readonly QuestionInputDto[] | undefined,
+  initial: TeacherActivityResponseDto['questions'],
+): boolean {
+  const normalizedCurrent = current ?? [];
+  if (normalizedCurrent.length !== initial.length) {
+    return false;
+  }
+  return normalizedCurrent.every((question, questionIndex) => {
+    const original = initial[questionIndex];
+    if (!original || question.prompt !== original.prompt) {
+      return false;
+    }
+    if (question.options.length !== original.options.length) {
+      return false;
+    }
+    return question.options.every((option, optionIndex) => {
+      const originalOption = original.options[optionIndex];
+      return (
+        originalOption !== undefined &&
+        option.label === originalOption.label &&
+        option.isCorrect === originalOption.isCorrect
+      );
+    });
+  });
+}
+
+function omitQuestions(payload: UpdateActivityPayload): UpdateActivityPayload {
+  const { questions: omitted, ...rest } = payload;
+  void omitted;
+  return rest;
 }
 
 /**
@@ -182,9 +246,11 @@ interface ActivityEditorContentProps {
 
 function ActivityEditorContent(props: ActivityEditorContentProps) {
   const { client } = useSessionService();
+  const queryClient = useQueryClient();
   const snapshot = useSessionSnapshot();
   const userId = snapshot.status === 'authenticated' ? snapshot.user.id : null;
   const { mode, classroomId } = props;
+  const reconciledLoadErrorRef = useRef(false);
 
   // Edit mode loads the teacher view (questions with correct answers) through
   // the scoped detail query; create mode renders the blank form directly.
@@ -204,6 +270,39 @@ function ActivityEditorContent(props: ActivityEditorContentProps) {
     enabled: mode.kind === 'edit' && userId !== null,
     staleTime: 0,
   });
+
+  useEffect(() => {
+    if (detailQuery.isSuccess) {
+      reconciledLoadErrorRef.current = false;
+      return;
+    }
+    if (!detailQuery.isError || userId === null) {
+      return;
+    }
+    const err = detailQuery.error;
+    if (
+      err instanceof ApiError &&
+      (err.kind === 'forbidden' ||
+        err.status === 403 ||
+        err.kind === 'not-found' ||
+        err.status === 404) &&
+      !reconciledLoadErrorRef.current
+    ) {
+      reconciledLoadErrorRef.current = true;
+      // Reconcile the stale activity list behind the dialog without invalidating
+      // this active errored detail query (which would immediately refetch the 404).
+      void queryClient.invalidateQueries({
+        predicate: createClassroomActivitiesListPredicate(userId, classroomId),
+      });
+    }
+  }, [
+    classroomId,
+    detailQuery.error,
+    detailQuery.isError,
+    detailQuery.isSuccess,
+    queryClient,
+    userId,
+  ]);
 
   if (mode.kind === 'create') {
     return (
@@ -231,19 +330,24 @@ function ActivityEditorContent(props: ActivityEditorContentProps) {
     const description =
       detailQuery.error instanceof ApiError
         ? detailQuery.error.userMessage
-        : classroomMessages.activities.detail.errorDescription;
+        : activityMessages.errorDescription;
     return (
       <div className="mt-5">
         <ErrorState
           headingLevel="h3"
           title={messages.detailErrorTitle}
           description={description}
+          onRetry={() => {
+            void detailQuery.refetch();
+          }}
+          isRetrying={detailQuery.isRefetching}
+          retryLabel={activityMessages.retryLabel}
         />
       </div>
     );
   }
 
-  if (detailQuery.data.kind !== 'teacher') {
+  if (!isTeacherActivityDetail(detailQuery.data)) {
     return (
       <div className="mt-5">
         <ErrorState
@@ -259,7 +363,7 @@ function ActivityEditorContent(props: ActivityEditorContentProps) {
     <EditEditorForm
       client={client}
       classroomId={classroomId}
-      activity={detailQuery.data.activity}
+      activity={detailQuery.data}
       onSaved={props.onSaved}
       onReconcileRequired={props.onReconcileRequired}
       onSubmittingChange={props.onSubmittingChange}
@@ -469,14 +573,21 @@ function EditEditorForm(props: EditEditorFormProps) {
   const write = (
     values: UpdateActivityValidatedPayload,
     signal: AbortSignal,
-  ): Promise<TeacherActivityResponseDto> =>
-    updateClassroomActivity(
+  ): Promise<TeacherActivityResponseDto> => {
+    const payload = toUpdateActivityDto(values);
+    const effectivePayload =
+      activity.format === 'MULTIPLE_CHOICE' &&
+      areQuestionsEqual(payload.questions, activity.questions)
+        ? omitQuestions(payload)
+        : payload;
+    return updateClassroomActivity(
       props.client,
       props.classroomId,
       activity.id,
-      toUpdateActivityDto(values),
+      effectivePayload,
       { signal },
     );
+  };
 
   return (
     <ActivityEditorFormShell
@@ -594,10 +705,11 @@ function ActivityEditorFormFields({
           description={messages.fields.description.description}
         >
           {(fieldProps) => (
-            <Input
+            <textarea
               {...fieldProps}
-              type="text"
+              rows={3}
               placeholder={messages.fields.description.placeholder}
+              className="motion-field min-h-24 w-full min-w-0 resize-y rounded-xl border-2 border-field-border bg-card px-4 py-2 text-base text-card-foreground shadow-inset placeholder:text-muted-foreground focus-visible:border-primary focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60 aria-invalid:border-destructive"
             />
           )}
         </FormField>
@@ -633,12 +745,7 @@ function ActivityEditorFormFields({
               <>
                 <p className="text-sm text-pretty text-foreground">
                   {messages.fields.opensAt.tpStoredValue(
-                    formatInstant(
-                      datetimeLocalToInstantUtc(lingeringOpensAt, {
-                        timeZone,
-                      }),
-                      { timeZone },
-                    ),
+                    formatLingeringOpensAt(lingeringOpensAt, timeZone),
                   )}
                 </p>
                 <Button
@@ -728,8 +835,10 @@ function ActivityEditorFormFields({
             <Input
               {...fieldProps}
               type="number"
-              step="any"
-              inputMode="decimal"
+              step={1}
+              min={ACTIVITY_LIMITS.maxScore.min}
+              max={ACTIVITY_LIMITS.maxScore.max}
+              inputMode="numeric"
               placeholder={messages.fields.maxScore.placeholder}
             />
           )}
@@ -745,7 +854,9 @@ function ActivityEditorFormFields({
             <Input
               {...fieldProps}
               type="number"
-              step="any"
+              step="0.01"
+              min={ACTIVITY_LIMITS.weight.min}
+              max={ACTIVITY_LIMITS.weight.max}
               inputMode="decimal"
               placeholder={messages.fields.weightMultiplier.placeholder}
             />

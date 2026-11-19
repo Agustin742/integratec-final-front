@@ -18,6 +18,7 @@ export const classroomMessages = {
     settings: 'Configuración',
   },
   role: 'Tu rol en esta aula',
+  backToList: 'Volver a mis aulas',
   errorTitle: 'No pudimos cargar el aula',
   errorDescription: 'Revisá tu conexión e intentá de nuevo.',
   roles: {
@@ -26,6 +27,23 @@ export const classroomMessages = {
     PARENT: 'Familiar',
     OWNER: 'Titular de la escuela',
     ADMIN: 'Administración escolar',
+  },
+  viewMode: {
+    switchTo2d: 'Cambiar a Modo 2D Clásico',
+    switchTo3d: 'Cambiar a Vista 3D',
+    shortcutHint: 'Atajo: Alt+M',
+    stage3dHeading: 'Vista 3D del aula',
+    stage3dDescription:
+      'Entorno tridimensional del aula. Podés pasar al Modo 2D Clásico en cualquier momento sin cerrar sesión ni perder tu contexto.',
+    canvasLabel: 'Escena 3D del aula',
+    mode2dHeading: 'Modo 2D Clásico',
+    mode2dDescription:
+      'Accedé por teclado o pantalla táctil a todas las herramientas disponibles de esta aula con las mismas validaciones del servidor.',
+    mode2dNavLabel: 'Paneles del aula en Modo 2D Clásico',
+    openPanelAction: 'Abrir panel',
+    mode2dEmptyTitle: 'No hay paneles disponibles',
+    mode2dEmptyDescription:
+      'El servidor todavía no habilitó paneles para tu cuenta en esta aula. Si cambia tu disponibilidad, los vas a ver acá al instante.',
   },
   list: {
     subtitle:
@@ -237,299 +255,205 @@ export const classroomMessages = {
     removeUnexpected:
       'No pudimos procesar la baja del estudiante. Intentá nuevamente en unos segundos.',
   },
-  activities: {
-    validation: {
-      titleRequired: 'Ingresá un título para la actividad.',
-      instantInvalid: 'Ingresá una fecha y hora válidas.',
-      opensAtOnlyForExams:
-        'La fecha de apertura solo aplica a exámenes, no a trabajos prácticos.',
-      opensAtBeforeDueAt:
-        'La apertura del examen debe ser anterior a la fecha límite.',
-      questionsRequired:
-        'Las actividades de opción múltiple necesitan al menos una pregunta.',
-      questionsForbiddenForFile:
-        'Las actividades con entrega de archivo no admiten preguntas de opción múltiple.',
-      exactlyOneCorrectOption:
-        'Cada pregunta debe tener exactamente una opción marcada como correcta.',
-      questionPromptRequired: 'Ingresá el enunciado de la pregunta.',
-      optionLabelRequired: 'Ingresá el texto de la opción.',
-      weightMultiplierPositive:
-        'La ponderación debe ser un número mayor que cero.',
-      weightMultiplierDecimals: 'La ponderación admite hasta dos decimales.',
-      maxScorePositive: 'El puntaje máximo debe ser un número mayor que cero.',
-    },
-    list: {
-      errorDescription: 'No pudimos cargar las actividades del aula.',
-      forbidden:
-        'Tu rol actual no tiene permisos para ver las actividades de esta aula.',
-      notFound: 'No encontramos el aula indicada o ya no tenés acceso.',
-    },
-    detail: {
-      errorDescription: 'No pudimos cargar la actividad.',
-      forbidden: 'Tu rol actual no tiene permisos para ver esta actividad.',
-      notFound: 'No encontramos la actividad o ya no tenés acceso.',
-    },
-    write: {
-      uncertain:
-        'No pudimos confirmar la operación en el servidor. Verificá el estado real de la actividad antes de volver a intentar.',
-      validation:
-        'El servidor rechazó los datos de la actividad. Revisá los campos marcados.',
-      forbidden:
-        'Tu rol actual no tiene permisos para gestionar actividades en esta aula.',
-      notFound:
-        'No encontramos la actividad o el aula indicada, o ya no tenés acceso.',
-      updateQuestionsLocked:
-        'Las preguntas ya no pueden modificarse porque existe al menos una entrega de la actividad.',
-      publishNotPublishable:
-        'La actividad no se puede publicar: revisá que la fecha límite sea futura y que las preguntas de opción múltiple estén completas.',
-      publishAlreadyPublished: 'La actividad ya estaba publicada.',
-      deactivateHasSubmissions:
-        'No se puede eliminar la actividad porque tiene entregas asociadas. Su historial académico se conserva.',
-      deactivateUnexpected:
-        'No pudimos desactivar la actividad. Intentá nuevamente en unos segundos.',
-    },
-    panel: {
-      heading: 'Actividades',
-      subtitle:
-        'Consultá los trabajos prácticos y exámenes del aula con su estado, fechas y puntajes.',
-      loading: 'Cargando las actividades del aula…',
-      errorTitle: 'No pudimos cargar las actividades',
-      staleTitle: 'Actividades pendientes de sincronización',
-      staleDescription:
-        'Mostramos la última lista confirmada. Falló la actualización en segundo plano.',
-      forbiddenTitle: 'Sin permisos para ver las actividades',
-      forbiddenDescription:
-        'Tu rol actual no tiene acceso a las actividades de esta aula.',
-      notFoundTitle: 'No encontramos el aula indicada',
-      notFoundDescription:
-        'El aula no existe o ya no tenés acceso para consultar sus actividades.',
-      emptyTitleStaff: 'Todavía no hay actividades en el aula',
-      emptyDescriptionStaff:
-        'Cuando crees un trabajo práctico o un examen, va a aparecer acá con su estado.',
-      emptyTitleStudent: 'Todavía no hay actividades publicadas',
-      emptyDescriptionStudent:
-        'Cuando tu docente publique una actividad, va a aparecer acá.',
-      emptyFilteredTitle: 'No encontramos actividades con ese filtro',
-      emptyFilteredDescription:
-        'Probá cambiando el filtro de estado de publicación.',
-      emptyPageTitle: 'No hay actividades en esta página',
-      emptyPageDescription:
-        'Volvé a una página anterior para ver el resto de las actividades.',
-      clearFiltersAction: 'Limpiar filtros',
-      stateFilterLabel: 'Estado de publicación',
-      stateOptions: {
-        ALL: 'Todas',
-        DRAFT: 'Borradores',
-        PUBLISHED: 'Publicadas',
+  members: {
+    tabsLabel: 'Secciones de integrantes',
+    rosterTab: 'Nómina',
+    invitationsTab: 'Invitaciones y código',
+  },
+  invitations: {
+    forbiddenTitle: 'Sin permisos para gestionar invitaciones',
+    forbiddenDescription:
+      'Solo docentes o personal directivo autorizado de esta aula pueden emitir o revocar invitaciones y códigos de acceso.',
+    notFoundTitle: 'No encontramos las invitaciones del aula',
+    notFoundDescription:
+      'El aula no existe o ya no tenés acceso para gestionar sus invitaciones.',
+    errorTitle: 'No pudimos cargar las invitaciones',
+    errorDescription:
+      'Revisá tu conexión e intentá actualizar la vista de invitaciones.',
+    joinCode: {
+      heading: 'Código de acceso al aula',
+      description:
+        'Compartí un código para que estudiantes se unan al aula. Otorga únicamente el rol de estudiante.',
+      oneTimeNotice:
+        'El código se muestra una sola vez al crearlo o regenerarlo. No se guarda localmente ni vuelve a consultarse al regresar a este panel.',
+      regenerateWarning:
+        'Al regenerar, el código anterior queda invalidado de inmediato.',
+      maxUsesLabel: 'Límite de usos (opcional)',
+      maxUsesDescription:
+        'Dejá este campo vacío para permitir usos ilimitados, o indicá un entero entre 1 y 1000.',
+      maxUsesPlaceholder: 'Ilimitado',
+      expiresLabel: 'Vigencia del código',
+      expiresDescription:
+        'Elegí cuánto tiempo permanecerá vigente antes de vencer.',
+      expiresOptions: {
+        default: 'Por defecto del servidor',
+        '1h': '1 hora',
+        '24h': '24 horas',
+        '7d': '7 días',
+        '30d': '30 días',
       },
-      types: {
-        TP: 'Trabajo práctico',
-        EXAM: 'Examen',
-      },
-      formats: {
-        FILE: 'Entrega de archivo',
-        MULTIPLE_CHOICE: 'Opción múltiple',
-      },
-      states: {
-        DRAFT: 'Borrador',
-        PUBLISHED: 'Publicada',
-      },
-      dueAtLabel: 'Fecha límite',
-      opensAtLabel: 'Apertura',
-      allowLateLabel: 'Acepta entregas tardías',
-      questionCountLabel: (count: number) =>
-        count === 1 ? '1 pregunta' : `${count} preguntas`,
-      maxScoreLabel: (score: number) =>
-        `Puntaje máximo: ${score.toLocaleString('es-AR')}`,
-      weightLabel: (weight: number) =>
-        `Ponderación: ×${weight.toLocaleString('es-AR', {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 2,
-        })}`,
-      deactivateAction: 'Desactivar',
-      deactivateAriaLabel: (title: string) => `Desactivar «${title}»`,
-      deactivateConfirmTitle: (title: string) =>
-        `Confirmar desactivación de «${title}»`,
-      deactivateConfirmDescription:
-        'La actividad deja de aparecer para los estudiantes, pero su historial académico (entregas y calificaciones) se conserva en el servidor.',
-      deactivateConfirmSubmit: 'Confirmar desactivación',
-      deactivateConfirmPending: 'Desactivando…',
-      deactivateConfirmCancel: 'Cancelar',
-      deactivatedTitle: 'Actividad desactivada',
-      deactivatedDescription: (title: string) =>
-        `Confirmamos la desactivación de «${title}». El historial académico se conservó.`,
-      deactivateErrorTitle: 'No pudimos completar la desactivación',
-      createAction: 'Crear actividad',
-      editAction: 'Editar',
-      editAriaLabel: (title: string) => `Editar «${title}»`,
-      publishAction: 'Publicar',
-      publishAriaLabel: (title: string) => `Publicar «${title}»`,
-    },
-    editor: {
-      createTitle: 'Crear actividad',
-      createDescription:
-        'Definí el tipo, el formato y los datos de la actividad. Se guarda como borrador hasta que la publiques.',
-      editTitle: 'Editar actividad',
-      editDescription:
-        'Actualizá los datos de la actividad. Los cambios aplican en cuanto el servidor los confirme.',
-      loadingDetail: 'Cargando la actividad…',
-      detailErrorTitle: 'No pudimos cargar la actividad',
-      detailNotTeacherView:
-        'Tu rol actual ya no permite editar actividades de esta aula.',
-      fields: {
-        type: {
-          legend: 'Tipo de actividad',
-          description: 'Elegí si es un trabajo práctico o un examen.',
-          immutableNotice:
-            'El tipo se define al crear la actividad y no se puede cambiar después.',
-          options: {
-            TP: {
-              label: 'Trabajo práctico',
-              description:
-                'Una entrega con fecha límite, sin ventana de apertura.',
-            },
-            EXAM: {
-              label: 'Examen',
-              description:
-                'Puede tener una ventana de apertura además de la fecha límite.',
-            },
-          },
-        },
-        format: {
-          legend: 'Formato de entrega',
-          description:
-            'Elegí cómo entregan los estudiantes. El formato no se puede cambiar después de crear la actividad.',
-          immutableNotice:
-            'El formato es definitivo desde la creación de la actividad.',
-          options: {
-            FILE: {
-              label: 'Entrega de archivo',
-              description: 'Los estudiantes suben un archivo como entrega.',
-            },
-            MULTIPLE_CHOICE: {
-              label: 'Opción múltiple',
-              description: 'Los estudiantes responden preguntas con opciones.',
-            },
-          },
-        },
-        title: {
-          label: 'Título',
-          description: 'Visible para el aula una vez publicada la actividad.',
-          placeholder: 'Ej. TP Fracciones',
-        },
-        description: {
-          label: 'Descripción (opcional)',
-          description: 'Consigna o indicaciones para los estudiantes.',
-          placeholder: 'Ej. Resolver los ejercicios del capítulo 3.',
-        },
-        dueAt: {
-          label: 'Fecha límite',
-          timezoneNote: (timeZone: string) =>
-            `Ingresala en la zona horaria del colegio (${timeZone}).`,
-        },
-        opensAt: {
-          label: 'Apertura del examen (opcional)',
-          timezoneNote: (timeZone: string) =>
-            `Momento en que el examen se habilita, en la zona horaria del colegio (${timeZone}).`,
-          tpHint:
-            'La apertura solo aplica a exámenes: los trabajos prácticos quedan visibles para los estudiantes desde que se publican.',
-          tpStoredValue: (formattedInstant: string) =>
-            `Tenés una apertura cargada: ${formattedInstant}.`,
-          removeAction: 'Quitar apertura',
-          immutableHint:
-            'La apertura no se puede quitar una vez definida; podés cambiarla de fecha y hora.',
-        },
-        allowLate: {
-          label: 'Aceptar entregas tardías',
-          description:
-            'Permite que los estudiantes entreguen después de la fecha límite.',
-        },
-        maxScore: {
-          label: 'Puntaje máximo',
-          description: 'Puntaje con el que se califica la actividad.',
-          placeholder: 'Ej. 10',
-        },
-        weightMultiplier: {
-          label: 'Ponderación',
-          description:
-            'Peso de la actividad en el promedio del período, con hasta dos decimales.',
-          placeholder: 'Ej. 1.5',
-        },
-      },
+      generateSubmit: 'Generar código',
+      regenerateSubmit: 'Regenerar código',
+      generatingPending: 'Generando código…',
+      confirmRegenerateTitle: 'Confirmar regeneración de código',
+      confirmRegenerateDescription:
+        'Al regenerar, el código anterior queda invalidado de inmediato. Quienes intenten unirse con el código previo ya no podrán hacerlo.',
+      confirmRegenerateSubmit: 'Confirmar regeneración',
+      confirmRegenerateCancel: 'Cancelar',
+      activeCardTitle: 'Código generado (visible solo esta vez)',
+      codeLabel: 'Código de acceso',
+      copyAction: 'Copiar código',
+      copiedAnnouncement: 'Código de acceso copiado al portapapeles.',
+      copyFallbackInstruction:
+        'No pudimos copiar automáticamente. Seleccioná y copiá el código manualmente:',
+      usesLabel: (useCount: number, maxUses: number | null) =>
+        maxUses === null
+          ? `Usos: ${useCount} (ilimitado)`
+          : `Usos: ${useCount} de ${maxUses}`,
+      expiresAtLabel: (formattedDate: string) => `Vence: ${formattedDate}`,
+      revokeCurrentAction: 'Revocar código',
+      revokeActiveAction: 'Revocar código activo',
+      revokeActiveHelp:
+        'Si ya generaste un código en una sesión anterior y necesitás anularlo, podés revocar el código activo actual desde acá.',
+      revokingPending: 'Revocando código…',
+      generatedTitle: 'Código generado',
+      generatedDescription:
+        'Copiá el código ahora: no volverá a mostrarse al salir de esta vista.',
+      revokedTitle: 'Código revocado',
+      revokedDescription:
+        'El código activo del aula quedó anulado y ya no admite nuevas incorporaciones.',
       validation: {
-        dueAtRequired: 'Ingresá la fecha límite.',
-        maxScoreRequired: 'Ingresá el puntaje máximo.',
-        weightMultiplierRequired: 'Ingresá la ponderación.',
-        opensAtCannotBeRemoved:
-          'La apertura no se puede quitar una vez definida. Cambiala de fecha y hora, o dejala como está.',
-      },
-      questions: {
-        heading: 'Preguntas de opción múltiple',
-        description:
-          'Armá las preguntas y sus opciones, y marcá la opción correcta de cada una. Las respuestas correctas solo se ven en vistas docentes.',
-        addQuestion: 'Agregar pregunta',
-        questionLegend: (position: number) => `Pregunta ${position}`,
-        removeQuestion: (position: number) => `Quitar la pregunta ${position}`,
-        moveQuestionUp: (position: number) => `Subir la pregunta ${position}`,
-        moveQuestionDown: (position: number) => `Bajar la pregunta ${position}`,
-        prompt: {
-          label: 'Enunciado',
-          placeholder: 'Ej. ¿Cuánto es 2 + 2?',
-        },
-        optionsLegend: (position: number) =>
-          `Opciones de la pregunta ${position}`,
-        optionLabel: (position: number) => `Texto de la opción ${position}`,
-        optionPlaceholder: 'Ej. 4',
-        correctGroup: (position: number) =>
-          `Respuesta correcta de la pregunta ${position}`,
-        markCorrect: (position: number) =>
-          `Marcar la opción ${position} como correcta`,
-        correctHint:
-          'Marcá con el selector la opción correcta de esta pregunta.',
-        addOption: 'Agregar opción',
-        removeOption: (position: number) => `Quitar la opción ${position}`,
-        moveOptionUp: (position: number) => `Subir la opción ${position}`,
-        moveOptionDown: (position: number) => `Bajar la opción ${position}`,
-        correctOptionLabel: 'Correcta',
-        fileFormatHint:
-          'Las actividades con entrega de archivo no admiten preguntas de opción múltiple.',
-        fileFormatStored: (count: number) =>
-          count === 1
-            ? 'Quedó 1 pregunta cargada de la etapa de opción múltiple.'
-            : `Quedaron ${count} preguntas cargadas de la etapa de opción múltiple.`,
-        removeQuestionsAction: 'Quitar todas las preguntas',
+        maxUsesInvalid:
+          'Ingresá un número entero entre 1 y 1000, o dejalo vacío.',
+        expiresInvalid: 'Elegí una vigencia válida para el código.',
       },
       errors: {
-        rootTitle: 'No pudimos guardar la actividad',
+        generateTitle: 'No pudimos generar el código',
+        revokeTitle: 'No pudimos revocar el código',
+        validationFailed: 'Revisá los parámetros del código antes de enviar.',
+        forbidden:
+          'Tu rol actual no tiene permisos para gestionar códigos de acceso en esta aula.',
+        notFoundGenerate:
+          'No encontramos el aula indicada o ya no tenés acceso.',
+        notFoundRevoke:
+          'No hay ningún código activo vigente para revocar o ya no tenés acceso al aula.',
+        uncertain:
+          'No pudimos confirmar si el cambio sobre el código se aplicó en el servidor. Verificá el estado antes de volver a intentar.',
+        unexpected:
+          'No pudimos completar la operación sobre el código. Intentá nuevamente en unos segundos.',
       },
-      actions: {
-        cancel: 'Cancelar',
-        createSubmit: 'Crear actividad',
-        createPending: 'Creando actividad…',
-        editSubmit: 'Guardar cambios',
-        editPending: 'Guardando cambios…',
-        unsavedChanges:
-          'Tenés cambios sin guardar en la actividad. ¿Querés descartarlos?',
+    },
+    email: {
+      heading: 'Invitaciones por correo electrónico',
+      description:
+        'Enviá una invitación de un solo uso para sumar a un estudiante por correo electrónico.',
+      roleLabel: 'Rol asignado',
+      roleValue: 'Estudiante',
+      nonDisclosureNote:
+        'Esta invitación solo permite sumar cuentas con rol Estudiante. Emitirla nunca revela si la dirección ya tiene una cuenta registrada.',
+      emailLabel: 'Correo electrónico del estudiante',
+      emailPlaceholder: 'estudiante@ejemplo.edu.ar',
+      emailDescription:
+        'El destinatario recibirá un enlace de un solo uso y podrá aceptarlo tras iniciar sesión.',
+      submitAction: 'Enviar invitación',
+      submitPending: 'Enviando invitación…',
+      createdTitle: 'Invitación creada',
+      createdDescription:
+        'La invitación quedó programada. Si necesitás compartirla en forma directa, copiá el enlace o el token ahora: se muestran una sola vez.',
+      inviteLinkLabel: 'Enlace de invitación',
+      tokenLabel: 'Token de invitación',
+      copyLinkAction: 'Copiar enlace de invitación',
+      copyTokenAction: 'Copiar token',
+      copiedLinkAnnouncement: 'Enlace de invitación copiado al portapapeles.',
+      copiedTokenAnnouncement: 'Token de invitación copiado al portapapeles.',
+      copyLinkFallbackInstruction:
+        'No pudimos copiar automáticamente. Seleccioná y copiá el enlace manualmente:',
+      copyTokenFallbackInstruction:
+        'No pudimos copiar automáticamente. Seleccioná y copiá el token manualmente:',
+      validation: {
+        emailRequired: 'Ingresá una dirección de correo electrónico.',
+        emailTooLong:
+          'El correo electrónico no puede superar los 320 caracteres.',
+        emailInvalid: 'Ingresá un correo electrónico válido.',
+        emailControlChars:
+          'El correo electrónico no puede incluir saltos de línea ni caracteres de control.',
       },
-      createdTitle: 'Borrador guardado',
-      createdDescription: (title: string) =>
-        `Confirmamos el borrador «${title}» en el servidor.`,
-      updatedTitle: 'Cambios guardados',
-      updatedDescription: (title: string) =>
-        `Confirmamos los cambios de «${title}» en el servidor.`,
-      publishedTitle: 'Actividad publicada',
-      publishedDescription: (title: string) =>
-        `Confirmamos la publicación de «${title}». Los estudiantes ya pueden verla.`,
-      publish: {
-        title: (title: string) => `Publicar «${title}»`,
-        description:
-          'Publicar es definitivo: la actividad pasa de borrador a publicada y los estudiantes la ven de inmediato. Confirmá que la fecha límite sea futura antes de publicar.',
-        dueAtLabel: 'Fecha límite a publicar',
-        submit: 'Publicar actividad',
-        pending: 'Publicando…',
-        cancel: 'Seguir como borrador',
-        errorTitle: 'No pudimos publicar la actividad',
+      errors: {
+        createTitle: 'No pudimos enviar la invitación',
+        validationFailed:
+          'Revisá el correo electrónico ingresado antes de enviar.',
+        forbidden:
+          'Tu rol actual no tiene permisos para enviar invitaciones en esta aula.',
+        notFound: 'No encontramos el aula indicada o ya no tenés acceso.',
+        uncertain:
+          'No pudimos confirmar si la invitación se emitió en el servidor. Actualizamos el listado para verificar el estado real antes de volver a intentar.',
+        unexpected:
+          'No pudimos procesar la invitación. Intentá nuevamente en unos segundos.',
       },
+    },
+    list: {
+      heading: 'Historial de invitaciones',
+      loading: 'Cargando invitaciones del aula…',
+      errorTitle: 'No pudimos cargar las invitaciones',
+      errorDescription:
+        'Revisá tu conexión e intentá actualizar el listado de invitaciones.',
+      staleTitle: 'Invitaciones pendientes de sincronización',
+      staleDescription:
+        'Mostrando las últimas invitaciones confirmadas. Falló la actualización en segundo plano.',
+      filterLabel: 'Filtrar por estado',
+      filters: {
+        PENDING: 'Pendientes',
+        USED: 'Usadas',
+        REVOKED: 'Revocadas',
+        EXPIRED: 'Vencidas',
+        ALL: 'Todas',
+      },
+      states: {
+        PENDING: 'Pendiente',
+        USED: 'Usada',
+        REVOKED: 'Revocada',
+        EXPIRED: 'Vencida',
+      },
+      kinds: {
+        EMAIL: 'Por correo',
+        JOIN_CODE: 'Código de aula',
+      },
+      emptyTitle: 'No hay invitaciones en este estado',
+      emptyDescription:
+        'Cuando emitas invitaciones por correo o códigos de aula, vas a poder consultar su estado acá.',
+      emptyPageTitle: 'No hay invitaciones en esta página',
+      emptyPageDescription:
+        'Volvé a una página anterior para ver el resto de las invitaciones.',
+      targetJoinCodeFallback: 'Código de acceso del aula',
+      createdAtLabel: (formattedDate: string) => `Creada: ${formattedDate}`,
+      expiresAtLabel: (formattedDate: string) => `Vence: ${formattedDate}`,
+      usesLabel: (useCount: number, maxUses: number | null) =>
+        maxUses === null
+          ? `Usos: ${useCount} (ilimitado)`
+          : `Usos: ${useCount} de ${maxUses}`,
+      revokeAction: 'Revocar',
+      revokeAriaLabel: (label: string) => `Revocar invitación ${label}`,
+      confirmRevokeTitle: (label: string) =>
+        `Confirmar revocación de «${label}»`,
+      confirmRevokeDescription:
+        'Esta invitación dejará de ser válida de inmediato y no podrá volver a usarse.',
+      confirmRevokeSubmit: 'Confirmar revocación',
+      confirmRevokePending: 'Revocando…',
+      confirmRevokeCancel: 'Cancelar',
+      revokedTitle: 'Invitación revocada',
+      revokedDescription: (label: string) =>
+        `Confirmamos la revocación de «${label}».`,
+      revokeErrorTitle: 'No pudimos revocar la invitación',
+      revokeBadRequest:
+        'La invitación ya no está pendiente (fue usada, revocada o venció). Actualizamos el listado para mostrar su estado actual.',
+      revokeForbidden:
+        'Tu rol actual no tiene permisos para revocar invitaciones en esta aula.',
+      revokeNotFound:
+        'No encontramos la invitación o el aula indicada, o ya no tenés acceso.',
+      revokeUncertain:
+        'No pudimos confirmar si la revocación se aplicó en el servidor. Actualizamos el listado para verificar el estado real antes de volver a intentar.',
+      revokeUnexpected:
+        'No pudimos revocar la invitación. Intentá nuevamente en unos segundos.',
     },
   },
 } as const;

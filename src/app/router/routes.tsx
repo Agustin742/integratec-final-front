@@ -136,6 +136,15 @@ export function createAppRoutes({
                     },
                     ...protectedRoutes,
                     {
+                      path: 'classrooms/:classroomId/activities/:activityId',
+                      lazy: {
+                        Component: async () =>
+                          (
+                            await import('@/features/classrooms/activities/activity-detail-page')
+                          ).ActivityDetailPage,
+                      },
+                    },
+                    {
                       path: 'classrooms/:classroomId',
                       lazy: {
                         Component: async () =>

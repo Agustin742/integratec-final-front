@@ -1,8 +1,8 @@
 import type { components } from '@/api/schema.generated';
 import { EmptyState } from '@/components/feedback/states';
-import { ClassroomActivitiesPanel } from '../activities/classroom-activities-panel';
+import { ActivitiesPanel } from '../activities/activities-panel';
 import { MaterialPanel } from '../materials/material-panel';
-import { ClassroomRosterPanel } from '../classroom-roster-panel';
+import { ClassroomMembersPanel } from '../classroom-members-panel';
 import { classroomMessages as messages } from '../messages';
 import type { PanelDescriptor } from './classroom-panels';
 
@@ -27,7 +27,7 @@ export const classroomPanelCatalog = [
   {
     key: 'activities',
     title: messages.panels.activities,
-    component: ClassroomActivitiesPanel,
+    component: ActivitiesPanel,
   },
   {
     key: 'material',
@@ -42,7 +42,7 @@ export const classroomPanelCatalog = [
   {
     key: 'members',
     title: messages.panels.members,
-    component: ClassroomRosterPanel,
+    component: ClassroomMembersPanel,
   },
   entry('settings'),
 ] as const;

@@ -8,17 +8,17 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { formatInstant } from '@/lib/dates';
 import { useSessionService } from '@/session/provider';
-import { classroomMessages } from '../messages';
+import type { TeacherActivityResponseDto } from './activity-schema';
 import {
   isAbortError,
   isUncertainWriteError,
   publishClassroomActivity,
 } from './activity-service';
-import type { TeacherActivityResponseDto } from './activity-schema';
+import { formatActivityDeadline } from './format-activity-deadline';
+import { activityMessages } from './messages';
 
-const messages = classroomMessages.activities.editor.publish;
+const messages = activityMessages.editor.publish;
 
 /** Minimal target shape the publish confirmation needs (summary or detail). */
 export interface PublishActivityTarget {
@@ -36,7 +36,7 @@ export interface PublishActivityDialogProps {
   readonly onOpenChange: (open: boolean) => void;
   /** Server-confirmed publish; the panel reconciles and announces. */
   readonly onPublished: (activity: TeacherActivityResponseDto) => void;
-  /** 403/404/uncertain outcomes: reconcile the list before retrying. */
+  /** 403/404/409/uncertain outcomes: reconcile the list before retrying. */
   readonly onReconcileRequired: () => void;
   readonly getTriggerElement?: () => HTMLElement | null;
   readonly fallbackFocus: () => HTMLElement | null;
@@ -58,8 +58,8 @@ function focusIfUsable(element: HTMLElement | null | undefined): boolean {
  * Publish confirmation (`HU-ACT-001`): states that publishing is one-way
  * (DRAFT -> PUBLISHED), that students will see the activity, and that `dueAt`
  * must be in the future. Pending, confirmed-failure (`400`/`409`, translated by
- * the service), and outcome-uncertain states are distinct; uncertain failures
- * keep the confirmation open and reconcile the list.
+ * the service), and outcome-uncertain states are distinct; `403`/`404`/`409`
+ * and uncertain failures keep the confirmation open and reconcile the list.
  */
 export function PublishActivityDialog({
   open,
@@ -149,12 +149,21 @@ export function PublishActivityDialog({
       const errorMessage =
         caughtError instanceof ApiError
           ? caughtError.userMessage
-          : classroomMessages.activities.write.uncertain;
+          : activityMessages.write.uncertain;
       setError(errorMessage);
 
-      if (isUncertainWriteError(caughtError)) {
-        // The write outcome is unknown: reconcile the list instead of
-        // offering a blind retry that could duplicate effects.
+      if (
+        (caughtError instanceof ApiError &&
+          (caughtError.kind === 'forbidden' ||
+            caughtError.status === 403 ||
+            caughtError.kind === 'not-found' ||
+            caughtError.status === 404 ||
+            caughtError.kind === 'conflict' ||
+            caughtError.status === 409)) ||
+        isUncertainWriteError(caughtError)
+      ) {
+        // State may have diverged (`409` already published, `404` removed,
+        // `403` revoked, or uncertain network/5xx/malformed 2xx): reconcile.
         onReconcileRequired();
       }
     } finally {
@@ -196,8 +205,7 @@ export function PublishActivityDialog({
         <DialogTitle>{messages.title(target.title)}</DialogTitle>
         <DialogDescription>
           {messages.description} {messages.dueAtLabel}:{' '}
-          {formatInstant(target.dueAt, { timeZone: target.timeZone })} (
-          {target.timeZone}).
+          {formatActivityDeadline(target.dueAt, target.timeZone)}.
         </DialogDescription>
 
         {error !== null && (
