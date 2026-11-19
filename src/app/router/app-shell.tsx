@@ -5,6 +5,7 @@ import { BaseLayout } from '@/components/layout/base-layout';
 import { Button } from '@/components/ui/button';
 import { Toast, toast } from '@/components/ui/toast';
 import { resetClassroomModeStore } from '@/features/classrooms/classroom-mode-store';
+import { NotificationCenter } from '@/features/notifications/notification-center';
 import {
   useSessionCleanup,
   useSessionService,
@@ -86,6 +87,7 @@ export function AppShell() {
                 >
                   {messages.shell.profileLink}
                 </NavLink>
+                <NotificationCenter />
                 <Button
                   type="button"
                   variant="secondary"

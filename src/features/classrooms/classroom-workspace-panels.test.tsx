@@ -172,7 +172,6 @@ function setup(
 const pendingCatalogCases = [
   ['grades', 'Calificaciones'],
   ['chat', 'Chat'],
-  ['notices', 'Avisos'],
   ['shop', 'Tienda'],
   ['bot', 'Asistente de estudio'],
   ['settings', 'Configuración'],
@@ -255,6 +254,18 @@ test('default catalog opens material by URL with MaterialPanel and closes cleanl
   expect(document.activeElement).toHaveTextContent('Classroom a');
 });
 
+test('default catalog opens notices by URL with NoticeBoardPanel and closes cleanly', async () => {
+  const view = setup(['notices'], '/classrooms/a/panels/notices', true);
+  const dialog = await screen.findByRole('dialog', { name: 'Avisos' });
+  expect(dialog).toHaveTextContent('Tablón de anuncios');
+  expect(dialog).not.toHaveTextContent('Funcionalidad pendiente');
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+  await screen.findByRole('button', { name: 'Open grades' });
+  expect(view.router.state.location.pathname).toBe('/classrooms/a');
+  expect(view.router.state.historyAction).toBe('REPLACE');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(document.activeElement).toHaveTextContent('Classroom a');
+});
 test.each([
   [[], 'grades'],
   [['pet'], 'pet'],

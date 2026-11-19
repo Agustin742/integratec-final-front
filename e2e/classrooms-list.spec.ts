@@ -206,6 +206,16 @@ test('teacher creates and configures a classroom, navigates to F16 workspace, an
 
     if (
       url.origin === apiOrigin &&
+      url.pathname === '/notifications' &&
+      request.method() === 'GET'
+    ) {
+      return route.fulfill({
+        json: { items: [], page: 1, pageSize: 20, total: 0 },
+      });
+    }
+
+    if (
+      url.origin === apiOrigin &&
       url.pathname === `/classrooms/${classroomId}/context-events`
     ) {
       await new Promise<void>((resolve) => page.once('close', () => resolve()));
@@ -384,6 +394,16 @@ test('student sees enrolled classroom link without create or configure controls'
           pageSize: 20,
           total: 1,
         },
+      });
+    }
+
+    if (
+      url.origin === apiOrigin &&
+      url.pathname === '/notifications' &&
+      request.method() === 'GET'
+    ) {
+      return route.fulfill({
+        json: { items: [], page: 1, pageSize: 20, total: 0 },
       });
     }
 

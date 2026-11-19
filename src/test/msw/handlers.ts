@@ -2206,6 +2206,381 @@ export function createClassroomInvitationsStore(
     ],
   };
 }
+export interface ClassroomAnnouncementItem {
+  readonly id: string;
+  readonly classroomId: string;
+  readonly authorId: string;
+  readonly title: string;
+  readonly content: string;
+  readonly mentionedUserIds: readonly string[];
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export type AnnouncementStoreOp = 'list' | 'create' | 'update' | 'remove';
+export type AnnouncementStoreFailure =
+  MswErrorResponseSpec | 'network' | 'drop-response';
+
+export interface ClassroomAnnouncementsStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly authorId?: string;
+  readonly initialItems?: readonly ClassroomAnnouncementItem[];
+  readonly mentionDirectory?: Readonly<Record<string, string>>;
+}
+
+export interface ClassroomAnnouncementsStore {
+  readonly handlers: readonly HttpHandler[];
+  getItems: () => readonly ClassroomAnnouncementItem[];
+  failNext: (
+    op: AnnouncementStoreOp,
+    failure: AnnouncementStoreFailure,
+  ) => void;
+}
+
+function resolveMentionsFromContent(
+  content: string,
+  directory: Readonly<Record<string, string>>,
+): string[] {
+  const resolved: string[] = [];
+  for (const [name, userId] of Object.entries(directory)) {
+    const token = `@${name}`;
+    if (content.includes(token) && !resolved.includes(userId)) {
+      resolved.push(userId);
+    }
+  }
+  return resolved.slice(0, 20);
+}
+
+/**
+ * Stateful contract-faithful MSW store for classroom announcements
+ * (`AnnouncementsController_list`, `AnnouncementsController_create`,
+ * `AnnouncementsController_update`, `AnnouncementsController_remove`).
+ */
+export function createClassroomAnnouncementsStore(
+  options: ClassroomAnnouncementsStoreOptions = {},
+): ClassroomAnnouncementsStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomId =
+    options.classroomId ?? '00000000-0000-4000-8000-000000000101';
+  const authorId = options.authorId ?? '00000000-0000-4000-8000-000000000001';
+  const mentionDirectory = options.mentionDirectory ?? {};
+
+  let items: ClassroomAnnouncementItem[] = [...(options.initialItems ?? [])];
+  let seq = items.length + 1;
+  const pending: Partial<
+    Record<AnnouncementStoreOp, AnnouncementStoreFailure>
+  > = {};
+
+  const fail = (failure: AnnouncementStoreFailure): Response => {
+    if (failure === 'network' || failure === 'drop-response') {
+      return HttpResponse.error();
+    }
+    return createErrorEnvelopeResponse(failure.status, failure.body);
+  };
+
+  return {
+    getItems: () => items,
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    handlers: [
+      http.get(`${baseUrl}/classrooms/:id/announcements`, ({ request }) => {
+        const failure = pending.list;
+        pending.list = undefined;
+        if (failure !== undefined) {
+          return fail(failure);
+        }
+
+        const url = new URL(request.url);
+        const page = Math.max(1, Number(url.searchParams.get('page') ?? 1));
+        const pageSize = Math.min(
+          100,
+          Math.max(1, Number(url.searchParams.get('pageSize') ?? 20)),
+        );
+        const ordered = [...items].sort((a, b) =>
+          b.createdAt.localeCompare(a.createdAt),
+        );
+        const start = (page - 1) * pageSize;
+        return HttpResponse.json({
+          items: ordered.slice(start, start + pageSize),
+          page,
+          pageSize,
+          total: ordered.length,
+        });
+      }),
+      http.post(
+        `${baseUrl}/classrooms/:id/announcements`,
+        async ({ params, request }) => {
+          const failure = pending.create;
+          pending.create = undefined;
+          if (failure !== undefined && failure !== 'drop-response') {
+            return fail(failure);
+          }
+
+          const body = (await request.json().catch(() => null)) as {
+            title?: unknown;
+            content?: unknown;
+          } | null;
+          const title =
+            typeof body?.title === 'string' ? body.title.trim() : '';
+          const content =
+            typeof body?.content === 'string' ? body.content.trim() : '';
+          if (title.length === 0 || content.length === 0) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'BAD_REQUEST',
+              message: 'Validation failed.',
+              correlationId: 'req-announcements-create-400',
+              details: [
+                {
+                  field: title.length === 0 ? 'title' : 'content',
+                  messages: ['El campo es obligatorio.'],
+                },
+              ],
+            });
+          }
+
+          const timestamp = new Date(
+            Date.UTC(2026, 10, 18, 12, seq, 0),
+          ).toISOString();
+          const created: ClassroomAnnouncementItem = {
+            id: `00000000-0000-4000-8000-${String(2000 + seq).padStart(12, '0')}`,
+            classroomId: String(params.id ?? classroomId),
+            authorId,
+            title,
+            content,
+            mentionedUserIds: resolveMentionsFromContent(
+              content,
+              mentionDirectory,
+            ),
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          };
+          seq += 1;
+          items = [created, ...items];
+          return failure === 'drop-response'
+            ? HttpResponse.error()
+            : HttpResponse.json(created, { status: 201 });
+        },
+      ),
+      http.patch(
+        `${baseUrl}/classrooms/:id/announcements/:announcementId`,
+        async ({ params, request }) => {
+          const failure = pending.update;
+          pending.update = undefined;
+          if (failure !== undefined && failure !== 'drop-response') {
+            return fail(failure);
+          }
+
+          const index = items.findIndex(
+            (item) => item.id === params.announcementId,
+          );
+          if (index === -1) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Announcement not found.',
+              correlationId: 'req-announcements-update-404',
+            });
+          }
+
+          const body = (await request.json().catch(() => null)) as {
+            title?: unknown;
+            content?: unknown;
+          } | null;
+          const current = items[index];
+          const nextTitle =
+            typeof body?.title === 'string' ? body.title.trim() : current.title;
+          const nextContent =
+            typeof body?.content === 'string'
+              ? body.content.trim()
+              : current.content;
+          if (nextTitle.length === 0 || nextContent.length === 0) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'BAD_REQUEST',
+              message: 'Validation failed.',
+              correlationId: 'req-announcements-update-400',
+            });
+          }
+
+          const updated: ClassroomAnnouncementItem = {
+            ...current,
+            title: nextTitle,
+            content: nextContent,
+            mentionedUserIds: resolveMentionsFromContent(
+              nextContent,
+              mentionDirectory,
+            ),
+            updatedAt: new Date(
+              Date.UTC(2026, 10, 18, 12, seq, 30),
+            ).toISOString(),
+          };
+          seq += 1;
+          items = items.map((item, idx) => (idx === index ? updated : item));
+          return failure === 'drop-response'
+            ? HttpResponse.error()
+            : HttpResponse.json(updated);
+        },
+      ),
+      http.delete(
+        `${baseUrl}/classrooms/:id/announcements/:announcementId`,
+        ({ params }) => {
+          const failure = pending.remove;
+          pending.remove = undefined;
+          if (failure !== undefined && failure !== 'drop-response') {
+            return fail(failure);
+          }
+
+          const exists = items.some(
+            (item) => item.id === params.announcementId,
+          );
+          if (!exists) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Announcement not found.',
+              correlationId: 'req-announcements-remove-404',
+            });
+          }
+          items = items.filter((item) => item.id !== params.announcementId);
+          return failure === 'drop-response'
+            ? HttpResponse.error()
+            : new HttpResponse(null, { status: 204 });
+        },
+      ),
+    ],
+  };
+}
+
+export type StudentWalletPayload = components['schemas']['StudentWalletDto'];
+export type PointMovementPayload = components['schemas']['PointMovementDto'];
+
+export interface CreateStudentWalletHandlerOptions {
+  readonly baseUrl?: string;
+  readonly status?: number;
+  readonly error?: ErrorBodyPayload;
+  readonly response?: Partial<StudentWalletPayload>;
+  readonly onRequest?: (request: Request) => void | Promise<void>;
+}
+
+/** Synthetic `ErrorBody` matching the status, so failure tests stay valid. */
+function syntheticWalletErrorBody(status: number): ErrorBodyPayload {
+  if (status === 400) {
+    return {
+      code: 'BAD_REQUEST',
+      message: 'Invalid pagination parameters.',
+      correlationId: 'corr-wallet-400',
+    };
+  }
+  if (status === 401) {
+    return {
+      code: 'UNAUTHENTICATED',
+      message: 'Missing or invalid session.',
+      correlationId: 'corr-wallet-401',
+    };
+  }
+  if (status === 403) {
+    return {
+      code: 'FORBIDDEN',
+      message: 'Caller is not an active enrolled student in this classroom.',
+      correlationId: 'corr-wallet-403',
+    };
+  }
+  if (status === 404) {
+    return {
+      code: 'NOT_FOUND',
+      message: 'Classroom not found.',
+      correlationId: 'corr-wallet-404',
+    };
+  }
+  return {
+    code: 'INTERNAL_ERROR',
+    message: 'Wallet request failed.',
+    correlationId: `corr-wallet-${status}`,
+  };
+}
+
+const WALLET_MOVEMENTS: readonly PointMovementPayload[] = [
+  {
+    id: '00000000-0000-4000-8000-000000000301',
+    entryKind: 'EARNING',
+    amount: 50,
+    sourceType: 'submission_grade',
+    sourceId: '00000000-0000-4000-8000-000000000311',
+    reason: 'Activity graded: Fractions Quiz',
+    actorId: '00000000-0000-4000-8000-000000000321',
+    createdAt: '2026-11-10T12:00:00.000Z',
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000302',
+    entryKind: 'DEBIT',
+    amount: -20,
+    sourceType: 'shop_purchase',
+    sourceId: '00000000-0000-4000-8000-000000000312',
+    reason: 'Shop purchase: Blue Classroom Cap',
+    actorId: null,
+    createdAt: '2026-11-12T15:30:00.000Z',
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000303',
+    entryKind: 'COMPENSATION',
+    amount: 5,
+    sourceType: 'grade_revision',
+    sourceId: '00000000-0000-4000-8000-000000000313',
+    reason: 'Regrade adjustment: Fractions Quiz',
+    actorId: '00000000-0000-4000-8000-000000000321',
+    createdAt: '2026-11-14T09:15:00.000Z',
+  },
+];
+
+/**
+ * Contract-faithful MSW handler for `GET /classrooms/{id}/points`
+ * (`PointsController_getOwnWallet`): the caller's own server-computed balance
+ * and one page of movements. Works before the backend implementation lands.
+ */
+export function createStudentWalletHandler(
+  classroomId: string,
+  options: CreateStudentWalletHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  return http.get(
+    `${baseUrl}/classrooms/${classroomId}/points`,
+    async ({ request }) => {
+      await options.onRequest?.(request);
+
+      const status = options.status ?? 200;
+      if (status >= 400) {
+        return createErrorEnvelopeResponse(
+          status,
+          options.error ?? syntheticWalletErrorBody(status),
+        );
+      }
+
+      const url = new URL(request.url);
+      const rawPage = url.searchParams.get('page');
+      const rawPageSize = url.searchParams.get('pageSize');
+      const parsedPage = rawPage === null ? 1 : Number(rawPage);
+      const parsedPageSize = rawPageSize === null ? 20 : Number(rawPageSize);
+      const page =
+        Number.isInteger(parsedPage) && parsedPage >= 1 ? parsedPage : 1;
+      const pageSize =
+        Number.isInteger(parsedPageSize) && parsedPageSize >= 1
+          ? parsedPageSize
+          : 20;
+      const start = (page - 1) * pageSize;
+
+      const payload: StudentWalletPayload = {
+        classroomId,
+        studentId: '00000000-0000-4000-8000-000000000011',
+        balance: 130,
+        items: WALLET_MOVEMENTS.slice(start, start + pageSize),
+        page,
+        pageSize,
+        total: WALLET_MOVEMENTS.length,
+        ...options.response,
+      };
+      return HttpResponse.json(payload, { status });
+    },
+  );
+}
 
 /**
  * Contract-faithful MSW handler for `GET /classrooms/{id}` returning
@@ -2755,8 +3130,6 @@ export function createClassroomActivitiesStore(
   };
 }
 
-export const defaultHandlers: readonly HttpHandler[] = [createHealthHandler()];
-
 export type TeacherActivityPayload =
   components['schemas']['TeacherActivityResponseDto'];
 export type StudentActivityPayload =
@@ -3179,3 +3552,155 @@ export function createDeactivateActivityHandler(
     },
   );
 }
+
+export interface NotificationStoreItem {
+  readonly id: string;
+  readonly kind:
+    | 'activity_published'
+    | 'grade_posted'
+    | 'announcement'
+    | 'mention'
+    | 'activity_forum_reply';
+  readonly resourceId: string;
+  readonly classroomId: string;
+  readonly studentId: string | null;
+  readonly readAt: string | null;
+  readonly createdAt: string;
+}
+
+export type NotificationStoreOp = 'list' | 'read' | 'readAll';
+export type NotificationStoreFailure =
+  MswErrorResponseSpec | 'network' | 'drop-response';
+
+export interface NotificationsStoreOptions {
+  readonly baseUrl?: string;
+  readonly initialItems?: readonly NotificationStoreItem[];
+  readonly readTimestamp?: string;
+}
+
+export interface NotificationsStore {
+  readonly handlers: readonly HttpHandler[];
+  getItems: () => readonly NotificationStoreItem[];
+  pushItem: (item: NotificationStoreItem) => void;
+  removeByClassroom: (classroomId: string) => void;
+  failNext: (
+    op: NotificationStoreOp,
+    failure: NotificationStoreFailure,
+  ) => void;
+}
+
+/**
+ * Stateful contract-faithful MSW store for in-app notifications
+ * (`NotificationsController_list`, `NotificationsController_read`,
+ * `NotificationsController_readAll`).
+ */
+export function createNotificationsStore(
+  options: NotificationsStoreOptions = {},
+): NotificationsStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const readTimestamp = options.readTimestamp ?? '2026-11-18T14:00:00.000Z';
+  let items: NotificationStoreItem[] = [...(options.initialItems ?? [])];
+  const pending: Partial<
+    Record<NotificationStoreOp, NotificationStoreFailure>
+  > = {};
+
+  const fail = (failure: NotificationStoreFailure): Response => {
+    if (failure === 'network' || failure === 'drop-response') {
+      return HttpResponse.error();
+    }
+    return createErrorEnvelopeResponse(failure.status, failure.body);
+  };
+
+  return {
+    getItems: () => items,
+    pushItem: (item) => {
+      items = [item, ...items.filter((existing) => existing.id !== item.id)];
+    },
+    removeByClassroom: (classroomId) => {
+      items = items.filter((item) => item.classroomId !== classroomId);
+    },
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    handlers: [
+      http.get(`${baseUrl}/notifications`, ({ request }) => {
+        const failure = pending.list;
+        pending.list = undefined;
+        if (failure !== undefined) {
+          return fail(failure);
+        }
+
+        const url = new URL(request.url);
+        const page = Math.max(1, Number(url.searchParams.get('page') ?? 1));
+        const pageSize = Math.min(
+          100,
+          Math.max(1, Number(url.searchParams.get('pageSize') ?? 20)),
+        );
+        const ordered = [...items].sort((a, b) =>
+          b.createdAt.localeCompare(a.createdAt),
+        );
+        const start = (page - 1) * pageSize;
+        return HttpResponse.json({
+          items: ordered.slice(start, start + pageSize),
+          page,
+          pageSize,
+          total: ordered.length,
+        });
+      }),
+      http.patch(`${baseUrl}/notifications/read-all`, () => {
+        const failure = pending.readAll;
+        pending.readAll = undefined;
+        if (failure !== undefined && failure !== 'drop-response') {
+          return fail(failure);
+        }
+
+        let updated = 0;
+        items = items.map((item) => {
+          if (item.readAt !== null) {
+            return item;
+          }
+          updated += 1;
+          return { ...item, readAt: readTimestamp };
+        });
+
+        return failure === 'drop-response'
+          ? HttpResponse.error()
+          : HttpResponse.json({ updated });
+      }),
+      http.patch(`${baseUrl}/notifications/:id/read`, ({ params }) => {
+        const failure = pending.read;
+        pending.read = undefined;
+        if (failure !== undefined && failure !== 'drop-response') {
+          return fail(failure);
+        }
+
+        const index = items.findIndex((item) => item.id === params.id);
+        if (index === -1) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Notification not found.',
+            correlationId: 'req-notifications-read-404',
+          });
+        }
+
+        const existing = items[index];
+        const next: NotificationStoreItem =
+          existing.readAt !== null
+            ? existing
+            : { ...existing, readAt: readTimestamp };
+        items = items.map((item, idx) => (idx === index ? next : item));
+
+        return failure === 'drop-response'
+          ? HttpResponse.error()
+          : HttpResponse.json(next);
+      }),
+    ],
+  };
+}
+
+export const defaultHandlers: readonly HttpHandler[] = [
+  createHealthHandler(),
+  http.get(`${TEST_API_BASE_URL}/notifications`, () =>
+    HttpResponse.json({ items: [], page: 1, pageSize: 20, total: 0 }),
+  ),
+];

@@ -546,3 +546,201 @@ export function classroomActivityDetailQueryKey(
     }),
   );
 }
+
+export interface AnnouncementListQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+}
+
+export interface NormalizedAnnouncementListQueryParams {
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+/**
+ * Key of `GET /classrooms/{id}/announcements`: paginated chronological list
+ * of announcements for one classroom, scoped by both `userId` and
+ * `classroomId` (`rules/state-management.md`).
+ */
+export function classroomAnnouncementsQueryKey(
+  userId: string,
+  classroomId: string,
+  params: AnnouncementListQueryParams = {},
+): ScopedQueryKey<NormalizedAnnouncementListQueryParams> {
+  const normalizedParams = Object.freeze({
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+  });
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'announcements',
+    'list',
+    normalizedParams,
+  );
+}
+
+/**
+ * Predicate matching every announcement list query entry owned by `userId` and
+ * `classroomId`.
+ */
+export function createClassroomAnnouncementsPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'announcements' &&
+      segment.resource === 'list'
+    );
+  };
+}
+
+/**
+ * Key of `GET /classrooms/{id}/points`: the signed-in student's server-computed
+ * points wallet and one page of movements, scoped by `userId` and `classroomId`
+ * (`rules/state-management.md`).
+ */
+export interface StudentWalletQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+}
+
+export interface NormalizedStudentWalletQueryParams {
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+/**
+ * Clamps wallet pagination the same way the roster and materials keys do, so
+ * the query key and the outgoing request always agree on the page values.
+ */
+export function normalizeStudentWalletQueryParams(
+  params: StudentWalletQueryParams,
+): NormalizedStudentWalletQueryParams {
+  return Object.freeze({
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+  });
+}
+
+/**
+ * Key of `GET /classrooms/{id}/points`: the caller's own wallet, scoped by
+ * `userId` and `classroomId`, so other pages and classrooms read isolated
+ * cache entries (`rules/state-management.md`).
+ */
+export function studentWalletQueryKey(
+  userId: string,
+  classroomId: string,
+  params: StudentWalletQueryParams = {},
+): ScopedQueryKey<NormalizedStudentWalletQueryParams> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'points',
+    'wallet',
+    normalizeStudentWalletQueryParams(params),
+  );
+}
+
+/**
+ * Predicate matching every student wallet query entry owned by `userId` in
+ * `classroomId`; used by mutations to refresh the balance through query
+ * invalidation.
+ */
+export function createStudentWalletPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'points' &&
+      segment.resource === 'wallet'
+    );
+  };
+}
+
+export interface NotificationListQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+}
+
+export interface NormalizedNotificationListQueryParams {
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+/**
+ * Key of `GET /notifications`: paginated list of in-app notifications for one
+ * authenticated user (`rules/state-management.md`).
+ */
+export function notificationsListQueryKey(
+  userId: string,
+  params: NotificationListQueryParams = {},
+): ScopedQueryKey<NormalizedNotificationListQueryParams> {
+  const normalizedParams = Object.freeze({
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+  });
+  return createScopedQueryKey(
+    { userId },
+    'notifications',
+    'list',
+    normalizedParams,
+  );
+}
+
+/**
+ * Predicate matching every notification list query entry owned by `userId`.
+ */
+export function createNotificationsPredicate(
+  userId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.domain === 'notifications' &&
+      segment.resource === 'list'
+    );
+  };
+}

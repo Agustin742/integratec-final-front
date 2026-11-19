@@ -128,6 +128,27 @@ async function interceptClassroomApi(
     if (url.pathname === '/users/me') {
       return route.fulfill({ json: profile });
     }
+    if (url.pathname === '/notifications' && request.method() === 'GET') {
+      return route.fulfill({
+        json: { items: [], page: 1, pageSize: 20, total: 0 },
+      });
+    }
+    if (
+      url.pathname === `/classrooms/${classroomId}/points` &&
+      request.method() === 'GET'
+    ) {
+      return route.fulfill({
+        json: {
+          classroomId,
+          studentId: userId,
+          balance: 0,
+          items: [],
+          page: 1,
+          pageSize: 20,
+          total: 0,
+        },
+      });
+    }
     if (url.pathname === `/classrooms/${classroomId}`) {
       return route.fulfill({ json: state.context });
     }
