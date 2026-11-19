@@ -9,11 +9,13 @@ activity inbox and detail navigation unified with
 teacher editor, multiple-choice builder, one-way publish flow, and deactivation — see the [activities feature doc](./classroom-activities.md)),
 `material` renders `MaterialPanel` ([`#40`](https://github.com/Agustin742/integratec-final-front/issues/40)),
 `notices` renders `NoticeBoardPanel` ([`#49`](https://github.com/Agustin742/integratec-final-front/issues/49)),
-and `members` renders `ClassroomMembersPanel`
+`grades` renders `GradesPanel` ([`#46`](https://github.com/Agustin742/integratec-final-front/issues/46),
+see the [grades guide](./ui-grades.md)) and
+`members` renders `ClassroomMembersPanel`
 ([`HU-AUL-003`](https://github.com/Agustin742/integratec-final-front/issues/33)
 `ClassroomRosterPanel` and capability-gated [`HU-AUL-002`](https://github.com/Agustin742/integratec-final-front/issues/32)
 `ClassroomInvitationsPanel` for `invite_members`-authorized email invitations and one-time classroom join codes), while the remaining
-five entries display the shared, honest “Funcionalidad pendiente” state until
+four entries display the shared, honest “Funcionalidad pendiente” state until
 their respective stories land.
 
 ## Approved scope reconciliation
@@ -29,7 +31,7 @@ the issue; team acceptance of the reconciled criterion remains part of PR review
 | -------------- | ---------------------------------------------------- |
 | `activities`   | Actividades (`ActivitiesPanel`, `#41` + `#39`)       |
 | `material`     | Material (`MaterialPanel`, `#40`)                    |
-| `grades`       | Calificaciones                                       |
+| `grades`       | Calificaciones (`GradesPanel`, `#46`)                |
 | `chat`         | Chat                                                 |
 | `notices`      | Avisos (`NoticeBoardPanel`, `#49`)                   |
 | `shop`         | Tienda                                               |

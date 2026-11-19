@@ -4163,3 +4163,275 @@ export const defaultHandlers: readonly HttpHandler[] = [
     HttpResponse.json({ items: [], page: 1, pageSize: 20, total: 0 }),
   ),
 ];
+
+export type ReportCardItemPayload = components['schemas']['ReportCardItemDto'];
+export type DailyMetricPayload = components['schemas']['DailyMetricDto'];
+export type StudentMetricSummaryPayload =
+  components['schemas']['StudentMetricSummaryDto'];
+
+export interface CreateGradesHandlerOptions {
+  readonly baseUrl?: string;
+  readonly status?: number;
+  readonly error?: ErrorBodyPayload;
+  readonly response?: Record<string, unknown>;
+  readonly onRequest?: (request: Request) => void | Promise<void>;
+}
+
+/** Synthetic `ErrorBody` matching the status, so failure tests stay valid. */
+function syntheticGradesErrorBody(status: number): ErrorBodyPayload {
+  if (status === 400) {
+    return {
+      code: 'BAD_REQUEST',
+      message: 'Invalid pagination parameters.',
+      correlationId: 'corr-grades-400',
+    };
+  }
+  if (status === 401) {
+    return {
+      code: 'UNAUTHENTICATED',
+      message: 'Missing or invalid session.',
+      correlationId: 'corr-grades-401',
+    };
+  }
+  if (status === 403) {
+    return {
+      code: 'FORBIDDEN',
+      message:
+        'Caller does not have the role this resource requires in this classroom.',
+      correlationId: 'corr-grades-403',
+    };
+  }
+  if (status === 404) {
+    return {
+      code: 'NOT_FOUND',
+      message: 'Classroom not found.',
+      correlationId: 'corr-grades-404',
+    };
+  }
+  return {
+    code: 'INTERNAL_ERROR',
+    message: 'Grades request failed.',
+    correlationId: `corr-grades-${status}`,
+  };
+}
+
+function readGradesPagination(url: URL): {
+  page: number;
+  pageSize: number;
+  start: number;
+} {
+  const rawPage = url.searchParams.get('page');
+  const rawPageSize = url.searchParams.get('pageSize');
+  const parsedPage = rawPage === null ? 1 : Number(rawPage);
+  const parsedPageSize = rawPageSize === null ? 20 : Number(rawPageSize);
+  const page = Number.isInteger(parsedPage) && parsedPage >= 1 ? parsedPage : 1;
+  const pageSize =
+    Number.isInteger(parsedPageSize) && parsedPageSize >= 1
+      ? Math.min(100, parsedPageSize)
+      : 20;
+  return { page, pageSize, start: (page - 1) * pageSize };
+}
+
+const REPORT_CARD_ITEMS: readonly ReportCardItemPayload[] = [
+  {
+    activityId: '00000000-0000-4000-8000-000000000601',
+    activityTitle: 'Fracciones: guía de ejercicios',
+    activityType: 'TP',
+    maxScore: 100,
+    score: 82,
+    feedback: 'Muy buen trabajo. Repasá la simplificación de fracciones.',
+    pointsAwarded: 41,
+    isLate: false,
+    submittedAt: '2026-11-10T12:00:00.000Z',
+    gradedAt: '2026-11-12T15:30:00.000Z',
+  },
+  {
+    activityId: '00000000-0000-4000-8000-000000000602',
+    activityTitle: 'Examen de geometría',
+    activityType: 'EXAM',
+    maxScore: 100,
+    score: 60,
+    feedback: 'Entregado fuera de término. Repasá triángulos y perímetros.',
+    pointsAwarded: 30,
+    isLate: true,
+    submittedAt: '2026-11-15T10:00:00.000Z',
+    gradedAt: '2026-11-16T09:15:00.000Z',
+  },
+  {
+    activityId: '00000000-0000-4000-8000-000000000603',
+    activityTitle: 'Práctica de porcentajes',
+    activityType: 'TP',
+    maxScore: 50,
+    score: 45,
+    feedback: 'Excelente práctica.',
+    pointsAwarded: 22,
+    isLate: false,
+    submittedAt: '2026-11-18T18:45:00.000Z',
+    gradedAt: '2026-11-19T11:05:00.000Z',
+  },
+];
+
+const DAILY_METRICS: readonly DailyMetricPayload[] = [
+  {
+    day: '2026-11-18',
+    connectedSeconds: 4500,
+    submissionCount: 1,
+    messageCount: 3,
+  },
+  {
+    day: '2026-11-17',
+    connectedSeconds: 900,
+    submissionCount: 0,
+    messageCount: 0,
+  },
+  {
+    day: '2026-11-16',
+    connectedSeconds: 7200,
+    submissionCount: 2,
+    messageCount: 5,
+  },
+];
+
+const STUDENT_METRIC_SUMMARIES: readonly StudentMetricSummaryPayload[] = [
+  {
+    studentId: '00000000-0000-4000-8000-000000000611',
+    displayName: 'Ana Sánchez',
+    connectedSeconds: 36_000,
+    submissionCount: 12,
+    messageCount: 27,
+    gradedCount: 10,
+    ungradedCount: 2,
+  },
+  {
+    studentId: '00000000-0000-4000-8000-000000000612',
+    displayName: 'Bruno Díaz',
+    connectedSeconds: 5400,
+    submissionCount: 3,
+    messageCount: 0,
+    gradedCount: 1,
+    ungradedCount: 2,
+  },
+  {
+    studentId: '00000000-0000-4000-8000-000000000613',
+    displayName: 'Carolina Pérez',
+    connectedSeconds: 12_960,
+    submissionCount: 8,
+    messageCount: 12,
+    gradedCount: 8,
+    ungradedCount: 0,
+  },
+];
+
+/**
+ * Contract-faithful MSW handler for `GET /classrooms/{id}/me/report-card`
+ * (`StudentMetricsController_reportCard`): the student's graded activities,
+ * paginated and latest grading first. Works before the backend lands.
+ */
+export function createStudentReportCardHandler(
+  classroomId: string,
+  options: CreateGradesHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  return http.get(
+    `${baseUrl}/classrooms/${classroomId}/me/report-card`,
+    async ({ request }) => {
+      await options.onRequest?.(request);
+
+      const status = options.status ?? 200;
+      if (status >= 400) {
+        return createErrorEnvelopeResponse(
+          status,
+          options.error ?? syntheticGradesErrorBody(status),
+        );
+      }
+
+      const { page, pageSize, start } = readGradesPagination(
+        new URL(request.url),
+      );
+      const payload = {
+        items: REPORT_CARD_ITEMS.slice(start, start + pageSize),
+        page,
+        pageSize,
+        total: REPORT_CARD_ITEMS.length,
+        ...options.response,
+      };
+      return HttpResponse.json(payload, { status });
+    },
+  );
+}
+
+/**
+ * Contract-faithful MSW handler for `GET /classrooms/{id}/me/activity-metrics`
+ * (`StudentMetricsController_myDailyMetrics`): the caller's own raw daily
+ * metric rows, latest day first.
+ */
+export function createOwnDailyMetricsHandler(
+  classroomId: string,
+  options: CreateGradesHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  return http.get(
+    `${baseUrl}/classrooms/${classroomId}/me/activity-metrics`,
+    async ({ request }) => {
+      await options.onRequest?.(request);
+
+      const status = options.status ?? 200;
+      if (status >= 400) {
+        return createErrorEnvelopeResponse(
+          status,
+          options.error ?? syntheticGradesErrorBody(status),
+        );
+      }
+
+      const { page, pageSize, start } = readGradesPagination(
+        new URL(request.url),
+      );
+      const payload = {
+        items: DAILY_METRICS.slice(start, start + pageSize),
+        page,
+        pageSize,
+        total: DAILY_METRICS.length,
+        ...options.response,
+      };
+      return HttpResponse.json(payload, { status });
+    },
+  );
+}
+
+/**
+ * Contract-faithful MSW handler for `GET /classrooms/{id}/activity-metrics`
+ * (`ClassroomMetricsController_classroomMetrics`): raw per-student totals for
+ * teaching staff, display name ascending.
+ */
+export function createClassroomMetricsHandler(
+  classroomId: string,
+  options: CreateGradesHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  return http.get(
+    `${baseUrl}/classrooms/${classroomId}/activity-metrics`,
+    async ({ request }) => {
+      await options.onRequest?.(request);
+
+      const status = options.status ?? 200;
+      if (status >= 400) {
+        return createErrorEnvelopeResponse(
+          status,
+          options.error ?? syntheticGradesErrorBody(status),
+        );
+      }
+
+      const { page, pageSize, start } = readGradesPagination(
+        new URL(request.url),
+      );
+      const payload = {
+        items: STUDENT_METRIC_SUMMARIES.slice(start, start + pageSize),
+        page,
+        pageSize,
+        total: STUDENT_METRIC_SUMMARIES.length,
+        ...options.response,
+      };
+      return HttpResponse.json(payload, { status });
+    },
+  );
+}
