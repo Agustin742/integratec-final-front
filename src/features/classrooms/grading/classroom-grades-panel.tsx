@@ -32,7 +32,7 @@ export function ClassroomGradesPanel() {
       <Tabs defaultValue="review" className="min-w-0 space-y-4">
         <TabsList>
           <TabsTrigger value="review">
-            {gradingMessages.panel.title}
+            {gradingMessages.panel.heading}
           </TabsTrigger>
           <TabsTrigger value="metrics">
             {gradesMessages.teacher.heading}
