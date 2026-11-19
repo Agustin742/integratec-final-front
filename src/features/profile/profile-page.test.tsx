@@ -21,6 +21,7 @@ import {
   createLoginHandler,
   createLogoutHandler,
   createOwnProfileStore,
+  createOwnStreakAndBadgesHandler,
   type OwnProfileStore,
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
@@ -56,7 +57,11 @@ async function renderProfile(
   store: OwnProfileStore,
   options: { readonly signIn?: boolean; readonly path?: string } = {},
 ) {
-  mswServer.use(createLoginHandler(), ...store.handlers);
+  mswServer.use(
+    createLoginHandler(),
+    createOwnStreakAndBadgesHandler(),
+    ...store.handlers,
+  );
   const session = createSession({ baseUrl: TEST_API_BASE_URL });
   if (options.signIn ?? true) {
     const result = await session.controller.login({

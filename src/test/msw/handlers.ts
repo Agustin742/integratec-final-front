@@ -5041,3 +5041,54 @@ export function createClassroomMetricsHandler(
     },
   );
 }
+
+export interface StreakBadgePayloadItem {
+  readonly id: string;
+  readonly code: string;
+  readonly name: string;
+  readonly description: string;
+  readonly unlocked: boolean;
+  readonly unlockedAt: string | null;
+}
+
+export interface OwnStreakAndBadgesPayload {
+  readonly currentStreak: number;
+  readonly bestStreak: number;
+  readonly lastQualifiedDate: string | null;
+  readonly badges: readonly StreakBadgePayloadItem[];
+}
+
+export interface CreateOwnStreakAndBadgesHandlerOptions {
+  readonly baseUrl?: string;
+  readonly payload?: OwnStreakAndBadgesPayload;
+  readonly error?: MswErrorResponseSpec | 'network';
+}
+
+export const DEFAULT_STREAK_AND_BADGES_PAYLOAD: OwnStreakAndBadgesPayload = {
+  currentStreak: 0,
+  bestStreak: 0,
+  lastQualifiedDate: null,
+  badges: [],
+};
+
+/**
+ * Contract-faithful MSW handler for `GET /users/me/streak-and-badges` (`HU-GAM-002`).
+ */
+export function createOwnStreakAndBadgesHandler(
+  options: CreateOwnStreakAndBadgesHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const payload = options.payload ?? DEFAULT_STREAK_AND_BADGES_PAYLOAD;
+  return http.get(`${baseUrl}/users/me/streak-and-badges`, () => {
+    if (options.error === 'network') {
+      return HttpResponse.error();
+    }
+    if (options.error) {
+      return createErrorEnvelopeResponse(
+        options.error.status,
+        options.error.body,
+      );
+    }
+    return HttpResponse.json(payload);
+  });
+}

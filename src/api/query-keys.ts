@@ -267,6 +267,14 @@ export function ownProfileQueryKey(userId: string): ScopedQueryKey {
   return createScopedQueryKey({ userId }, 'profile', 'own');
 }
 
+/**
+ * Key of `GET /users/me/streak-and-badges`: server-confirmed study streak and
+ * earned/locked badges for the authenticated user (`HU-GAM-002`).
+ */
+export function ownStreakAndBadgesQueryKey(userId: string): ScopedQueryKey {
+  return createScopedQueryKey({ userId }, 'gamification', 'streak-and-badges');
+}
+
 export type MaterialSortOrder = 'createdAt' | '-createdAt';
 
 export interface MaterialListQueryParams {
