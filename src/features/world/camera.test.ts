@@ -4,9 +4,12 @@ import {
   AVATAR_FRAME,
   CAMERA_ELEVATION,
   frameAvatarCamera,
+  CLASSROOM_BOUNDS,
+  CLASSROOM_WALL_HEIGHT,
   frameCamera,
   WORLD_BOUNDS,
 } from './camera';
+import { CLASSROOM_LAYOUT } from '@/realtime';
 
 describe('fixed world framing', () => {
   test.each([
@@ -43,6 +46,57 @@ describe('fixed world framing', () => {
     const before = camera.projectionMatrix.clone();
     frameCamera(camera, 0, 0);
     expect(camera.projectionMatrix.equals(before)).toBe(true);
+  });
+});
+
+describe('classroom framing', () => {
+  test('derives its bounds from the shared classroom layout', () => {
+    const { bounds } = CLASSROOM_LAYOUT;
+    expect(CLASSROOM_BOUNDS.min).toEqual([bounds.minX, 0, bounds.minZ]);
+    expect(CLASSROOM_BOUNDS.max).toEqual([
+      bounds.maxX,
+      CLASSROOM_WALL_HEIGHT,
+      bounds.maxZ,
+    ]);
+  });
+  test.each([
+    [1280, 560],
+    [360, 480],
+    [480, 360],
+  ])('fits every corner of the room at %sx%s', (width, height) => {
+    const camera = new OrthographicCamera();
+    frameCamera(camera, width, height, CLASSROOM_BOUNDS);
+    for (const x of [CLASSROOM_BOUNDS.min[0], CLASSROOM_BOUNDS.max[0]])
+      for (const y of [CLASSROOM_BOUNDS.min[1], CLASSROOM_BOUNDS.max[1]])
+        for (const z of [CLASSROOM_BOUNDS.min[2], CLASSROOM_BOUNDS.max[2]]) {
+          const point = new Vector3(x, y, z).project(camera);
+          expect(Math.abs(point.x)).toBeLessThan(1);
+          expect(Math.abs(point.y)).toBeLessThan(1);
+          expect(Math.abs(point.z)).toBeLessThan(1);
+        }
+  });
+  test('keeps the isometric angles and a distance that contains the room', () => {
+    const camera = new OrthographicCamera();
+    frameCamera(camera, 360, 480, CLASSROOM_BOUNDS);
+    expect(camera.position.x).toBeCloseTo(camera.position.z);
+    const target = new Vector3(0, CLASSROOM_WALL_HEIGHT / 2, 0);
+    const offset = camera.position.clone().sub(target);
+    const elevation = Math.asin(offset.y / offset.length());
+    expect((elevation * 180) / Math.PI).toBeCloseTo(CAMERA_ELEVATION);
+    expect(camera.far).toBeGreaterThan(offset.length() + 10);
+  });
+  test('leaves the default framing on the reference bounds', () => {
+    const explicit = new OrthographicCamera();
+    const implicit = new OrthographicCamera();
+    frameCamera(explicit, 360, 480, WORLD_BOUNDS);
+    frameCamera(implicit, 360, 480);
+    expect(explicit.projectionMatrix.equals(implicit.projectionMatrix)).toBe(
+      true,
+    );
+    expect(explicit.position.equals(implicit.position)).toBe(true);
+    expect(implicit.position.y).toBeCloseTo(
+      1 + 16 * Math.sin((CAMERA_ELEVATION * Math.PI) / 180),
+    );
   });
 });
 

@@ -1,4 +1,9 @@
 export { WorldCanvas, type WorldCanvasProps } from './world-canvas';
+export { ClassroomScene } from './classroom/classroom-scene';
+export {
+  ClassroomWorld,
+  type ClassroomWorldProps,
+} from './classroom/classroom-world';
 export { WarmLighting } from './world-lighting';
 export { WorldReference } from './world-reference';
 export { GlbAsset, type GlbAssetProps } from './glb-asset';

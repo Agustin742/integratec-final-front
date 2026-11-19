@@ -362,6 +362,13 @@ test('frames the avatar from the front when asked, keeping the classroom framing
   render(<WorldCanvas label="Classroom" />);
   expect(state.camera.position.x).toBeCloseTo(state.camera.position.z);
 });
+test('frames the whole classroom by default and the small reference on request', () => {
+  state.size = { width: 360, height: 480 };
+  render(<WorldCanvas label="Classroom" />);
+  const classroomHeight = state.camera.top;
+  render(<WorldCanvas label="Reference" framing="reference" />);
+  expect(state.camera.top).toBeLessThan(classroomHeight);
+});
 test('lets a host size the canvas and drop the loading line', () => {
   renderer.delayOnCreated = true;
   const { container } = render(
