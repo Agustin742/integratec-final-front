@@ -148,8 +148,11 @@ trackers.
 ## Out of scope
 
 The study material manager (`HU-ACT-001` part 2/2, delivered in `#40`), the
-grading queue (`HU-ACT-004`), student submissions (`back#29`), and server-side
-answer protection and notification fan-out (backend) are not delivered here.
+per-activity query forum tab (`HU-COM-003` MVP Core part, delivered in `#52` —
+see [classroom forum](./classroom-forum.md) — and wired via `renderForumTab` in
+`ActivityDetailRoute`), the grading queue (`HU-ACT-004`), student submissions
+(`back#29`), and server-side answer protection and notification fan-out (backend)
+are outside `#39`/`#41`.
 Whether a teacher may edit a published activity that already has submissions
 stays a server decision: the editor never claims an edit succeeded and surfaces
 the server outcome, including the `409` questions-locked refusal.
