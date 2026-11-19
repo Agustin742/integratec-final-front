@@ -267,6 +267,23 @@ export function ownProfileQueryKey(userId: string): ScopedQueryKey {
   return createScopedQueryKey({ userId }, 'profile', 'own');
 }
 
+/**
+ * Key of `GET /classrooms/{id}/bot/status`: Study Guide Bot availability and
+ * server-decided exam lockout state scoped by `userId` and `classroomId`
+ * (`rules/ai-bot-and-daily-briefing.md`, `HU-BOT-002`).
+ */
+export function classroomBotStatusQueryKey(
+  userId: string,
+  classroomId: string,
+): ScopedQueryKey<undefined> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'bot',
+    'status',
+    undefined,
+  );
+}
+
 export type MaterialSortOrder = 'createdAt' | '-createdAt';
 
 export interface MaterialListQueryParams {

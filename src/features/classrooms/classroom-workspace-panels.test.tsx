@@ -189,7 +189,7 @@ function setup(
 }
 const pendingCatalogCases = [
   ['chat', 'Chat'],
-  ['bot', 'Asistente de estudio'],
+
   ['settings', 'Configuración'],
 ] as const;
 
