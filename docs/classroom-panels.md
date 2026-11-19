@@ -11,6 +11,8 @@ teacher editor, multiple-choice builder, one-way publish flow, and deactivation 
 `grades` renders `ClassroomGradesPanel` ([`#44`](https://github.com/Agustin742/integratec-final-front/issues/44)
 teacher grading queue, submission viewer, and grading/regrading workflow for `publish_content`-authorized staff, while showing the honest pending state to students and parents — see the [grading feature doc](./classroom-grading.md)),
 `notices` renders `NoticeBoardPanel` ([`#49`](https://github.com/Agustin742/integratec-final-front/issues/49)),
+`shop` renders `ShopPanel` ([`#48`](https://github.com/Agustin742/integratec-final-front/issues/48)
+student classroom shop catalog, idempotent purchase confirmation, and purchase history — see the [classroom shop doc](./classroom-shop.md)),
 `grades` renders `GradesPanel` ([`#46`](https://github.com/Agustin742/integratec-final-front/issues/46),
 see the [grades guide](./ui-grades.md)) and
 `members` renders `ClassroomMembersPanel`
@@ -36,7 +38,7 @@ the issue; team acceptance of the reconciled criterion remains part of PR review
 | `grades`       | Calificaciones (`ClassroomGradesPanel`, `#44` + `#46`) |
 | `chat`         | Chat                                                   |
 | `notices`      | Avisos (`NoticeBoardPanel`, `#49`)                     |
-| `shop`         | Tienda                                                 |
+| `shop`         | Tienda (`ShopPanel`, `#48`)                          |
 | `bot`          | Asistente de estudio                                   |
 | `members`      | Integrantes (`ClassroomMembersPanel`, `#33` + `#32`)   |
 | `settings`     | Configuración                                          |

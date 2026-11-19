@@ -4861,6 +4861,528 @@ export function createClassroomGradingStore(
   };
 }
 
+export type ShopStoreItemKind =
+  'CLASSROOM_ITEM' | 'AVATAR_ACCESSORY' | 'DESK_UPGRADE' | 'PET_ACCESSORY';
+
+export interface ShopStoreCatalogItem {
+  readonly id: string;
+  readonly code: string;
+  readonly name: string;
+  readonly description: string;
+  readonly kind: ShopStoreItemKind;
+  readonly price: number;
+  readonly isImplemented: boolean;
+  readonly ownedByStudent?: boolean;
+  readonly ownedByClassroom?: boolean;
+  readonly metadata?: Record<string, unknown>;
+  readonly createdAt: string;
+}
+
+export interface ShopStorePurchase {
+  readonly id: string;
+  readonly classroomId: string;
+  readonly studentId: string;
+  readonly shopItemId: string;
+  readonly shopItemCode: string;
+  readonly shopItemName: string;
+  readonly shopItemKind: ShopStoreItemKind;
+  readonly pointTransactionId: string;
+  readonly pricePaid: number;
+  readonly createdAt: string;
+}
+
+export type ShopStoreOp = 'items' | 'purchases' | 'purchase' | 'wallet';
+
+export type ShopStoreFailure =
+  MswErrorResponseSpec | 'network' | 'drop-response' | 'malformed-2xx';
+
+export interface ClassroomShopStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId: string;
+  readonly studentId?: string;
+  readonly role?: string;
+  readonly initialBalance?: number;
+  readonly initialItems?: readonly ShopStoreCatalogItem[];
+  readonly initialPurchases?: readonly ShopStorePurchase[];
+  readonly purchaseDelayMs?: number;
+}
+
+export interface ClassroomShopStore {
+  readonly handlers: readonly HttpHandler[];
+  getBalance: () => number;
+  setBalance: (balance: number) => void;
+  setRole: (role: string) => void;
+  removeItem: (shopItemId: string) => void;
+  markOwnedExternally: (shopItemId: string) => void;
+  failNext: (op: ShopStoreOp, failure: ShopStoreFailure) => void;
+  getCounts: () => Record<ShopStoreOp, number>;
+  getReceivedIdempotencyKeys: () => readonly string[];
+}
+
+/**
+ * Stateful contract-faithful MSW store for classroom shop (`HU-GAM-003`,
+ * backend `#34`) plus synchronized `GET /classrooms/:id/points` wallet view.
+ */
+export function createClassroomShopStore(
+  options: ClassroomShopStoreOptions,
+): ClassroomShopStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const studentId = options.studentId ?? '00000000-0000-4000-8000-000000007001';
+  let currentRole = options.role ?? 'STUDENT';
+  let balance = options.initialBalance ?? 250;
+  let items: ShopStoreCatalogItem[] = [...(options.initialItems ?? [])];
+  let purchases: ShopStorePurchase[] = [...(options.initialPurchases ?? [])];
+  let purchaseSeq = 100;
+
+  const idempotencyRecords = new Map<
+    string,
+    {
+      readonly shopItemId: string;
+      readonly purchase: ShopStorePurchase;
+      readonly classroomItem: {
+        readonly id: string;
+        readonly classroomId: string;
+        readonly shopItemId: string;
+        readonly purchaseId: string;
+        readonly state: 'ACTIVE';
+        readonly createdAt: string;
+      } | null;
+      readonly balanceAfter: number;
+    }
+  >();
+
+  const pending: Partial<Record<ShopStoreOp, ShopStoreFailure>> = {};
+  const counts: Record<ShopStoreOp, number> = {
+    items: 0,
+    purchases: 0,
+    purchase: 0,
+    wallet: 0,
+  };
+  const receivedKeys: string[] = [];
+
+  const consumeFailure = (op: ShopStoreOp): ShopStoreFailure | undefined => {
+    const failure = pending[op];
+    pending[op] = undefined;
+    return failure;
+  };
+
+  const respondFailure = (failure: ShopStoreFailure): Response => {
+    if (failure === 'network' || failure === 'drop-response') {
+      return HttpResponse.error();
+    }
+    if (failure === 'malformed-2xx') {
+      return HttpResponse.json({ broken: true }, { status: 200 });
+    }
+    return createErrorEnvelopeResponse(failure.status, failure.body);
+  };
+
+  const toCatalogDto = (item: ShopStoreCatalogItem) => {
+    const ownedByStudent = Boolean(item.ownedByStudent);
+    const ownedByClassroom = Boolean(item.ownedByClassroom);
+    const isPurchasable =
+      item.isImplemented &&
+      !ownedByStudent &&
+      !(item.kind === 'CLASSROOM_ITEM' && ownedByClassroom);
+    return {
+      id: item.id,
+      code: item.code,
+      name: item.name,
+      description: item.description,
+      kind: item.kind,
+      price: item.price,
+      isImplemented: item.isImplemented,
+      isPurchasable,
+      ownedByStudent,
+      ownedByClassroom,
+      metadata: item.metadata ?? {},
+      createdAt: item.createdAt,
+    };
+  };
+
+  return {
+    getBalance: () => balance,
+    setBalance: (next) => {
+      balance = Math.max(0, next);
+    },
+    setRole: (role) => {
+      currentRole = role;
+    },
+    removeItem: (shopItemId) => {
+      items = items.filter((item) => item.id !== shopItemId);
+    },
+    markOwnedExternally: (shopItemId) => {
+      items = items.map((item) =>
+        item.id === shopItemId
+          ? {
+              ...item,
+              ownedByStudent: true,
+              ownedByClassroom:
+                item.kind === 'CLASSROOM_ITEM' ? true : item.ownedByClassroom,
+            }
+          : item,
+      );
+    },
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    getCounts: () => ({ ...counts }),
+    getReceivedIdempotencyKeys: () => [...receivedKeys],
+    handlers: [
+      http.get(`${baseUrl}/classrooms/:id/points`, ({ params }) => {
+        counts.wallet += 1;
+        const failure = consumeFailure('wallet');
+        if (failure !== undefined) {
+          return respondFailure(failure);
+        }
+        if (String(params.id ?? '') !== options.classroomId) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Classroom not found.',
+            correlationId: 'req-shop-wallet-404',
+          });
+        }
+        if (currentRole !== 'STUDENT') {
+          return createErrorEnvelopeResponse(403, {
+            code: 'FORBIDDEN',
+            message: 'Student role required.',
+            correlationId: 'req-shop-wallet-403',
+          });
+        }
+        return HttpResponse.json({
+          classroomId: options.classroomId,
+          studentId,
+          balance,
+          items: purchases.map((p) => ({
+            id: p.pointTransactionId,
+            entryKind: 'DEBIT',
+            amount: -p.pricePaid,
+            sourceType: 'SHOP_PURCHASE',
+            sourceId: p.id,
+            reason: `Compra en tienda: ${p.shopItemName}`,
+            actorId: studentId,
+            createdAt: p.createdAt,
+          })),
+          page: 1,
+          pageSize: 20,
+          total: purchases.length,
+        });
+      }),
+      http.get(
+        `${baseUrl}/classrooms/:id/shop/items`,
+        ({ params, request }) => {
+          counts.items += 1;
+          const failure = consumeFailure('items');
+          if (failure !== undefined) {
+            return respondFailure(failure);
+          }
+          if (String(params.id ?? '') !== options.classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-shop-items-404',
+            });
+          }
+          if (currentRole !== 'STUDENT') {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Student role required.',
+              correlationId: 'req-shop-items-403',
+            });
+          }
+
+          const url = new URL(request.url);
+          const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+          const pageSize = Math.min(
+            100,
+            Math.max(1, Number(url.searchParams.get('pageSize') ?? '20')),
+          );
+          const kind = url.searchParams.get('kind') ?? '';
+          const sort = url.searchParams.get('sort') ?? 'createdAt';
+          const allowedSorts = new Set([
+            'createdAt',
+            '-createdAt',
+            'defaultPrice',
+            '-defaultPrice',
+            'name',
+            '-name',
+          ]);
+          if (!allowedSorts.has(sort)) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid sort parameter.',
+              details: [{ field: 'sort', messages: ['Invalid sort field'] }],
+              correlationId: 'req-shop-items-400',
+            });
+          }
+
+          let filtered = [...items];
+          if (kind) {
+            filtered = filtered.filter((item) => item.kind === kind);
+          }
+
+          const sorted = filtered.sort((a, b) => {
+            if (sort === 'defaultPrice') {
+              return a.price - b.price || a.id.localeCompare(b.id);
+            }
+            if (sort === '-defaultPrice') {
+              return b.price - a.price || a.id.localeCompare(b.id);
+            }
+            if (sort === 'name') {
+              return a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+            }
+            if (sort === '-name') {
+              return b.name.localeCompare(a.name) || a.id.localeCompare(b.id);
+            }
+            if (sort === '-createdAt') {
+              return (
+                Date.parse(b.createdAt) - Date.parse(a.createdAt) ||
+                a.id.localeCompare(b.id)
+              );
+            }
+            return (
+              Date.parse(a.createdAt) - Date.parse(b.createdAt) ||
+              a.id.localeCompare(b.id)
+            );
+          });
+
+          const start = (page - 1) * pageSize;
+          return HttpResponse.json({
+            items: sorted.slice(start, start + pageSize).map(toCatalogDto),
+            page,
+            pageSize,
+            total: sorted.length,
+          });
+        },
+      ),
+      http.get(
+        `${baseUrl}/classrooms/:id/shop/purchases`,
+        ({ params, request }) => {
+          counts.purchases += 1;
+          const failure = consumeFailure('purchases');
+          if (failure !== undefined) {
+            return respondFailure(failure);
+          }
+          if (String(params.id ?? '') !== options.classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-shop-purchases-404',
+            });
+          }
+          if (currentRole !== 'STUDENT') {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Student role required.',
+              correlationId: 'req-shop-purchases-403',
+            });
+          }
+
+          const url = new URL(request.url);
+          const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+          const pageSize = Math.min(
+            100,
+            Math.max(1, Number(url.searchParams.get('pageSize') ?? '20')),
+          );
+          const sorted = [...purchases].sort(
+            (a, b) =>
+              Date.parse(b.createdAt) - Date.parse(a.createdAt) ||
+              a.id.localeCompare(b.id),
+          );
+          const start = (page - 1) * pageSize;
+          return HttpResponse.json({
+            items: sorted.slice(start, start + pageSize),
+            page,
+            pageSize,
+            total: sorted.length,
+          });
+        },
+      ),
+      http.post(
+        `${baseUrl}/classrooms/:id/shop/purchase`,
+        async ({ params, request }) => {
+          counts.purchase += 1;
+          if (options.purchaseDelayMs) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, options.purchaseDelayMs),
+            );
+          }
+
+          const key = request.headers.get('Idempotency-Key')?.trim() ?? '';
+          if (key) {
+            receivedKeys.push(key);
+          }
+
+          const failure = consumeFailure('purchase');
+          if (
+            failure !== undefined &&
+            failure !== 'drop-response' &&
+            failure !== 'malformed-2xx'
+          ) {
+            return respondFailure(failure);
+          }
+
+          if (String(params.id ?? '') !== options.classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-shop-purchase-404',
+            });
+          }
+          if (currentRole !== 'STUDENT') {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Student role required.',
+              correlationId: 'req-shop-purchase-403',
+            });
+          }
+          if (!key || key.length > 128) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Idempotency-Key header is required.',
+              details: [
+                {
+                  field: 'idempotency-key',
+                  messages: ['Idempotency-Key header is required'],
+                },
+              ],
+              correlationId: 'req-shop-purchase-400-key',
+            });
+          }
+
+          const body = (await request.json()) as Record<string, unknown>;
+          const extraKeys = Object.keys(body).filter((k) => k !== 'shopItemId');
+          if (
+            extraKeys.length > 0 ||
+            typeof body.shopItemId !== 'string' ||
+            body.shopItemId.trim().length === 0
+          ) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid purchase payload.',
+              details: [
+                { field: 'shopItemId', messages: ['Invalid shopItemId'] },
+              ],
+              correlationId: 'req-shop-purchase-400-body',
+            });
+          }
+
+          const shopItemId = body.shopItemId;
+          const existingRecord = idempotencyRecords.get(key);
+          if (existingRecord) {
+            if (existingRecord.shopItemId !== shopItemId) {
+              return createErrorEnvelopeResponse(409, {
+                code: 'CONFLICT',
+                message: 'Conflict.',
+                correlationId: 'req-shop-purchase-409-key-mismatch',
+              });
+            }
+            return HttpResponse.json(
+              {
+                purchase: existingRecord.purchase,
+                classroomItem: existingRecord.classroomItem,
+                balance,
+                replayed: true,
+              },
+              { status: 200 },
+            );
+          }
+
+          const item = items.find((entry) => entry.id === shopItemId);
+          if (!item) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Item not found.',
+              correlationId: 'req-shop-purchase-404-item',
+            });
+          }
+
+          if (
+            !item.isImplemented ||
+            item.ownedByStudent ||
+            (item.kind === 'CLASSROOM_ITEM' && item.ownedByClassroom) ||
+            balance < item.price
+          ) {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message: 'Conflict.',
+              correlationId: 'req-shop-purchase-409',
+            });
+          }
+
+          purchaseSeq += 1;
+          const now = '2026-11-19T02:30:00.000Z';
+          const purchaseId = `00000000-0000-4000-8000-20000000${String(purchaseSeq).padStart(4, '0')}`;
+          const txId = `00000000-0000-4000-8000-30000000${String(purchaseSeq).padStart(4, '0')}`;
+
+          balance -= item.price;
+          items = items.map((entry) =>
+            entry.id === item.id
+              ? {
+                  ...entry,
+                  ownedByStudent: true,
+                  ownedByClassroom:
+                    entry.kind === 'CLASSROOM_ITEM'
+                      ? true
+                      : entry.ownedByClassroom,
+                }
+              : entry,
+          );
+
+          const purchase: ShopStorePurchase = {
+            id: purchaseId,
+            classroomId: options.classroomId,
+            studentId,
+            shopItemId: item.id,
+            shopItemCode: item.code,
+            shopItemName: item.name,
+            shopItemKind: item.kind,
+            pointTransactionId: txId,
+            pricePaid: item.price,
+            createdAt: now,
+          };
+          purchases = [purchase, ...purchases];
+
+          const classroomItem =
+            item.kind === 'CLASSROOM_ITEM'
+              ? {
+                  id: `00000000-0000-4000-8000-40000000${String(purchaseSeq).padStart(4, '0')}`,
+                  classroomId: options.classroomId,
+                  shopItemId: item.id,
+                  purchaseId,
+                  state: 'ACTIVE' as const,
+                  createdAt: now,
+                }
+              : null;
+
+          idempotencyRecords.set(key, {
+            shopItemId,
+            purchase,
+            classroomItem,
+            balanceAfter: balance,
+          });
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+          if (failure === 'malformed-2xx') {
+            return HttpResponse.json({ broken: true }, { status: 201 });
+          }
+
+          return HttpResponse.json(
+            {
+              purchase,
+              classroomItem,
+              balance,
+              replayed: false,
+            },
+            { status: 201 },
+          );
+        },
+      ),
+    ],
+  };
+}
+
 export const defaultHandlers: readonly HttpHandler[] = [
   createHealthHandler(),
   http.get(`${TEST_API_BASE_URL}/notifications`, () =>
