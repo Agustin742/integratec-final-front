@@ -148,8 +148,11 @@ trackers.
 ## Out of scope
 
 The study material manager (`HU-ACT-001` part 2/2, delivered in `#40`), the
-grading queue (`HU-ACT-004`), student submissions (`back#29`), and server-side
-answer protection and notification fan-out (backend) are not delivered here.
+teacher grading queue and form (`HU-ACT-004`, delivered separately in `#44` — see
+[classroom grading](./classroom-grading.md) — and wired into the default
+`Revisión docente` tab of `ActivityDetailPage`), student submissions (`back#29`),
+and server-side answer protection and notification fan-out (backend) are outside
+`#39`/`#41`.
 Whether a teacher may edit a published activity that already has submissions
 stays a server decision: the editor never claims an edit succeeded and surfaces
 the server outcome, including the `409` questions-locked refusal.

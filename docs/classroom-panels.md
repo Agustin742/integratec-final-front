@@ -8,6 +8,8 @@ activity inbox and detail navigation unified with
 [`#39`](https://github.com/Agustin742/integratec-final-front/issues/39)
 teacher editor, multiple-choice builder, one-way publish flow, and deactivation — see the [activities feature doc](./classroom-activities.md)),
 `material` renders `MaterialPanel` ([`#40`](https://github.com/Agustin742/integratec-final-front/issues/40)),
+`grades` renders `ClassroomGradesPanel` ([`#44`](https://github.com/Agustin742/integratec-final-front/issues/44)
+teacher grading queue, submission viewer, and grading/regrading workflow for `publish_content`-authorized staff, while showing the honest pending state to students and parents — see the [grading feature doc](./classroom-grading.md)),
 `notices` renders `NoticeBoardPanel` ([`#49`](https://github.com/Agustin742/integratec-final-front/issues/49)),
 `grades` renders `GradesPanel` ([`#46`](https://github.com/Agustin742/integratec-final-front/issues/46),
 see the [grades guide](./ui-grades.md)) and
@@ -27,17 +29,17 @@ to action capabilities. Actions still require their own server checks. This
 frontend decision does not change the backend permission matrix or remotely edit
 the issue; team acceptance of the reconciled criterion remains part of PR review.
 
-| Registered key | Title                                                |
-| -------------- | ---------------------------------------------------- |
-| `activities`   | Actividades (`ActivitiesPanel`, `#41` + `#39`)       |
-| `material`     | Material (`MaterialPanel`, `#40`)                    |
-| `grades`       | Calificaciones (`GradesPanel`, `#46`)                |
-| `chat`         | Chat                                                 |
-| `notices`      | Avisos (`NoticeBoardPanel`, `#49`)                   |
-| `shop`         | Tienda                                               |
-| `bot`          | Asistente de estudio                                 |
-| `members`      | Integrantes (`ClassroomMembersPanel`, `#33` + `#32`) |
-| `settings`     | Configuración                                        |
+| Registered key | Title                                                  |
+| -------------- | ------------------------------------------------------ |
+| `activities`   | Actividades (`ActivitiesPanel`, `#41` + `#39`)         |
+| `material`     | Material (`MaterialPanel`, `#40`)                      |
+| `grades`       | Calificaciones (`ClassroomGradesPanel`, `#44` + `#46`) |
+| `chat`         | Chat                                                   |
+| `notices`      | Avisos (`NoticeBoardPanel`, `#49`)                     |
+| `shop`         | Tienda                                                 |
+| `bot`          | Asistente de estudio                                   |
+| `members`      | Integrantes (`ClassroomMembersPanel`, `#33` + `#32`)   |
+| `settings`     | Configuración                                          |
 
 `pet` is reserved and never emitted by the current backend contract. It remains
 unregistered and inaccessible even if a malformed response lists it. Unknown

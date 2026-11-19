@@ -1,8 +1,8 @@
 import type { components } from '@/api/schema.generated';
 import { EmptyState } from '@/components/feedback/states';
 import { ActivitiesPanel } from '../activities/activities-panel';
-import { GradesPanel } from '../grades/grades-panel';
 import { NoticeBoardPanel } from '../announcements/notice-board-panel';
+import { ClassroomGradesPanel } from '../grading/classroom-grades-panel';
 import { MaterialPanel } from '../materials/material-panel';
 import { ClassroomMembersPanel } from '../classroom-members-panel';
 import { classroomMessages as messages } from '../messages';
@@ -39,7 +39,7 @@ export const classroomPanelCatalog = [
   {
     key: 'grades',
     title: messages.panels.grades,
-    component: GradesPanel,
+    component: ClassroomGradesPanel,
   },
   entry('chat'),
   {

@@ -4157,6 +4157,612 @@ export function createNotificationsStore(
   };
 }
 
+export interface GradingStoreFile {
+  readonly id: string;
+  readonly originalName: string;
+  readonly contentType: string;
+  readonly sizeBytes: number;
+  readonly position: number;
+  readonly downloadUrl?: string;
+  readonly downloadUrlExpiresAt?: string;
+}
+
+export interface GradingStoreGrade {
+  readonly id: string;
+  readonly graderId: string;
+  readonly score: number;
+  readonly feedback: string;
+  readonly pointsAwarded: number;
+  readonly pointTransactionId: string | null;
+  readonly version: number;
+  readonly gradedAt: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface GradingStoreSubmission {
+  readonly id: string;
+  readonly classroomId: string;
+  readonly activityId: string;
+  readonly activityTitle: string;
+  readonly activityType: 'TP' | 'EXAM';
+  readonly activityFormat?: 'FILE' | 'MULTIPLE_CHOICE';
+  readonly maxScore?: number;
+  readonly weightMultiplier?: number;
+  readonly studentId: string;
+  readonly studentDisplayName: string;
+  readonly submittedAt: string;
+  readonly isLate: boolean;
+  readonly studentActive?: boolean;
+  readonly files: readonly GradingStoreFile[];
+  readonly grade: GradingStoreGrade | null;
+}
+
+export type GradingStoreOp =
+  'queue' | 'detail' | 'getGrade' | 'grade' | 'regrade';
+
+export type GradingStoreFailure =
+  MswErrorResponseSpec | 'network' | 'drop-response' | 'malformed-2xx';
+
+export interface ClassroomGradingStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId: string;
+  readonly graderId?: string;
+  readonly initialSubmissions?: readonly GradingStoreSubmission[];
+  readonly allowedRoles?: readonly string[];
+  readonly role?: string;
+}
+
+export interface ClassroomGradingStore {
+  readonly handlers: readonly HttpHandler[];
+  getSubmissions: () => readonly GradingStoreSubmission[];
+  setRole: (role: string) => void;
+  setGradeExternally: (submissionId: string, grade: GradingStoreGrade) => void;
+  removeSubmission: (submissionId: string) => void;
+  failNext: (op: GradingStoreOp, failure: GradingStoreFailure) => void;
+  getCounts: () => Record<GradingStoreOp, number>;
+}
+
+/**
+ * Stateful contract-faithful MSW store for teacher grading (`HU-ACT-004`,
+ * backend D18): `GET /classrooms/:id/submissions`, `GET /submissions/:id`, and
+ * `GET`/`POST`/`PATCH /submissions/:id/grade`.
+ */
+export function createClassroomGradingStore(
+  options: ClassroomGradingStoreOptions,
+): ClassroomGradingStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const graderId = options.graderId ?? '00000000-0000-4000-8000-000000000001';
+  let currentRole = options.role ?? 'TEACHER';
+  const staffRoles = new Set(
+    options.allowedRoles ?? ['SCHOOL_OWNER', 'ADMIN', 'TEACHER'],
+  );
+
+  let submissions: GradingStoreSubmission[] = [
+    ...(options.initialSubmissions ?? []),
+  ];
+  let linkGeneration = 0;
+  let gradeSequence = 100;
+  const pending: Partial<Record<GradingStoreOp, GradingStoreFailure>> = {};
+  const counts: Record<GradingStoreOp, number> = {
+    queue: 0,
+    detail: 0,
+    getGrade: 0,
+    grade: 0,
+    regrade: 0,
+  };
+
+  const computeServerPoints = (score: number, weightMultiplier = 1): number =>
+    Math.max(0, Math.round(score * weightMultiplier));
+
+  const consumeFailure = (
+    op: GradingStoreOp,
+  ): GradingStoreFailure | undefined => {
+    const failure = pending[op];
+    pending[op] = undefined;
+    return failure;
+  };
+
+  const respondFailure = (failure: GradingStoreFailure): Response => {
+    if (failure === 'network' || failure === 'drop-response') {
+      return HttpResponse.error();
+    }
+    if (failure === 'malformed-2xx') {
+      return HttpResponse.json({ unexpected: true }, { status: 200 });
+    }
+    return createErrorEnvelopeResponse(failure.status, failure.body);
+  };
+
+  return {
+    getSubmissions: () => submissions,
+    setRole: (role) => {
+      currentRole = role;
+    },
+    setGradeExternally: (submissionId, grade) => {
+      submissions = submissions.map((item) =>
+        item.id === submissionId ? { ...item, grade } : item,
+      );
+    },
+    removeSubmission: (submissionId) => {
+      submissions = submissions.filter((item) => item.id !== submissionId);
+    },
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    getCounts: () => ({ ...counts }),
+    handlers: [
+      http.get(
+        `${baseUrl}/classrooms/:id/submissions`,
+        ({ params, request }) => {
+          counts.queue += 1;
+          const failure = consumeFailure('queue');
+          if (failure !== undefined) {
+            return respondFailure(failure);
+          }
+
+          const requestedClassroomId = String(params.id ?? '');
+          if (requestedClassroomId !== options.classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-grading-queue-404',
+            });
+          }
+
+          if (!staffRoles.has(currentRole)) {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Staff role required.',
+              correlationId: 'req-grading-queue-403',
+            });
+          }
+
+          const url = new URL(request.url);
+          const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+          const pageSize = Math.min(
+            100,
+            Math.max(1, Number(url.searchParams.get('pageSize') ?? '20')),
+          );
+          const activityId = url.searchParams.get('activityId') ?? '';
+          const state = url.searchParams.get('state') ?? '';
+          const sort = url.searchParams.get('sort') ?? 'submittedAt';
+
+          let filtered = submissions.filter(
+            (item) =>
+              item.classroomId === requestedClassroomId &&
+              item.studentActive !== false,
+          );
+          if (activityId) {
+            filtered = filtered.filter(
+              (item) => item.activityId === activityId,
+            );
+          }
+          if (state === 'submitted') {
+            filtered = filtered.filter((item) => item.grade === null);
+          } else if (state === 'graded') {
+            filtered = filtered.filter((item) => item.grade !== null);
+          }
+
+          const sorted = [...filtered].sort((a, b) => {
+            if (sort === '-submittedAt') {
+              const diff =
+                Date.parse(b.submittedAt) - Date.parse(a.submittedAt);
+              return diff !== 0 ? diff : a.id.localeCompare(b.id);
+            }
+            if (sort === 'gradedAt' || sort === '-gradedAt') {
+              const aGraded = a.grade ? Date.parse(a.grade.gradedAt) : null;
+              const bGraded = b.grade ? Date.parse(b.grade.gradedAt) : null;
+              if (aGraded === null && bGraded === null) {
+                return a.id.localeCompare(b.id);
+              }
+              if (aGraded === null) return 1;
+              if (bGraded === null) return -1;
+              const diff =
+                sort === '-gradedAt' ? bGraded - aGraded : aGraded - bGraded;
+              return diff !== 0 ? diff : a.id.localeCompare(b.id);
+            }
+            const diff = Date.parse(a.submittedAt) - Date.parse(b.submittedAt);
+            return diff !== 0 ? diff : a.id.localeCompare(b.id);
+          });
+
+          const start = (page - 1) * pageSize;
+          const items = sorted.slice(start, start + pageSize).map((item) => ({
+            id: item.id,
+            activityId: item.activityId,
+            activityTitle: item.activityTitle,
+            activityType: item.activityType,
+            studentId: item.studentId,
+            studentDisplayName: item.studentDisplayName,
+            submittedAt: item.submittedAt,
+            isLate: item.isLate,
+            status: item.grade ? ('graded' as const) : ('submitted' as const),
+            fileCount: item.files.length,
+            grade: item.grade
+              ? {
+                  id: item.grade.id,
+                  graderId: item.grade.graderId,
+                  score: item.grade.score,
+                  feedback: item.grade.feedback,
+                  pointsAwarded: item.grade.pointsAwarded,
+                  version: item.grade.version,
+                  gradedAt: item.grade.gradedAt,
+                }
+              : null,
+          }));
+
+          return HttpResponse.json({
+            items,
+            page,
+            pageSize,
+            total: sorted.length,
+          });
+        },
+      ),
+      http.get(`${baseUrl}/submissions/:submissionId`, ({ params }) => {
+        counts.detail += 1;
+        const failure = consumeFailure('detail');
+        if (failure !== undefined) {
+          return respondFailure(failure);
+        }
+
+        const submission = submissions.find(
+          (item) =>
+            item.id === params.submissionId &&
+            item.classroomId === options.classroomId,
+        );
+        if (!submission || !staffRoles.has(currentRole)) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Submission not found.',
+            correlationId: 'req-submission-detail-404',
+          });
+        }
+
+        linkGeneration += 1;
+        return HttpResponse.json(
+          {
+            id: submission.id,
+            activityId: submission.activityId,
+            submittedAt: submission.submittedAt,
+            isLate: submission.isLate,
+            status: submission.grade ? 'graded' : 'submitted',
+            files: submission.files.map((file) => ({
+              id: file.id,
+              originalName: file.originalName,
+              contentType: file.contentType,
+              sizeBytes: file.sizeBytes,
+              position: file.position,
+              downloadUrl:
+                file.downloadUrl ??
+                `https://storage.example.invalid/signed/${submission.id}/${file.id}?sig=v${linkGeneration}`,
+              downloadUrlExpiresAt:
+                file.downloadUrlExpiresAt ?? '2026-11-19T18:00:00.000Z',
+            })),
+          },
+          { headers: { 'Cache-Control': 'no-store' } },
+        );
+      }),
+      http.get(`${baseUrl}/submissions/:submissionId/grade`, ({ params }) => {
+        counts.getGrade += 1;
+        const failure = consumeFailure('getGrade');
+        if (failure !== undefined) {
+          return respondFailure(failure);
+        }
+
+        const submission = submissions.find(
+          (item) =>
+            item.id === params.submissionId &&
+            item.classroomId === options.classroomId,
+        );
+        if (!submission || !submission.grade) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Grade not found.',
+            correlationId: 'req-grade-get-404',
+          });
+        }
+        return HttpResponse.json({
+          ...submission.grade,
+          submissionId: submission.id,
+          activityId: submission.activityId,
+          studentId: submission.studentId,
+        });
+      }),
+      http.post(
+        `${baseUrl}/submissions/:submissionId/grade`,
+        async ({ params, request }) => {
+          counts.grade += 1;
+          const failure = consumeFailure('grade');
+          if (
+            failure !== undefined &&
+            failure !== 'drop-response' &&
+            failure !== 'malformed-2xx'
+          ) {
+            return respondFailure(failure);
+          }
+
+          if (!staffRoles.has(currentRole)) {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Staff role required.',
+              correlationId: 'req-grade-post-403',
+            });
+          }
+
+          const submission = submissions.find(
+            (item) =>
+              item.id === params.submissionId &&
+              item.classroomId === options.classroomId,
+          );
+          if (!submission) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Submission not found.',
+              correlationId: 'req-grade-post-404',
+            });
+          }
+          if (submission.activityFormat === 'MULTIPLE_CHOICE') {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message: 'Only file submissions can be graded manually.',
+              details: [
+                {
+                  field: 'activity',
+                  messages: ['Only file submissions can be graded manually'],
+                },
+              ],
+              correlationId: 'req-grade-post-409-activity',
+            });
+          }
+          if (submission.grade !== null || submission.studentActive === false) {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message: 'Submission cannot be graded.',
+              details: [
+                {
+                  field: 'submission',
+                  messages: ['Submission already graded or student inactive'],
+                },
+              ],
+              correlationId: 'req-grade-post-409-submission',
+            });
+          }
+
+          const body = (await request.json()) as {
+            score?: unknown;
+            feedback?: unknown;
+          };
+          const maxScore = submission.maxScore ?? 100;
+          if (
+            typeof body.score !== 'number' ||
+            !Number.isInteger(body.score) ||
+            body.score < 0 ||
+            body.score > 100 ||
+            body.score > maxScore
+          ) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid score.',
+              details: [
+                {
+                  field: 'score',
+                  messages: [
+                    `Score must be an integer between 0 and ${maxScore}`,
+                  ],
+                },
+              ],
+              correlationId: 'req-grade-post-400-score',
+            });
+          }
+          if (
+            typeof body.feedback !== 'string' ||
+            body.feedback.trim().length === 0 ||
+            /[\p{Cc}\p{Zl}\p{Zp}]/u.test(body.feedback)
+          ) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid feedback.',
+              details: [
+                {
+                  field: 'feedback',
+                  messages: ['Feedback must be visible single-line text'],
+                },
+              ],
+              correlationId: 'req-grade-post-400-feedback',
+            });
+          }
+
+          gradeSequence += 1;
+          const now = '2026-11-18T16:30:00.000Z';
+          const nextGrade: GradingStoreGrade = {
+            id: `00000000-0000-4000-8000-00000000${String(gradeSequence).padStart(4, '0')}`,
+            graderId,
+            score: body.score,
+            feedback: body.feedback.trim(),
+            pointsAwarded: computeServerPoints(
+              body.score,
+              submission.weightMultiplier ?? 1,
+            ),
+            pointTransactionId: `00000000-0000-4000-8000-10000000${String(gradeSequence).padStart(4, '0')}`,
+            version: 1,
+            gradedAt: now,
+            createdAt: now,
+            updatedAt: now,
+          };
+
+          submissions = submissions.map((item) =>
+            item.id === submission.id ? { ...item, grade: nextGrade } : item,
+          );
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+          if (failure === 'malformed-2xx') {
+            return HttpResponse.json({ broken: true }, { status: 201 });
+          }
+
+          return HttpResponse.json(
+            {
+              ...nextGrade,
+              submissionId: submission.id,
+              activityId: submission.activityId,
+              studentId: submission.studentId,
+            },
+            { status: 201 },
+          );
+        },
+      ),
+      http.patch(
+        `${baseUrl}/submissions/:submissionId/grade`,
+        async ({ params, request }) => {
+          counts.regrade += 1;
+          const failure = consumeFailure('regrade');
+          if (
+            failure !== undefined &&
+            failure !== 'drop-response' &&
+            failure !== 'malformed-2xx'
+          ) {
+            return respondFailure(failure);
+          }
+
+          if (!staffRoles.has(currentRole)) {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Staff role required.',
+              correlationId: 'req-grade-patch-403',
+            });
+          }
+
+          const submission = submissions.find(
+            (item) =>
+              item.id === params.submissionId &&
+              item.classroomId === options.classroomId,
+          );
+          if (!submission || !submission.grade) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Grade not found.',
+              correlationId: 'req-grade-patch-404',
+            });
+          }
+          if (submission.studentActive === false) {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message: 'Student is no longer active.',
+              details: [
+                {
+                  field: 'submission',
+                  messages: ['Student is no longer active in classroom'],
+                },
+              ],
+              correlationId: 'req-grade-patch-409-submission',
+            });
+          }
+
+          const body = (await request.json()) as {
+            score?: unknown;
+            feedback?: unknown;
+            version?: unknown;
+          };
+
+          if (body.version !== submission.grade.version) {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message: 'Grade version mismatch.',
+              details: [
+                {
+                  field: 'version',
+                  messages: ['Grade was modified by another request'],
+                },
+              ],
+              correlationId: 'req-grade-patch-409-version',
+            });
+          }
+
+          const maxScore = submission.maxScore ?? 100;
+          if (
+            typeof body.score !== 'number' ||
+            !Number.isInteger(body.score) ||
+            body.score < 0 ||
+            body.score > 100 ||
+            (body.score !== submission.grade.score && body.score > maxScore)
+          ) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid score.',
+              details: [
+                {
+                  field: 'score',
+                  messages: [
+                    `Score must be an integer between 0 and ${maxScore}`,
+                  ],
+                },
+              ],
+              correlationId: 'req-grade-patch-400-score',
+            });
+          }
+          if (
+            typeof body.feedback !== 'string' ||
+            body.feedback.trim().length === 0 ||
+            /[\p{Cc}\p{Zl}\p{Zp}]/u.test(body.feedback)
+          ) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid feedback.',
+              details: [
+                {
+                  field: 'feedback',
+                  messages: ['Feedback must be visible single-line text'],
+                },
+              ],
+              correlationId: 'req-grade-patch-400-feedback',
+            });
+          }
+
+          const trimmedFeedback = body.feedback.trim();
+          const unchanged =
+            body.score === submission.grade.score &&
+            trimmedFeedback === submission.grade.feedback;
+
+          const now = '2026-11-18T17:15:00.000Z';
+          const nextGrade: GradingStoreGrade = unchanged
+            ? submission.grade
+            : {
+                ...submission.grade,
+                score: body.score,
+                feedback: trimmedFeedback,
+                pointsAwarded: computeServerPoints(
+                  body.score,
+                  submission.weightMultiplier ?? 1,
+                ),
+                version: submission.grade.version + 1,
+                gradedAt: now,
+                updatedAt: now,
+              };
+
+          submissions = submissions.map((item) =>
+            item.id === submission.id ? { ...item, grade: nextGrade } : item,
+          );
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+          if (failure === 'malformed-2xx') {
+            return HttpResponse.json({ broken: true }, { status: 200 });
+          }
+
+          return HttpResponse.json({
+            ...nextGrade,
+            submissionId: submission.id,
+            activityId: submission.activityId,
+            studentId: submission.studentId,
+          });
+        },
+      ),
+    ],
+  };
+}
+
 export const defaultHandlers: readonly HttpHandler[] = [
   createHealthHandler(),
   http.get(`${TEST_API_BASE_URL}/notifications`, () =>

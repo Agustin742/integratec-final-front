@@ -86,8 +86,16 @@ function setup(
             total: 0,
           });
         }
-        // The default catalog maps `grades` to GradesPanel (#46); the
-        // TEACHER context below reads the classroom activity metrics.
+        if (url.pathname.endsWith('/submissions')) {
+          return Response.json({
+            items: [],
+            page: 1,
+            pageSize: 10,
+            total: 0,
+          });
+        }
+        // The default catalog maps `grades` to ClassroomGradesPanel (#44 + #46);
+        // the TEACHER context without publish_content reads classroom metrics.
         if (url.pathname.endsWith('/activity-metrics')) {
           return Response.json({
             items: [],
@@ -230,6 +238,18 @@ test('default catalog opens members with tabs when invite_members is granted', a
   expect(
     await screen.findByRole('heading', { name: 'Código de acceso al aula' }),
   ).toBeVisible();
+});
+
+test('default catalog opens grades with teacher grading queue when publish_content is granted', async () => {
+  setup(['grades'], '/classrooms/a/panels/grades', true, ['publish_content']);
+  const dialog = await screen.findByRole('dialog', { name: 'Calificaciones' });
+  expect(
+    await within(dialog).findByRole('heading', { name: 'Cola de corrección' }),
+  ).toBeVisible();
+  expect(
+    await within(dialog).findByText('Todavía no hay entregas para revisar'),
+  ).toBeVisible();
+  expect(dialog).not.toHaveTextContent('Funcionalidad pendiente');
 });
 
 test('default catalog opens grades by URL with the GradesPanel teacher view', async () => {
