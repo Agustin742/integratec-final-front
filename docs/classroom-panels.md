@@ -16,8 +16,9 @@ see the [grades guide](./ui-grades.md)) and
 `members` renders `ClassroomMembersPanel`
 ([`HU-AUL-003`](https://github.com/Agustin742/integratec-final-front/issues/33)
 `ClassroomRosterPanel` and capability-gated [`HU-AUL-002`](https://github.com/Agustin742/integratec-final-front/issues/32)
-`ClassroomInvitationsPanel` for `invite_members`-authorized email invitations and one-time classroom join codes), while the remaining
-four entries display the shared, honest “Funcionalidad pendiente” state until
+`ClassroomInvitationsPanel` for `invite_members`-authorized email invitations and one-time classroom join codes), and
+`bot` renders `StudyGuideBotPanel` ([#54](https://github.com/Agustin742/integratec-final-front/issues/54)), while the remaining
+three entries display the shared, honest “Funcionalidad pendiente” state until
 their respective stories land.
 
 ## Approved scope reconciliation
@@ -37,7 +38,7 @@ the issue; team acceptance of the reconciled criterion remains part of PR review
 | `chat`         | Chat                                                   |
 | `notices`      | Avisos (`NoticeBoardPanel`, `#49`)                     |
 | `shop`         | Tienda                                                 |
-| `bot`          | Asistente de estudio                                   |
+| `bot`          | Asistente de estudio (`StudyGuideBotPanel`, `#54`)     |
 | `members`      | Integrantes (`ClassroomMembersPanel`, `#33` + `#32`)   |
 | `settings`     | Configuración                                          |
 

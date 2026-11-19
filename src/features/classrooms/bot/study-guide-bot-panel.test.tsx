@@ -1,6 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import axe from 'axe-core';
+import { http, HttpResponse } from 'msw';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -51,13 +52,16 @@ function renderBotPanel(options: { readonly role?: Role } = {}) {
     { initialEntries: [`/classrooms/${CLASSROOM_ID}`] },
   );
 
-  return render(
-    <ApiQueryProvider client={queryClient}>
-      <SessionProvider service={session.service}>
-        <RouterProvider router={router} />
-      </SessionProvider>
-    </ApiQueryProvider>,
-  );
+  return {
+    queryClient,
+    ...render(
+      <ApiQueryProvider client={queryClient}>
+        <SessionProvider service={session.service}>
+          <RouterProvider router={router} />
+        </SessionProvider>
+      </ApiQueryProvider>,
+    ),
+  };
 }
 
 describe('StudyGuideBotPanel (HU-BOT-002)', () => {
@@ -196,5 +200,96 @@ describe('StudyGuideBotPanel (HU-BOT-002)', () => {
     expect(
       screen.queryByLabelText('Tu consulta para el asistente'),
     ).not.toBeInTheDocument();
+  });
+
+  it('shows exam-specific reason on 409/423 (never generic conflict), aborts in-flight answer when status turns exam_in_progress, and hides denied content on 403 status refetch', async () => {
+    let releaseAsk: (() => void) | undefined;
+    const store = createClassroomBotStore({
+      classroomId: CLASSROOM_ID,
+      onAsk: async () => {
+        await new Promise<void>((resolve) => {
+          releaseAsk = resolve;
+        });
+        return { answer: 'Respuesta que no debe mostrarse' };
+      },
+    });
+    mswServer.use(...store.handlers);
+
+    const { queryClient } = renderBotPanel({ role: 'STUDENT' });
+
+    // Empty state + client validation (F-06)
+    expect(
+      await screen.findByText('Todavía no hiciste consultas en esta sesión'),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar consulta' }));
+    expect(
+      await screen.findByText('Escribí una consulta antes de enviar.'),
+    ).toBeInTheDocument();
+
+    // In-flight 409 shows examLockedDefault, never generic conflict (F-01)
+    const composer = screen.getByLabelText('Tu consulta para el asistente');
+    fireEvent.change(composer, {
+      target: { value: 'Consulta durante examen' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar consulta' }));
+    await waitFor(() => {
+      expect(releaseAsk).toBeDefined();
+    });
+    store.setExamLocked(true);
+    releaseAsk?.();
+
+    expect(
+      await screen.findByText('Asistente pausado durante el examen'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'El asistente no está disponible mientras tenés un examen en curso según el servidor.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/La operación entra en conflicto/),
+    ).not.toBeInTheDocument();
+
+    // Status refetch returning 403 hides cached content instead of StaleDataNotice (F-03)
+    mswServer.use(
+      http.get(`${TEST_API_BASE_URL}/classrooms/:id/bot/status`, () =>
+        HttpResponse.json(
+          {
+            code: 'FORBIDDEN',
+            message: 'Forbidden',
+            correlationId: 'req-bot-status-403',
+          },
+          { status: 403 },
+        ),
+      ),
+    );
+    await queryClient.refetchQueries();
+    expect(
+      await screen.findByText('Sin permiso para consultar el asistente'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Tu consulta para el asistente'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows unavailableTitle with fallback description when status is no_materials with empty message', async () => {
+    const store = createClassroomBotStore({
+      classroomId: CLASSROOM_ID,
+      initialAvailable: false,
+      initialReason: 'no_materials',
+      initialMessage: '',
+    });
+    mswServer.use(...store.handlers);
+
+    renderBotPanel({ role: 'STUDENT' });
+
+    expect(
+      await screen.findByText('Asistente no disponible'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'El asistente de estudio no está disponible en este momento para esta aula.',
+      ),
+    ).toBeInTheDocument();
   });
 });

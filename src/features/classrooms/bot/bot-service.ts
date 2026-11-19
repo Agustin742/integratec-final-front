@@ -79,11 +79,13 @@ function classifyBotError(error: unknown): BotServiceError {
   }
 
   if (error.status === 409 || error.status === 423) {
+    const detailText = error.details
+      .flatMap((detail) => detail.messages)
+      .join(' ')
+      .trim();
     return new BotServiceError(
       'exam_locked',
-      error.userMessage.trim().length > 0
-        ? error.userMessage
-        : botMessages.examLockedDefault,
+      detailText.length > 0 ? detailText : botMessages.examLockedDefault,
       error,
     );
   }
@@ -96,7 +98,12 @@ function classifyBotError(error: unknown): BotServiceError {
     );
   }
 
-  if (error.status === 502 || error.status === 503 || error.status === 504) {
+  if (
+    error.status === 502 ||
+    error.status === 503 ||
+    error.status === 504 ||
+    error.code === 'SERVICE_UNAVAILABLE'
+  ) {
     return new BotServiceError(
       'provider_unavailable',
       botMessages.errors.providerUnavailableDescription,

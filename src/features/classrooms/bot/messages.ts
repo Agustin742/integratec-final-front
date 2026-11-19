@@ -15,6 +15,7 @@ export const botMessages = {
   examLockedTitle: 'Asistente pausado durante el examen',
   examLockedDefault:
     'El asistente no está disponible mientras tenés un examen en curso según el servidor.',
+  unavailableTitle: 'Asistente no disponible',
   unavailableDefault:
     'El asistente de estudio no está disponible en este momento para esta aula.',
   emptyHistoryTitle: 'Todavía no hiciste consultas en esta sesión',
@@ -44,6 +45,7 @@ export const botMessages = {
     forbiddenTitle: 'Sin permiso para consultar el asistente',
     forbiddenDescription:
       'No tenés permiso para usar el asistente de estudio en esta aula.',
+    notFoundTitle: 'Aula o asistente no disponible',
     notFoundDescription:
       'No encontramos esta aula o el recurso ya no está disponible.',
     networkDescription:

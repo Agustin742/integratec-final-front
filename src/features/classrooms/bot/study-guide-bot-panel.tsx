@@ -110,6 +110,7 @@ function StudyGuideBotConversation({
 
   const sendingRef = useRef(false);
   const activeAbortRef = useRef<AbortController | null>(null);
+  const terminalReconciledRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -122,7 +123,56 @@ function StudyGuideBotConversation({
     queryKey: classroomBotStatusQueryKey(userId, classroomId),
     queryFn: ({ signal }) =>
       fetchClassroomBotStatus(client, classroomId, { signal }),
+    staleTime: 0,
+    gcTime: 0,
   });
+
+  const isTerminalStatusError =
+    statusQuery.isError &&
+    statusQuery.error instanceof BotServiceError &&
+    (statusQuery.error.category === 'forbidden' ||
+      statusQuery.error.category === 'not_found');
+
+  const isExamLocked =
+    statusQuery.data !== undefined &&
+    !statusQuery.data.available &&
+    statusQuery.data.reason === 'exam_in_progress';
+
+  useEffect(() => {
+    if (isExamLocked || isTerminalStatusError) {
+      activeAbortRef.current?.abort();
+      activeAbortRef.current = null;
+      sendingRef.current = false;
+    }
+  }, [isExamLocked, isTerminalStatusError]);
+
+  useEffect(() => {
+    if (!isTerminalStatusError) {
+      terminalReconciledRef.current = false;
+      return;
+    }
+    if (!terminalReconciledRef.current) {
+      terminalReconciledRef.current = true;
+      void queryClient.invalidateQueries({
+        queryKey: classroomDetailQueryKey(userId, classroomId),
+      });
+    }
+  }, [classroomId, isTerminalStatusError, queryClient, userId]);
+
+  if (isTerminalStatusError) {
+    const terminalError = statusQuery.error as BotServiceError;
+    return (
+      <ErrorState
+        headingLevel="h3"
+        title={
+          terminalError.category === 'forbidden'
+            ? botMessages.errors.forbiddenTitle
+            : botMessages.errors.notFoundTitle
+        }
+        description={terminalError.message}
+      />
+    );
+  }
 
   if (statusQuery.isPending && statusQuery.data === undefined) {
     return <LoadingState label={botMessages.loading} />;
@@ -130,7 +180,8 @@ function StudyGuideBotConversation({
 
   if (statusQuery.isError && statusQuery.data === undefined) {
     const description =
-      statusQuery.error instanceof Error
+      statusQuery.error instanceof BotServiceError ||
+      statusQuery.error instanceof ApiError
         ? statusQuery.error.message
         : botMessages.loadErrorDescription;
     return (
@@ -148,9 +199,12 @@ function StudyGuideBotConversation({
     return <LoadingState label={botMessages.loading} />;
   }
 
-  const isExamLocked =
-    !botStatus.available && botStatus.reason === 'exam_in_progress';
   const isUnavailable = !botStatus.available;
+  const effectiveIsSending = isSending && !isUnavailable;
+  const statusMessage =
+    typeof botStatus.message === 'string' && botStatus.message.trim().length > 0
+      ? botStatus.message.trim()
+      : null;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -186,6 +240,13 @@ function StudyGuideBotConversation({
       });
       if (controller.signal.aborted) return;
 
+      const latestStatus = queryClient.getQueryData<BotStatusDto>(
+        classroomBotStatusQueryKey(userId, classroomId),
+      );
+      if (latestStatus && !latestStatus.available) {
+        return;
+      }
+
       setTurns((prev) => [
         ...prev,
         {
@@ -213,10 +274,7 @@ function StudyGuideBotConversation({
               message: error.message,
             },
           );
-          setSendNotice({
-            title: botMessages.errors.examLockedTitle,
-            description: error.message,
-          });
+          setSendNotice(null);
           return;
         }
         if (error.category === 'rate_limited') {
@@ -235,7 +293,10 @@ function StudyGuideBotConversation({
         }
         if (error.category === 'forbidden' || error.category === 'not_found') {
           setSendNotice({
-            title: botMessages.errors.forbiddenTitle,
+            title:
+              error.category === 'forbidden'
+                ? botMessages.errors.forbiddenTitle
+                : botMessages.errors.notFoundTitle,
             description: error.message,
           });
           void queryClient.invalidateQueries({
@@ -285,10 +346,10 @@ function StudyGuideBotConversation({
           <AlertTitle>
             {isExamLocked
               ? botMessages.examLockedTitle
-              : botMessages.loadErrorTitle}
+              : botMessages.unavailableTitle}
           </AlertTitle>
           <AlertDescription>
-            {botStatus.message ??
+            {statusMessage ??
               (isExamLocked
                 ? botMessages.examLockedDefault
                 : botMessages.unavailableDefault)}
@@ -303,81 +364,83 @@ function StudyGuideBotConversation({
         </Alert>
       )}
 
-      <section aria-label={botMessages.conversationRegionLabel}>
-        {turns.length === 0 ? (
-          <EmptyState
-            title={botMessages.emptyHistoryTitle}
-            description={botMessages.emptyHistoryDescription}
-          />
-        ) : (
-          <ul className="space-y-4">
-            {turns.map((turn) => (
-              <li
-                key={turn.id}
-                className="min-w-0 space-y-3 rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-sm"
-              >
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold text-muted-foreground">
-                    {botMessages.userAuthorLabel}
-                  </p>
-                  <p className="text-sm text-foreground wrap-anywhere">
-                    {turn.question}
-                  </p>
-                </div>
-
-                <div className="space-y-2 border-t border-border/60 pt-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-xs font-semibold text-primary">
-                      {botMessages.botAuthorLabel}
+      {!isExamLocked && (
+        <section aria-label={botMessages.conversationRegionLabel}>
+          {turns.length === 0 ? (
+            <EmptyState
+              title={botMessages.emptyHistoryTitle}
+              description={botMessages.emptyHistoryDescription}
+            />
+          ) : (
+            <ul className="space-y-4">
+              {turns.map((turn) => (
+                <li
+                  key={turn.id}
+                  className="min-w-0 space-y-3 rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-sm"
+                >
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground">
+                      {botMessages.userAuthorLabel}
                     </p>
-                    {turn.reply.outcome === 'out_of_scope' && (
-                      <Badge variant="outline">
-                        {botMessages.outOfScopeBadge}
-                      </Badge>
-                    )}
-                    {turn.reply.outcome === 'guided_only' && (
-                      <Badge variant="secondary">
-                        {botMessages.guidedOnlyBadge}
-                      </Badge>
-                    )}
+                    <p className="text-sm text-foreground wrap-anywhere">
+                      {turn.question}
+                    </p>
                   </div>
 
-                  <p className="whitespace-pre-line text-sm text-foreground wrap-anywhere">
-                    {turn.reply.answer}
-                  </p>
-
-                  {turn.reply.citations.length > 0 && (
-                    <div className="space-y-1.5 rounded-xl bg-muted/50 p-3">
-                      <p className="text-xs font-semibold text-muted-foreground">
-                        {botMessages.citationsLabel}
+                  <div className="space-y-2 border-t border-border/60 pt-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-xs font-semibold text-primary">
+                        {botMessages.botAuthorLabel}
                       </p>
-                      <ul className="space-y-1">
-                        {turn.reply.citations.map((citation) => (
-                          <li
-                            key={`${turn.id}-${citation.materialId}`}
-                            className="text-xs text-foreground wrap-anywhere"
-                          >
-                            <span className="font-medium">
-                              {citation.filename}
-                            </span>
-                            {typeof citation.excerpt === 'string' &&
-                              citation.excerpt.length > 0 && (
-                                <span className="text-muted-foreground">
-                                  {' — '}
-                                  {citation.excerpt}
-                                </span>
-                              )}
-                          </li>
-                        ))}
-                      </ul>
+                      {turn.reply.outcome === 'out_of_scope' && (
+                        <Badge variant="outline">
+                          {botMessages.outOfScopeBadge}
+                        </Badge>
+                      )}
+                      {turn.reply.outcome === 'guided_only' && (
+                        <Badge variant="secondary">
+                          {botMessages.guidedOnlyBadge}
+                        </Badge>
+                      )}
                     </div>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+
+                    <p className="whitespace-pre-line text-sm text-foreground wrap-anywhere">
+                      {turn.reply.answer}
+                    </p>
+
+                    {turn.reply.citations.length > 0 && (
+                      <div className="space-y-1.5 rounded-xl bg-muted/50 p-3">
+                        <p className="text-xs font-semibold text-muted-foreground">
+                          {botMessages.citationsLabel}
+                        </p>
+                        <ul className="space-y-1">
+                          {turn.reply.citations.map((citation, index) => (
+                            <li
+                              key={`${turn.id}-${citation.materialId}-${index}`}
+                              className="text-xs text-foreground wrap-anywhere"
+                            >
+                              <span className="font-medium">
+                                {citation.filename}
+                              </span>
+                              {typeof citation.excerpt === 'string' &&
+                                citation.excerpt.length > 0 && (
+                                  <span className="text-muted-foreground">
+                                    {' — '}
+                                    {citation.excerpt}
+                                  </span>
+                                )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       <form
         onSubmit={(event) => void handleSubmit(event)}
@@ -395,7 +458,7 @@ function StudyGuideBotConversation({
             id="study-guide-bot-question"
             rows={3}
             value={question}
-            disabled={isUnavailable}
+            disabled={isUnavailable || effectiveIsSending}
             aria-invalid={fieldError !== null || undefined}
             aria-describedby={
               fieldError !== null ? 'study-guide-bot-field-error' : undefined
@@ -422,9 +485,11 @@ function StudyGuideBotConversation({
           <Button
             type="submit"
             disabled={isUnavailable}
-            aria-disabled={isSending || isUnavailable || undefined}
+            busy={effectiveIsSending}
           >
-            {isSending ? botMessages.sendingAction : botMessages.sendAction}
+            {effectiveIsSending
+              ? botMessages.sendingAction
+              : botMessages.sendAction}
           </Button>
         </div>
       </form>
