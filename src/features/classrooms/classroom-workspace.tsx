@@ -20,6 +20,10 @@ import { ErrorState, LoadingState } from '@/components/feedback/states';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { WalletIndicator } from '@/features/points/wallet-indicator';
 import { Button, buttonStyles } from '@/components/ui/button';
+import {
+  isEditableTarget,
+  isInteractionBlocked,
+} from '@/lib/input-arbitration';
 import { useSessionCleanup, useSessionSnapshot } from '@/session/provider';
 import { Classroom2DLayout } from './classroom-2d-layout';
 import { Classroom3DStage, clearLoadedWorldAssets } from './classroom-3d-stage';
@@ -56,20 +60,6 @@ export function ClassroomWorkspace({
         <NotFoundPage />
       )}
     </div>
-  );
-}
-
-function isEditableShortcutTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-  if (target.isContentEditable) {
-    return true;
-  }
-  return (
-    target.closest(
-      'input, textarea, select, [contenteditable=""], [contenteditable="true"], [contenteditable="plaintext-only"]',
-    ) !== null
   );
 }
 
@@ -198,10 +188,10 @@ function WorkspaceContext({
       }
       const keyMatches =
         event.code === 'KeyM' || event.key.toLowerCase() === 'm';
-      if (!keyMatches || isEditableShortcutTarget(event.target)) {
+      if (!keyMatches || isEditableTarget(event.target)) {
         return;
       }
-      if (document.querySelector('[role="dialog"]') !== null) {
+      if (isInteractionBlocked()) {
         return;
       }
       event.preventDefault();

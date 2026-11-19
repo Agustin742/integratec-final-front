@@ -13,3 +13,15 @@ export {
   type PathFollow,
   type Waypoint,
 } from './pathfinding';
+export {
+  ARRIVE_RADIUS,
+  LocalAvatarController,
+  MAX_FRAME_SECONDS,
+  type LocalAvatarControllerOptions,
+  type StepResult,
+} from './local-avatar-controller';
+export {
+  useLocalAvatarController,
+  type LocalAvatarApi,
+  type UseLocalAvatarControllerOptions,
+} from './use-local-avatar-controller';
