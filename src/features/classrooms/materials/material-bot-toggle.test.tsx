@@ -1,5 +1,6 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import axe from 'axe-core';
+import { http, HttpResponse } from 'msw';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import {
@@ -246,5 +247,85 @@ describe('MaterialPanel HU-BOT-001', () => {
       );
     });
     expect(toggle).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('cancels overlapping bot-config GETs on toggle, preserves focus while toggling, and handles 403/500 config errors without unbounded polling', async () => {
+    const store = createClassroomMaterialsStore({
+      classroomId: CLASSROOM_ID,
+      initialItems: [BASE_ITEM],
+    });
+    mswServer.use(...store.handlers);
+
+    let releaseDelayedGet: (() => void) | undefined;
+    let botGetCalls = 0;
+    mswServer.use(
+      http.get(
+        `${TEST_API_BASE_URL}/classrooms/:id/bot/materials`,
+        async () => {
+          botGetCalls += 1;
+          if (botGetCalls === 2) {
+            await new Promise<void>((resolve) => {
+              releaseDelayedGet = resolve;
+            });
+            return HttpResponse.json({ items: [] });
+          }
+          return HttpResponse.json({ items: store.readBotStates() });
+        },
+      ),
+    );
+
+    const { queryClient } = renderPanel({ role: 'TEACHER' });
+    const toggle = await screen.findByRole('switch', {
+      name: /Habilitar «guia-bot-unidad-1\.pdf» para el asistente de estudio/,
+    });
+
+    // Trigger an overlapping GET and toggle while it is in flight (F-01).
+    const overlappingRefetch = queryClient.refetchQueries();
+    await waitFor(() => {
+      expect(releaseDelayedGet).toBeDefined();
+    });
+
+    toggle.focus();
+    expect(toggle).toHaveFocus();
+    fireEvent.click(toggle);
+
+    // Focus must remain on the switch while aria-disabled="true" (F-04).
+    expect(toggle).toHaveFocus();
+    expect(toggle).toHaveAttribute('aria-disabled', 'true');
+
+    expect(
+      await screen.findByText('Material habilitado para el asistente'),
+    ).toBeInTheDocument();
+    releaseDelayedGet?.();
+    await overlappingRefetch;
+
+    // Delayed pre-toggle GET must not overwrite confirmed state.
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText('Indexando…')).toBeInTheDocument();
+
+    // Terminal 403 on bot-config load disables switch without showing disabledHint (F-02, F-03).
+    mswServer.use(
+      http.get(`${TEST_API_BASE_URL}/classrooms/:id/bot/materials`, () =>
+        HttpResponse.json(
+          {
+            code: 'FORBIDDEN',
+            message: 'Forbidden',
+            correlationId: 'req-bot-load-403',
+          },
+          { status: 403 },
+        ),
+      ),
+    );
+    await queryClient.refetchQueries();
+    expect(
+      await screen.findByText('No pudimos consultar el asistente'),
+    ).toBeInTheDocument();
+    expect(toggle).toHaveAttribute('aria-disabled', 'true');
+    expect(
+      screen.getByText('No pudimos confirmar el estado actual en el servidor.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Reintentar estado del asistente' }),
+    ).not.toBeInTheDocument();
   });
 });

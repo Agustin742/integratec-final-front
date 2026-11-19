@@ -30,6 +30,36 @@ function getIndexingBadgeVariant(
   }
 }
 
+function resolveHintText(options: {
+  readonly isToggling: boolean;
+  readonly isConfigPending: boolean;
+  readonly isConfigError: boolean;
+  readonly botEnabled: boolean;
+  readonly indexingStatus: BotIndexingStatus;
+}): string {
+  if (options.isToggling) {
+    return materialMessages.list.bot.updatingHint;
+  }
+  if (options.isConfigError) {
+    return materialMessages.list.bot.errorConfigHint;
+  }
+  if (options.isConfigPending) {
+    return materialMessages.list.bot.pendingConfigHint;
+  }
+  if (!options.botEnabled) {
+    return materialMessages.list.bot.disabledHint;
+  }
+  switch (options.indexingStatus) {
+    case 'pending':
+      return materialMessages.list.bot.pendingIndexingHint;
+    case 'failed':
+      return materialMessages.list.bot.failedIndexingHint;
+    case 'ready':
+    case 'disabled':
+      return materialMessages.list.bot.enabledHint;
+  }
+}
+
 export function MaterialBotToggleSlot({
   material,
   botState,
@@ -38,19 +68,20 @@ export function MaterialBotToggleSlot({
   isToggling,
   onToggle,
 }: MaterialBotToggleSlotProps) {
-  const botEnabled = botState?.botEnabled ?? false;
+  const isUnavailable = isConfigPending || isConfigError;
+  const botEnabled = isUnavailable ? false : (botState?.botEnabled ?? false);
   const indexingStatus: BotIndexingStatus =
     botState?.indexingStatus ?? 'disabled';
-  const isUnavailable =
-    isConfigPending || (isConfigError && botState === undefined);
   const isDisabled = isToggling || isUnavailable;
   const hintId = `bot-material-hint-${material.id}`;
 
-  const hintText = isToggling
-    ? materialMessages.list.bot.updatingHint
-    : botEnabled
-      ? materialMessages.list.bot.enabledHint
-      : materialMessages.list.bot.disabledHint;
+  const hintText = resolveHintText({
+    isToggling,
+    isConfigPending,
+    isConfigError,
+    botEnabled,
+    indexingStatus,
+  });
 
   return (
     <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
@@ -68,7 +99,8 @@ export function MaterialBotToggleSlot({
         <p id={hintId} className="text-xs text-muted-foreground">
           {hintText}
         </p>
-        {indexingStatus === 'failed' &&
+        {!isUnavailable &&
+          indexingStatus === 'failed' &&
           typeof botState?.indexingError === 'string' &&
           botState.indexingError.length > 0 && (
             <p className="text-xs text-destructive wrap-anywhere">
@@ -83,18 +115,32 @@ export function MaterialBotToggleSlot({
         aria-checked={botEnabled}
         aria-label={materialMessages.list.bot.switchLabel(material.filename)}
         aria-describedby={hintId}
-        disabled={isDisabled}
-        onClick={() => onToggle(material, !botEnabled)}
-        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-          botEnabled ? 'border-primary bg-primary' : 'border-border bg-muted'
+        aria-disabled={isDisabled}
+        aria-busy={isToggling || undefined}
+        onClick={() => {
+          if (isDisabled) return;
+          onToggle(material, !botEnabled);
+        }}
+        className={`inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+          isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
         }`}
       >
         <span
           aria-hidden="true"
-          className={`pointer-events-none inline-block size-4 rounded-full bg-background shadow-sm transition-transform ${
-            botEnabled ? 'translate-x-5' : 'translate-x-1'
+          className={`relative inline-flex h-6 w-11 items-center rounded-full border transition-colors ${
+            botEnabled
+              ? 'border-primary bg-primary'
+              : 'border-foreground/35 bg-muted'
           }`}
-        />
+        >
+          <span
+            className={`pointer-events-none inline-block size-4 rounded-full shadow-sm transition-transform ${
+              botEnabled
+                ? 'translate-x-5 bg-background'
+                : 'translate-x-1 bg-foreground/75'
+            }`}
+          />
+        </span>
       </button>
     </div>
   );

@@ -100,7 +100,13 @@ export const materialMessages = {
       switchLabel: (filename: string) =>
         `Habilitar «${filename}» para el asistente de estudio`,
       enabledHint: 'Disponible como fuente para el asistente del aula.',
+      pendingIndexingHint:
+        'El servidor está procesando este archivo para el asistente.',
+      failedIndexingHint:
+        'No pudo indexarse para el asistente. Podés reintentar o desactivarlo.',
       disabledHint: 'No incluido en las fuentes del asistente.',
+      pendingConfigHint: 'Consultando estado del asistente…',
+      errorConfigHint: 'No pudimos confirmar el estado actual en el servidor.',
       updatingHint: 'Guardando cambio en el servidor…',
       statuses: {
         disabled: 'Desactivado para el bot',
@@ -108,6 +114,7 @@ export const materialMessages = {
         ready: 'Listo para el bot',
         failed: 'Error de indexación',
       },
+      loadErrorTitle: 'No pudimos consultar el asistente',
       loadErrorNotice:
         'No pudimos consultar qué materiales tiene habilitados el asistente. Podés reintentar.',
       retryLoadAction: 'Reintentar estado del asistente',

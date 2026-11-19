@@ -201,7 +201,11 @@ export async function setClassroomBotMaterialEnabled(
   }
 
   const parsed = botAllowedMaterialDtoSchema.safeParse(raw);
-  if (!parsed.success) {
+  if (
+    !parsed.success ||
+    parsed.data.classroomId !== classroomId ||
+    parsed.data.materialId !== materialId
+  ) {
     throw markUncertain(
       new ApiError({
         kind: 'unexpected',

@@ -4,6 +4,7 @@ import { useParams } from 'react-router';
 import { ApiError } from '@/api/errors';
 import {
   classroomBotMaterialsQueryKey,
+  classroomDetailQueryKey,
   classroomMaterialsQueryKey,
   createClassroomBotMaterialsPredicate,
   createClassroomMaterialsPredicate,
@@ -94,6 +95,7 @@ function MaterialPanelContent({
     () => new Set(),
   );
   const togglingBotRef = useRef<Set<string>>(new Set());
+  const terminalBotReconciledRef = useRef(false);
   const unmountAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -136,12 +138,48 @@ function MaterialPanelContent({
       listClassroomBotMaterials(client, classroomId, { signal }),
     enabled: userId !== null && canConfigureBot,
     refetchInterval: (currentQuery) => {
+      if (currentQuery.state.status === 'error') {
+        return false;
+      }
       const hasPending = currentQuery.state.data?.items.some(
         (entry) => entry.indexingStatus === 'pending',
       );
       return hasPending ? 4000 : false;
     },
   });
+
+  const isTerminalBotConfigError =
+    botQuery.isError &&
+    botQuery.error instanceof ApiError &&
+    (botQuery.error.kind === 'forbidden' ||
+      botQuery.error.kind === 'not-found');
+
+  useEffect(() => {
+    if (userId === null) return;
+    if (!canConfigureBot) {
+      terminalBotReconciledRef.current = false;
+      void queryClient.removeQueries({
+        predicate: createClassroomBotMaterialsPredicate(userId, classroomId),
+      });
+      return;
+    }
+    if (!isTerminalBotConfigError) {
+      terminalBotReconciledRef.current = false;
+      return;
+    }
+    if (!terminalBotReconciledRef.current) {
+      terminalBotReconciledRef.current = true;
+      void queryClient.invalidateQueries({
+        queryKey: classroomDetailQueryKey(userId, classroomId),
+      });
+    }
+  }, [
+    canConfigureBot,
+    classroomId,
+    isTerminalBotConfigError,
+    queryClient,
+    userId,
+  ]);
 
   async function reconcileMaterials(resetPage = false) {
     if (resetPage) {
@@ -172,6 +210,9 @@ function MaterialPanelContent({
     setActionNotice(null);
 
     try {
+      await queryClient.cancelQueries({
+        predicate: createClassroomBotMaterialsPredicate(userId, classroomId),
+      });
       const confirmed = await setClassroomBotMaterialEnabled(
         client,
         classroomId,
@@ -179,6 +220,11 @@ function MaterialPanelContent({
         { enabled: nextEnabled },
         { signal },
       );
+      if (signal?.aborted) return;
+
+      await queryClient.cancelQueries({
+        predicate: createClassroomBotMaterialsPredicate(userId, classroomId),
+      });
       if (signal?.aborted) return;
 
       queryClient.setQueryData<BotAllowedMaterialListDto>(
@@ -224,9 +270,16 @@ function MaterialPanelContent({
         description,
       });
       if (
-        isUncertainBotMaterialError(error) ||
-        (error instanceof ApiError && error.kind === 'not-found')
+        error instanceof ApiError &&
+        (error.kind === 'forbidden' || error.kind === 'not-found')
       ) {
+        await queryClient.invalidateQueries({
+          queryKey: classroomDetailQueryKey(userId, classroomId),
+        });
+        if (error.kind === 'not-found') {
+          await reconcileMaterials();
+        }
+      } else if (isUncertainBotMaterialError(error)) {
         await reconcileMaterials();
       }
     } finally {
@@ -413,17 +466,23 @@ function MaterialPanelContent({
 
       {canConfigureBot && botQuery.isError && (
         <Alert variant="destructive" role="alert">
-          <AlertTitle>{materialMessages.list.bot.toggleErrorTitle}</AlertTitle>
+          <AlertTitle>{materialMessages.list.bot.loadErrorTitle}</AlertTitle>
           <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
-            <span>{materialMessages.list.bot.loadErrorNotice}</span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void botQuery.refetch()}
-            >
-              {materialMessages.list.bot.retryLoadAction}
-            </Button>
+            <span>
+              {botQuery.error instanceof ApiError && isTerminalBotConfigError
+                ? botQuery.error.userMessage
+                : materialMessages.list.bot.loadErrorNotice}
+            </span>
+            {!isTerminalBotConfigError && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void botQuery.refetch()}
+              >
+                {materialMessages.list.bot.retryLoadAction}
+              </Button>
+            )}
           </AlertDescription>
         </Alert>
       )}

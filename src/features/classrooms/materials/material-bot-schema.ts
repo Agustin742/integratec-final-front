@@ -32,7 +32,7 @@ export const botAllowedMaterialDtoSchema: z.ZodType<BotAllowedMaterialDto> =
     classroomId: z.string().uuid(),
     botEnabled: z.boolean(),
     indexingStatus: botIndexingStatusSchema,
-    indexingError: z.string().trim().max(300).nullable().optional(),
+    indexingError: z.string().trim().nullable().optional(),
     updatedAt: z.string().datetime({ offset: true }),
   });
 
