@@ -2,6 +2,7 @@ import type { components } from '@/api/schema.generated';
 import { EmptyState } from '@/components/feedback/states';
 import { ActivitiesPanel } from '../activities/activities-panel';
 import { NoticeBoardPanel } from '../announcements/notice-board-panel';
+import { StudyGuideBotPanel } from '../bot/study-guide-bot-panel';
 import { ClassroomGradesPanel } from '../grading/classroom-grades-panel';
 import { MaterialPanel } from '../materials/material-panel';
 import { ClassroomMembersPanel } from '../classroom-members-panel';
@@ -48,7 +49,11 @@ export const classroomPanelCatalog = [
     component: NoticeBoardPanel,
   },
   entry('shop'),
-  entry('bot'),
+  {
+    key: 'bot',
+    title: messages.panels.bot,
+    component: StudyGuideBotPanel,
+  },
   {
     key: 'members',
     title: messages.panels.members,

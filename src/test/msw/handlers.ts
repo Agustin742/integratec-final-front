@@ -5041,3 +5041,162 @@ export function createClassroomMetricsHandler(
     },
   );
 }
+
+export type BotStoreOp = 'status' | 'ask';
+
+export interface BotStoreCitation {
+  readonly materialId: string;
+  readonly filename: string;
+  readonly excerpt?: string | null;
+}
+
+export interface ClassroomBotStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly initialAvailable?: boolean;
+  readonly initialReason?:
+    'exam_in_progress' | 'no_materials' | 'disabled' | null;
+  readonly initialMessage?: string | null;
+  readonly onAsk?: (question: string) =>
+    | {
+        readonly answer: string;
+        readonly outcome?: 'answered' | 'out_of_scope' | 'guided_only';
+        readonly citations?: readonly BotStoreCitation[];
+      }
+    | Promise<{
+        readonly answer: string;
+        readonly outcome?: 'answered' | 'out_of_scope' | 'guided_only';
+        readonly citations?: readonly BotStoreCitation[];
+      }>;
+}
+
+export interface ClassroomBotStore {
+  readonly handlers: readonly HttpHandler[];
+  setExamLocked(locked: boolean, message?: string | null): void;
+  failNext(op: BotStoreOp, failure: MswErrorResponseSpec | 'network'): void;
+}
+
+/**
+ * Stateful, contract-faithful MSW store for `HU-BOT-002` (`GET /bot/status`,
+ * `POST /bot/messages`).
+ */
+export function createClassroomBotStore(
+  options: ClassroomBotStoreOptions = {},
+): ClassroomBotStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomId =
+    options.classroomId ?? '00000000-0000-4000-8000-000000000010';
+  let available = options.initialAvailable ?? true;
+  let reason: 'exam_in_progress' | 'no_materials' | 'disabled' | null =
+    options.initialReason ?? null;
+  let message: string | null = options.initialMessage ?? null;
+  let seq = 1;
+  const pending: Partial<Record<BotStoreOp, MswErrorResponseSpec | 'network'>> =
+    {};
+
+  const fail = (failure: MswErrorResponseSpec | 'network'): Response =>
+    failure === 'network'
+      ? HttpResponse.error()
+      : createErrorEnvelopeResponse(failure.status, failure.body);
+
+  return {
+    setExamLocked(locked, nextMessage) {
+      available = !locked;
+      reason = locked ? 'exam_in_progress' : null;
+      message = locked
+        ? (nextMessage ??
+          'El asistente está pausado porque tenés un examen en curso.')
+        : null;
+    },
+    failNext(op, failure) {
+      pending[op] = failure;
+    },
+    handlers: [
+      http.get(`${baseUrl}/classrooms/:id/bot/status`, ({ params }) => {
+        const failure = pending.status;
+        pending.status = undefined;
+        if (failure) {
+          return fail(failure);
+        }
+        if (options.classroomId && params.id !== classroomId) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Classroom not found.',
+            correlationId: 'req-bot-status-404',
+          });
+        }
+        return HttpResponse.json({
+          available,
+          reason,
+          message,
+        });
+      }),
+      http.post(
+        `${baseUrl}/classrooms/:id/bot/messages`,
+        async ({ params, request }) => {
+          const failure = pending.ask;
+          pending.ask = undefined;
+          if (failure) {
+            return fail(failure);
+          }
+          if (options.classroomId && params.id !== classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-bot-ask-404',
+            });
+          }
+          if (!available && reason === 'exam_in_progress') {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message:
+                message ??
+                'El asistente está pausado porque tenés un examen en curso.',
+              correlationId: 'req-bot-exam-409',
+            });
+          }
+          const body = (await request.json().catch(() => null)) as {
+            question?: unknown;
+          } | null;
+          const question =
+            typeof body?.question === 'string' ? body.question.trim() : '';
+          if (!question) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'question is required.',
+              correlationId: 'req-bot-ask-400',
+            });
+          }
+          const custom = options.onAsk ? await options.onAsk(question) : null;
+          if (!available && reason === 'exam_in_progress') {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message:
+                message ??
+                'El asistente está pausado porque tenés un examen en curso.',
+              correlationId: 'req-bot-exam-inflight-409',
+            });
+          }
+          const id = `bot-msg-${seq}`;
+          seq += 1;
+          return HttpResponse.json({
+            id,
+            answer:
+              custom?.answer ??
+              'Revisá la definición de fracciones equivalentes en el apunte de la unidad.',
+            outcome: custom?.outcome ?? 'answered',
+            citations: custom?.citations ?? [
+              {
+                materialId: '00000000-0000-4000-8000-000000001001',
+                filename: 'guia-unidad-1.pdf',
+                excerpt:
+                  'Dos fracciones son equivalentes cuando representan la misma parte.',
+              },
+            ],
+            createdAt: '2026-11-19T02:25:00.000Z',
+          });
+        },
+      ),
+    ],
+  };
+}
