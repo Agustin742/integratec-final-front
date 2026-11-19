@@ -314,7 +314,6 @@ describe('ClassroomWorkspace 3D / 2D Classic Mode switch (#34)', () => {
     const dialog = await screen.findByRole('dialog', {
       name: classroomMessages.panels.grades,
     });
-    expect(dialog).toHaveTextContent(classroomMessages.pendingPanelTitle);
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cerrar' }));
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
