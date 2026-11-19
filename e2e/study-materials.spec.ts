@@ -311,6 +311,137 @@ test('student sees materials and download action without upload or remove contro
   ).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: 'Quitar' })).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: 'Descargar' })).toBeVisible();
+  await expect(dialog.getByRole('switch')).toHaveCount(0);
+  await expect(dialog.getByText('Asistente de estudio (IA)')).toHaveCount(0);
+
+  expect(cspViolations).toEqual([]);
+  expect(pageErrors).toEqual([]);
+});
+
+test('teacher toggles study material for the Study Guide Bot and captures responsive views', async ({
+  page,
+}) => {
+  const { cspViolations, pageErrors } = await setupAuthSession(page);
+
+  await page.route(`${apiOrigin}/classrooms/${classroomId}`, (route) =>
+    route.fulfill({
+      json: {
+        id: classroomId,
+        name: '3.º Año B - Matemática',
+        subject: null,
+        schoolId: null,
+        independentTeacherId: null,
+        adultMode: false,
+        chatMuted: false,
+        collaborationLocked: false,
+        gamesDisabled: false,
+        myRole: 'TEACHER',
+        capabilities: [...teacherCapabilities, 'configure_bot'],
+        availablePanels: ['material'],
+        deskCount: 12,
+        pet: null,
+        createdAt: '2026-11-01T00:00:00.000Z',
+        updatedAt: '2026-11-01T00:00:00.000Z',
+      } satisfies components['schemas']['ClassroomContextResponseDto'],
+    }),
+  );
+
+  await page.route(
+    `${apiOrigin}/classrooms/${classroomId}/materials**`,
+    (route) =>
+      route.fulfill({
+        json: {
+          items: [
+            {
+              id: initialMaterialId,
+              classroomId,
+              authorId: userId,
+              filename: 'programa-anual.pdf',
+              contentType: 'application/pdf',
+              sizeBytes: 245760,
+              createdAt: '2026-11-18T03:00:00.000Z',
+            },
+          ],
+          page: 1,
+          pageSize: 10,
+          total: 1,
+        },
+      }),
+  );
+
+  let botEntry: {
+    materialId: string;
+    classroomId: string;
+    botEnabled: boolean;
+    indexingStatus: 'disabled' | 'pending' | 'ready' | 'failed';
+    indexingError: string | null;
+    updatedAt: string;
+  } | null = null;
+
+  await page.route(
+    `${apiOrigin}/classrooms/${classroomId}/bot/materials`,
+    (route) =>
+      route.fulfill({
+        json: {
+          items: botEntry ? [botEntry] : [],
+        },
+      }),
+  );
+
+  await page.route(
+    `${apiOrigin}/classrooms/${classroomId}/bot/materials/${initialMaterialId}`,
+    async (route) => {
+      const payload = route.request().postDataJSON() as { enabled?: boolean };
+      const enabled = Boolean(payload.enabled);
+      botEntry = {
+        materialId: initialMaterialId,
+        classroomId,
+        botEnabled: enabled,
+        indexingStatus: enabled ? 'ready' : 'disabled',
+        indexingError: null,
+        updatedAt: '2026-11-19T01:30:00.000Z',
+      };
+      await route.fulfill({ json: botEntry });
+    },
+  );
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(`./classrooms/${classroomId}/panels/material`);
+  const dialog = page.getByRole('dialog', { name: 'Material', exact: true });
+  await expect(dialog.getByText('programa-anual.pdf')).toBeVisible();
+
+  const toggle = dialog.getByRole('switch', {
+    name: /Habilitar «programa-anual\.pdf» para el asistente de estudio/,
+  });
+  await expect(toggle).toHaveAttribute('aria-checked', 'false');
+  await expect(dialog.getByText('Desactivado para el bot')).toBeVisible();
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-checked', 'true');
+  await expect(dialog.getByText('Listo para el bot')).toBeVisible();
+
+  await page.screenshot({
+    path: 'docs/assets/classrooms/bot-materials-1280.png',
+    fullPage: false,
+  });
+
+  await page.setViewportSize({ width: 360, height: 740 });
+  await toggle.scrollIntoViewIfNeeded();
+  await expect(toggle).toBeVisible();
+  const hasHorizontalOverflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth >
+      document.documentElement.clientWidth,
+  );
+  expect(hasHorizontalOverflow).toBe(false);
+  await page.screenshot({
+    path: 'docs/assets/classrooms/bot-materials-360.png',
+    fullPage: false,
+  });
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-checked', 'false');
+  await expect(dialog.getByText('Desactivado para el bot')).toBeVisible();
 
   expect(cspViolations).toEqual([]);
   expect(pageErrors).toEqual([]);

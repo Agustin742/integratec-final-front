@@ -664,6 +664,10 @@ describe('ActivitiesPanel and ActivityDetailPage', () => {
     let classroomRevoked = false;
     mswServer.use(
       ...store.handlers,
+      http.get(
+        `${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}/submissions`,
+        () => HttpResponse.json({ items: [], page: 1, pageSize: 10, total: 0 }),
+      ),
       http.get(`${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}`, () =>
         classroomRevoked
           ? HttpResponse.json(
@@ -732,6 +736,10 @@ describe('ActivitiesPanel and ActivityDetailPage', () => {
 
     mswServer.use(
       ...store.handlers,
+      http.get(
+        `${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}/submissions`,
+        () => HttpResponse.json({ items: [], page: 1, pageSize: 10, total: 0 }),
+      ),
       http.get(`${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}`, () =>
         HttpResponse.json({
           id: CLASSROOM_ID,
@@ -772,9 +780,9 @@ describe('ActivitiesPanel and ActivityDetailPage', () => {
     fireEvent.click(reviewTab);
     expect(reviewTab).toHaveAttribute('aria-selected', 'true');
     expect(
-      await screen.findByText(
-        'Próximamente vas a poder revisar entregas y calificar esta actividad desde esta sección.',
-      ),
+      await screen.findByRole('heading', {
+        name: 'Entregas de esta actividad',
+      }),
     ).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/HU-(?:ACT|COM)-\d+/);
 

@@ -947,15 +947,26 @@ export interface ClassroomMaterialItem {
   readonly createdAt: string;
 }
 
-export type MaterialStoreOp = 'list' | 'upload' | 'download' | 'remove';
+export type MaterialStoreOp =
+  'list' | 'upload' | 'download' | 'remove' | 'botList' | 'botToggle';
 export type MaterialStoreFailure =
   MswErrorResponseSpec | 'network' | 'drop-response';
+
+export interface BotMaterialStateEntry {
+  readonly materialId: string;
+  readonly classroomId: string;
+  readonly botEnabled: boolean;
+  readonly indexingStatus: 'disabled' | 'pending' | 'ready' | 'failed';
+  readonly indexingError?: string | null;
+  readonly updatedAt: string;
+}
 
 export interface ClassroomMaterialsStoreOptions {
   readonly baseUrl?: string;
   readonly classroomId?: string;
   readonly authorId?: string;
   readonly initialItems?: readonly ClassroomMaterialItem[];
+  readonly initialBotStates?: readonly BotMaterialStateEntry[];
   readonly signedUrlBase?: string;
   readonly expiresInSeconds?: number;
 }
@@ -963,6 +974,14 @@ export interface ClassroomMaterialsStoreOptions {
 export interface ClassroomMaterialsStore {
   readonly handlers: readonly HttpHandler[];
   read(): readonly ClassroomMaterialItem[];
+  readBotStates(): readonly BotMaterialStateEntry[];
+  setBotState(
+    materialId: string,
+    state: Pick<
+      BotMaterialStateEntry,
+      'botEnabled' | 'indexingStatus' | 'indexingError'
+    >,
+  ): void;
   failNext(op: MaterialStoreOp, failure: MaterialStoreFailure): void;
 }
 
@@ -989,6 +1008,9 @@ export function createClassroomMaterialsStore(
     options.signedUrlBase ?? 'https://files.example.test/signed';
   const expiresInSeconds = options.expiresInSeconds ?? 120;
   let items: ClassroomMaterialItem[] = [...(options.initialItems ?? [])];
+  const botStates = new Map<string, BotMaterialStateEntry>(
+    (options.initialBotStates ?? []).map((entry) => [entry.materialId, entry]),
+  );
   let seq = items.length + 1;
   const pending: Partial<Record<MaterialStoreOp, MaterialStoreFailure>> = {};
 
@@ -999,6 +1021,17 @@ export function createClassroomMaterialsStore(
 
   return {
     read: () => [...items],
+    readBotStates: () => [...botStates.values()],
+    setBotState(materialId, state) {
+      botStates.set(materialId, {
+        materialId,
+        classroomId,
+        botEnabled: state.botEnabled,
+        indexingStatus: state.indexingStatus,
+        indexingError: state.indexingError ?? null,
+        updatedAt: '2026-11-19T01:30:00.000Z',
+      });
+    },
     failNext(op, failure) {
       pending[op] = failure;
     },
@@ -1149,7 +1182,72 @@ export function createClassroomMaterialsStore(
             });
           }
           items = items.filter((item) => item.id !== params.materialId);
+          botStates.delete(String(params.materialId));
           return new HttpResponse(null, { status: 204 });
+        },
+      ),
+      http.get(`${baseUrl}/classrooms/:id/bot/materials`, ({ params }) => {
+        const failure = pending.botList;
+        pending.botList = undefined;
+        if (failure !== undefined && failure !== 'drop-response') {
+          return fail(failure);
+        }
+        if (options.classroomId && params.id !== classroomId) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Classroom not found.',
+            correlationId: 'req-bot-materials-list-404',
+          });
+        }
+        return HttpResponse.json({
+          items: [...botStates.values()],
+        });
+      }),
+      http.put(
+        `${baseUrl}/classrooms/:id/bot/materials/:materialId`,
+        async ({ params, request }) => {
+          const failure = pending.botToggle;
+          pending.botToggle = undefined;
+          if (failure !== undefined && failure !== 'drop-response') {
+            return fail(failure);
+          }
+          if (options.classroomId && params.id !== classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-bot-materials-toggle-404',
+            });
+          }
+          const materialId = String(params.materialId);
+          const found = items.find((item) => item.id === materialId);
+          if (!found) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Material not found.',
+              correlationId: 'req-bot-materials-toggle-404',
+            });
+          }
+          const body = (await request.json().catch(() => null)) as {
+            enabled?: unknown;
+          } | null;
+          if (!body || typeof body.enabled !== 'boolean') {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'enabled must be a boolean.',
+              correlationId: 'req-bot-materials-toggle-400',
+            });
+          }
+          seq += 1;
+          const nextEntry: BotMaterialStateEntry = {
+            materialId,
+            classroomId: found.classroomId,
+            botEnabled: body.enabled,
+            indexingStatus: body.enabled ? 'pending' : 'disabled',
+            indexingError: null,
+            updatedAt: '2026-11-19T01:30:00.000Z',
+          };
+          botStates.set(materialId, nextEntry);
+          return HttpResponse.json(nextEntry);
         },
       ),
     ],
@@ -4157,6 +4255,1134 @@ export function createNotificationsStore(
   };
 }
 
+export interface GradingStoreFile {
+  readonly id: string;
+  readonly originalName: string;
+  readonly contentType: string;
+  readonly sizeBytes: number;
+  readonly position: number;
+  readonly downloadUrl?: string;
+  readonly downloadUrlExpiresAt?: string;
+}
+
+export interface GradingStoreGrade {
+  readonly id: string;
+  readonly graderId: string;
+  readonly score: number;
+  readonly feedback: string;
+  readonly pointsAwarded: number;
+  readonly pointTransactionId: string | null;
+  readonly version: number;
+  readonly gradedAt: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface GradingStoreSubmission {
+  readonly id: string;
+  readonly classroomId: string;
+  readonly activityId: string;
+  readonly activityTitle: string;
+  readonly activityType: 'TP' | 'EXAM';
+  readonly activityFormat?: 'FILE' | 'MULTIPLE_CHOICE';
+  readonly maxScore?: number;
+  readonly weightMultiplier?: number;
+  readonly studentId: string;
+  readonly studentDisplayName: string;
+  readonly submittedAt: string;
+  readonly isLate: boolean;
+  readonly studentActive?: boolean;
+  readonly files: readonly GradingStoreFile[];
+  readonly grade: GradingStoreGrade | null;
+}
+
+export type GradingStoreOp =
+  'queue' | 'detail' | 'getGrade' | 'grade' | 'regrade';
+
+export type GradingStoreFailure =
+  MswErrorResponseSpec | 'network' | 'drop-response' | 'malformed-2xx';
+
+export interface ClassroomGradingStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId: string;
+  readonly graderId?: string;
+  readonly initialSubmissions?: readonly GradingStoreSubmission[];
+  readonly allowedRoles?: readonly string[];
+  readonly role?: string;
+}
+
+export interface ClassroomGradingStore {
+  readonly handlers: readonly HttpHandler[];
+  getSubmissions: () => readonly GradingStoreSubmission[];
+  setRole: (role: string) => void;
+  setGradeExternally: (submissionId: string, grade: GradingStoreGrade) => void;
+  removeSubmission: (submissionId: string) => void;
+  failNext: (op: GradingStoreOp, failure: GradingStoreFailure) => void;
+  getCounts: () => Record<GradingStoreOp, number>;
+}
+
+/**
+ * Stateful contract-faithful MSW store for teacher grading (`HU-ACT-004`,
+ * backend D18): `GET /classrooms/:id/submissions`, `GET /submissions/:id`, and
+ * `GET`/`POST`/`PATCH /submissions/:id/grade`.
+ */
+export function createClassroomGradingStore(
+  options: ClassroomGradingStoreOptions,
+): ClassroomGradingStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const graderId = options.graderId ?? '00000000-0000-4000-8000-000000000001';
+  let currentRole = options.role ?? 'TEACHER';
+  const staffRoles = new Set(
+    options.allowedRoles ?? ['SCHOOL_OWNER', 'ADMIN', 'TEACHER'],
+  );
+
+  let submissions: GradingStoreSubmission[] = [
+    ...(options.initialSubmissions ?? []),
+  ];
+  let linkGeneration = 0;
+  let gradeSequence = 100;
+  const pending: Partial<Record<GradingStoreOp, GradingStoreFailure>> = {};
+  const counts: Record<GradingStoreOp, number> = {
+    queue: 0,
+    detail: 0,
+    getGrade: 0,
+    grade: 0,
+    regrade: 0,
+  };
+
+  const computeServerPoints = (score: number, weightMultiplier = 1): number =>
+    Math.max(0, Math.round(score * weightMultiplier));
+
+  const consumeFailure = (
+    op: GradingStoreOp,
+  ): GradingStoreFailure | undefined => {
+    const failure = pending[op];
+    pending[op] = undefined;
+    return failure;
+  };
+
+  const respondFailure = (failure: GradingStoreFailure): Response => {
+    if (failure === 'network' || failure === 'drop-response') {
+      return HttpResponse.error();
+    }
+    if (failure === 'malformed-2xx') {
+      return HttpResponse.json({ unexpected: true }, { status: 200 });
+    }
+    return createErrorEnvelopeResponse(failure.status, failure.body);
+  };
+
+  return {
+    getSubmissions: () => submissions,
+    setRole: (role) => {
+      currentRole = role;
+    },
+    setGradeExternally: (submissionId, grade) => {
+      submissions = submissions.map((item) =>
+        item.id === submissionId ? { ...item, grade } : item,
+      );
+    },
+    removeSubmission: (submissionId) => {
+      submissions = submissions.filter((item) => item.id !== submissionId);
+    },
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    getCounts: () => ({ ...counts }),
+    handlers: [
+      http.get(
+        `${baseUrl}/classrooms/:id/submissions`,
+        ({ params, request }) => {
+          counts.queue += 1;
+          const failure = consumeFailure('queue');
+          if (failure !== undefined) {
+            return respondFailure(failure);
+          }
+
+          const requestedClassroomId = String(params.id ?? '');
+          if (requestedClassroomId !== options.classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-grading-queue-404',
+            });
+          }
+
+          if (!staffRoles.has(currentRole)) {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Staff role required.',
+              correlationId: 'req-grading-queue-403',
+            });
+          }
+
+          const url = new URL(request.url);
+          const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+          const pageSize = Math.min(
+            100,
+            Math.max(1, Number(url.searchParams.get('pageSize') ?? '20')),
+          );
+          const activityId = url.searchParams.get('activityId') ?? '';
+          const state = url.searchParams.get('state') ?? '';
+          const sort = url.searchParams.get('sort') ?? 'submittedAt';
+
+          let filtered = submissions.filter(
+            (item) =>
+              item.classroomId === requestedClassroomId &&
+              item.studentActive !== false,
+          );
+          if (activityId) {
+            filtered = filtered.filter(
+              (item) => item.activityId === activityId,
+            );
+          }
+          if (state === 'submitted') {
+            filtered = filtered.filter((item) => item.grade === null);
+          } else if (state === 'graded') {
+            filtered = filtered.filter((item) => item.grade !== null);
+          }
+
+          const sorted = [...filtered].sort((a, b) => {
+            if (sort === '-submittedAt') {
+              const diff =
+                Date.parse(b.submittedAt) - Date.parse(a.submittedAt);
+              return diff !== 0 ? diff : a.id.localeCompare(b.id);
+            }
+            if (sort === 'gradedAt' || sort === '-gradedAt') {
+              const aGraded = a.grade ? Date.parse(a.grade.gradedAt) : null;
+              const bGraded = b.grade ? Date.parse(b.grade.gradedAt) : null;
+              if (aGraded === null && bGraded === null) {
+                return a.id.localeCompare(b.id);
+              }
+              if (aGraded === null) return 1;
+              if (bGraded === null) return -1;
+              const diff =
+                sort === '-gradedAt' ? bGraded - aGraded : aGraded - bGraded;
+              return diff !== 0 ? diff : a.id.localeCompare(b.id);
+            }
+            const diff = Date.parse(a.submittedAt) - Date.parse(b.submittedAt);
+            return diff !== 0 ? diff : a.id.localeCompare(b.id);
+          });
+
+          const start = (page - 1) * pageSize;
+          const items = sorted.slice(start, start + pageSize).map((item) => ({
+            id: item.id,
+            activityId: item.activityId,
+            activityTitle: item.activityTitle,
+            activityType: item.activityType,
+            studentId: item.studentId,
+            studentDisplayName: item.studentDisplayName,
+            submittedAt: item.submittedAt,
+            isLate: item.isLate,
+            status: item.grade ? ('graded' as const) : ('submitted' as const),
+            fileCount: item.files.length,
+            grade: item.grade
+              ? {
+                  id: item.grade.id,
+                  graderId: item.grade.graderId,
+                  score: item.grade.score,
+                  feedback: item.grade.feedback,
+                  pointsAwarded: item.grade.pointsAwarded,
+                  version: item.grade.version,
+                  gradedAt: item.grade.gradedAt,
+                }
+              : null,
+          }));
+
+          return HttpResponse.json({
+            items,
+            page,
+            pageSize,
+            total: sorted.length,
+          });
+        },
+      ),
+      http.get(`${baseUrl}/submissions/:submissionId`, ({ params }) => {
+        counts.detail += 1;
+        const failure = consumeFailure('detail');
+        if (failure !== undefined) {
+          return respondFailure(failure);
+        }
+
+        const submission = submissions.find(
+          (item) =>
+            item.id === params.submissionId &&
+            item.classroomId === options.classroomId,
+        );
+        if (!submission || !staffRoles.has(currentRole)) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Submission not found.',
+            correlationId: 'req-submission-detail-404',
+          });
+        }
+
+        linkGeneration += 1;
+        return HttpResponse.json(
+          {
+            id: submission.id,
+            activityId: submission.activityId,
+            submittedAt: submission.submittedAt,
+            isLate: submission.isLate,
+            status: submission.grade ? 'graded' : 'submitted',
+            files: submission.files.map((file) => ({
+              id: file.id,
+              originalName: file.originalName,
+              contentType: file.contentType,
+              sizeBytes: file.sizeBytes,
+              position: file.position,
+              downloadUrl:
+                file.downloadUrl ??
+                `https://storage.example.invalid/signed/${submission.id}/${file.id}?sig=v${linkGeneration}`,
+              downloadUrlExpiresAt:
+                file.downloadUrlExpiresAt ?? '2026-11-19T18:00:00.000Z',
+            })),
+          },
+          { headers: { 'Cache-Control': 'no-store' } },
+        );
+      }),
+      http.get(`${baseUrl}/submissions/:submissionId/grade`, ({ params }) => {
+        counts.getGrade += 1;
+        const failure = consumeFailure('getGrade');
+        if (failure !== undefined) {
+          return respondFailure(failure);
+        }
+
+        const submission = submissions.find(
+          (item) =>
+            item.id === params.submissionId &&
+            item.classroomId === options.classroomId,
+        );
+        if (!submission || !submission.grade) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Grade not found.',
+            correlationId: 'req-grade-get-404',
+          });
+        }
+        return HttpResponse.json({
+          ...submission.grade,
+          submissionId: submission.id,
+          activityId: submission.activityId,
+          studentId: submission.studentId,
+        });
+      }),
+      http.post(
+        `${baseUrl}/submissions/:submissionId/grade`,
+        async ({ params, request }) => {
+          counts.grade += 1;
+          const failure = consumeFailure('grade');
+          if (
+            failure !== undefined &&
+            failure !== 'drop-response' &&
+            failure !== 'malformed-2xx'
+          ) {
+            return respondFailure(failure);
+          }
+
+          if (!staffRoles.has(currentRole)) {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Staff role required.',
+              correlationId: 'req-grade-post-403',
+            });
+          }
+
+          const submission = submissions.find(
+            (item) =>
+              item.id === params.submissionId &&
+              item.classroomId === options.classroomId,
+          );
+          if (!submission) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Submission not found.',
+              correlationId: 'req-grade-post-404',
+            });
+          }
+          if (submission.activityFormat === 'MULTIPLE_CHOICE') {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message: 'Only file submissions can be graded manually.',
+              details: [
+                {
+                  field: 'activity',
+                  messages: ['Only file submissions can be graded manually'],
+                },
+              ],
+              correlationId: 'req-grade-post-409-activity',
+            });
+          }
+          if (submission.grade !== null || submission.studentActive === false) {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message: 'Submission cannot be graded.',
+              details: [
+                {
+                  field: 'submission',
+                  messages: ['Submission already graded or student inactive'],
+                },
+              ],
+              correlationId: 'req-grade-post-409-submission',
+            });
+          }
+
+          const body = (await request.json()) as {
+            score?: unknown;
+            feedback?: unknown;
+          };
+          const maxScore = submission.maxScore ?? 100;
+          if (
+            typeof body.score !== 'number' ||
+            !Number.isInteger(body.score) ||
+            body.score < 0 ||
+            body.score > 100 ||
+            body.score > maxScore
+          ) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid score.',
+              details: [
+                {
+                  field: 'score',
+                  messages: [
+                    `Score must be an integer between 0 and ${maxScore}`,
+                  ],
+                },
+              ],
+              correlationId: 'req-grade-post-400-score',
+            });
+          }
+          if (
+            typeof body.feedback !== 'string' ||
+            body.feedback.trim().length === 0 ||
+            /[\p{Cc}\p{Zl}\p{Zp}]/u.test(body.feedback)
+          ) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid feedback.',
+              details: [
+                {
+                  field: 'feedback',
+                  messages: ['Feedback must be visible single-line text'],
+                },
+              ],
+              correlationId: 'req-grade-post-400-feedback',
+            });
+          }
+
+          gradeSequence += 1;
+          const now = '2026-11-18T16:30:00.000Z';
+          const nextGrade: GradingStoreGrade = {
+            id: `00000000-0000-4000-8000-00000000${String(gradeSequence).padStart(4, '0')}`,
+            graderId,
+            score: body.score,
+            feedback: body.feedback.trim(),
+            pointsAwarded: computeServerPoints(
+              body.score,
+              submission.weightMultiplier ?? 1,
+            ),
+            pointTransactionId: `00000000-0000-4000-8000-10000000${String(gradeSequence).padStart(4, '0')}`,
+            version: 1,
+            gradedAt: now,
+            createdAt: now,
+            updatedAt: now,
+          };
+
+          submissions = submissions.map((item) =>
+            item.id === submission.id ? { ...item, grade: nextGrade } : item,
+          );
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+          if (failure === 'malformed-2xx') {
+            return HttpResponse.json({ broken: true }, { status: 201 });
+          }
+
+          return HttpResponse.json(
+            {
+              ...nextGrade,
+              submissionId: submission.id,
+              activityId: submission.activityId,
+              studentId: submission.studentId,
+            },
+            { status: 201 },
+          );
+        },
+      ),
+      http.patch(
+        `${baseUrl}/submissions/:submissionId/grade`,
+        async ({ params, request }) => {
+          counts.regrade += 1;
+          const failure = consumeFailure('regrade');
+          if (
+            failure !== undefined &&
+            failure !== 'drop-response' &&
+            failure !== 'malformed-2xx'
+          ) {
+            return respondFailure(failure);
+          }
+
+          if (!staffRoles.has(currentRole)) {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Staff role required.',
+              correlationId: 'req-grade-patch-403',
+            });
+          }
+
+          const submission = submissions.find(
+            (item) =>
+              item.id === params.submissionId &&
+              item.classroomId === options.classroomId,
+          );
+          if (!submission || !submission.grade) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Grade not found.',
+              correlationId: 'req-grade-patch-404',
+            });
+          }
+          if (submission.studentActive === false) {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message: 'Student is no longer active.',
+              details: [
+                {
+                  field: 'submission',
+                  messages: ['Student is no longer active in classroom'],
+                },
+              ],
+              correlationId: 'req-grade-patch-409-submission',
+            });
+          }
+
+          const body = (await request.json()) as {
+            score?: unknown;
+            feedback?: unknown;
+            version?: unknown;
+          };
+
+          if (body.version !== submission.grade.version) {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message: 'Grade version mismatch.',
+              details: [
+                {
+                  field: 'version',
+                  messages: ['Grade was modified by another request'],
+                },
+              ],
+              correlationId: 'req-grade-patch-409-version',
+            });
+          }
+
+          const maxScore = submission.maxScore ?? 100;
+          if (
+            typeof body.score !== 'number' ||
+            !Number.isInteger(body.score) ||
+            body.score < 0 ||
+            body.score > 100 ||
+            (body.score !== submission.grade.score && body.score > maxScore)
+          ) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid score.',
+              details: [
+                {
+                  field: 'score',
+                  messages: [
+                    `Score must be an integer between 0 and ${maxScore}`,
+                  ],
+                },
+              ],
+              correlationId: 'req-grade-patch-400-score',
+            });
+          }
+          if (
+            typeof body.feedback !== 'string' ||
+            body.feedback.trim().length === 0 ||
+            /[\p{Cc}\p{Zl}\p{Zp}]/u.test(body.feedback)
+          ) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid feedback.',
+              details: [
+                {
+                  field: 'feedback',
+                  messages: ['Feedback must be visible single-line text'],
+                },
+              ],
+              correlationId: 'req-grade-patch-400-feedback',
+            });
+          }
+
+          const trimmedFeedback = body.feedback.trim();
+          const unchanged =
+            body.score === submission.grade.score &&
+            trimmedFeedback === submission.grade.feedback;
+
+          const now = '2026-11-18T17:15:00.000Z';
+          const nextGrade: GradingStoreGrade = unchanged
+            ? submission.grade
+            : {
+                ...submission.grade,
+                score: body.score,
+                feedback: trimmedFeedback,
+                pointsAwarded: computeServerPoints(
+                  body.score,
+                  submission.weightMultiplier ?? 1,
+                ),
+                version: submission.grade.version + 1,
+                gradedAt: now,
+                updatedAt: now,
+              };
+
+          submissions = submissions.map((item) =>
+            item.id === submission.id ? { ...item, grade: nextGrade } : item,
+          );
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+          if (failure === 'malformed-2xx') {
+            return HttpResponse.json({ broken: true }, { status: 200 });
+          }
+
+          return HttpResponse.json({
+            ...nextGrade,
+            submissionId: submission.id,
+            activityId: submission.activityId,
+            studentId: submission.studentId,
+          });
+        },
+      ),
+    ],
+  };
+}
+
+export type ShopStoreItemKind =
+  'CLASSROOM_ITEM' | 'AVATAR_ACCESSORY' | 'DESK_UPGRADE' | 'PET_ACCESSORY';
+
+export interface ShopStoreCatalogItem {
+  readonly id: string;
+  readonly code: string;
+  readonly name: string;
+  readonly description: string;
+  readonly kind: ShopStoreItemKind;
+  readonly price: number;
+  readonly isImplemented: boolean;
+  readonly ownedByStudent?: boolean;
+  readonly ownedByClassroom?: boolean;
+  readonly metadata?: Record<string, unknown>;
+  readonly createdAt: string;
+}
+
+export interface ShopStorePurchase {
+  readonly id: string;
+  readonly classroomId: string;
+  readonly studentId: string;
+  readonly shopItemId: string;
+  readonly shopItemCode: string;
+  readonly shopItemName: string;
+  readonly shopItemKind: ShopStoreItemKind;
+  readonly pointTransactionId: string;
+  readonly pricePaid: number;
+  readonly createdAt: string;
+}
+
+export type ShopStoreOp = 'items' | 'purchases' | 'purchase' | 'wallet';
+
+export type ShopStoreFailure =
+  MswErrorResponseSpec | 'network' | 'drop-response' | 'malformed-2xx';
+
+export interface ClassroomShopStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId: string;
+  readonly studentId?: string;
+  readonly role?: string;
+  readonly initialBalance?: number;
+  readonly initialItems?: readonly ShopStoreCatalogItem[];
+  readonly initialPurchases?: readonly ShopStorePurchase[];
+  readonly purchaseDelayMs?: number;
+}
+
+export interface ClassroomShopStore {
+  readonly handlers: readonly HttpHandler[];
+  getBalance: () => number;
+  setBalance: (balance: number) => void;
+  setRole: (role: string) => void;
+  removeItem: (shopItemId: string) => void;
+  markOwnedExternally: (shopItemId: string) => void;
+  failNext: (op: ShopStoreOp, failure: ShopStoreFailure) => void;
+  getCounts: () => Record<ShopStoreOp, number>;
+  getReceivedIdempotencyKeys: () => readonly string[];
+}
+
+/**
+ * Stateful contract-faithful MSW store for classroom shop (`HU-GAM-003`,
+ * backend `#34`) plus synchronized `GET /classrooms/:id/points` wallet view.
+ */
+export function createClassroomShopStore(
+  options: ClassroomShopStoreOptions,
+): ClassroomShopStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const studentId = options.studentId ?? '00000000-0000-4000-8000-000000007001';
+  let currentRole = options.role ?? 'STUDENT';
+  let balance = options.initialBalance ?? 250;
+  let items: ShopStoreCatalogItem[] = [...(options.initialItems ?? [])];
+  let purchases: ShopStorePurchase[] = [...(options.initialPurchases ?? [])];
+  let purchaseSeq = 100;
+
+  const idempotencyRecords = new Map<
+    string,
+    {
+      readonly shopItemId: string;
+      readonly purchase: ShopStorePurchase;
+      readonly classroomItem: {
+        readonly id: string;
+        readonly classroomId: string;
+        readonly shopItemId: string;
+        readonly purchaseId: string;
+        readonly state: 'ACTIVE';
+        readonly createdAt: string;
+      } | null;
+      readonly balanceAfter: number;
+    }
+  >();
+
+  const pending: Partial<Record<ShopStoreOp, ShopStoreFailure>> = {};
+  const counts: Record<ShopStoreOp, number> = {
+    items: 0,
+    purchases: 0,
+    purchase: 0,
+    wallet: 0,
+  };
+  const receivedKeys: string[] = [];
+
+  const consumeFailure = (op: ShopStoreOp): ShopStoreFailure | undefined => {
+    const failure = pending[op];
+    pending[op] = undefined;
+    return failure;
+  };
+
+  const respondFailure = (failure: ShopStoreFailure): Response => {
+    if (failure === 'network' || failure === 'drop-response') {
+      return HttpResponse.error();
+    }
+    if (failure === 'malformed-2xx') {
+      return HttpResponse.json({ broken: true }, { status: 200 });
+    }
+    return createErrorEnvelopeResponse(failure.status, failure.body);
+  };
+
+  const toCatalogDto = (item: ShopStoreCatalogItem) => {
+    const ownedByStudent = Boolean(item.ownedByStudent);
+    const ownedByClassroom = Boolean(item.ownedByClassroom);
+    const isPurchasable =
+      item.isImplemented &&
+      !ownedByStudent &&
+      !(item.kind === 'CLASSROOM_ITEM' && ownedByClassroom);
+    return {
+      id: item.id,
+      code: item.code,
+      name: item.name,
+      description: item.description,
+      kind: item.kind,
+      price: item.price,
+      isImplemented: item.isImplemented,
+      isPurchasable,
+      ownedByStudent,
+      ownedByClassroom,
+      metadata: item.metadata ?? {},
+      createdAt: item.createdAt,
+    };
+  };
+
+  return {
+    getBalance: () => balance,
+    setBalance: (next) => {
+      balance = Math.max(0, next);
+    },
+    setRole: (role) => {
+      currentRole = role;
+    },
+    removeItem: (shopItemId) => {
+      items = items.filter((item) => item.id !== shopItemId);
+    },
+    markOwnedExternally: (shopItemId) => {
+      items = items.map((item) =>
+        item.id === shopItemId
+          ? {
+              ...item,
+              ownedByStudent: true,
+              ownedByClassroom:
+                item.kind === 'CLASSROOM_ITEM' ? true : item.ownedByClassroom,
+            }
+          : item,
+      );
+    },
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    getCounts: () => ({ ...counts }),
+    getReceivedIdempotencyKeys: () => [...receivedKeys],
+    handlers: [
+      http.get(`${baseUrl}/classrooms/:id/points`, ({ params }) => {
+        counts.wallet += 1;
+        const failure = consumeFailure('wallet');
+        if (failure !== undefined) {
+          return respondFailure(failure);
+        }
+        if (String(params.id ?? '') !== options.classroomId) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Classroom not found.',
+            correlationId: 'req-shop-wallet-404',
+          });
+        }
+        if (currentRole !== 'STUDENT') {
+          return createErrorEnvelopeResponse(403, {
+            code: 'FORBIDDEN',
+            message: 'Student role required.',
+            correlationId: 'req-shop-wallet-403',
+          });
+        }
+        return HttpResponse.json({
+          classroomId: options.classroomId,
+          studentId,
+          balance,
+          items: purchases.map((p) => ({
+            id: p.pointTransactionId,
+            entryKind: 'DEBIT',
+            amount: -p.pricePaid,
+            sourceType: 'SHOP_PURCHASE',
+            sourceId: p.id,
+            reason: `Compra en tienda: ${p.shopItemName}`,
+            actorId: studentId,
+            createdAt: p.createdAt,
+          })),
+          page: 1,
+          pageSize: 20,
+          total: purchases.length,
+        });
+      }),
+      http.get(
+        `${baseUrl}/classrooms/:id/shop/items`,
+        ({ params, request }) => {
+          counts.items += 1;
+          const failure = consumeFailure('items');
+          if (failure !== undefined) {
+            return respondFailure(failure);
+          }
+          if (String(params.id ?? '') !== options.classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-shop-items-404',
+            });
+          }
+          if (currentRole !== 'STUDENT') {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Student role required.',
+              correlationId: 'req-shop-items-403',
+            });
+          }
+
+          const url = new URL(request.url);
+          const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+          const pageSize = Math.min(
+            100,
+            Math.max(1, Number(url.searchParams.get('pageSize') ?? '20')),
+          );
+          const kind = url.searchParams.get('kind') ?? '';
+          const sort = url.searchParams.get('sort') ?? 'createdAt';
+          const allowedSorts = new Set([
+            'createdAt',
+            '-createdAt',
+            'defaultPrice',
+            '-defaultPrice',
+            'name',
+            '-name',
+          ]);
+          if (!allowedSorts.has(sort)) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid sort parameter.',
+              details: [{ field: 'sort', messages: ['Invalid sort field'] }],
+              correlationId: 'req-shop-items-400',
+            });
+          }
+
+          let filtered = [...items];
+          if (kind) {
+            filtered = filtered.filter((item) => item.kind === kind);
+          }
+
+          const sorted = filtered.sort((a, b) => {
+            if (sort === 'defaultPrice') {
+              return a.price - b.price || a.id.localeCompare(b.id);
+            }
+            if (sort === '-defaultPrice') {
+              return b.price - a.price || a.id.localeCompare(b.id);
+            }
+            if (sort === 'name') {
+              return a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+            }
+            if (sort === '-name') {
+              return b.name.localeCompare(a.name) || a.id.localeCompare(b.id);
+            }
+            if (sort === '-createdAt') {
+              return (
+                Date.parse(b.createdAt) - Date.parse(a.createdAt) ||
+                a.id.localeCompare(b.id)
+              );
+            }
+            return (
+              Date.parse(a.createdAt) - Date.parse(b.createdAt) ||
+              a.id.localeCompare(b.id)
+            );
+          });
+
+          const start = (page - 1) * pageSize;
+          return HttpResponse.json({
+            items: sorted.slice(start, start + pageSize).map(toCatalogDto),
+            page,
+            pageSize,
+            total: sorted.length,
+          });
+        },
+      ),
+      http.get(
+        `${baseUrl}/classrooms/:id/shop/purchases`,
+        ({ params, request }) => {
+          counts.purchases += 1;
+          const failure = consumeFailure('purchases');
+          if (failure !== undefined) {
+            return respondFailure(failure);
+          }
+          if (String(params.id ?? '') !== options.classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-shop-purchases-404',
+            });
+          }
+          if (currentRole !== 'STUDENT') {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Student role required.',
+              correlationId: 'req-shop-purchases-403',
+            });
+          }
+
+          const url = new URL(request.url);
+          const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+          const pageSize = Math.min(
+            100,
+            Math.max(1, Number(url.searchParams.get('pageSize') ?? '20')),
+          );
+          const sorted = [...purchases].sort(
+            (a, b) =>
+              Date.parse(b.createdAt) - Date.parse(a.createdAt) ||
+              a.id.localeCompare(b.id),
+          );
+          const start = (page - 1) * pageSize;
+          return HttpResponse.json({
+            items: sorted.slice(start, start + pageSize),
+            page,
+            pageSize,
+            total: sorted.length,
+          });
+        },
+      ),
+      http.post(
+        `${baseUrl}/classrooms/:id/shop/purchase`,
+        async ({ params, request }) => {
+          counts.purchase += 1;
+          if (options.purchaseDelayMs) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, options.purchaseDelayMs),
+            );
+          }
+
+          const key = request.headers.get('Idempotency-Key')?.trim() ?? '';
+          if (key) {
+            receivedKeys.push(key);
+          }
+
+          const failure = consumeFailure('purchase');
+          if (
+            failure !== undefined &&
+            failure !== 'drop-response' &&
+            failure !== 'malformed-2xx'
+          ) {
+            return respondFailure(failure);
+          }
+
+          if (String(params.id ?? '') !== options.classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-shop-purchase-404',
+            });
+          }
+          if (currentRole !== 'STUDENT') {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Student role required.',
+              correlationId: 'req-shop-purchase-403',
+            });
+          }
+          if (!key || key.length > 128) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Idempotency-Key header is required.',
+              details: [
+                {
+                  field: 'idempotency-key',
+                  messages: ['Idempotency-Key header is required'],
+                },
+              ],
+              correlationId: 'req-shop-purchase-400-key',
+            });
+          }
+
+          const body = (await request.json()) as Record<string, unknown>;
+          const extraKeys = Object.keys(body).filter((k) => k !== 'shopItemId');
+          if (
+            extraKeys.length > 0 ||
+            typeof body.shopItemId !== 'string' ||
+            body.shopItemId.trim().length === 0
+          ) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid purchase payload.',
+              details: [
+                { field: 'shopItemId', messages: ['Invalid shopItemId'] },
+              ],
+              correlationId: 'req-shop-purchase-400-body',
+            });
+          }
+
+          const shopItemId = body.shopItemId;
+          const existingRecord = idempotencyRecords.get(key);
+          if (existingRecord) {
+            if (existingRecord.shopItemId !== shopItemId) {
+              return createErrorEnvelopeResponse(409, {
+                code: 'CONFLICT',
+                message: 'Conflict.',
+                correlationId: 'req-shop-purchase-409-key-mismatch',
+              });
+            }
+            return HttpResponse.json(
+              {
+                purchase: existingRecord.purchase,
+                classroomItem: existingRecord.classroomItem,
+                balance,
+                replayed: true,
+              },
+              { status: 200 },
+            );
+          }
+
+          const item = items.find((entry) => entry.id === shopItemId);
+          if (!item) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Item not found.',
+              correlationId: 'req-shop-purchase-404-item',
+            });
+          }
+
+          if (
+            !item.isImplemented ||
+            item.ownedByStudent ||
+            (item.kind === 'CLASSROOM_ITEM' && item.ownedByClassroom) ||
+            balance < item.price
+          ) {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message: 'Conflict.',
+              correlationId: 'req-shop-purchase-409',
+            });
+          }
+
+          purchaseSeq += 1;
+          const now = '2026-11-19T02:30:00.000Z';
+          const purchaseId = `00000000-0000-4000-8000-20000000${String(purchaseSeq).padStart(4, '0')}`;
+          const txId = `00000000-0000-4000-8000-30000000${String(purchaseSeq).padStart(4, '0')}`;
+
+          balance -= item.price;
+          items = items.map((entry) =>
+            entry.id === item.id
+              ? {
+                  ...entry,
+                  ownedByStudent: true,
+                  ownedByClassroom:
+                    entry.kind === 'CLASSROOM_ITEM'
+                      ? true
+                      : entry.ownedByClassroom,
+                }
+              : entry,
+          );
+
+          const purchase: ShopStorePurchase = {
+            id: purchaseId,
+            classroomId: options.classroomId,
+            studentId,
+            shopItemId: item.id,
+            shopItemCode: item.code,
+            shopItemName: item.name,
+            shopItemKind: item.kind,
+            pointTransactionId: txId,
+            pricePaid: item.price,
+            createdAt: now,
+          };
+          purchases = [purchase, ...purchases];
+
+          const classroomItem =
+            item.kind === 'CLASSROOM_ITEM'
+              ? {
+                  id: `00000000-0000-4000-8000-40000000${String(purchaseSeq).padStart(4, '0')}`,
+                  classroomId: options.classroomId,
+                  shopItemId: item.id,
+                  purchaseId,
+                  state: 'ACTIVE' as const,
+                  createdAt: now,
+                }
+              : null;
+
+          idempotencyRecords.set(key, {
+            shopItemId,
+            purchase,
+            classroomItem,
+            balanceAfter: balance,
+          });
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+          if (failure === 'malformed-2xx') {
+            return HttpResponse.json({ broken: true }, { status: 201 });
+          }
+
+          return HttpResponse.json(
+            {
+              purchase,
+              classroomItem,
+              balance,
+              replayed: false,
+            },
+            { status: 201 },
+          );
+        },
+      ),
+    ],
+  };
+}
+
 export const defaultHandlers: readonly HttpHandler[] = [
   createHealthHandler(),
   http.get(`${TEST_API_BASE_URL}/notifications`, () =>
@@ -4434,6 +5660,216 @@ export function createClassroomMetricsHandler(
       return HttpResponse.json(payload, { status });
     },
   );
+}
+
+export interface StreakBadgePayloadItem {
+  readonly id: string;
+  readonly code: string;
+  readonly name: string;
+  readonly description: string;
+  readonly unlocked: boolean;
+  readonly unlockedAt: string | null;
+}
+
+export interface OwnStreakAndBadgesPayload {
+  readonly currentStreak: number;
+  readonly bestStreak: number;
+  readonly lastQualifiedDate: string | null;
+  readonly badges: readonly StreakBadgePayloadItem[];
+}
+
+export interface CreateOwnStreakAndBadgesHandlerOptions {
+  readonly baseUrl?: string;
+  readonly payload?: OwnStreakAndBadgesPayload;
+  readonly error?: MswErrorResponseSpec | 'network';
+}
+
+export const DEFAULT_STREAK_AND_BADGES_PAYLOAD: OwnStreakAndBadgesPayload = {
+  currentStreak: 0,
+  bestStreak: 0,
+  lastQualifiedDate: null,
+  badges: [],
+};
+
+/**
+ * Contract-faithful MSW handler for `GET /users/me/streak-and-badges` (`HU-GAM-002`).
+ */
+export function createOwnStreakAndBadgesHandler(
+  options: CreateOwnStreakAndBadgesHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const payload = options.payload ?? DEFAULT_STREAK_AND_BADGES_PAYLOAD;
+  return http.get(`${baseUrl}/users/me/streak-and-badges`, () => {
+    if (options.error === 'network') {
+      return HttpResponse.error();
+    }
+    if (options.error) {
+      return createErrorEnvelopeResponse(
+        options.error.status,
+        options.error.body,
+      );
+    }
+    return HttpResponse.json(payload);
+  });
+}
+
+export type BotStoreOp = 'status' | 'ask';
+
+export interface BotStoreCitation {
+  readonly materialId: string;
+  readonly filename: string;
+  readonly excerpt?: string | null;
+}
+
+export interface ClassroomBotStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly initialAvailable?: boolean;
+  readonly initialReason?:
+    'exam_in_progress' | 'no_materials' | 'disabled' | null;
+  readonly initialMessage?: string | null;
+  readonly onAsk?: (question: string) =>
+    | {
+        readonly answer: string;
+        readonly outcome?: 'answered' | 'out_of_scope' | 'guided_only';
+        readonly citations?: readonly BotStoreCitation[];
+      }
+    | Promise<{
+        readonly answer: string;
+        readonly outcome?: 'answered' | 'out_of_scope' | 'guided_only';
+        readonly citations?: readonly BotStoreCitation[];
+      }>;
+}
+
+export interface ClassroomBotStore {
+  readonly handlers: readonly HttpHandler[];
+  setExamLocked(locked: boolean, message?: string | null): void;
+  failNext(op: BotStoreOp, failure: MswErrorResponseSpec | 'network'): void;
+}
+
+/**
+ * Stateful, contract-faithful MSW store for `HU-BOT-002` (`GET /bot/status`,
+ * `POST /bot/messages`).
+ */
+export function createClassroomBotStore(
+  options: ClassroomBotStoreOptions = {},
+): ClassroomBotStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomId =
+    options.classroomId ?? '00000000-0000-4000-8000-000000000010';
+  let available = options.initialAvailable ?? true;
+  let reason: 'exam_in_progress' | 'no_materials' | 'disabled' | null =
+    options.initialReason ?? null;
+  let message: string | null = options.initialMessage ?? null;
+  let seq = 1;
+  const pending: Partial<Record<BotStoreOp, MswErrorResponseSpec | 'network'>> =
+    {};
+
+  const fail = (failure: MswErrorResponseSpec | 'network'): Response =>
+    failure === 'network'
+      ? HttpResponse.error()
+      : createErrorEnvelopeResponse(failure.status, failure.body);
+
+  return {
+    setExamLocked(locked, nextMessage) {
+      available = !locked;
+      reason = locked ? 'exam_in_progress' : null;
+      message = locked
+        ? (nextMessage ??
+          'El asistente está pausado porque tenés un examen en curso.')
+        : null;
+    },
+    failNext(op, failure) {
+      pending[op] = failure;
+    },
+    handlers: [
+      http.get(`${baseUrl}/classrooms/:id/bot/status`, ({ params }) => {
+        const failure = pending.status;
+        pending.status = undefined;
+        if (failure) {
+          return fail(failure);
+        }
+        if (options.classroomId && params.id !== classroomId) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Classroom not found.',
+            correlationId: 'req-bot-status-404',
+          });
+        }
+        return HttpResponse.json({
+          available,
+          reason,
+          message,
+        });
+      }),
+      http.post(
+        `${baseUrl}/classrooms/:id/bot/messages`,
+        async ({ params, request }) => {
+          const failure = pending.ask;
+          pending.ask = undefined;
+          if (failure) {
+            return fail(failure);
+          }
+          if (options.classroomId && params.id !== classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-bot-ask-404',
+            });
+          }
+          if (!available && reason === 'exam_in_progress') {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message:
+                message ??
+                'El asistente está pausado porque tenés un examen en curso.',
+              correlationId: 'req-bot-exam-409',
+            });
+          }
+          const body = (await request.json().catch(() => null)) as {
+            question?: unknown;
+          } | null;
+          const question =
+            typeof body?.question === 'string' ? body.question.trim() : '';
+          if (!question) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'question is required.',
+              correlationId: 'req-bot-ask-400',
+            });
+          }
+          const custom = options.onAsk ? await options.onAsk(question) : null;
+          if (!available && reason === 'exam_in_progress') {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message:
+                message ??
+                'El asistente está pausado porque tenés un examen en curso.',
+              correlationId: 'req-bot-exam-inflight-409',
+            });
+          }
+          const id = `bot-msg-${seq}`;
+          seq += 1;
+          return HttpResponse.json({
+            id,
+            answer:
+              custom?.answer ??
+              'Revisá la definición de fracciones equivalentes en el apunte de la unidad.',
+            outcome: custom?.outcome ?? 'answered',
+            citations: custom?.citations ?? [
+              {
+                materialId: '00000000-0000-4000-8000-000000001001',
+                filename: 'guia-unidad-1.pdf',
+                excerpt:
+                  'Dos fracciones son equivalentes cuando representan la misma parte.',
+              },
+            ],
+            createdAt: '2026-11-19T02:25:00.000Z',
+          });
+        },
+      ),
+    ],
+  };
 }
 
 export interface ForumStorePost {
