@@ -6,6 +6,7 @@ import {
   classroomActivityMetricsQueryKey,
   classroomDetailQueryKey,
   createClassroomActivityMetricsPredicate,
+  createOwnActivityMetricsPredicate,
   createStudentReportCardPredicate,
   ownActivityMetricsQueryKey,
   studentReportCardQueryKey,
@@ -79,37 +80,47 @@ function GradesPanelContent({ classroomId }: { classroomId: string }) {
         headingLevel="h3"
         title={
           isForbidden
-            ? messages.teacher.forbiddenTitle
+            ? messages.context.forbiddenTitle
             : isNotFound
-              ? messages.teacher.notFoundTitle
-              : messages.teacher.errorTitle
+              ? messages.context.notFoundTitle
+              : messages.context.errorTitle
         }
         description={
           isForbidden
-            ? messages.teacher.forbiddenDescription
+            ? messages.context.forbiddenDescription
             : isNotFound
-              ? messages.teacher.notFoundDescription
+              ? messages.context.notFoundDescription
               : context.error.userMessage
         }
         onRetry={isForbidden || isNotFound ? undefined : context.retry}
-        retryLabel={messages.teacher.retryLabel}
+        retryLabel={messages.context.retryLabel}
       />
     );
   }
 
   const myRole = context.classroom.myRole;
+  if (myRole === 'PARENT') {
+    return (
+      <EmptyState
+        headingLevel="h3"
+        title={messages.parent.title}
+        description={messages.parent.description}
+      />
+    );
+  }
+
   const isStaff =
     myRole === 'OWNER' || myRole === 'ADMIN' || myRole === 'TEACHER';
 
   return isStaff ? (
     <TeacherMetricsView
-      key={`teacher:${classroomId}`}
+      key={`teacher:${context.userId}:${classroomId}`}
       classroomId={classroomId}
       userId={context.userId}
     />
   ) : (
     <StudentGradesView
-      key={`student:${classroomId}`}
+      key={`student:${context.userId}:${classroomId}`}
       classroomId={classroomId}
       userId={context.userId}
     />
@@ -203,6 +214,7 @@ function DailyMetricsTable({
   return (
     <div className="min-w-0 overflow-x-auto">
       <table className="w-full border-collapse text-sm">
+        <caption className="sr-only">{metrics.tableCaption}</caption>
         <thead>
           <tr className="border-b-2 border-edge text-left">
             <th scope="col" className="px-2 py-2 font-semibold">
@@ -222,7 +234,9 @@ function DailyMetricsTable({
         <tbody>
           {items.map((row) => (
             <tr key={row.day} className="border-b border-edge/60">
-              <td className="px-2 py-2">{formatMetricDay(row.day)}</td>
+              <th scope="row" className="px-2 py-2 text-left font-normal">
+                {formatMetricDay(row.day)}
+              </th>
               <td className="px-2 py-2">
                 {formatConnectedSeconds(row.connectedSeconds)}
               </td>
@@ -284,17 +298,25 @@ function StudentGradesView({
 
   const reportCardError =
     reportCard.error instanceof ApiError ? reportCard.error : null;
-  const isAccessError =
+  const metricsError = metrics.error instanceof ApiError ? metrics.error : null;
+  const isReportCardAccessError =
     reportCard.isError &&
     (reportCardError?.status === 403 || reportCardError?.status === 404);
+  const isMetricsAccessError =
+    metrics.isError &&
+    (metricsError?.status === 403 || metricsError?.status === 404);
+  const isAccessError = isReportCardAccessError || isMetricsAccessError;
+  const accessNotFoundError =
+    reportCardError?.status === 404
+      ? reportCard.error
+      : metricsError?.status === 404
+        ? metrics.error
+        : null;
 
   useEffect(() => {
-    if (!reportCard.isError) {
+    if (!isAccessError) {
       reconciledErrorRef.current = null;
       terminalCleanupRef.current = null;
-      return;
-    }
-    if (!isAccessError) {
       return;
     }
     terminalCleanupRef.current = { userId, classroomId };
@@ -304,25 +326,21 @@ function StudentGradesView({
       predicate: createStudentReportCardPredicate(userId, classroomId),
       type: 'inactive',
     });
+    queryClient.removeQueries({
+      predicate: createOwnActivityMetricsPredicate(userId, classroomId),
+      type: 'inactive',
+    });
     if (
-      reportCardError?.status === 404 &&
-      reconciledErrorRef.current !== reportCard.error
+      accessNotFoundError !== null &&
+      reconciledErrorRef.current !== accessNotFoundError
     ) {
-      reconciledErrorRef.current = reportCard.error;
+      reconciledErrorRef.current = accessNotFoundError;
       void queryClient.invalidateQueries({
         queryKey: classroomDetailQueryKey(userId, classroomId),
         exact: true,
       });
     }
-  }, [
-    classroomId,
-    isAccessError,
-    queryClient,
-    reportCard.error,
-    reportCard.isError,
-    reportCardError?.status,
-    userId,
-  ]);
+  }, [accessNotFoundError, classroomId, isAccessError, queryClient, userId]);
 
   useEffect(() => {
     return () => {
@@ -334,12 +352,28 @@ function StudentGradesView({
             cleanup.classroomId,
           ),
         });
+        queryClient.removeQueries({
+          predicate: createOwnActivityMetricsPredicate(
+            cleanup.userId,
+            cleanup.classroomId,
+          ),
+        });
       }
     };
   }, [queryClient]);
 
   if (reportCard.isPending) {
     return <LoadingState label={student.loadingLabel} />;
+  }
+
+  if (metricsError?.status === 404) {
+    return (
+      <ErrorState
+        headingLevel="h3"
+        title={student.notFoundTitle}
+        description={student.notFoundDescription}
+      />
+    );
   }
 
   const isTerminalReportCardError =
@@ -385,10 +419,9 @@ function StudentGradesView({
   const isOutOfRangeReportCardPage =
     data !== undefined && data.items.length === 0 && reportCardPage > 1;
 
-  const metricsError = metrics.error instanceof ApiError ? metrics.error : null;
-  const isMetricsTerminalError =
-    metrics.isError &&
-    (metricsError?.status === 403 || metricsError?.status === 404);
+  const isMetricsForbidden = metrics.isError && metricsError?.status === 403;
+  const isMetricsNotFound = metrics.isError && metricsError?.status === 404;
+  const isMetricsTerminalError = isMetricsForbidden || isMetricsNotFound;
 
   return (
     <div className="min-w-0 space-y-6">
@@ -474,9 +507,11 @@ function StudentGradesView({
             headingLevel="h4"
             title={student.metrics.errorTitle}
             description={
-              isMetricsTerminalError
-                ? student.notFoundDescription
-                : student.metrics.errorDescription
+              isMetricsForbidden
+                ? student.metrics.forbiddenDescription
+                : isMetricsNotFound
+                  ? student.metrics.notFoundDescription
+                  : student.metrics.errorDescription
             }
             onRetry={
               isMetricsTerminalError
@@ -549,6 +584,7 @@ function ClassroomMetricsTable({
   return (
     <div className="min-w-0 overflow-x-auto">
       <table className="w-full border-collapse text-sm">
+        <caption className="sr-only">{messages.teacher.tableCaption}</caption>
         <thead>
           <tr className="border-b-2 border-edge text-left">
             <th scope="col" className="px-2 py-2 font-semibold">

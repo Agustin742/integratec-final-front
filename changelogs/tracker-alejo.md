@@ -1,5 +1,16 @@
 # Tracker — Alejo
 
+## 2026-11-18 — Implement student report card and teacher tracking metrics panel (#46)
+
+- **Status:** in-progress (PR #100 open against `develop`, review fixes applied)
+- **Area / files:** `src/api/schema.generated.ts` (sync), `src/api/query-keys.ts`, `src/features/classrooms/grades/`, `src/features/classrooms/panels/classroom-panel-catalog.tsx`, `src/features/classrooms/classroom-mode-switch.test.tsx`, `src/test/msw/handlers.ts`, `e2e/classroom-workspace.spec.ts`, `e2e/grades.spec.ts`, `docs/ui-grades.md`, `docs/classroom-panels.md`, `docs/assets/grades/`, `changelogs/tracker-alejo.md`
+- **Change:** Implemented [issue #46](https://github.com/Agustin742/integratec-final-front/issues/46) (`HU-ACT-005`) on `feat/46-report-card-and-metrics`:
+  1. Synced the committed contract artifacts from `feat/36-activity-metrics` (back #36 / PR #105) into `src/api/schema.generated.ts` (+324 lines), added user/classroom-scoped query keys and predicates (`src/api/query-keys.ts`), jitless Zod schemas (`grades-schema.ts`), typed REST service (`grades-service.ts`), centralized `es-AR` copy (`messages.ts`), and `formatConnectedSeconds`.
+  2. Implemented `GradesPanel` wired into `classroomPanelCatalog` (`grades`): role-branched on server-resolved `myRole` (student report card + own UTC-day participation metrics + embedded `WalletPanel`; teacher per-student raw totals table; parent honest non-student state without issuing student requests), plus loading/empty/stale/forbidden/not-found states, `403`/`404` cache cleanup across both report-card and own-metrics queries, and out-of-range page recovery.
+  3. Added contract-faithful MSW handlers (`src/test/msw/handlers.ts`), unit/RTL/axe tests, Playwright `e2e/grades.spec.ts` with 1280px/360px screenshots under `docs/assets/grades/`, and documentation in `docs/ui-grades.md` and `docs/classroom-panels.md`.
+- **Reason:** Deliver student report card and teacher per-student tracking panel with raw server values (`rules/activities-and-grading.md`, `rules/ui-and-accessibility.md`, `rules/data-and-time.md`, `rules/state-management.md`, `rules/api-contracts.md`, `rules/error-handling-and-feedback.md`).
+- **Next step:** Merge PR #100 into `develop` after CI passes, then reconcile `'grades'` panel slot with #44 (PR #101).
+
 ## 2026-11-18 — Teacher activity editor for assignments and exams with multiple-choice builder (#39)
 
 - **Status:** completed (published on [PR #97](https://github.com/Agustin742/integratec-final-front/pull/97); entry relocated from `changelogs/tracker-mati.md` to `changelogs/tracker-alejo.md` during review hygiene).

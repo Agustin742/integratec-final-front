@@ -1,6 +1,5 @@
 import { requestApi, type TypedApiClient } from '@/api/client';
 import { ApiError } from '@/api/errors';
-import { apiErrorMessages } from '@/api/messages';
 import type { NormalizedGradesMetricsQueryParams } from '@/api/query-keys';
 import { gradesMessages } from './messages';
 import {
@@ -11,22 +10,6 @@ import {
   type OwnDailyMetrics,
   type StudentReportCard,
 } from './grades-schema';
-
-/**
- * `requestApi` maps every failure to an `ApiError` except an abort, which it
- * rethrows untouched. Anything else that reaches the query is wrapped so
- * callers can rely on the query error always carrying an `ApiError`.
- */
-function toApiError(error: unknown): ApiError {
-  if (error instanceof ApiError) return error;
-  return new ApiError({
-    kind: 'unexpected',
-    status: null,
-    code: null,
-    userMessage: apiErrorMessages.unexpected,
-    cause: error,
-  });
-}
 
 function toUnexpectedPayloadError(): ApiError {
   return new ApiError({
@@ -110,5 +93,3 @@ export async function fetchClassroomMetrics(
   }
   return parsed.data;
 }
-
-export { toApiError };

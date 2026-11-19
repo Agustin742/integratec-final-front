@@ -3,6 +3,21 @@ export const gradesMessages = {
     unexpected:
       'Ocurrió un problema inesperado al consultar los datos del aula.',
   },
+  context: {
+    errorTitle: 'No pudimos cargar las calificaciones',
+    forbiddenTitle: 'No tenés acceso a este panel',
+    forbiddenDescription:
+      'No tenés permiso para consultar las calificaciones o métricas de esta aula.',
+    notFoundTitle: 'Aula no encontrada',
+    notFoundDescription:
+      'No encontramos el aula o ya no tenés permiso para ver este panel.',
+    retryLabel: 'Reintentar',
+  },
+  parent: {
+    title: 'Vista para madres, padres y tutores',
+    description:
+      'La vista de calificaciones para responsables se ofrece en el área familiar; este panel del aula está disponible para alumnos y docentes.',
+  },
   student: {
     heading: 'Boletín de calificaciones',
     subtitle:
@@ -52,6 +67,11 @@ export const gradesMessages = {
       errorTitle: 'No pudimos cargar tu participación',
       errorDescription:
         'Ocurrió un problema al consultar tus métricas. Reintentá en unos segundos.',
+      forbiddenDescription:
+        'Tus métricas de participación están disponibles únicamente para el alumno del aula.',
+      notFoundDescription:
+        'No encontramos el aula o ya no tenés permiso para ver tu participación.',
+      tableCaption: 'Participación diaria en el aula',
       retryLabel: 'Reintentar',
     },
     wallet: {
@@ -83,6 +103,7 @@ export const gradesMessages = {
     staleTitle: 'Mostrando la última información confirmada',
     staleDescription:
       'Falló la actualización automática; el seguimiento puede no estar al día.',
+    tableCaption: 'Seguimiento de participación por alumno',
     columns: {
       student: 'Alumno',
       connected: 'Tiempo conectado',

@@ -1,7 +1,16 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
-import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  test,
+  vi,
+} from 'vitest';
 import { createApiClient } from '@/api/client';
 import { createAppQueryClient } from '@/api/query-client';
 import { fakeSession } from '@/app/router/fake-session';
@@ -44,10 +53,28 @@ function rowOf(text: string): HTMLElement {
 function renderGradesPanel(
   options: {
     readonly role?: ClassroomRole;
+    readonly contextStatus?: 403 | 404;
   } = {},
 ) {
   const role = options.role ?? 'STUDENT';
-  mswServer.use(createClassroomContextHandler(CLASSROOM_ID, { myRole: role }));
+  if (options.contextStatus !== undefined) {
+    mswServer.use(
+      http.get(`${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}`, () =>
+        HttpResponse.json(
+          {
+            code: options.contextStatus === 403 ? 'FORBIDDEN' : 'NOT_FOUND',
+            message: FORBIDDEN_DIAGNOSTIC,
+            correlationId: 'req-ctx-error',
+          },
+          { status: options.contextStatus },
+        ),
+      ),
+    );
+  } else {
+    mswServer.use(
+      createClassroomContextHandler(CLASSROOM_ID, { myRole: role }),
+    );
+  }
 
   const client = createApiClient({ baseUrl: TEST_API_BASE_URL });
   const session = fakeSession(
@@ -475,5 +502,158 @@ describe('GradesPanel (#46, HU-ACT-005)', () => {
     expect(await screen.findByText(teacher.loadingLabel)).toBeVisible();
     await expectAccessible(teacherView.container);
     teacherView.unmount();
+  });
+
+  test('parent role sees non-student message without issuing student report-card or metrics requests', async () => {
+    const reportCardSpy = vi.fn();
+    const ownMetricsSpy = vi.fn();
+    mswServer.use(
+      createStudentReportCardHandler(CLASSROOM_ID, {
+        onRequest: reportCardSpy,
+      }),
+      createOwnDailyMetricsHandler(CLASSROOM_ID, {
+        onRequest: ownMetricsSpy,
+      }),
+    );
+
+    const { container } = renderGradesPanel({ role: 'PARENT' });
+
+    expect(
+      await screen.findByRole('heading', { name: gradesMessages.parent.title }),
+    ).toBeVisible();
+    expect(screen.getByText(gradesMessages.parent.description)).toBeVisible();
+    expect(reportCardSpy).not.toHaveBeenCalled();
+    expect(ownMetricsSpy).not.toHaveBeenCalled();
+    await expectAccessible(container);
+  });
+
+  test('context 403 uses role-neutral copy rather than teacher-only copy', async () => {
+    const { container } = renderGradesPanel({ contextStatus: 403 });
+
+    expect(
+      await screen.findByRole('heading', {
+        name: gradesMessages.context.forbiddenTitle,
+      }),
+    ).toBeVisible();
+    expect(
+      screen.getByText(gradesMessages.context.forbiddenDescription),
+    ).toBeVisible();
+    await expectAccessible(container);
+  });
+
+  test('transient 500 error offers Reintentar and recovers on retry', async () => {
+    let failReportCard = true;
+    mswServer.use(
+      http.get(
+        `${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}/me/report-card`,
+        () =>
+          failReportCard
+            ? HttpResponse.json(
+                {
+                  code: 'INTERNAL_ERROR',
+                  message: 'Temporary failure',
+                  correlationId: 'req-rc-500',
+                },
+                { status: 500 },
+              )
+            : undefined,
+      ),
+      createStudentReportCardHandler(CLASSROOM_ID),
+      createOwnDailyMetricsHandler(CLASSROOM_ID),
+      createStudentWalletHandler(CLASSROOM_ID),
+    );
+    renderGradesPanel();
+
+    expect(
+      await screen.findByRole('heading', { name: student.errorTitle }),
+    ).toBeVisible();
+
+    failReportCard = false;
+    fireEvent.click(screen.getByRole('button', { name: student.retryLabel }));
+
+    expect(
+      await screen.findByText('Fracciones: guía de ejercicios'),
+    ).toBeVisible();
+  });
+
+  test('background refetch failure shows StaleDataNotice while preserving confirmed report card', async () => {
+    let failRefetch = false;
+    mswServer.use(
+      http.get(
+        `${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}/me/report-card`,
+        () =>
+          failRefetch
+            ? HttpResponse.json(
+                {
+                  code: 'INTERNAL_ERROR',
+                  message: 'Refresh failed',
+                  correlationId: 'req-rc-stale',
+                },
+                { status: 500 },
+              )
+            : undefined,
+      ),
+      createStudentReportCardHandler(CLASSROOM_ID),
+      createOwnDailyMetricsHandler(CLASSROOM_ID),
+      createStudentWalletHandler(CLASSROOM_ID),
+    );
+    const { queryClient } = renderGradesPanel();
+
+    expect(
+      await screen.findByText('Fracciones: guía de ejercicios'),
+    ).toBeVisible();
+
+    failRefetch = true;
+    await queryClient.invalidateQueries();
+
+    expect(await screen.findByText(student.staleTitle)).toBeVisible();
+    expect(screen.getByText('Fracciones: guía de ejercicios')).toBeVisible();
+  });
+
+  test('pagination advances to page 2 and recovers from an out-of-range page', async () => {
+    let forceEmptyPage2 = false;
+    mswServer.use(
+      http.get(
+        `${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}/me/report-card`,
+        ({ request }) => {
+          const url = new URL(request.url);
+          if (forceEmptyPage2 && url.searchParams.get('page') === '2') {
+            return HttpResponse.json({
+              items: [],
+              page: 2,
+              pageSize: 20,
+              total: 20,
+            });
+          }
+          return undefined;
+        },
+      ),
+      createStudentReportCardHandler(CLASSROOM_ID, {
+        response: { total: 25 },
+      }),
+      createOwnDailyMetricsHandler(CLASSROOM_ID),
+      createStudentWalletHandler(CLASSROOM_ID),
+    );
+    renderGradesPanel();
+
+    expect(
+      await screen.findByText('Fracciones: guía de ejercicios'),
+    ).toBeVisible();
+
+    forceEmptyPage2 = true;
+    fireEvent.click(
+      screen.getByRole('button', { name: paginationMessages.nextPage }),
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: student.emptyPageTitle }),
+    ).toBeVisible();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: student.backToFirstPageLabel }),
+    );
+    expect(
+      await screen.findByText('Fracciones: guía de ejercicios'),
+    ).toBeVisible();
   });
 });

@@ -3768,7 +3768,7 @@ function readGradesPagination(url: URL): {
   const page = Number.isInteger(parsedPage) && parsedPage >= 1 ? parsedPage : 1;
   const pageSize =
     Number.isInteger(parsedPageSize) && parsedPageSize >= 1
-      ? parsedPageSize
+      ? Math.min(100, parsedPageSize)
       : 20;
   return { page, pageSize, start: (page - 1) * pageSize };
 }
