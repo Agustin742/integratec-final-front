@@ -21,6 +21,9 @@ import {
   createClassroomActivitiesStore,
   createClassroomDetailHandler,
   createClassroomGradingStore,
+  createOwnDailyMetricsHandler,
+  createStudentReportCardHandler,
+  createStudentWalletHandler,
   TEST_API_BASE_URL,
   type ActivityStoreItem,
   type GradingStoreSubmission,
@@ -501,10 +504,19 @@ describe('TeacherGradingQueuePanel & ClassroomGradesPanel (#44)', () => {
       classroomId: CLASSROOM_ID,
       initialSubmissions: [makeSubmission()],
     });
-    mswServer.use(...gradingStore.handlers);
+    mswServer.use(
+      ...gradingStore.handlers,
+      createStudentReportCardHandler(CLASSROOM_ID),
+      createOwnDailyMetricsHandler(CLASSROOM_ID),
+      createStudentWalletHandler(CLASSROOM_ID),
+    );
 
     renderGradingRoute({ role: 'STUDENT' });
-    expect(await screen.findByText('Funcionalidad pendiente')).toBeVisible();
+    expect(
+      await screen.findByRole('heading', {
+        name: gradesMessages.student.heading,
+      }),
+    ).toBeVisible();
     expect(
       screen.queryByRole('heading', { name: 'Cola de corrección' }),
     ).not.toBeInTheDocument();
