@@ -1,5 +1,14 @@
 # Tracker — Alejo
 
+## 2026-11-19 — Point the workflow profile tracker line at the acting participant
+
+- **Status:** completed (published on [PR #111](https://github.com/Agustin742/integratec-final-front/pull/111) and merged into `develop` with a merge commit; CI green after one rerun of a load-induced test timeout, merge authorized directly by the repo owner without a second team review)
+- **Area / files:** `AGENTS.md` (Workflow profile), `changelogs/tracker-alejo.md`
+- **Change:** Replaced the fixed `- Tracker: changelogs/tracker-mati.md` line in the `AGENTS.md` workflow profile with a pointer to the acting participant's own tracker (`changelogs/tracker-<name>.md`, linked to the changelog guide), removing the assumption that Mati is always the one working. The rest of `AGENTS.md` ("Track your work" section, line 25) already required the acting participant's tracker, so only this stale line named a fixed person.
+- **Reason:** The named-tracker line misdirected any work not done by Mati (e.g. my entries belong in `changelogs/tracker-alejo.md`); user-reported and confirmed as wrong.
+- **Verification:** Read-only grep confirmed `tracker-mati.md` no longer appears in `AGENTS.md`; no other project doc repeats the fixed-tracker assumption (`changelogs/README.md` already defines per-participant trackers). CI evidence for PR #111: the first `checks` run failed only on `src/features/classrooms/invitation-accept-page.test.tsx` "rejects an invitation consumed by another account without showing private classroom data" — a vitest 5 s timeout hit at 5002 ms under heavy runner load (110 jsdom environments, 67 s suite), 1109/1110 tests passing. Reproduced locally in isolation on Node v24.15.0 (`--config.engine-strict=false`, project pins Node 22): the test passes, and since this docs-only PR touches no invitation code, the failed job was rerun once and the full `checks` job passed green. Local checks for the tracker-only commit: `pnpm prettier --check changelogs/tracker-alejo.md` and `git diff --check` clean.
+- **Next step:** None for PR #111 (merged into `develop`). Follow-up recommended: harden the flaky invitation-accept timeout (per-test timeout or leaner setup) in a dedicated issue. Unrelated leftover: `changelogs/tracker-mati.md` still has uncommitted local edits from the PR #107 review session — deliberately excluded from this PR; relocate or commit separately.
+
 ## 2026-11-18 — Implement student report card and teacher tracking metrics panel (#46)
 
 - **Status:** in-progress (PR #100 open against `develop`, review fixes applied)
