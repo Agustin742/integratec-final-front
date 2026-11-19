@@ -216,6 +216,9 @@ test.beforeEach(async ({ page, baseURL }) => {
       expect(request.headers().authorization).toBe('Bearer synthetic-access');
       return route.fulfill({ json: profile });
     }
+    if (url.origin === apiOrigin && url.pathname === '/users/me/daily-review') {
+      return route.fulfill({ json: { status: 'not_due' } });
+    }
     if (
       url.origin === apiOrigin &&
       url.pathname === '/notifications' &&
@@ -242,6 +245,30 @@ test.beforeEach(async ({ page, baseURL }) => {
       expect(request.method()).toBe('GET');
       expect(request.headers().authorization).toBe('Bearer synthetic-access');
       return route.fulfill({ json: wallet });
+    }
+    // The teacher grading queue populates its activities selector and
+    // metadata map from the classroom activities list; the request carries
+    // pagination query params, so match on the pathname.
+    if (
+      url.origin === apiOrigin &&
+      url.pathname === `/classrooms/${classroomId}/activities`
+    ) {
+      expect(request.method()).toBe('GET');
+      return route.fulfill({
+        json: { items: [], page: 1, pageSize: 100, total: 0 },
+      });
+    }
+    // The teacher grading queue reads the classroom submissions queue; the
+    // request carries pagination and filter query params, so match on the
+    // pathname.
+    if (
+      url.origin === apiOrigin &&
+      url.pathname === `/classrooms/${classroomId}/submissions`
+    ) {
+      expect(request.method()).toBe('GET');
+      return route.fulfill({
+        json: { items: [], page: 1, pageSize: 20, total: 0 },
+      });
     }
     await route.abort();
     throw new Error(
@@ -384,6 +411,11 @@ test('teacher grades panel shows raw per-student metrics without client aggregat
     exact: true,
   });
   await expect(dialog).toBeVisible();
+  // The staff panel opens on the grading queue tab (#103 unification);
+  // switch to the classroom metrics tab before asserting its content.
+  await dialog
+    .getByRole('tab', { name: gradesMessages.teacher.heading, exact: true })
+    .click();
   await expect(
     dialog.getByRole('heading', {
       level: 3,
