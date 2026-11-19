@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import { classroomMessages } from '../messages';
 import {
+  ACTIVITY_LIMITS,
   createActivityPayloadSchema,
   updateActivityPayloadSchema,
 } from './activity-schema';
+import { activityMessages } from './messages';
 
 const validDueAt = '2026-12-01T23:59:59.000Z';
 const validOpensAt = '2026-11-25T12:00:00.000Z';
@@ -41,8 +42,11 @@ const validMcqExamPayload = {
 };
 
 describe('createActivityPayloadSchema', () => {
-  test('accepts a valid FILE TP payload without questions', () => {
-    const parsed = createActivityPayloadSchema.safeParse(validFileTpPayload);
+  test('accepts a valid FILE TP payload without questions and explicit offset instants', () => {
+    const parsed = createActivityPayloadSchema.safeParse({
+      ...validFileTpPayload,
+      dueAt: '2026-12-01T20:59:59-03:00',
+    });
     expect(parsed.success).toBe(true);
   });
 
@@ -51,7 +55,7 @@ describe('createActivityPayloadSchema', () => {
     expect(parsed.success).toBe(true);
   });
 
-  test('rejects a missing or blank title', () => {
+  test('rejects a missing, blank, or overly long title and overly long description', () => {
     const missing = createActivityPayloadSchema.safeParse({
       ...validFileTpPayload,
       title: undefined,
@@ -65,7 +69,29 @@ describe('createActivityPayloadSchema', () => {
     expect(blank.success).toBe(false);
     if (!blank.success) {
       expect(blank.error.issues[0].message).toBe(
-        classroomMessages.activities.validation.titleRequired,
+        activityMessages.validation.titleRequired,
+      );
+    }
+
+    const tooLongTitle = createActivityPayloadSchema.safeParse({
+      ...validFileTpPayload,
+      title: 'A'.repeat(ACTIVITY_LIMITS.titleMax + 1),
+    });
+    expect(tooLongTitle.success).toBe(false);
+    if (!tooLongTitle.success) {
+      expect(tooLongTitle.error.issues[0].message).toBe(
+        activityMessages.validation.titleTooLong,
+      );
+    }
+
+    const tooLongDescription = createActivityPayloadSchema.safeParse({
+      ...validFileTpPayload,
+      description: 'D'.repeat(ACTIVITY_LIMITS.descriptionMax + 1),
+    });
+    expect(tooLongDescription.success).toBe(false);
+    if (!tooLongDescription.success) {
+      expect(tooLongDescription.error.issues[0].message).toBe(
+        activityMessages.validation.descriptionTooLong,
       );
     }
   });
@@ -78,7 +104,7 @@ describe('createActivityPayloadSchema', () => {
     expect(parsed.success).toBe(false);
     if (!parsed.success) {
       expect(parsed.error.issues[0].message).toBe(
-        classroomMessages.activities.validation.opensAtOnlyForExams,
+        activityMessages.validation.opensAtOnlyForExams,
       );
     }
   });
@@ -91,7 +117,7 @@ describe('createActivityPayloadSchema', () => {
     expect(same.success).toBe(false);
     if (!same.success) {
       expect(same.error.issues[0].message).toBe(
-        classroomMessages.activities.validation.opensAtBeforeDueAt,
+        activityMessages.validation.opensAtBeforeDueAt,
       );
     }
 
@@ -102,34 +128,90 @@ describe('createActivityPayloadSchema', () => {
     expect(after.success).toBe(false);
   });
 
-  test('rejects a MULTIPLE_CHOICE payload without questions', () => {
-    const parsed = createActivityPayloadSchema.safeParse({
+  test('enforces MULTIPLE_CHOICE question bounds (1..50) and forbids questions on FILE', () => {
+    const withoutQuestions = createActivityPayloadSchema.safeParse({
       ...validMcqExamPayload,
       questions: undefined,
     });
-    expect(parsed.success).toBe(false);
-    if (!parsed.success) {
-      expect(parsed.error.issues[0].message).toBe(
-        classroomMessages.activities.validation.questionsRequired,
+    expect(withoutQuestions.success).toBe(false);
+    if (!withoutQuestions.success) {
+      expect(withoutQuestions.error.issues[0].message).toBe(
+        activityMessages.validation.questionsRequired,
       );
     }
-  });
 
-  test('rejects questions on a FILE payload', () => {
-    const parsed = createActivityPayloadSchema.safeParse({
+    const tooManyQuestions = createActivityPayloadSchema.safeParse({
+      ...validMcqExamPayload,
+      questions: Array.from(
+        { length: ACTIVITY_LIMITS.questions.max + 1 },
+        (_, idx) => ({
+          prompt: `Pregunta ${idx + 1}`,
+          options: [
+            { label: 'Sí', isCorrect: true },
+            { label: 'No', isCorrect: false },
+          ],
+        }),
+      ),
+    });
+    expect(tooManyQuestions.success).toBe(false);
+    if (!tooManyQuestions.success) {
+      expect(tooManyQuestions.error.issues[0].message).toBe(
+        activityMessages.validation.questionsTooMany,
+      );
+    }
+
+    const onFile = createActivityPayloadSchema.safeParse({
       ...validFileTpPayload,
       questions: validMcqExamPayload.questions,
     });
-    expect(parsed.success).toBe(false);
-    if (!parsed.success) {
-      expect(parsed.error.issues[0].message).toBe(
-        classroomMessages.activities.validation.questionsForbiddenForFile,
+    expect(onFile.success).toBe(false);
+    if (!onFile.success) {
+      expect(onFile.error.issues[0].message).toBe(
+        activityMessages.validation.questionsForbiddenForFile,
       );
     }
   });
 
-  test('rejects a question with zero correct options', () => {
-    const parsed = createActivityPayloadSchema.safeParse({
+  test('enforces option count bounds (2..6) and exactly one correct option per question', () => {
+    const oneOption = createActivityPayloadSchema.safeParse({
+      ...validMcqExamPayload,
+      questions: [
+        {
+          prompt: '¿2+2?',
+          options: [{ label: '4', isCorrect: true }],
+        },
+      ],
+    });
+    expect(oneOption.success).toBe(false);
+    if (!oneOption.success) {
+      expect(oneOption.error.issues[0].message).toBe(
+        activityMessages.validation.optionsMin,
+      );
+    }
+
+    const sevenOptions = createActivityPayloadSchema.safeParse({
+      ...validMcqExamPayload,
+      questions: [
+        {
+          prompt: '¿2+2?',
+          options: Array.from(
+            { length: ACTIVITY_LIMITS.options.max + 1 },
+            (_, idx) => ({
+              label: `Opción ${idx + 1}`,
+              isCorrect: idx === 0,
+            }),
+          ),
+        },
+      ],
+    });
+    expect(sevenOptions.success).toBe(false);
+    if (!sevenOptions.success) {
+      expect(sevenOptions.error.issues[0].message).toBe(
+        activityMessages.validation.optionsMax,
+      );
+    }
+
+    const zeroCorrect = createActivityPayloadSchema.safeParse({
       ...validMcqExamPayload,
       questions: [
         {
@@ -141,16 +223,14 @@ describe('createActivityPayloadSchema', () => {
         },
       ],
     });
-    expect(parsed.success).toBe(false);
-    if (!parsed.success) {
-      expect(parsed.error.issues[0].message).toBe(
-        classroomMessages.activities.validation.exactlyOneCorrectOption,
+    expect(zeroCorrect.success).toBe(false);
+    if (!zeroCorrect.success) {
+      expect(zeroCorrect.error.issues[0].message).toBe(
+        activityMessages.validation.exactlyOneCorrectOption,
       );
     }
-  });
 
-  test('rejects a question with more than one correct option', () => {
-    const parsed = createActivityPayloadSchema.safeParse({
+    const multipleCorrect = createActivityPayloadSchema.safeParse({
       ...validMcqExamPayload,
       questions: [
         {
@@ -163,71 +243,160 @@ describe('createActivityPayloadSchema', () => {
         },
       ],
     });
-    expect(parsed.success).toBe(false);
-    if (!parsed.success) {
-      expect(parsed.error.issues[0].message).toBe(
-        classroomMessages.activities.validation.exactlyOneCorrectOption,
+    expect(multipleCorrect.success).toBe(false);
+    if (!multipleCorrect.success) {
+      expect(multipleCorrect.error.issues[0].message).toBe(
+        activityMessages.validation.exactlyOneCorrectOption,
       );
     }
   });
 
-  test('rejects a blank question prompt and blank option label', () => {
-    const parsed = createActivityPayloadSchema.safeParse({
+  test('rejects blank or overly long question prompts and option labels', () => {
+    const blank = createActivityPayloadSchema.safeParse({
       ...validMcqExamPayload,
       questions: [
         {
           prompt: '   ',
-          options: [{ label: '', isCorrect: true }],
+          options: [
+            { label: '', isCorrect: true },
+            { label: '4', isCorrect: false },
+          ],
         },
       ],
     });
-    expect(parsed.success).toBe(false);
+    expect(blank.success).toBe(false);
+
+    const tooLongPrompt = createActivityPayloadSchema.safeParse({
+      ...validMcqExamPayload,
+      questions: [
+        {
+          prompt: 'P'.repeat(ACTIVITY_LIMITS.promptMax + 1),
+          options: [
+            { label: 'A', isCorrect: true },
+            { label: 'B', isCorrect: false },
+          ],
+        },
+      ],
+    });
+    expect(tooLongPrompt.success).toBe(false);
+    if (!tooLongPrompt.success) {
+      expect(tooLongPrompt.error.issues[0].message).toBe(
+        activityMessages.validation.questionPromptTooLong,
+      );
+    }
+
+    const tooLongLabel = createActivityPayloadSchema.safeParse({
+      ...validMcqExamPayload,
+      questions: [
+        {
+          prompt: '¿Cuál?',
+          options: [
+            {
+              label: 'L'.repeat(ACTIVITY_LIMITS.labelMax + 1),
+              isCorrect: true,
+            },
+            { label: 'B', isCorrect: false },
+          ],
+        },
+      ],
+    });
+    expect(tooLongLabel.success).toBe(false);
+    if (!tooLongLabel.success) {
+      expect(tooLongLabel.error.issues[0].message).toBe(
+        activityMessages.validation.optionLabelTooLong,
+      );
+    }
   });
 
-  test('rejects a weightMultiplier with more than two decimals', () => {
-    const parsed = createActivityPayloadSchema.safeParse({
+  test('enforces weightMultiplier bounds (0.5..3) and at most two decimals', () => {
+    expect(
+      createActivityPayloadSchema.safeParse({
+        ...validFileTpPayload,
+        weightMultiplier: 0.5,
+      }).success,
+    ).toBe(true);
+    expect(
+      createActivityPayloadSchema.safeParse({
+        ...validFileTpPayload,
+        weightMultiplier: 3,
+      }).success,
+    ).toBe(true);
+
+    const tooLow = createActivityPayloadSchema.safeParse({
+      ...validFileTpPayload,
+      weightMultiplier: 0.4,
+    });
+    expect(tooLow.success).toBe(false);
+    if (!tooLow.success) {
+      expect(tooLow.error.issues[0].message).toBe(
+        activityMessages.validation.weightMultiplierRange,
+      );
+    }
+
+    const tooHigh = createActivityPayloadSchema.safeParse({
+      ...validFileTpPayload,
+      weightMultiplier: 3.1,
+    });
+    expect(tooHigh.success).toBe(false);
+    if (!tooHigh.success) {
+      expect(tooHigh.error.issues[0].message).toBe(
+        activityMessages.validation.weightMultiplierRange,
+      );
+    }
+
+    const tooManyDecimals = createActivityPayloadSchema.safeParse({
       ...validFileTpPayload,
       weightMultiplier: 1.234,
     });
-    expect(parsed.success).toBe(false);
-    if (!parsed.success) {
-      expect(parsed.error.issues[0].message).toBe(
-        classroomMessages.activities.validation.weightMultiplierDecimals,
+    expect(tooManyDecimals.success).toBe(false);
+    if (!tooManyDecimals.success) {
+      expect(tooManyDecimals.error.issues[0].message).toBe(
+        activityMessages.validation.weightMultiplierDecimals,
       );
     }
   });
 
-  test('rejects a non-positive maxScore', () => {
-    const zero = createActivityPayloadSchema.safeParse({
-      ...validFileTpPayload,
-      maxScore: 0,
-    });
-    expect(zero.success).toBe(false);
+  test('enforces integer maxScore between 0 and 100 inclusive', () => {
+    expect(
+      createActivityPayloadSchema.safeParse({
+        ...validFileTpPayload,
+        maxScore: 0,
+      }).success,
+    ).toBe(true);
+    expect(
+      createActivityPayloadSchema.safeParse({
+        ...validFileTpPayload,
+        maxScore: 100,
+      }).success,
+    ).toBe(true);
 
-    const negative = createActivityPayloadSchema.safeParse({
-      ...validFileTpPayload,
-      maxScore: -10,
-    });
-    expect(negative.success).toBe(false);
-    if (!negative.success) {
-      expect(negative.error.issues[0].message).toBe(
-        classroomMessages.activities.validation.maxScorePositive,
-      );
+    for (const invalidScore of [-1, 10.5, 101]) {
+      const parsed = createActivityPayloadSchema.safeParse({
+        ...validFileTpPayload,
+        maxScore: invalidScore,
+      });
+      expect(parsed.success).toBe(false);
+      if (!parsed.success) {
+        expect(parsed.error.issues[0].message).toBe(
+          activityMessages.validation.maxScoreRange,
+        );
+      }
     }
   });
 
-  test('rejects a missing or invalid dueAt', () => {
-    const missing = createActivityPayloadSchema.safeParse({
-      ...validFileTpPayload,
-      dueAt: undefined,
-    });
-    expect(missing.success).toBe(false);
-
-    const notIso = createActivityPayloadSchema.safeParse({
-      ...validFileTpPayload,
-      dueAt: 'mañana',
-    });
-    expect(notIso.success).toBe(false);
+  test('requires strict ISO-8601-with-offset instants for dueAt and opensAt', () => {
+    for (const invalidDueAt of [
+      undefined,
+      'mañana',
+      '2026-12-01',
+      '2026-12-01T23:59:59',
+    ]) {
+      const parsed = createActivityPayloadSchema.safeParse({
+        ...validFileTpPayload,
+        dueAt: invalidDueAt,
+      });
+      expect(parsed.success).toBe(false);
+    }
   });
 
   test('rejects an unknown type or format', () => {
@@ -272,7 +441,7 @@ describe('updateActivityPayloadSchema', () => {
     expect(parsed.success).toBe(false);
     if (!parsed.success) {
       expect(parsed.error.issues[0].message).toBe(
-        classroomMessages.activities.validation.opensAtBeforeDueAt,
+        activityMessages.validation.opensAtBeforeDueAt,
       );
     }
   });

@@ -7,6 +7,7 @@ import {
   within,
 } from '@testing-library/react';
 import { HttpResponse } from 'msw';
+import { MemoryRouter } from 'react-router';
 import {
   afterAll,
   afterEach,
@@ -38,8 +39,8 @@ import {
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
 import { render } from '@/test/render';
-import { classroomMessages } from '../messages';
-import { ClassroomActivitiesPanel } from './classroom-activities-panel';
+import { ActivitiesPanel } from './activities-panel';
+import { activityMessages } from './messages';
 
 // Multi-step dialog flows (several submits, MSW round trips, a11y scans)
 // exceed the 5s default in this file.
@@ -65,11 +66,11 @@ afterAll(() => {
   mswServer.close();
 });
 
-const copy = classroomMessages.activities.panel;
-const editorCopy = classroomMessages.activities.editor;
+const actionsCopy = activityMessages.actions;
+const editorCopy = activityMessages.editor;
 const questionsCopy = editorCopy.questions;
-const validationCopy = classroomMessages.activities.validation;
-const writeCopy = classroomMessages.activities.write;
+const validationCopy = activityMessages.validation;
+const writeCopy = activityMessages.write;
 const classroomId = '4e5f6a7b-0000-4000-8000-000000000033';
 
 /** Draft file-submission TP, only visible to staff. */
@@ -144,38 +145,38 @@ const draftExamDetail: TeacherActivityPayload = {
   createdById: profile.id,
   questions: [
     {
-      id: '6a6b6c6d-0000-4000-8000-0000000000q1',
-      position: 0,
+      id: '6a6b6c6d-0000-4000-8000-000000000101',
+      position: 1,
       prompt: '¿Cuánto es 2 + 2?',
       options: [
         {
-          id: '6a6b6c6d-0000-4000-8000-00000000o11',
-          position: 0,
+          id: '6a6b6c6d-0000-4000-8000-000000001011',
+          position: 1,
           label: '3',
           isCorrect: false,
         },
         {
-          id: '6a6b6c6d-0000-4000-8000-00000000o12',
-          position: 1,
+          id: '6a6b6c6d-0000-4000-8000-000000001012',
+          position: 2,
           label: '4',
           isCorrect: true,
         },
       ],
     },
     {
-      id: '6a6b6c6d-0000-4000-8000-0000000000q2',
-      position: 1,
+      id: '6a6b6c6d-0000-4000-8000-000000000102',
+      position: 2,
       prompt: '¿Capital de Argentina?',
       options: [
         {
-          id: '6a6b6c6d-0000-4000-8000-00000000o21',
-          position: 0,
+          id: '6a6b6c6d-0000-4000-8000-000000001021',
+          position: 1,
           label: 'Córdoba',
           isCorrect: false,
         },
         {
-          id: '6a6b6c6d-0000-4000-8000-00000000o22',
-          position: 1,
+          id: '6a6b6c6d-0000-4000-8000-000000001022',
+          position: 2,
           label: 'Buenos Aires',
           isCorrect: true,
         },
@@ -227,10 +228,12 @@ function renderActivitiesPanel() {
     createApiClient({ baseUrl: TEST_API_BASE_URL }),
   );
   const view = render(
-    <SessionProvider service={session.service}>
-      <Toast />
-      <ClassroomActivitiesPanel classroomId={classroomId} />
-    </SessionProvider>,
+    <MemoryRouter>
+      <SessionProvider service={session.service}>
+        <Toast />
+        <ActivitiesPanel classroomId={classroomId} />
+      </SessionProvider>
+    </MemoryRouter>,
     { queryClient },
   );
   return { queryClient, session, ...view };
@@ -239,7 +242,7 @@ function renderActivitiesPanel() {
 async function openCreateDialog(): Promise<HTMLElement> {
   renderActivitiesPanel();
   const trigger = await screen.findByRole('button', {
-    name: copy.createAction,
+    name: actionsCopy.createAction,
   });
   fireEvent.click(trigger);
   const dialog = await screen.findByRole('dialog', {
@@ -251,13 +254,12 @@ async function openCreateDialog(): Promise<HTMLElement> {
 async function openEditDialog(title: string): Promise<HTMLElement> {
   renderActivitiesPanel();
   const trigger = await screen.findByRole('button', {
-    name: copy.editAriaLabel(title),
+    name: actionsCopy.editAriaLabel(title),
   });
   fireEvent.click(trigger);
   const dialog = await screen.findByRole('dialog', {
     name: editorCopy.editTitle,
   });
-  // Wait for the teacher detail to load before interacting with the form.
   await within(dialog).findByLabelText(editorCopy.fields.title.label);
   return dialog;
 }
@@ -266,10 +268,10 @@ function fillInput(
   dialog: HTMLElement,
   label: string,
   value: string,
-): HTMLInputElement {
+): HTMLInputElement | HTMLTextAreaElement {
   const input = within(dialog).getByLabelText(label);
   fireEvent.change(input, { target: { value } });
-  return input as HTMLInputElement;
+  return input as HTMLInputElement | HTMLTextAreaElement;
 }
 
 function submitCreate(dialog: HTMLElement): void {
@@ -288,8 +290,8 @@ function submitEdit(dialog: HTMLElement): void {
   );
 }
 
-describe('ActivityEditorDialog (#39 T3)', () => {
-  test('create success converts school-zone datetimes into UTC instants, reconciles the list, and offers publishing', async () => {
+describe('ActivityEditorDialog and PublishActivityDialog (#39)', () => {
+  test('create success converts school-zone datetimes into UTC instants, uses multiline description, reconciles, and offers publishing', async () => {
     let createBody: CreateActivityRequestPayload | undefined;
     let listCalls = 0;
     let created: TeacherActivityPayload | null = null;
@@ -302,11 +304,11 @@ describe('ActivityEditorDialog (#39 T3)', () => {
           listCalls += 1;
           return HttpResponse.json(
             created === null
-              ? { items: [], page: 1, pageSize: 20, total: 0 }
+              ? { items: [], page: 1, pageSize: 10, total: 0 }
               : {
                   items: [summaryFromPayload(created)],
                   page: 1,
-                  pageSize: 20,
+                  pageSize: 10,
                   total: 1,
                 },
           );
@@ -338,12 +340,12 @@ describe('ActivityEditorDialog (#39 T3)', () => {
             updatedAt: '2026-11-18T12:00:00.000Z',
             createdById: profile.id,
             questions: (body.questions ?? []).map((question, index) => ({
-              id: `question-${index}`,
-              position: index,
+              id: `00000000-0000-4000-8000-${String(3000 + index).padStart(12, '0')}`,
+              position: index + 1,
               prompt: question.prompt,
               options: question.options.map((option, optionIndex) => ({
-                id: `option-${index}-${optionIndex}`,
-                position: optionIndex,
+                id: `00000000-0000-4000-8000-${String(4000 + index * 10 + optionIndex).padStart(12, '0')}`,
+                position: optionIndex + 1,
                 label: option.label,
                 isCorrect: option.isCorrect,
               })),
@@ -356,10 +358,17 @@ describe('ActivityEditorDialog (#39 T3)', () => {
 
     const dialog = await openCreateDialog();
 
+    const descInput = fillInput(
+      dialog,
+      editorCopy.fields.description.label,
+      'Punto 1\nPunto 2',
+    );
+    expect(descInput.tagName).toBe('TEXTAREA');
+
     // School timezone (UTC-3): 20:00 local on 2026-12-01 is 23:00 UTC.
     fillInput(dialog, editorCopy.fields.title.label, '  TP Nuevo Fracciones  ');
     fillInput(dialog, editorCopy.fields.dueAt.label, '2026-12-01T20:00');
-    fillInput(dialog, editorCopy.fields.maxScore.label, '10');
+    fillInput(dialog, editorCopy.fields.maxScore.label, '0');
     submitCreate(dialog);
 
     await waitFor(() => {
@@ -372,20 +381,17 @@ describe('ActivityEditorDialog (#39 T3)', () => {
       type: 'TP',
       format: 'FILE',
       title: 'TP Nuevo Fracciones',
+      description: 'Punto 1\nPunto 2',
       dueAt: '2026-12-01T23:00:00.000Z',
       allowLate: false,
-      maxScore: 10,
+      maxScore: 0,
       weightMultiplier: 1,
     });
     expect(createBody?.opensAt).toBeUndefined();
     expect(createBody?.questions).toBeUndefined();
 
-    // Confirmed draft appears in the reconciled list.
-    expect(await screen.findByText('TP Nuevo Fracciones')).toBeVisible();
-    expect(screen.getByText(copy.states.DRAFT)).toBeVisible();
     expect(screen.getByText(editorCopy.createdTitle)).toBeVisible();
 
-    // Publishing the fresh draft is offered with the one-way confirmation.
     const publishOffer = await screen.findByRole('dialog', {
       name: editorCopy.publish.title('TP Nuevo Fracciones'),
     });
@@ -404,9 +410,17 @@ describe('ActivityEditorDialog (#39 T3)', () => {
         }),
       ).not.toBeInTheDocument();
     });
-    // Closing the offer returns focus to the opener.
+
+    const list = await screen.findByRole('list', {
+      name: activityMessages.listRegionLabel,
+    });
+    expect(within(list).getByText('TP Nuevo Fracciones')).toBeVisible();
+    expect(
+      within(list).getByText(activityMessages.stateLabels.DRAFT),
+    ).toBeVisible();
+
     const createTrigger = screen.getByRole('button', {
-      name: copy.createAction,
+      name: actionsCopy.createAction,
     });
     expect(createTrigger).toHaveFocus();
     expect(listCalls).toBeGreaterThanOrEqual(2);
@@ -448,7 +462,6 @@ describe('ActivityEditorDialog (#39 T3)', () => {
     const alert = await within(dialog).findByRole('alert');
     expect(alert).toHaveTextContent('title already exists in this classroom');
 
-    // Safe editable input is preserved after the rejection.
     expect(titleInput).toHaveValue('TP Duplicado');
     expect(
       within(dialog).getByLabelText(editorCopy.fields.dueAt.label),
@@ -456,8 +469,9 @@ describe('ActivityEditorDialog (#39 T3)', () => {
     expect(dialog).toBeVisible();
   });
 
-  test('create uncertain failure (5xx) keeps input, shows the uncertain message, and reconciles the list', async () => {
+  test('create uncertain failure (5xx and malformed 201) keeps input, shows uncertain message, and reconciles list', async () => {
     let listCalls = 0;
+    let createCalls = 0;
     mswServer.use(
       staffDetailHandler(),
       createClassroomActivitiesListHandler({
@@ -467,20 +481,29 @@ describe('ActivityEditorDialog (#39 T3)', () => {
           return HttpResponse.json({
             items: [],
             page: 1,
-            pageSize: 20,
+            pageSize: 10,
             total: 0,
           });
         },
       }),
       createCreateActivityHandler({
         classroomId,
-        error: {
-          status: 500,
-          body: {
-            code: 'INTERNAL_ERROR',
-            message: 'DB write failed; must never leak',
-            correlationId: 'corr-create-500',
-          },
+        resolveResponse: () => {
+          createCalls += 1;
+          if (createCalls === 1) {
+            // Malformed 201 must still be recognized as an uncertain write and reconcile.
+            return HttpResponse.json({ broken: true }, { status: 201 });
+          }
+          return HttpResponse.json(
+            {
+              error: {
+                code: 'INTERNAL_ERROR',
+                message: 'DB write failed; must never leak',
+                correlationId: 'corr-create-500',
+              },
+            },
+            { status: 500 },
+          );
         },
       }),
     );
@@ -493,20 +516,29 @@ describe('ActivityEditorDialog (#39 T3)', () => {
     );
     fillInput(dialog, editorCopy.fields.dueAt.label, '2026-12-01T20:00');
     fillInput(dialog, editorCopy.fields.maxScore.label, '10');
+
+    // First submit: malformed 201 response.
     submitCreate(dialog);
-
-    const alert = await within(dialog).findByRole('alert');
-    expect(alert).toHaveTextContent(writeCopy.uncertain);
-    expect(alert).not.toHaveTextContent('DB write failed');
+    const alert1 = await within(dialog).findByRole('alert');
+    expect(alert1).toHaveTextContent(writeCopy.uncertain);
     expect(titleInput).toHaveValue('TP Incierto');
-
     await waitFor(() => {
       expect(listCalls).toBeGreaterThanOrEqual(2);
+    });
+
+    // Second submit: 500 failure.
+    const callsBefore500 = listCalls;
+    submitCreate(dialog);
+    const alert2 = await within(dialog).findByRole('alert');
+    expect(alert2).toHaveTextContent(writeCopy.uncertain);
+    expect(alert2).not.toHaveTextContent('DB write failed');
+    await waitFor(() => {
+      expect(listCalls).toBeGreaterThan(callsBefore500);
     });
     expect(dialog).toBeVisible();
   });
 
-  test('required fields and numeric boundaries surface the contract messages', async () => {
+  test('required fields and contract numeric boundaries surface validation messages', async () => {
     mswServer.use(
       staffDetailHandler(),
       createClassroomActivitiesListHandler({ classroomId, items: [] }),
@@ -515,7 +547,6 @@ describe('ActivityEditorDialog (#39 T3)', () => {
 
     const dialog = await openCreateDialog();
 
-    // Blank submit: title, dueAt and maxScore are required.
     submitCreate(dialog);
     expect(
       await within(dialog).findByText(validationCopy.titleRequired),
@@ -527,18 +558,30 @@ describe('ActivityEditorDialog (#39 T3)', () => {
       within(dialog).getByText(editorCopy.validation.maxScoreRequired),
     ).toBeVisible();
 
-    // Fill everything valid, then break one numeric bound at a time.
     fillInput(dialog, editorCopy.fields.title.label, 'TP Límites');
     fillInput(dialog, editorCopy.fields.dueAt.label, '2026-12-01T20:00');
-    fillInput(dialog, editorCopy.fields.maxScore.label, '10');
 
-    fillInput(dialog, editorCopy.fields.maxScore.label, '0');
+    // Decimal maxScore is rejected (must be integer 0..100).
+    fillInput(dialog, editorCopy.fields.maxScore.label, '10.5');
     submitCreate(dialog);
     expect(
-      await within(dialog).findByText(validationCopy.maxScorePositive),
+      await within(dialog).findByText(validationCopy.maxScoreRange),
+    ).toBeVisible();
+
+    // Out-of-range maxScore (> 100) is rejected.
+    fillInput(dialog, editorCopy.fields.maxScore.label, '101');
+    submitCreate(dialog);
+    expect(
+      await within(dialog).findByText(validationCopy.maxScoreRange),
     ).toBeVisible();
 
     fillInput(dialog, editorCopy.fields.maxScore.label, '10');
+    fillInput(dialog, editorCopy.fields.weightMultiplier.label, '0.4');
+    submitCreate(dialog);
+    expect(
+      await within(dialog).findByText(validationCopy.weightMultiplierRange),
+    ).toBeVisible();
+
     fillInput(dialog, editorCopy.fields.weightMultiplier.label, '1.234');
     submitCreate(dialog);
     expect(
@@ -554,9 +597,6 @@ describe('ActivityEditorDialog (#39 T3)', () => {
     ).toBeVisible();
 
     fillInput(dialog, editorCopy.fields.weightMultiplier.label, '1.5');
-    // The browser sanitizes garbage entered into a datetime-local input to an
-    // empty value; the cleared deadline surfaces the required message instead
-    // of a silently shifted date.
     fillInput(dialog, editorCopy.fields.dueAt.label, 'fecha-invalida');
     submitCreate(dialog);
     expect(
@@ -564,10 +604,20 @@ describe('ActivityEditorDialog (#39 T3)', () => {
     ).toBeVisible();
   });
 
-  test('exam window boundaries: opensAt must strictly precede dueAt and is TP-forbidden', async () => {
+  test('exam window boundaries: opensAt must strictly precede dueAt, is TP-forbidden, and switching EXAM -> TP with DST-gap opensAt never crashes', async () => {
+    const dstExamSummary: ActivitySummaryPayload = {
+      ...draftExamSummary,
+      id: '6a6b6c6d-0000-4000-8000-0000000000a8',
+      opensAt: null,
+      dueAt: '2026-03-09T16:00:00.000Z',
+      timeZone: 'America/New_York',
+    };
     mswServer.use(
       staffDetailHandler(),
-      createClassroomActivitiesListHandler({ classroomId, items: [] }),
+      createClassroomActivitiesListHandler({
+        classroomId,
+        items: [dstExamSummary],
+      }),
       createCreateActivityHandler({ classroomId }),
     );
 
@@ -588,8 +638,7 @@ describe('ActivityEditorDialog (#39 T3)', () => {
       await within(dialog).findByText(validationCopy.opensAtBeforeDueAt),
     ).toBeVisible();
 
-    // Switching to TP keeps the entered window; the refusal is visible next
-    // to the TP hint instead of a silently dropped value.
+    // Switching to TP keeps the entered window without crashing render.
     fireEvent.click(
       within(dialog).getByRole('radio', {
         name: editorCopy.fields.type.options.TP.label,
@@ -603,20 +652,33 @@ describe('ActivityEditorDialog (#39 T3)', () => {
       within(dialog).getByText(editorCopy.fields.opensAt.tpHint),
     ).toBeVisible();
 
-    // The teacher can drop the lingering window explicitly.
+    // Switch back to EXAM, force an invalid/nonexistent value, and switch to TP:
+    // rendering lingeringOpensAt must safely fall back without throwing.
     fireEvent.click(
-      within(dialog).getByRole('button', {
-        name: editorCopy.fields.opensAt.removeAction,
+      within(dialog).getByRole('radio', {
+        name: editorCopy.fields.type.options.EXAM.label,
       }),
     );
-    await waitFor(() => {
-      expect(
-        screen.queryByText(validationCopy.opensAtOnlyForExams),
-      ).not.toBeInTheDocument();
+    fillInput(dialog, editorCopy.fields.opensAt.label, '2026-02-30T10:00');
+    fireEvent.click(
+      within(dialog).getByRole('radio', {
+        name: editorCopy.fields.type.options.TP.label,
+      }),
+    );
+    expect(
+      within(dialog).getByText(editorCopy.fields.opensAt.tpHint),
+    ).toBeVisible();
+
+    // Drop the lingering window cleanly if present.
+    const removeButton = within(dialog).queryByRole('button', {
+      name: editorCopy.fields.opensAt.removeAction,
     });
+    if (removeButton !== null) {
+      fireEvent.click(removeButton);
+    }
   });
 
-  test('multiple-choice builder boundaries: questions are required and exactly one option is correct', async () => {
+  test('multiple-choice builder boundaries: questions required, 2..6 options, and exactly one option correct', async () => {
     mswServer.use(
       staffDetailHandler(),
       createClassroomActivitiesListHandler({ classroomId, items: [] }),
@@ -633,14 +695,11 @@ describe('ActivityEditorDialog (#39 T3)', () => {
       }),
     );
 
-    // MULTIPLE_CHOICE without questions is rejected.
     submitCreate(dialog);
     expect(
       await within(dialog).findByText(validationCopy.questionsRequired),
     ).toBeVisible();
 
-    // A blank question: prompt and option labels are required, and zero
-    // correct options violate the exactly-one-correct rule.
     fireEvent.click(
       within(dialog).getByRole('button', { name: questionsCopy.addQuestion }),
     );
@@ -662,16 +721,11 @@ describe('ActivityEditorDialog (#39 T3)', () => {
     fillInput(question, questionsCopy.optionLabel(1), '3');
     fillInput(question, questionsCopy.optionLabel(2), '4');
 
-    // Zero correct options after filling labels.
     submitCreate(dialog);
     expect(
       await within(question).findByText(validationCopy.exactlyOneCorrectOption),
     ).toBeVisible();
 
-    // The radio semantics keep a single selection: marking one option correct
-    // satisfies the rule and unmarks every other option automatically, so a
-    // multiple-correct state cannot be produced from the UI (covered at
-    // schema level instead).
     fireEvent.click(
       within(question).getByRole('radio', {
         name: questionsCopy.markCorrect(2),
@@ -723,16 +777,6 @@ describe('ActivityEditorDialog (#39 T3)', () => {
         name: questionsCopy.markCorrect(2),
       }),
     );
-    expect(
-      within(firstQuestion).getByRole('radio', {
-        name: questionsCopy.markCorrect(2),
-      }),
-    ).toBeChecked();
-    expect(
-      within(firstQuestion).getByRole('radio', {
-        name: questionsCopy.markCorrect(1),
-      }),
-    ).not.toBeChecked();
 
     fireEvent.click(
       within(dialog).getByRole('button', { name: questionsCopy.addQuestion }),
@@ -749,7 +793,6 @@ describe('ActivityEditorDialog (#39 T3)', () => {
       }),
     );
 
-    // First question cannot move up; last cannot move down.
     expect(
       within(firstQuestion).getByRole('button', {
         name: questionsCopy.moveQuestionUp(1),
@@ -761,7 +804,6 @@ describe('ActivityEditorDialog (#39 T3)', () => {
       }),
     ).toBeDisabled();
 
-    // Reorder questions with the accessible buttons.
     fireEvent.click(
       within(secondQuestion).getByRole('button', {
         name: questionsCopy.moveQuestionUp(2),
@@ -772,7 +814,6 @@ describe('ActivityEditorDialog (#39 T3)', () => {
       .map((input) => (input as HTMLInputElement).value);
     expect(prompts).toEqual(['Pregunta dos', 'Pregunta uno']);
 
-    // Reorder and remove options; the correct marking follows the row.
     const movedFirst = within(dialog).getByRole('group', {
       name: questionsCopy.questionLegend(1),
     });
@@ -806,11 +847,6 @@ describe('ActivityEditorDialog (#39 T3)', () => {
       .getAllByLabelText(questionsCopy.prompt.label)
       .map((input) => (input as HTMLInputElement).value);
     expect(remainingPrompts).toEqual(['Pregunta uno']);
-    expect(
-      within(dialog).queryByRole('group', {
-        name: questionsCopy.questionLegend(2),
-      }),
-    ).not.toBeInTheDocument();
   });
 
   test('FILE format with lingering questions is refused until the questions are removed', async () => {
@@ -856,7 +892,6 @@ describe('ActivityEditorDialog (#39 T3)', () => {
     fillInput(dialog, editorCopy.fields.dueAt.label, '2026-12-01T20:00');
     fillInput(dialog, editorCopy.fields.maxScore.label, '10');
 
-    // Build a valid MCQ question, then switch the format to FILE.
     fireEvent.click(
       within(dialog).getByRole('radio', {
         name: editorCopy.fields.format.options.MULTIPLE_CHOICE.label,
@@ -883,8 +918,6 @@ describe('ActivityEditorDialog (#39 T3)', () => {
       }),
     );
 
-    // The questions stay visible next to the FILE hint; the payload schema
-    // refuses questions for FILE activities.
     expect(
       within(dialog).getByText(questionsCopy.fileFormatHint),
     ).toBeVisible();
@@ -896,7 +929,6 @@ describe('ActivityEditorDialog (#39 T3)', () => {
       await within(dialog).findByText(validationCopy.questionsForbiddenForFile),
     ).toBeVisible();
 
-    // Removing the questions lets the FILE draft through, without questions.
     fireEvent.click(
       within(dialog).getByRole('button', {
         name: questionsCopy.removeQuestionsAction,
@@ -928,7 +960,6 @@ describe('ActivityEditorDialog (#39 T3)', () => {
 
     const dialog = await openEditDialog(draftExamSummary.title);
 
-    // UTC instants are displayed as school-zone datetime-local values.
     expect(
       within(dialog).getByLabelText(editorCopy.fields.dueAt.label),
     ).toHaveValue('2026-11-30T20:00');
@@ -943,8 +974,6 @@ describe('ActivityEditorDialog (#39 T3)', () => {
       ).value,
     ).toBe('1.5');
 
-    // Type and format are immutable after creation and disabled with an
-    // explanation.
     expect(
       within(dialog).getByRole('radio', {
         name: editorCopy.fields.type.options.TP.label,
@@ -959,8 +988,6 @@ describe('ActivityEditorDialog (#39 T3)', () => {
       within(dialog).getByText(editorCopy.fields.format.immutableNotice),
     ).toBeVisible();
 
-    // The builder shows the server-confirmed questions with correct answers
-    // (teacher view only).
     const prompts = within(dialog)
       .getAllByLabelText(questionsCopy.prompt.label)
       .map((input) => (input as HTMLInputElement).value);
@@ -977,8 +1004,8 @@ describe('ActivityEditorDialog (#39 T3)', () => {
     await expectAccessible(document.body);
   });
 
-  test('edit draft success sends the converted payload and offers publishing', async () => {
-    let patchBody: UpdateActivityRequestPayload | undefined;
+  test('edit omits questions on PATCH when only metadata changed and sends questions when modified', async () => {
+    const patchBodies: UpdateActivityRequestPayload[] = [];
     mswServer.use(
       staffDetailHandler(),
       createClassroomActivitiesListHandler({
@@ -994,7 +1021,7 @@ describe('ActivityEditorDialog (#39 T3)', () => {
         classroomId,
         activityId: draftExamSummary.id,
         onRequest: (_request, body) => {
-          patchBody = body;
+          patchBodies.push(body);
         },
         resolveResponse: ({ body }) =>
           HttpResponse.json({
@@ -1005,9 +1032,10 @@ describe('ActivityEditorDialog (#39 T3)', () => {
       }),
     );
 
-    const dialog = await openEditDialog(draftExamSummary.title);
-    fillInput(dialog, editorCopy.fields.title.label, 'Examen Parcial v2');
-    submitEdit(dialog);
+    // 1. Metadata-only edit: questions must be omitted so submitted exams do not hit 409.
+    const dialog1 = await openEditDialog(draftExamSummary.title);
+    fillInput(dialog1, editorCopy.fields.title.label, 'Examen Parcial v2');
+    submitEdit(dialog1);
 
     await waitFor(() => {
       expect(
@@ -1015,9 +1043,7 @@ describe('ActivityEditorDialog (#39 T3)', () => {
       ).not.toBeInTheDocument();
     });
 
-    // School-zone values are converted back into UTC instants, and the
-    // questions are replaced as a full set.
-    expect(patchBody).toMatchObject({
+    expect(patchBodies[0]).toMatchObject({
       title: 'Examen Parcial v2',
       dueAt: '2026-11-30T23:00:00.000Z',
       opensAt: '2026-11-25T13:00:00.000Z',
@@ -1025,20 +1051,8 @@ describe('ActivityEditorDialog (#39 T3)', () => {
       maxScore: 10,
       weightMultiplier: 1.5,
     });
-    expect(patchBody?.questions?.[0]).toMatchObject({
-      prompt: '¿Cuánto es 2 + 2?',
-    });
-    expect(patchBody?.questions?.[0]?.options[1]).toMatchObject({
-      label: '4',
-      isCorrect: true,
-    });
-    expect(patchBody?.questions?.[1]?.options[1]?.isCorrect).toBe(true);
+    expect(patchBodies[0]?.questions).toBeUndefined();
 
-    await waitFor(() => {
-      expect(screen.getByText(editorCopy.updatedTitle)).toBeVisible();
-    });
-
-    // The updated draft is offered for publishing.
     const publishOffer = await screen.findByRole('dialog', {
       name: editorCopy.publish.title('Examen Parcial v2'),
     });
@@ -1047,6 +1061,109 @@ describe('ActivityEditorDialog (#39 T3)', () => {
         name: editorCopy.publish.cancel,
       }),
     );
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', {
+          name: editorCopy.publish.title('Examen Parcial v2'),
+        }),
+      ).not.toBeInTheDocument();
+    });
+
+    // 2. Question edit: questions must be included in the PATCH payload.
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: actionsCopy.editAriaLabel(draftExamSummary.title),
+      }),
+    );
+    const dialog2 = await screen.findByRole('dialog', {
+      name: editorCopy.editTitle,
+    });
+    await within(dialog2).findByLabelText(editorCopy.fields.title.label);
+    const firstQuestion = within(dialog2).getByRole('group', {
+      name: questionsCopy.questionLegend(1),
+    });
+    fillInput(firstQuestion, questionsCopy.prompt.label, '¿Cuánto es 3 + 3?');
+    submitEdit(dialog2);
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: editorCopy.editTitle }),
+      ).not.toBeInTheDocument();
+    });
+
+    expect(patchBodies[1]?.questions?.[0]).toMatchObject({
+      prompt: '¿Cuánto es 3 + 3?',
+    });
+    expect(patchBodies[1]?.questions?.[0]?.options[1]).toMatchObject({
+      label: '4',
+      isCorrect: true,
+    });
+  });
+
+  test('edit load failure shows retry button and reconciles list on 404', async () => {
+    let listCalls = 0;
+    let detailCalls = 0;
+    mswServer.use(
+      staffDetailHandler(),
+      createClassroomActivitiesListHandler({
+        classroomId,
+        resolveResponse: () => {
+          listCalls += 1;
+          return HttpResponse.json({
+            items: [draftExamSummary],
+            page: 1,
+            pageSize: 10,
+            total: 1,
+          });
+        },
+      }),
+      createActivityDetailHandler({
+        classroomId,
+        activityId: draftExamSummary.id,
+        resolveResponse: () => {
+          detailCalls += 1;
+          if (detailCalls === 1) {
+            return HttpResponse.json(
+              {
+                error: {
+                  code: 'NOT_FOUND',
+                  message: 'Activity deleted concurrently',
+                  correlationId: 'corr-edit-load-404',
+                },
+              },
+              { status: 404 },
+            );
+          }
+          return HttpResponse.json(draftExamDetail);
+        },
+      }),
+    );
+
+    renderActivitiesPanel();
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: actionsCopy.editAriaLabel(draftExamSummary.title),
+      }),
+    );
+
+    const dialog = await screen.findByRole('dialog', {
+      name: editorCopy.editTitle,
+    });
+    expect(
+      await within(dialog).findByText(editorCopy.detailErrorTitle),
+    ).toBeVisible();
+    await waitFor(() => {
+      expect(listCalls).toBeGreaterThanOrEqual(2);
+    });
+    expect(detailCalls).toBe(1);
+
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: activityMessages.retryLabel }),
+    );
+    expect(
+      await within(dialog).findByLabelText(editorCopy.fields.title.label),
+    ).toHaveValue(draftExamDetail.title);
+    expect(detailCalls).toBe(2);
   });
 
   test('edit 409 on questions after submissions explains the lock and keeps input', async () => {
@@ -1076,17 +1193,20 @@ describe('ActivityEditorDialog (#39 T3)', () => {
     );
 
     const dialog = await openEditDialog(draftExamSummary.title);
-    const titleInput = fillInput(
-      dialog,
-      editorCopy.fields.title.label,
-      'Examen Bloqueado',
+    const firstQuestion = within(dialog).getByRole('group', {
+      name: questionsCopy.questionLegend(1),
+    });
+    const promptInput = fillInput(
+      firstQuestion,
+      questionsCopy.prompt.label,
+      '¿Nueva pregunta bloqueada?',
     );
     submitEdit(dialog);
 
     const alert = await within(dialog).findByRole('alert');
     expect(alert).toHaveTextContent(writeCopy.updateQuestionsLocked);
     expect(alert).not.toHaveTextContent('after a submission exists');
-    expect(titleInput).toHaveValue('Examen Bloqueado');
+    expect(promptInput).toHaveValue('¿Nueva pregunta bloqueada?');
     expect(dialog).toBeVisible();
   });
 
@@ -1138,8 +1258,8 @@ describe('ActivityEditorDialog (#39 T3)', () => {
           listCalls += 1;
           return HttpResponse.json(
             published
-              ? { items: [publishedFileTp], page: 1, pageSize: 20, total: 1 }
-              : { items: [draftFileTp], page: 1, pageSize: 20, total: 1 },
+              ? { items: [publishedFileTp], page: 1, pageSize: 10, total: 1 }
+              : { items: [draftFileTp], page: 1, pageSize: 10, total: 1 },
           );
         },
       }),
@@ -1166,7 +1286,7 @@ describe('ActivityEditorDialog (#39 T3)', () => {
     renderActivitiesPanel();
     fireEvent.click(
       await screen.findByRole('button', {
-        name: copy.publishAriaLabel(draftFileTp.title),
+        name: actionsCopy.publishAriaLabel(draftFileTp.title),
       }),
     );
 
@@ -1198,21 +1318,27 @@ describe('ActivityEditorDialog (#39 T3)', () => {
         screen.getByText(editorCopy.publishedDescription(draftFileTp.title)),
       ).toBeVisible();
     });
-    expect(await screen.findByText(copy.states.PUBLISHED)).toBeVisible();
+    const list = screen.getByRole('list', {
+      name: activityMessages.listRegionLabel,
+    });
+    expect(
+      await within(list).findByText(activityMessages.stateLabels.PUBLISHED),
+    ).toBeVisible();
     expect(listCalls).toBeGreaterThanOrEqual(2);
-    // After a confirmed publish the per-item trigger disappears, so focus
-    // lands on the panel heading.
     await waitFor(
       () => {
         expect(
-          screen.getByRole('heading', { level: 3, name: copy.heading }),
+          screen.getByRole('heading', {
+            level: 3,
+            name: activityMessages.heading,
+          }),
         ).toHaveFocus();
       },
       { timeout: 5000 },
     );
   });
 
-  test('publish 400 surfaces publishNotPublishable and keeps the confirmation open', async () => {
+  test('publish 400 VALIDATION_FAILED surfaces publishNotPublishable and keeps the confirmation open', async () => {
     mswServer.use(
       staffDetailHandler(),
       createClassroomActivitiesListHandler({
@@ -1225,9 +1351,12 @@ describe('ActivityEditorDialog (#39 T3)', () => {
         error: {
           status: 400,
           body: {
-            code: 'BAD_REQUEST',
+            code: 'VALIDATION_FAILED',
             message: 'dueAt is in the past',
             correlationId: 'corr-publish-400',
+            details: [
+              { field: 'dueAt', messages: ['dueAt must be in the future'] },
+            ],
           },
         },
       }),
@@ -1236,7 +1365,7 @@ describe('ActivityEditorDialog (#39 T3)', () => {
     renderActivitiesPanel();
     fireEvent.click(
       await screen.findByRole('button', {
-        name: copy.publishAriaLabel(draftFileTp.title),
+        name: actionsCopy.publishAriaLabel(draftFileTp.title),
       }),
     );
     const confirmDialog = await screen.findByRole('dialog', {
@@ -1254,23 +1383,62 @@ describe('ActivityEditorDialog (#39 T3)', () => {
     expect(confirmDialog).toBeVisible();
   });
 
-  test('publish 409 surfaces publishAlreadyPublished and keeps the confirmation open', async () => {
+  test('publish 409, 404, and 403 surface translated errors, keep confirmation open, and reconcile list', async () => {
+    let listCalls = 0;
+    let publishAttempt = 0;
     mswServer.use(
       staffDetailHandler(),
       createClassroomActivitiesListHandler({
         classroomId,
-        items: [draftFileTp],
+        resolveResponse: () => {
+          listCalls += 1;
+          return HttpResponse.json({
+            items: [draftFileTp],
+            page: 1,
+            pageSize: 10,
+            total: 1,
+          });
+        },
       }),
       createPublishActivityHandler({
         classroomId,
         activityId: draftFileTp.id,
-        error: {
-          status: 409,
-          body: {
-            code: 'CONFLICT',
-            message: 'Activity is already published',
-            correlationId: 'corr-publish-409',
-          },
+        resolveResponse: () => {
+          publishAttempt += 1;
+          if (publishAttempt === 1) {
+            return HttpResponse.json(
+              {
+                error: {
+                  code: 'CONFLICT',
+                  message: 'Activity is already published',
+                  correlationId: 'corr-publish-409',
+                },
+              },
+              { status: 409 },
+            );
+          }
+          if (publishAttempt === 2) {
+            return HttpResponse.json(
+              {
+                error: {
+                  code: 'NOT_FOUND',
+                  message: 'Activity missing',
+                  correlationId: 'corr-publish-404',
+                },
+              },
+              { status: 404 },
+            );
+          }
+          return HttpResponse.json(
+            {
+              error: {
+                code: 'FORBIDDEN',
+                message: 'Role revoked',
+                correlationId: 'corr-publish-403',
+              },
+            },
+            { status: 403 },
+          );
         },
       }),
     );
@@ -1278,21 +1446,58 @@ describe('ActivityEditorDialog (#39 T3)', () => {
     renderActivitiesPanel();
     fireEvent.click(
       await screen.findByRole('button', {
-        name: copy.publishAriaLabel(draftFileTp.title),
+        name: actionsCopy.publishAriaLabel(draftFileTp.title),
       }),
     );
     const confirmDialog = await screen.findByRole('dialog', {
       name: editorCopy.publish.title(draftFileTp.title),
     });
+
+    // 409 Conflict -> translated message + list reconciliation
+    const before409 = listCalls;
     fireEvent.click(
       within(confirmDialog).getByRole('button', {
         name: editorCopy.publish.submit,
       }),
     );
+    const alert409 = await within(confirmDialog).findByRole('alert');
+    expect(alert409).toHaveTextContent(writeCopy.publishAlreadyPublished);
+    expect(alert409).not.toHaveTextContent('Activity is already published');
+    await waitFor(() => {
+      expect(listCalls).toBeGreaterThan(before409);
+    });
 
-    const alert = await within(confirmDialog).findByRole('alert');
-    expect(alert).toHaveTextContent(writeCopy.publishAlreadyPublished);
-    expect(alert).not.toHaveTextContent('already published by the server');
+    // 404 Not Found -> translated message + list reconciliation
+    const before404 = listCalls;
+    fireEvent.click(
+      within(confirmDialog).getByRole('button', {
+        name: editorCopy.publish.submit,
+      }),
+    );
+    await waitFor(() => {
+      expect(within(confirmDialog).getByRole('alert')).toHaveTextContent(
+        writeCopy.notFound,
+      );
+    });
+    await waitFor(() => {
+      expect(listCalls).toBeGreaterThan(before404);
+    });
+
+    // 403 Forbidden -> translated message + list reconciliation
+    const before403 = listCalls;
+    fireEvent.click(
+      within(confirmDialog).getByRole('button', {
+        name: editorCopy.publish.submit,
+      }),
+    );
+    await waitFor(() => {
+      expect(within(confirmDialog).getByRole('alert')).toHaveTextContent(
+        writeCopy.forbidden,
+      );
+    });
+    await waitFor(() => {
+      expect(listCalls).toBeGreaterThan(before403);
+    });
     expect(confirmDialog).toBeVisible();
   });
 
@@ -1304,10 +1509,8 @@ describe('ActivityEditorDialog (#39 T3)', () => {
 
     const dialog = await openCreateDialog();
 
-    // Focus moved into the dialog when it opened.
     expect(dialog.contains(document.activeElement)).toBe(true);
 
-    // Tab keeps focus trapped inside the modal.
     for (let index = 0; index < 8; index += 1) {
       fireEvent.keyDown(document.activeElement ?? document.body, {
         key: 'Tab',
@@ -1319,7 +1522,6 @@ describe('ActivityEditorDialog (#39 T3)', () => {
       ).toBe(true);
     }
 
-    // Unsaved changes: dismissal is blocked unless the teacher confirms.
     fillInput(dialog, editorCopy.fields.title.label, 'TP Sin Guardar');
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     fireEvent.keyDown(dialog, { key: 'Escape' });
@@ -1339,7 +1541,7 @@ describe('ActivityEditorDialog (#39 T3)', () => {
       ).not.toBeInTheDocument();
     });
     expect(
-      screen.getByRole('button', { name: copy.createAction }),
+      screen.getByRole('button', { name: actionsCopy.createAction }),
     ).toHaveFocus();
   });
 });

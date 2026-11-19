@@ -1,5 +1,6 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import type { components } from '../src/api/schema.generated';
+import { activityMessages } from '../src/features/classrooms/activities/messages';
 import { classroomMessages } from '../src/features/classrooms/messages';
 
 const apiOrigin = 'https://api.example.invalid';
@@ -9,8 +10,8 @@ const schoolTimeZone = 'America/Argentina/Buenos_Aires';
 const activitiesPath = `/classrooms/${classroomId}/activities`;
 const syntheticNow = '2026-11-18T15:00:00.000Z';
 
-const panelCopy = classroomMessages.activities.panel;
-const editorCopy = classroomMessages.activities.editor;
+const actionsCopy = activityMessages.actions;
+const editorCopy = activityMessages.editor;
 
 type ClassroomContext = components['schemas']['ClassroomContextResponseDto'];
 type TeacherActivity = components['schemas']['TeacherActivityResponseDto'];
@@ -43,7 +44,9 @@ function classroomContext(role: 'TEACHER' | 'STUDENT'): ClassroomContext {
     gamesDisabled: false,
     myRole: role,
     capabilities:
-      role === 'TEACHER' ? ['publish_content', 'configure_classroom'] : [],
+      role === 'TEACHER'
+        ? ['publish_content', 'configure_classroom']
+        : ['participate_activities'],
     availablePanels: ['activities', 'members'],
     deskCount: 12,
     pet: null,
@@ -150,7 +153,7 @@ async function interceptClassroomApi(
         json: {
           items: items.map(toSummary),
           page: 1,
-          pageSize: 20,
+          pageSize: 10,
           total: items.length,
         },
       });
@@ -165,13 +168,14 @@ async function interceptClassroomApi(
           body.questions.length > 0 &&
           body.questions.every(
             (question) =>
+              question.options.length >= 2 &&
               question.options.filter((option) => option.isCorrect).length ===
-              1,
+                1,
           ));
       if (!titleValid || !questionsValid) {
         return route.fulfill({
           status: 400,
-          json: errorBody('VALIDATION_ERROR'),
+          json: errorBody('VALIDATION_FAILED'),
         });
       }
       const questions = (body.questions ?? []).map(
@@ -225,13 +229,13 @@ async function interceptClassroomApi(
       if (activity === undefined || activity.state === 'PUBLISHED') {
         return route.fulfill({
           status: 409,
-          json: errorBody('ALREADY_PUBLISHED'),
+          json: errorBody('CONFLICT'),
         });
       }
       if (Date.parse(activity.dueAt) <= Date.now()) {
         return route.fulfill({
           status: 400,
-          json: errorBody('NOT_PUBLISHABLE'),
+          json: errorBody('VALIDATION_FAILED'),
         });
       }
       const publishedAt = new Date().toISOString();
@@ -326,11 +330,11 @@ test('teacher publishes an exam and the server-confirmed activity appears in the
   });
   await expect(panel).toBeVisible();
   await expect(
-    panel.getByText(panelCopy.emptyTitleStaff, { exact: true }),
+    panel.getByText(activityMessages.emptyTitleStaff, { exact: true }),
   ).toBeVisible();
 
   await panel
-    .getByRole('button', { name: panelCopy.createAction, exact: true })
+    .getByRole('button', { name: actionsCopy.createAction, exact: true })
     .click();
 
   const editor = page.getByRole('dialog', {
@@ -341,12 +345,8 @@ test('teacher publishes an exam and the server-confirmed activity appears in the
   await expect(editor).toContainText(editorCopy.createDescription);
 
   const examTitle = 'Examen de fuerzas';
-  // Unambiguous school-zone datetime strictly in the future.
   const dueAtLocal = '2030-06-15T18:00';
 
-  // The choice rows render their radios `sr-only` behind the visible
-  // card labels, so the labels are clicked and the radios are then asserted
-  // through their accessible names.
   const examTypeRadio = editor.getByRole('radio', {
     name: editorCopy.fields.type.options.EXAM.label,
     exact: true,
@@ -407,7 +407,6 @@ test('teacher publishes an exam and the server-confirmed activity appears in the
     })
     .click();
 
-  // The confirmed draft opens the one-way publish confirmation.
   const publish = page.getByRole('dialog', {
     name: editorCopy.publish.title(examTitle),
     exact: true,
@@ -417,10 +416,17 @@ test('teacher publishes an exam and the server-confirmed activity appears in the
   await expect(publish).toContainText(editorCopy.publish.dueAtLabel);
   await expect(editor).toHaveCount(0);
 
-  // The server-confirmed draft is already in the reconciled list.
-  await expect(panel.getByText(examTitle, { exact: true })).toBeVisible();
+  // While the modal publish dialog is open, Radix marks the background panel
+  // `aria-hidden="true"`, so verify the reconciled draft via DOM text until
+  // the publish modal closes and restores full ARIA access to the list.
+  const backgroundList = panel.locator('ul');
   await expect(
-    panel.getByText(panelCopy.states.DRAFT, { exact: true }),
+    backgroundList.getByText(examTitle, { exact: true }),
+  ).toBeVisible();
+  await expect(
+    backgroundList.getByText(activityMessages.stateLabels.DRAFT, {
+      exact: true,
+    }),
   ).toBeVisible();
 
   await publish
@@ -428,28 +434,34 @@ test('teacher publishes an exam and the server-confirmed activity appears in the
     .click();
 
   await expect(publish).toHaveCount(0);
-  const publishedItem = panel
+  const list = panel.getByRole('list', {
+    name: activityMessages.listRegionLabel,
+  });
+  const publishedItem = list
     .getByRole('listitem')
     .filter({ hasText: examTitle });
   await expect(publishedItem).toBeVisible();
   await expect(
-    publishedItem.getByText(panelCopy.states.PUBLISHED, { exact: true }),
-  ).toBeVisible();
-  await expect(
-    publishedItem.getByText(panelCopy.states.DRAFT, { exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    publishedItem.getByText(panelCopy.types.EXAM, { exact: true }),
-  ).toBeVisible();
-  await expect(
-    publishedItem.getByText(panelCopy.formats.MULTIPLE_CHOICE, {
+    publishedItem.getByText(activityMessages.stateLabels.PUBLISHED, {
       exact: true,
     }),
   ).toBeVisible();
-  // The one-way publish action is no longer offered for the published item.
+  await expect(
+    publishedItem.getByText(activityMessages.stateLabels.DRAFT, {
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await expect(
+    publishedItem.getByText(activityMessages.typeLabels.EXAM, { exact: true }),
+  ).toBeVisible();
+  await expect(
+    publishedItem.getByText(activityMessages.formatLabels.MULTIPLE_CHOICE, {
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(
     publishedItem.getByRole('button', {
-      name: panelCopy.publishAriaLabel(examTitle),
+      name: actionsCopy.publishAriaLabel(examTitle),
     }),
   ).toHaveCount(0);
 
@@ -463,10 +475,11 @@ test('teacher publishes an exam and the server-confirmed activity appears in the
   expect(pageErrors).toEqual([]);
 });
 
-test('student sees only published activities without teacher actions', async ({
+test('student sees only published activities without teacher actions on desktop and mobile', async ({
   page,
 }, testInfo) => {
-  await page.setViewportSize({ width: 1280, height: 800 });
+  const width = testInfo.project.name === 'mobile' ? 360 : 1280;
+  await page.setViewportSize({ width, height: 800 });
   const { cspViolations, pageErrors } = await attachRuntimeMonitors(page);
 
   const publishedTp: TeacherActivity = {
@@ -548,13 +561,42 @@ test('student sees only published activities without teacher actions', async ({
     panel.getByText(publishedTp.title, { exact: true }),
   ).toBeVisible();
   await expect(
-    panel.getByText(panelCopy.states.PUBLISHED, { exact: true }),
+    panel.getByRole('link', {
+      name: `${activityMessages.openDetailLabel}: ${publishedTp.title}`,
+    }),
   ).toBeVisible();
 
-  // The server decides: drafts never reach the student list.
+  // Drafts never reach the student list, and teacher actions/filters are absent.
   await expect(panel.getByText(draftExam.title, { exact: true })).toHaveCount(
     0,
   );
+  await expect(
+    panel.getByRole('button', { name: actionsCopy.createAction }),
+  ).toHaveCount(0);
+  await expect(
+    panel.getByRole('button', {
+      name: actionsCopy.editAriaLabel(publishedTp.title),
+    }),
+  ).toHaveCount(0);
+  await expect(
+    panel.getByRole('button', {
+      name: actionsCopy.publishAriaLabel(publishedTp.title),
+    }),
+  ).toHaveCount(0);
+  await expect(
+    panel.getByRole('button', {
+      name: actionsCopy.deactivateAriaLabel(publishedTp.title),
+    }),
+  ).toHaveCount(0);
+  await expect(panel.getByLabel(activityMessages.stateFilterLabel)).toHaveCount(
+    0,
+  );
+
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
 
   expect(cspViolations).toEqual([]);
   expect(pageErrors).toEqual([]);
@@ -642,15 +684,18 @@ test('captures activities panel and editor UI evidence for documentation', async
     exact: true,
   });
   await expect(panel).toBeVisible();
+  const list = panel.getByRole('list', {
+    name: activityMessages.listRegionLabel,
+  });
   await expect(
-    panel.getByText(publishedTp.title, { exact: true }),
+    list.getByText(publishedTp.title, { exact: true }),
   ).toBeVisible();
-  await expect(panel.getByText(draftExam.title, { exact: true })).toBeVisible();
+  await expect(list.getByText(draftExam.title, { exact: true })).toBeVisible();
   await expect(
-    panel.getByText(panelCopy.states.DRAFT, { exact: true }),
+    list.getByText(activityMessages.stateLabels.DRAFT, { exact: true }),
   ).toBeVisible();
   await expect(
-    panel.getByText(panelCopy.states.PUBLISHED, { exact: true }),
+    list.getByText(activityMessages.stateLabels.PUBLISHED, { exact: true }),
   ).toBeVisible();
 
   await page.screenshot({
@@ -659,7 +704,7 @@ test('captures activities panel and editor UI evidence for documentation', async
   });
 
   await panel
-    .getByRole('button', { name: panelCopy.createAction, exact: true })
+    .getByRole('button', { name: actionsCopy.createAction, exact: true })
     .click();
 
   const editor = page.getByRole('dialog', {

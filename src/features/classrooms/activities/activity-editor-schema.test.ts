@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest';
 import { DEFAULT_SCHOOL_TIME_ZONE } from '@/lib/dates';
-import { classroomMessages } from '../messages';
 import {
   activityEditorDefaultsFromDetail,
   createActivityEditorDefaults,
@@ -8,9 +7,10 @@ import {
   updateActivityEditorSchema,
   type ActivityEditorFormInput,
 } from './activity-editor-schema';
+import { activityMessages } from './messages';
 
-const validationCopy = classroomMessages.activities.validation;
-const editorValidationCopy = classroomMessages.activities.editor.validation;
+const validationCopy = activityMessages.validation;
+const editorValidationCopy = activityMessages.editor.validation;
 
 type SafeParseLike =
   | { readonly success: true }
@@ -120,7 +120,10 @@ describe('activity editor schema (#39 T3)', () => {
       questions: [
         {
           prompt: '¿Cuánto es 2 + 2?',
-          options: [{ label: '4', isCorrect: true }],
+          options: [
+            { label: '3', isCorrect: false },
+            { label: '4', isCorrect: true },
+          ],
         },
       ],
     });
@@ -129,7 +132,19 @@ describe('activity editor schema (#39 T3)', () => {
     );
   });
 
-  test('exactly one correct option per question: zero and multiple are refused', () => {
+  test('enforces 2..6 options and exactly one correct option per question', () => {
+    const singleOption = createActivityEditorSchema().safeParse({
+      ...validCreateInput(),
+      format: 'MULTIPLE_CHOICE',
+      questions: [
+        {
+          prompt: '¿Cuánto es 2 + 2?',
+          options: [{ label: '4', isCorrect: true }],
+        },
+      ],
+    });
+    expect(messagesOf(singleOption)).toContain(validationCopy.optionsMin);
+
     const zero = createActivityEditorSchema().safeParse({
       ...validCreateInput(),
       format: 'MULTIPLE_CHOICE',
@@ -178,7 +193,7 @@ describe('activity editor schema (#39 T3)', () => {
     expect(single.success).toBe(true);
   });
 
-  test('weightMultiplier admits at most two decimals and must be positive', () => {
+  test('weightMultiplier must be between 0.5 and 3 with at most two decimals', () => {
     const threeDecimals = createActivityEditorSchema().safeParse({
       ...validCreateInput(),
       weightMultiplier: '1.234',
@@ -187,13 +202,17 @@ describe('activity editor schema (#39 T3)', () => {
       validationCopy.weightMultiplierDecimals,
     );
 
-    const negative = createActivityEditorSchema().safeParse({
+    const tooLow = createActivityEditorSchema().safeParse({
       ...validCreateInput(),
-      weightMultiplier: '-1',
+      weightMultiplier: '0.4',
     });
-    expect(messagesOf(negative)).toContain(
-      validationCopy.weightMultiplierPositive,
-    );
+    expect(messagesOf(tooLow)).toContain(validationCopy.weightMultiplierRange);
+
+    const tooHigh = createActivityEditorSchema().safeParse({
+      ...validCreateInput(),
+      weightMultiplier: '3.5',
+    });
+    expect(messagesOf(tooHigh)).toContain(validationCopy.weightMultiplierRange);
 
     const twoDecimals = createActivityEditorSchema().safeParse({
       ...validCreateInput(),
@@ -202,12 +221,30 @@ describe('activity editor schema (#39 T3)', () => {
     expect(twoDecimals.success).toBe(true);
   });
 
-  test('maxScore must be positive', () => {
+  test('maxScore must be an integer between 0 and 100 inclusive', () => {
     const zero = createActivityEditorSchema().safeParse({
       ...validCreateInput(),
       maxScore: '0',
     });
-    expect(messagesOf(zero)).toContain(validationCopy.maxScorePositive);
+    expect(zero.success).toBe(true);
+
+    const decimal = createActivityEditorSchema().safeParse({
+      ...validCreateInput(),
+      maxScore: '10.5',
+    });
+    expect(messagesOf(decimal)).toContain(validationCopy.maxScoreRange);
+
+    const overMax = createActivityEditorSchema().safeParse({
+      ...validCreateInput(),
+      maxScore: '101',
+    });
+    expect(messagesOf(overMax)).toContain(validationCopy.maxScoreRange);
+
+    const negative = createActivityEditorSchema().safeParse({
+      ...validCreateInput(),
+      maxScore: '-1',
+    });
+    expect(messagesOf(negative)).toContain(validationCopy.maxScoreRange);
   });
 
   test('malformed and DST-gap datetime-local values are refused', () => {
@@ -241,7 +278,7 @@ describe('activity editor schema (#39 T3)', () => {
   test('edit defaults convert UTC instants back into school-zone values', () => {
     const defaults = activityEditorDefaultsFromDetail({
       id: '6a6b6c6d-0000-4000-8000-0000000000a3',
-      classroomId: 'classroom',
+      classroomId: '4e5f6a7b-0000-4000-8000-000000000033',
       type: 'EXAM',
       format: 'MULTIPLE_CHOICE',
       state: 'DRAFT',
@@ -257,15 +294,25 @@ describe('activity editor schema (#39 T3)', () => {
       questionCount: 1,
       createdAt: '2026-11-10T12:00:00.000Z',
       updatedAt: '2026-11-10T12:00:00.000Z',
-      createdById: 'teacher',
+      createdById: '00000000-0000-4000-8000-000000000001',
       questions: [
         {
-          id: 'q1',
-          position: 0,
+          id: '00000000-0000-4000-8000-000000001001',
+          position: 1,
           prompt: '¿Cuánto es 2 + 2?',
           options: [
-            { id: 'o1', position: 0, label: '3', isCorrect: false },
-            { id: 'o2', position: 1, label: '4', isCorrect: true },
+            {
+              id: '00000000-0000-4000-8000-000000002001',
+              position: 1,
+              label: '3',
+              isCorrect: false,
+            },
+            {
+              id: '00000000-0000-4000-8000-000000002002',
+              position: 2,
+              label: '4',
+              isCorrect: true,
+            },
           ],
         },
       ],

@@ -7,6 +7,7 @@ import {
   within,
 } from '@testing-library/react';
 import { HttpResponse } from 'msw';
+import { MemoryRouter } from 'react-router';
 import {
   afterAll,
   afterEach,
@@ -21,7 +22,6 @@ import { createApiClient } from '@/api/client';
 import { classroomDetailQueryKey } from '@/api/query-keys';
 import { fakeSession } from '@/app/router/fake-session';
 import { Toast } from '@/components/ui/toast';
-import { formatInstant } from '@/lib/dates';
 import { SessionProvider } from '@/session/provider';
 import { profile } from '@/session/test-fixtures';
 import { expectAccessible } from '@/test/accessibility';
@@ -34,8 +34,9 @@ import {
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
 import { render } from '@/test/render';
-import { classroomMessages } from '../messages';
-import { ClassroomActivitiesPanel } from './classroom-activities-panel';
+import { ActivitiesPanel } from './activities-panel';
+import { formatActivityDeadline } from './format-activity-deadline';
+import { activityMessages } from './messages';
 
 beforeAll(() => {
   mswServer.listen({ onUnhandledFrame: 'error' });
@@ -57,8 +58,8 @@ afterAll(() => {
   mswServer.close();
 });
 
-const copy = classroomMessages.activities.panel;
-const writeCopy = classroomMessages.activities.write;
+const actionsCopy = activityMessages.actions;
+const writeCopy = activityMessages.write;
 const classroomId = '4e5f6a7b-0000-4000-8000-000000000033';
 
 /** Draft file-submission TP, only visible to staff. */
@@ -103,15 +104,6 @@ const publishedExam: ActivitySummaryPayload = {
   updatedAt: '2026-11-20T10:00:00.000Z',
 };
 
-/** School-timezone display text for one summary instant (FD11: never the browser zone). */
-function schoolInstantText(
-  isoInstant: string,
-  timeZone: string,
-  label: string,
-): string {
-  return `${label}: ${formatInstant(isoInstant, { timeZone })}`;
-}
-
 function renderActivitiesPanel(
   options: { readonly queryClient?: QueryClient } = {},
 ) {
@@ -128,17 +120,19 @@ function renderActivitiesPanel(
     createApiClient({ baseUrl: TEST_API_BASE_URL }),
   );
   const view = render(
-    <SessionProvider service={session.service}>
-      <Toast />
-      <ClassroomActivitiesPanel classroomId={classroomId} />
-    </SessionProvider>,
+    <MemoryRouter>
+      <SessionProvider service={session.service}>
+        <Toast />
+        <ActivitiesPanel classroomId={classroomId} />
+      </SessionProvider>
+    </MemoryRouter>,
     { queryClient },
   );
   return { queryClient, session, ...view };
 }
 
-describe('ClassroomActivitiesPanel (#39)', () => {
-  test('renders staff list with badges, school-timezone dates, scores, and passes accessibility checks', async () => {
+describe('ActivitiesPanel teacher management (#39 + #41 unified)', () => {
+  test('renders staff list with badges, FD11 school IANA timezone deadlines, detail links, scores, and passes axe checks', async () => {
     mswServer.use(
       createClassroomDetailHandler(classroomId, {
         myRole: 'TEACHER',
@@ -155,71 +149,95 @@ describe('ClassroomActivitiesPanel (#39)', () => {
     expect(await screen.findByText(draftFileTp.title)).toBeVisible();
     expect(screen.getByText(publishedExam.title)).toBeVisible();
 
-    expect(screen.getByText(copy.states.DRAFT)).toBeVisible();
-    expect(screen.getByText(copy.states.PUBLISHED)).toBeVisible();
-    expect(screen.getByText(copy.types.TP)).toBeVisible();
-    expect(screen.getByText(copy.types.EXAM)).toBeVisible();
-    expect(screen.getByText(copy.formats.FILE)).toBeVisible();
-    expect(screen.getByText(copy.formats.MULTIPLE_CHOICE)).toBeVisible();
+    const list = screen.getByRole('list', {
+      name: activityMessages.listRegionLabel,
+    });
+    expect(
+      within(list).getByText(activityMessages.stateLabels.DRAFT),
+    ).toBeVisible();
+    expect(
+      within(list).getByText(activityMessages.stateLabels.PUBLISHED),
+    ).toBeVisible();
+    expect(
+      within(list).getByText(activityMessages.typeLabels.TP),
+    ).toBeVisible();
+    expect(
+      within(list).getByText(activityMessages.typeLabels.EXAM),
+    ).toBeVisible();
+    expect(
+      within(list).getByText(activityMessages.formatLabels.FILE),
+    ).toBeVisible();
+    expect(
+      within(list).getByText(activityMessages.formatLabels.MULTIPLE_CHOICE),
+    ).toBeVisible();
 
+    // Deadlines render in the server school IANA time zone (FD11).
     expect(
-      screen.getByText(
-        schoolInstantText(
-          draftFileTp.dueAt,
-          draftFileTp.timeZone,
-          copy.dueAtLabel,
-        ),
+      within(list).getByText(
+        formatActivityDeadline(draftFileTp.dueAt, draftFileTp.timeZone),
       ),
     ).toBeVisible();
     expect(
-      screen.getByText(
-        schoolInstantText(
-          publishedExam.dueAt,
-          publishedExam.timeZone,
-          copy.dueAtLabel,
-        ),
+      within(list).getByText(
+        formatActivityDeadline(publishedExam.dueAt, publishedExam.timeZone),
       ),
     ).toBeVisible();
     expect(
-      screen.getByText(
-        schoolInstantText(
+      within(list).getByText(
+        formatActivityDeadline(
           publishedExam.opensAt as string,
           publishedExam.timeZone,
-          copy.opensAtLabel,
         ),
       ),
     ).toBeVisible();
-    expect(screen.getByText(copy.allowLateLabel)).toBeVisible();
+
     expect(
-      screen.getByText(copy.questionCountLabel(publishedExam.questionCount)),
+      within(list).getByText(activityMessages.lateAllowedLabel),
     ).toBeVisible();
     expect(
-      screen.getByText(
-        `${copy.maxScoreLabel(publishedExam.maxScore)} · ${copy.weightLabel(publishedExam.weightMultiplier)}`,
+      within(list).getByText(
+        activityMessages.questionCountLabel(publishedExam.questionCount),
       ),
     ).toBeVisible();
     expect(
-      screen.getByText(
-        `${copy.maxScoreLabel(draftFileTp.maxScore)} · ${copy.weightLabel(draftFileTp.weightMultiplier)}`,
+      within(list).getAllByText(
+        activityMessages.maxScoreLabel(publishedExam.maxScore),
+      ),
+    ).toHaveLength(2);
+    expect(
+      within(list).getByText(
+        activityMessages.weightLabel(publishedExam.weightMultiplier),
       ),
     ).toBeVisible();
 
-    expect(screen.getByText(copy.stateFilterLabel)).toBeVisible();
+    // Detail links stay available alongside teacher controls.
+    expect(
+      screen.getByRole('link', {
+        name: `${activityMessages.openDetailLabel}: ${draftFileTp.title}`,
+      }),
+    ).toHaveAttribute(
+      'href',
+      `/classrooms/${classroomId}/activities/${draftFileTp.id}`,
+    );
+
+    expect(
+      screen.getByLabelText(activityMessages.stateFilterLabel),
+    ).toBeVisible();
     expect(
       screen.getByRole('button', {
-        name: copy.deactivateAriaLabel(draftFileTp.title),
+        name: actionsCopy.deactivateAriaLabel(draftFileTp.title),
       }),
     ).toBeEnabled();
     expect(
       screen.getByRole('button', {
-        name: copy.deactivateAriaLabel(publishedExam.title),
+        name: actionsCopy.deactivateAriaLabel(publishedExam.title),
       }),
     ).toBeEnabled();
 
     await expectAccessible(container);
   });
 
-  test('student view renders published activities without staff controls', async () => {
+  test('student view renders published activities with detail link and without staff controls', async () => {
     mswServer.use(
       createClassroomDetailHandler(classroomId),
       createClassroomActivitiesListHandler({
@@ -231,29 +249,32 @@ describe('ClassroomActivitiesPanel (#39)', () => {
     const { container } = renderActivitiesPanel();
 
     expect(await screen.findByText(publishedExam.title)).toBeVisible();
-    expect(screen.getByText(copy.states.PUBLISHED)).toBeVisible();
+    expect(
+      screen.getByRole('link', {
+        name: `${activityMessages.openDetailLabel}: ${publishedExam.title}`,
+      }),
+    ).toBeVisible();
 
     expect(
       screen.queryByRole('button', {
-        name: copy.deactivateAriaLabel(publishedExam.title),
+        name: actionsCopy.deactivateAriaLabel(publishedExam.title),
       }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: copy.createAction }),
+      screen.queryByRole('button', { name: actionsCopy.createAction }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', {
-        name: copy.editAriaLabel(publishedExam.title),
+        name: actionsCopy.editAriaLabel(publishedExam.title),
       }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', {
-        name: copy.publishAriaLabel(publishedExam.title),
+        name: actionsCopy.publishAriaLabel(publishedExam.title),
       }),
     ).not.toBeInTheDocument();
-    expect(screen.queryByText(copy.stateFilterLabel)).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: copy.stateOptions.DRAFT }),
+      screen.queryByLabelText(activityMessages.stateFilterLabel),
     ).not.toBeInTheDocument();
 
     await expectAccessible(container);
@@ -292,7 +313,7 @@ describe('ClassroomActivitiesPanel (#39)', () => {
             return HttpResponse.json({
               items: [publishedExam],
               page: 1,
-              pageSize: 20,
+              pageSize: 10,
               total: 1,
             });
           }
@@ -311,18 +332,22 @@ describe('ClassroomActivitiesPanel (#39)', () => {
     );
 
     const { queryClient } = renderActivitiesPanel();
-    expect(await screen.findByText(copy.loading)).toBeVisible();
+    expect(
+      await screen.findByText(activityMessages.loadingLabel),
+    ).toBeVisible();
 
     releaseInitial();
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent(copy.errorTitle);
+    expect(alert).toHaveTextContent(activityMessages.errorTitle);
     expect(alert).not.toHaveTextContent('DB failure');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: activityMessages.retryLabel }),
+    );
     expect(await screen.findByText(publishedExam.title)).toBeVisible();
 
     await act(() => queryClient.invalidateQueries());
-    expect(await screen.findByText(copy.staleTitle)).toBeVisible();
+    expect(await screen.findByText(activityMessages.staleTitle)).toBeVisible();
     expect(screen.getByText(publishedExam.title)).toBeVisible();
   });
 
@@ -336,8 +361,12 @@ describe('ClassroomActivitiesPanel (#39)', () => {
     );
 
     renderActivitiesPanel();
-    expect(await screen.findByText(copy.emptyTitleStaff)).toBeVisible();
-    expect(screen.getByText(copy.emptyDescriptionStaff)).toBeVisible();
+    expect(
+      await screen.findByText(activityMessages.emptyTitleStaff),
+    ).toBeVisible();
+    expect(
+      screen.getByText(activityMessages.emptyDescriptionStaff),
+    ).toBeVisible();
   });
 
   test('renders the student empty state without staff copy or controls', async () => {
@@ -347,12 +376,14 @@ describe('ClassroomActivitiesPanel (#39)', () => {
     );
 
     renderActivitiesPanel();
-    expect(await screen.findByText(copy.emptyTitleStudent)).toBeVisible();
-    expect(screen.getByText(copy.emptyDescriptionStudent)).toBeVisible();
-    expect(screen.queryByText(copy.stateFilterLabel)).not.toBeInTheDocument();
+    expect(await screen.findByText(activityMessages.emptyTitle)).toBeVisible();
+    expect(screen.getByText(activityMessages.emptyDescription)).toBeVisible();
+    expect(
+      screen.queryByLabelText(activityMessages.stateFilterLabel),
+    ).not.toBeInTheDocument();
   });
 
-  test('state filter DRAFT refetches with state=DRAFT and offers clear-filters recovery', async () => {
+  test('state filter DRAFT refetches with state=DRAFT and offers clear-filter recovery', async () => {
     const observedStates: Array<string | null> = [];
     mswServer.use(
       createClassroomDetailHandler(classroomId, {
@@ -373,17 +404,19 @@ describe('ClassroomActivitiesPanel (#39)', () => {
     expect(await screen.findByText(publishedExam.title)).toBeVisible();
     expect(observedStates).toEqual([null]);
 
-    fireEvent.click(
-      screen.getByRole('button', { name: copy.stateOptions.DRAFT }),
-    );
-    expect(await screen.findByText(copy.emptyFilteredTitle)).toBeVisible();
+    fireEvent.change(screen.getByLabelText(activityMessages.stateFilterLabel), {
+      target: { value: 'DRAFT' },
+    });
     expect(
-      screen.getByRole('button', { name: copy.clearFiltersAction }),
+      await screen.findByText(activityMessages.emptyFilteredDescription),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: activityMessages.clearFilterLabel }),
     ).toBeEnabled();
     expect(observedStates.at(-1)).toBe('DRAFT');
 
     fireEvent.click(
-      screen.getByRole('button', { name: copy.clearFiltersAction }),
+      screen.getByRole('button', { name: activityMessages.clearFilterLabel }),
     );
     expect(await screen.findByText(publishedExam.title)).toBeVisible();
     expect(observedStates.at(-1)).toBe(null);
@@ -410,7 +443,7 @@ describe('ClassroomActivitiesPanel (#39)', () => {
 
     const view403 = renderActivitiesPanel();
     const alert403 = await screen.findByRole('alert');
-    expect(alert403).toHaveTextContent(copy.forbiddenTitle);
+    expect(alert403).toHaveTextContent(activityMessages.forbiddenTitle);
     expect(alert403).not.toHaveTextContent('Student role');
     expect(screen.queryByText(publishedExam.title)).not.toBeInTheDocument();
     view403.unmount();
@@ -442,7 +475,7 @@ describe('ClassroomActivitiesPanel (#39)', () => {
 
     renderActivitiesPanel({ queryClient });
     const alert404 = await screen.findByRole('alert');
-    expect(alert404).toHaveTextContent(copy.notFoundTitle);
+    expect(alert404).toHaveTextContent(activityMessages.notFoundTitle);
     expect(alert404).not.toHaveTextContent('Classroom not found');
     expect(screen.queryByText(publishedExam.title)).not.toBeInTheDocument();
     await waitFor(() => {
@@ -453,7 +486,7 @@ describe('ClassroomActivitiesPanel (#39)', () => {
     });
   });
 
-  test('staff without publish_content see the list but no management actions', async () => {
+  test('staff without publish_content see the list and detail link but no management actions', async () => {
     mswServer.use(
       createClassroomDetailHandler(classroomId, {
         myRole: 'TEACHER',
@@ -469,21 +502,21 @@ describe('ClassroomActivitiesPanel (#39)', () => {
 
     expect(await screen.findByText(draftFileTp.title)).toBeVisible();
     expect(
-      screen.queryByRole('button', { name: copy.createAction }),
+      screen.queryByRole('button', { name: actionsCopy.createAction }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', {
-        name: copy.editAriaLabel(draftFileTp.title),
+        name: actionsCopy.editAriaLabel(draftFileTp.title),
       }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', {
-        name: copy.publishAriaLabel(draftFileTp.title),
+        name: actionsCopy.publishAriaLabel(draftFileTp.title),
       }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', {
-        name: copy.deactivateAriaLabel(draftFileTp.title),
+        name: actionsCopy.deactivateAriaLabel(draftFileTp.title),
       }),
     ).not.toBeInTheDocument();
   });
@@ -503,34 +536,33 @@ describe('ClassroomActivitiesPanel (#39)', () => {
     const { container } = renderActivitiesPanel();
 
     expect(
-      await screen.findByRole('button', { name: copy.createAction }),
+      await screen.findByRole('button', {
+        name: actionsCopy.editAriaLabel(draftFileTp.title),
+      }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: actionsCopy.createAction }),
     ).toBeEnabled();
     expect(
       screen.getByRole('button', {
-        name: copy.editAriaLabel(draftFileTp.title),
+        name: actionsCopy.editAriaLabel(publishedExam.title),
       }),
     ).toBeEnabled();
     expect(
       screen.getByRole('button', {
-        name: copy.editAriaLabel(publishedExam.title),
+        name: actionsCopy.publishAriaLabel(draftFileTp.title),
       }),
     ).toBeEnabled();
-    expect(
-      screen.getByRole('button', {
-        name: copy.publishAriaLabel(draftFileTp.title),
-      }),
-    ).toBeEnabled();
-    // Already-published activities cannot be published again.
     expect(
       screen.queryByRole('button', {
-        name: copy.publishAriaLabel(publishedExam.title),
+        name: actionsCopy.publishAriaLabel(publishedExam.title),
       }),
     ).not.toBeInTheDocument();
 
     await expectAccessible(container);
   });
 
-  test('deactivation confirms with focus management, cancels back to the trigger, and reconciles on 204', async () => {
+  test('deactivation confirms with focus management, cancels back to trigger, and reconciles on 204', async () => {
     const deactivatedActivityIds: string[] = [];
     let listCalls = 0;
 
@@ -547,13 +579,13 @@ describe('ClassroomActivitiesPanel (#39)', () => {
             ? HttpResponse.json({
                 items: [draftFileTp],
                 page: 1,
-                pageSize: 20,
+                pageSize: 10,
                 total: 1,
               })
             : HttpResponse.json({
                 items: [],
                 page: 1,
-                pageSize: 20,
+                pageSize: 10,
                 total: 0,
               });
         },
@@ -570,27 +602,29 @@ describe('ClassroomActivitiesPanel (#39)', () => {
     renderActivitiesPanel();
 
     const trigger = await screen.findByRole('button', {
-      name: copy.deactivateAriaLabel(draftFileTp.title),
+      name: actionsCopy.deactivateAriaLabel(draftFileTp.title),
     });
     fireEvent.click(trigger);
 
     const confirmRegion = await screen.findByRole('region', {
-      name: copy.deactivateConfirmTitle(draftFileTp.title),
+      name: actionsCopy.deactivateConfirmTitle(draftFileTp.title),
     });
-    expect(confirmRegion).toHaveTextContent(copy.deactivateConfirmDescription);
+    expect(confirmRegion).toHaveTextContent(
+      actionsCopy.deactivateConfirmDescription,
+    );
     expect(
       within(confirmRegion).getByRole('heading', { level: 4 }),
     ).toHaveFocus();
 
     fireEvent.click(
       within(confirmRegion).getByRole('button', {
-        name: copy.deactivateConfirmCancel,
+        name: actionsCopy.deactivateConfirmCancel,
       }),
     );
     await waitFor(() => {
       expect(
         screen.queryByRole('region', {
-          name: copy.deactivateConfirmTitle(draftFileTp.title),
+          name: actionsCopy.deactivateConfirmTitle(draftFileTp.title),
         }),
       ).not.toBeInTheDocument();
     });
@@ -598,37 +632,39 @@ describe('ClassroomActivitiesPanel (#39)', () => {
 
     fireEvent.click(trigger);
     const activeConfirmRegion = await screen.findByRole('region', {
-      name: copy.deactivateConfirmTitle(draftFileTp.title),
+      name: actionsCopy.deactivateConfirmTitle(draftFileTp.title),
     });
     fireEvent.click(
       within(activeConfirmRegion).getByRole('button', {
-        name: copy.deactivateConfirmSubmit,
+        name: actionsCopy.deactivateConfirmSubmit,
       }),
     );
 
     await waitFor(() => {
       expect(
         screen.queryByRole('region', {
-          name: copy.deactivateConfirmTitle(draftFileTp.title),
+          name: actionsCopy.deactivateConfirmTitle(draftFileTp.title),
         }),
       ).not.toBeInTheDocument();
     });
     expect(deactivatedActivityIds).toEqual([draftFileTp.id]);
-    expect(await screen.findByText(copy.deactivatedTitle)).toBeVisible();
+    expect(await screen.findByText(actionsCopy.deactivatedTitle)).toBeVisible();
     expect(
-      screen.getByText(copy.deactivatedDescription(draftFileTp.title)),
+      screen.getByText(actionsCopy.deactivatedDescription(draftFileTp.title)),
     ).toBeVisible();
 
-    // Confirmed write reconciles the list through query invalidation.
-    expect(await screen.findByText(copy.emptyTitleStaff)).toBeVisible();
+    expect(
+      await screen.findByText(activityMessages.emptyTitleStaff),
+    ).toBeVisible();
     expect(screen.queryByText(draftFileTp.title)).not.toBeInTheDocument();
     expect(listCalls).toBe(2);
     expect(
-      screen.getByRole('heading', { level: 3, name: copy.heading }),
+      screen.getByRole('heading', { level: 3, name: activityMessages.heading }),
     ).toHaveFocus();
   });
 
-  test('deactivation 409 keeps the confirmation open and explains the submissions refusal', async () => {
+  test('deactivation 409 keeps the confirmation open, reconciles, and explains the submissions refusal', async () => {
+    let listCalls = 0;
     mswServer.use(
       createClassroomDetailHandler(classroomId, {
         myRole: 'TEACHER',
@@ -636,7 +672,15 @@ describe('ClassroomActivitiesPanel (#39)', () => {
       }),
       createClassroomActivitiesListHandler({
         classroomId,
-        items: [draftFileTp],
+        resolveResponse: () => {
+          listCalls += 1;
+          return HttpResponse.json({
+            items: [draftFileTp],
+            page: 1,
+            pageSize: 10,
+            total: 1,
+          });
+        },
       }),
       createDeactivateActivityHandler({
         classroomId,
@@ -656,23 +700,26 @@ describe('ClassroomActivitiesPanel (#39)', () => {
 
     fireEvent.click(
       await screen.findByRole('button', {
-        name: copy.deactivateAriaLabel(draftFileTp.title),
+        name: actionsCopy.deactivateAriaLabel(draftFileTp.title),
       }),
     );
     const confirmRegion = await screen.findByRole('region', {
-      name: copy.deactivateConfirmTitle(draftFileTp.title),
+      name: actionsCopy.deactivateConfirmTitle(draftFileTp.title),
     });
     fireEvent.click(
       within(confirmRegion).getByRole('button', {
-        name: copy.deactivateConfirmSubmit,
+        name: actionsCopy.deactivateConfirmSubmit,
       }),
     );
 
     const alert = await within(confirmRegion).findByRole('alert');
-    expect(alert).toHaveTextContent(copy.deactivateErrorTitle);
+    expect(alert).toHaveTextContent(actionsCopy.deactivateErrorTitle);
     expect(alert).toHaveTextContent(writeCopy.deactivateHasSubmissions);
     expect(alert).not.toHaveTextContent('cannot be deactivated');
     expect(confirmRegion).toBeVisible();
+    await waitFor(() => {
+      expect(listCalls).toBeGreaterThanOrEqual(2);
+    });
   });
 
   test('aborts in-flight deactivation on unmount without unhandled rejections', async () => {
@@ -708,16 +755,18 @@ describe('ClassroomActivitiesPanel (#39)', () => {
     const view = renderActivitiesPanel();
     fireEvent.click(
       await screen.findByRole('button', {
-        name: copy.deactivateAriaLabel(draftFileTp.title),
+        name: actionsCopy.deactivateAriaLabel(draftFileTp.title),
       }),
     );
     fireEvent.click(
-      screen.getByRole('button', { name: copy.deactivateConfirmSubmit }),
+      screen.getByRole('button', { name: actionsCopy.deactivateConfirmSubmit }),
     );
 
     await waitFor(() => {
       expect(
-        screen.getByRole('button', { name: copy.deactivateConfirmPending }),
+        screen.getByRole('button', {
+          name: actionsCopy.deactivateConfirmPending,
+        }),
       ).toHaveAttribute('aria-disabled', 'true');
     });
 

@@ -4,6 +4,7 @@ import {
   datetimeLocalToInstantUtc,
   instantToDatetimeLocal,
   isValidSchoolDatetimeLocal,
+  resolveSchoolTimeZone,
 } from './activity-school-datetime';
 
 describe('activity school datetime conversions (#39)', () => {
@@ -76,11 +77,30 @@ describe('activity school datetime conversions (#39)', () => {
     ).toBe('2026-11-01T01:30');
   });
 
-  test('rejects malformed datetime-local values', () => {
+  test('rejects malformed and impossible calendar datetime-local values with clear errors', () => {
     expect(isValidSchoolDatetimeLocal('')).toBe(false);
     expect(isValidSchoolDatetimeLocal('2026-11-30')).toBe(false);
     expect(isValidSchoolDatetimeLocal('not-a-date')).toBe(false);
     expect(isValidSchoolDatetimeLocal('2026-02-30T10:00')).toBe(false);
+    expect(() => datetimeLocalToInstantUtc('2026-02-30T10:00')).toThrow(
+      /calendar date or time is out of range/,
+    );
+  });
+
+  test('falls back safely to the default school time zone on empty or invalid IANA zones', () => {
+    expect(resolveSchoolTimeZone('')).toBe(DEFAULT_SCHOOL_TIME_ZONE);
+    expect(resolveSchoolTimeZone('   ')).toBe(DEFAULT_SCHOOL_TIME_ZONE);
+    expect(resolveSchoolTimeZone('Mars/Olympus_Mons')).toBe(
+      DEFAULT_SCHOOL_TIME_ZONE,
+    );
+    expect(
+      datetimeLocalToInstantUtc('2026-11-30T20:00', {
+        timeZone: 'Invalid/Zone',
+      }),
+    ).toBe('2026-11-30T23:00:00.000Z');
+    expect(
+      instantToDatetimeLocal('2026-11-30T23:00:00.000Z', { timeZone: '' }),
+    ).toBe('2026-11-30T20:00');
   });
 
   test('defaults to the school time zone, never the browser zone', () => {
