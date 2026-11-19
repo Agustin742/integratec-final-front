@@ -335,6 +335,55 @@ export function createClassroomMaterialsPredicate(
     );
   };
 }
+
+/**
+ * Key of `GET /classrooms/{id}/bot/materials`: Study Guide Bot allowed-material
+ * configuration and indexing state scoped by `userId` and `classroomId`
+ * (`rules/state-management.md`, `HU-BOT-001`).
+ */
+export function classroomBotMaterialsQueryKey(
+  userId: string,
+  classroomId: string,
+): ScopedQueryKey<undefined> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'materials',
+    'bot-config',
+    undefined,
+  );
+}
+
+/**
+ * Predicate matching every Study Guide Bot material-config query entry owned by
+ * `userId` and `classroomId`.
+ */
+export function createClassroomBotMaterialsPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'materials' &&
+      segment.resource === 'bot-config'
+    );
+  };
+}
 export type InvitationStateFilter =
   'PENDING' | 'USED' | 'REVOKED' | 'EXPIRED' | 'ALL';
 

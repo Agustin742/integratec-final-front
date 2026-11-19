@@ -947,15 +947,26 @@ export interface ClassroomMaterialItem {
   readonly createdAt: string;
 }
 
-export type MaterialStoreOp = 'list' | 'upload' | 'download' | 'remove';
+export type MaterialStoreOp =
+  'list' | 'upload' | 'download' | 'remove' | 'botList' | 'botToggle';
 export type MaterialStoreFailure =
   MswErrorResponseSpec | 'network' | 'drop-response';
+
+export interface BotMaterialStateEntry {
+  readonly materialId: string;
+  readonly classroomId: string;
+  readonly botEnabled: boolean;
+  readonly indexingStatus: 'disabled' | 'pending' | 'ready' | 'failed';
+  readonly indexingError?: string | null;
+  readonly updatedAt: string;
+}
 
 export interface ClassroomMaterialsStoreOptions {
   readonly baseUrl?: string;
   readonly classroomId?: string;
   readonly authorId?: string;
   readonly initialItems?: readonly ClassroomMaterialItem[];
+  readonly initialBotStates?: readonly BotMaterialStateEntry[];
   readonly signedUrlBase?: string;
   readonly expiresInSeconds?: number;
 }
@@ -963,6 +974,14 @@ export interface ClassroomMaterialsStoreOptions {
 export interface ClassroomMaterialsStore {
   readonly handlers: readonly HttpHandler[];
   read(): readonly ClassroomMaterialItem[];
+  readBotStates(): readonly BotMaterialStateEntry[];
+  setBotState(
+    materialId: string,
+    state: Pick<
+      BotMaterialStateEntry,
+      'botEnabled' | 'indexingStatus' | 'indexingError'
+    >,
+  ): void;
   failNext(op: MaterialStoreOp, failure: MaterialStoreFailure): void;
 }
 
@@ -989,6 +1008,9 @@ export function createClassroomMaterialsStore(
     options.signedUrlBase ?? 'https://files.example.test/signed';
   const expiresInSeconds = options.expiresInSeconds ?? 120;
   let items: ClassroomMaterialItem[] = [...(options.initialItems ?? [])];
+  const botStates = new Map<string, BotMaterialStateEntry>(
+    (options.initialBotStates ?? []).map((entry) => [entry.materialId, entry]),
+  );
   let seq = items.length + 1;
   const pending: Partial<Record<MaterialStoreOp, MaterialStoreFailure>> = {};
 
@@ -999,6 +1021,17 @@ export function createClassroomMaterialsStore(
 
   return {
     read: () => [...items],
+    readBotStates: () => [...botStates.values()],
+    setBotState(materialId, state) {
+      botStates.set(materialId, {
+        materialId,
+        classroomId,
+        botEnabled: state.botEnabled,
+        indexingStatus: state.indexingStatus,
+        indexingError: state.indexingError ?? null,
+        updatedAt: '2026-11-19T01:30:00.000Z',
+      });
+    },
     failNext(op, failure) {
       pending[op] = failure;
     },
@@ -1149,7 +1182,72 @@ export function createClassroomMaterialsStore(
             });
           }
           items = items.filter((item) => item.id !== params.materialId);
+          botStates.delete(String(params.materialId));
           return new HttpResponse(null, { status: 204 });
+        },
+      ),
+      http.get(`${baseUrl}/classrooms/:id/bot/materials`, ({ params }) => {
+        const failure = pending.botList;
+        pending.botList = undefined;
+        if (failure !== undefined && failure !== 'drop-response') {
+          return fail(failure);
+        }
+        if (options.classroomId && params.id !== classroomId) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Classroom not found.',
+            correlationId: 'req-bot-materials-list-404',
+          });
+        }
+        return HttpResponse.json({
+          items: [...botStates.values()],
+        });
+      }),
+      http.put(
+        `${baseUrl}/classrooms/:id/bot/materials/:materialId`,
+        async ({ params, request }) => {
+          const failure = pending.botToggle;
+          pending.botToggle = undefined;
+          if (failure !== undefined && failure !== 'drop-response') {
+            return fail(failure);
+          }
+          if (options.classroomId && params.id !== classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-bot-materials-toggle-404',
+            });
+          }
+          const materialId = String(params.materialId);
+          const found = items.find((item) => item.id === materialId);
+          if (!found) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Material not found.',
+              correlationId: 'req-bot-materials-toggle-404',
+            });
+          }
+          const body = (await request.json().catch(() => null)) as {
+            enabled?: unknown;
+          } | null;
+          if (!body || typeof body.enabled !== 'boolean') {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'enabled must be a boolean.',
+              correlationId: 'req-bot-materials-toggle-400',
+            });
+          }
+          seq += 1;
+          const nextEntry: BotMaterialStateEntry = {
+            materialId,
+            classroomId: found.classroomId,
+            botEnabled: body.enabled,
+            indexingStatus: body.enabled ? 'pending' : 'disabled',
+            indexingError: null,
+            updatedAt: '2026-11-19T01:30:00.000Z',
+          };
+          botStates.set(materialId, nextEntry);
+          return HttpResponse.json(nextEntry);
         },
       ),
     ],
