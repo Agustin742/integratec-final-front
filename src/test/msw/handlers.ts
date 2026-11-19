@@ -1,4 +1,4 @@
-import { HttpResponse, http, type HttpHandler } from 'msw';
+import { delay, HttpResponse, http, type HttpHandler } from 'msw';
 import type { components, operations } from '../../api/schema.generated';
 
 export type HealthStatusPayload = components['schemas']['HealthStatus'];
@@ -3748,6 +3748,13 @@ export interface ExamAnswersStoreOptions {
   /** Server-clock instant used to decide the answering window. */
   readonly now?: string;
   readonly initialItems?: readonly ExamAnswersStoreItem[];
+  /**
+   * Artificial latency for every `GET .../exam-answers/me` response, so tests
+   * can observe the panel's transient "verifying with the server" phase: MSW
+   * resolves in microtasks, which lets the whole uncertain-failure
+   * reconciliation finish before React ever commits the intermediate state.
+   */
+  readonly readOwnDelayMs?: number;
 }
 
 export interface ExamAnswerCreateRequestRecord {
@@ -3771,21 +3778,32 @@ export function createExamAnswersStore(
   const role = options.role ?? 'STUDENT';
   const activity = options.activity;
   const now = options.now ?? '2026-11-19T12:00:00.000Z';
+  const readOwnDelayMs = options.readOwnDelayMs ?? 0;
   const items: ExamAnswersStoreItem[] = [...(options.initialItems ?? [])];
   const pending: Partial<Record<ExamAnswersStoreOp, ExamAnswersStoreFailure>> =
     {};
   let lastCreateRequest: ExamAnswerCreateRequestRecord | null = null;
 
-  const respondJson = (body: unknown, status: number): Response =>
-    new Response(JSON.stringify(body), {
-      status,
-      headers: {
-        'content-type': 'application/json',
-        'access-control-allow-origin': '*',
-      },
+  // jsdom enforces CORS, so every store response carries the header a real
+  // API gateway would add; `HttpResponse.error()` stays unwrapped.
+  const withCors = (response: Response): Response => {
+    const headers = new Headers(response.headers);
+    headers.set('access-control-allow-origin', '*');
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
     });
+  };
+  const respondJson = (body: unknown, status: number): Response =>
+    withCors(
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
   const respondError = (status: number, body: ErrorBodyPayload): Response =>
-    createErrorEnvelopeResponse(status, body);
+    withCors(createErrorEnvelopeResponse(status, body));
 
   const fail = (failure: ExamAnswersStoreFailure): Response =>
     failure === 'network' || failure === 'drop-response'
@@ -4086,7 +4104,10 @@ export function createExamAnswersStore(
       ),
       http.get(
         `${baseUrl}/activities/:activityId/exam-answers/me`,
-        ({ params }) => {
+        async ({ params }) => {
+          if (readOwnDelayMs > 0) {
+            await delay(readOwnDelayMs);
+          }
           const failure = pending.readOwn;
           pending.readOwn = undefined;
           if (failure !== undefined) {
