@@ -1,5 +1,13 @@
 # Tracker — Alejo
 
+## 2026-11-19 — Student multiple-choice exam answering and result display (#43)
+
+- **Status:** in-progress (worktree `odd/worktrees/43-exam-answering`, branch `feat/43-student-exam-answering` from `origin/develop` `9d53c7b`; exploration complete, ODD task breakdown written, no source changes yet)
+- **Area / files:** planned: `src/features/classrooms/activities/exam/`, `src/api/query-keys.ts`, `src/test/msw/handlers.ts`, tests, `e2e/`, `docs/exam-answering.md`, `docs/assets/`, this tracker
+- **Change:** Starting [issue #43](https://github.com/Agustin742/integratec-final-front/issues/43) (`HU-ACT-003` part 2/2): student multiple-choice exam answering UI with server-computed result, answer retention on recoverable failure, double-submit protection with `Idempotency-Key`, no correct answers exposed while the attempt is open, and contract-faithful MSW handlers (provisional contract, documented) until back `Agustin742/integratec-final-back#47` ships; real integration deferred to the backend release.
+- **Reason:** Deliver the MVP Core student exam-answering experience per the issue scope and `rules/activities-and-grading.md`.
+- **Next step:** Implement T1 (provisional contract + service + MSW store), T2 (exam panel UI), T3 (tests + e2e evidence), T4 (docs + full local checks).
+
 ## 2026-11-18 — Implement student report card and teacher tracking metrics panel (#46)
 
 - **Status:** in-progress (PR #100 open against `develop`, review fixes applied)

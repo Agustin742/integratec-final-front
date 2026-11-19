@@ -641,6 +641,28 @@ export function classroomActivitySubmissionQueryKey(
   );
 }
 
+/**
+ * Key of the provisional `GET /activities/{activityId}/exam-answers/me`
+ * (`HU-ACT-003` part 2/2, see `docs/exam-answering.md`): the calling
+ * student's own exam attempt for one activity. The response is not cacheable
+ * per the contract, so consumers keep it fresh rather than relying on cached
+ * reads.
+ */
+export function classroomExamAttemptQueryKey(
+  userId: string,
+  classroomId: string,
+  activityId: string,
+): ScopedQueryKey<{ readonly activityId: string }> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'activities',
+    'exam-attempt',
+    Object.freeze({
+      activityId: normalizeRequiredText(activityId, 'activityId'),
+    }),
+  );
+}
+
 export interface AnnouncementListQueryParams {
   readonly page?: number;
   readonly pageSize?: number;

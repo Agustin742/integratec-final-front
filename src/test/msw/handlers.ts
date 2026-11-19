@@ -3687,6 +3687,457 @@ export function createClassroomSubmissionsStore(
   };
 }
 
+/**
+ * Stateful contract-faithful MSW store for the PROVISIONAL exam-answering
+ * endpoints of `HU-ACT-003` part 2/2 (see `docs/exam-answering.md`, pending
+ * `Agustin742/integratec-final-back#47`):
+ * `POST /activities/{activityId}/exam-answers` and
+ * `GET /activities/{activityId}/exam-answers/me`.
+ *
+ * Correct answers live only inside this store and are never part of any
+ * response (`RN-06`): the stored attempt exposes the selected answers and the
+ * server-computed score only. Provisional scoring is all-or-nothing per
+ * question (`score = maxScore * correctQuestions / totalQuestions`); the
+ * browser never computes a score.
+ */
+export interface ExamAnswersStoreOption {
+  readonly id: string;
+  /** Store-internal only; never included in any response (`RN-06`). */
+  readonly isCorrect: boolean;
+}
+
+export interface ExamAnswersStoreQuestion {
+  readonly id: string;
+  readonly options: readonly ExamAnswersStoreOption[];
+}
+
+export interface ExamAnswersStoreActivity {
+  readonly id: string;
+  readonly state: 'DRAFT' | 'PUBLISHED';
+  readonly format: 'FILE' | 'MULTIPLE_CHOICE';
+  readonly opensAt: string | null;
+  readonly dueAt: string;
+  readonly allowLate: boolean;
+  readonly maxScore: number;
+  readonly questions: readonly ExamAnswersStoreQuestion[];
+}
+
+export interface ExamAnswersStoreItem {
+  readonly id: string;
+  readonly activityId: string;
+  readonly submittedAt: string;
+  readonly isLate: boolean;
+  readonly idempotencyKey: string;
+  readonly answers: readonly {
+    readonly questionId: string;
+    readonly selectedOptionIds: readonly string[];
+  }[];
+  readonly score: number;
+  readonly maxScore: number;
+}
+
+export type ExamAnswersStoreOp = 'create' | 'readOwn';
+export type ExamAnswersStoreFailure =
+  MswErrorResponseSpec | 'network' | 'drop-response';
+
+export interface ExamAnswersStoreOptions {
+  readonly baseUrl?: string;
+  readonly role?: 'TEACHER' | 'SCHOOL_OWNER' | 'STUDENT' | 'PARENT';
+  /** Published `MULTIPLE_CHOICE` activity the store accepts answers for. */
+  readonly activity?: ExamAnswersStoreActivity;
+  /** Server-clock instant used to decide the answering window. */
+  readonly now?: string;
+  readonly initialItems?: readonly ExamAnswersStoreItem[];
+}
+
+export interface ExamAnswerCreateRequestRecord {
+  readonly idempotencyKey: string | null;
+  readonly authorization: string | null;
+  readonly accessTokenUsed: string | null;
+  readonly answers: unknown;
+}
+
+export interface ExamAnswersStore {
+  readonly handlers: readonly HttpHandler[];
+  getItems: () => readonly ExamAnswersStoreItem[];
+  getLastCreateRequest: () => ExamAnswerCreateRequestRecord | null;
+  failNext: (op: ExamAnswersStoreOp, failure: ExamAnswersStoreFailure) => void;
+}
+
+export function createExamAnswersStore(
+  options: ExamAnswersStoreOptions = {},
+): ExamAnswersStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const role = options.role ?? 'STUDENT';
+  const activity = options.activity;
+  const now = options.now ?? '2026-11-19T12:00:00.000Z';
+  const items: ExamAnswersStoreItem[] = [...(options.initialItems ?? [])];
+  const pending: Partial<Record<ExamAnswersStoreOp, ExamAnswersStoreFailure>> =
+    {};
+  let lastCreateRequest: ExamAnswerCreateRequestRecord | null = null;
+
+  const respondJson = (body: unknown, status: number): Response =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: {
+        'content-type': 'application/json',
+        'access-control-allow-origin': '*',
+      },
+    });
+  const respondError = (status: number, body: ErrorBodyPayload): Response =>
+    createErrorEnvelopeResponse(status, body);
+
+  const fail = (failure: ExamAnswersStoreFailure): Response =>
+    failure === 'network' || failure === 'drop-response'
+      ? HttpResponse.error()
+      : respondError(failure.status, failure.body);
+
+  return {
+    getItems: () => items,
+    getLastCreateRequest: () => lastCreateRequest,
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    handlers: [
+      // jsdom sends a CORS preflight for the JSON POST's custom headers
+      // (`Authorization`, `Idempotency-Key`); answer it like the real API.
+      http.options(
+        `${baseUrl}/activities/:activityId/exam-answers`,
+        () =>
+          new HttpResponse(null, {
+            status: 204,
+            headers: {
+              'access-control-allow-origin': '*',
+              'access-control-allow-methods': 'POST, GET, OPTIONS',
+              'access-control-allow-headers':
+                'authorization, idempotency-key, accept, content-type',
+            },
+          }),
+      ),
+      http.options(
+        `${baseUrl}/activities/:activityId/exam-answers/me`,
+        () =>
+          new HttpResponse(null, {
+            status: 204,
+            headers: {
+              'access-control-allow-origin': '*',
+              'access-control-allow-methods': 'GET, OPTIONS',
+              'access-control-allow-headers': 'authorization, accept',
+            },
+          }),
+      ),
+      http.post(
+        `${baseUrl}/activities/:activityId/exam-answers`,
+        async ({ params, request }) => {
+          const failure = pending.create;
+          pending.create = undefined;
+          if (failure === 'network') {
+            return HttpResponse.error();
+          }
+          if (failure !== undefined && failure !== 'drop-response') {
+            return respondError(failure.status, failure.body);
+          }
+
+          const idempotencyKey = request.headers.get('Idempotency-Key');
+          const authorization = request.headers.get('Authorization');
+          const body: unknown = await request.json().catch(() => null);
+          lastCreateRequest = {
+            idempotencyKey,
+            authorization,
+            accessTokenUsed:
+              authorization?.startsWith('Bearer ') && authorization.length > 7
+                ? authorization.slice(7)
+                : null,
+            answers: body,
+          };
+
+          if (!activity || params.activityId !== activity.id) {
+            return respondError(404, {
+              code: 'NOT_FOUND',
+              message: 'Activity not found.',
+              correlationId: 'req-exam-answers-create-404',
+            });
+          }
+          if (activity.state !== 'PUBLISHED') {
+            return respondError(404, {
+              code: 'NOT_FOUND',
+              message: 'Activity not found.',
+              correlationId: 'req-exam-answers-create-404-draft',
+            });
+          }
+          if (role !== 'STUDENT') {
+            return respondError(403, {
+              code: 'FORBIDDEN',
+              message: 'Only students can answer exams.',
+              correlationId: 'req-exam-answers-create-403',
+            });
+          }
+
+          const key = idempotencyKey?.trim() ?? '';
+          if (key.length < 1 || key.length > 255) {
+            return respondError(400, {
+              code: 'BAD_REQUEST',
+              message: 'Missing or invalid Idempotency-Key.',
+              details: [
+                {
+                  field: 'idempotencyKey',
+                  messages: ['Idempotency-Key is required.'],
+                },
+              ],
+              correlationId: 'req-exam-answers-create-400-key',
+            });
+          }
+
+          const existing = items.find(
+            (item) => item.activityId === activity.id,
+          );
+          if (existing) {
+            if (existing.idempotencyKey === key) {
+              // Idempotent replay: the stored attempt, nothing new stored.
+              return respondJson(
+                {
+                  id: existing.id,
+                  activityId: existing.activityId,
+                  submittedAt: existing.submittedAt,
+                  isLate: existing.isLate,
+                  status: 'graded',
+                  score: existing.score,
+                  maxScore: existing.maxScore,
+                },
+                200,
+              );
+            }
+            return respondError(409, {
+              code: 'CONFLICT',
+              message: 'Already answered with another idempotency key.',
+              details: [
+                {
+                  field: 'idempotencyKey',
+                  messages: [
+                    'Already answered with a different idempotency key.',
+                  ],
+                },
+              ],
+              correlationId: 'req-exam-answers-create-409-key',
+            });
+          }
+
+          if (activity.format !== 'MULTIPLE_CHOICE') {
+            return respondError(409, {
+              code: 'CONFLICT',
+              message: 'Not a multiple-choice activity.',
+              details: [
+                {
+                  field: 'format',
+                  messages: ['Not a multiple-choice activity.'],
+                },
+              ],
+              correlationId: 'req-exam-answers-create-409-format',
+            });
+          }
+
+          if (activity.opensAt && now < activity.opensAt) {
+            return respondError(409, {
+              code: 'CONFLICT',
+              message: 'Answering window not open yet.',
+              details: [
+                {
+                  field: 'opensAt',
+                  messages: ['Answering window not open yet.'],
+                },
+              ],
+              correlationId: 'req-exam-answers-create-409-window',
+            });
+          }
+          const isLate = now > activity.dueAt;
+          if (isLate && !activity.allowLate) {
+            return respondError(409, {
+              code: 'CONFLICT',
+              message: 'Answering window closed.',
+              details: [
+                {
+                  field: 'dueAt',
+                  messages: ['Answering window closed.'],
+                },
+              ],
+              correlationId: 'req-exam-answers-create-409-closed',
+            });
+          }
+
+          const requestAnswers =
+            typeof body === 'object' &&
+            body !== null &&
+            Array.isArray((body as { answers?: unknown }).answers)
+              ? ((body as { answers: unknown[] }).answers as unknown[])
+              : null;
+          if (
+            requestAnswers === null ||
+            requestAnswers.length !== activity.questions.length
+          ) {
+            return respondError(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'One answer per published question is required.',
+              correlationId: 'req-exam-answers-create-400-count',
+            });
+          }
+
+          const seenQuestionIds = new Set<string>();
+          const validatedAnswers: {
+            questionId: string;
+            selectedOptionIds: string[];
+          }[] = [];
+          for (const answer of requestAnswers) {
+            const questionId =
+              typeof answer === 'object' &&
+              answer !== null &&
+              typeof (answer as { questionId?: unknown }).questionId ===
+                'string'
+                ? (answer as { questionId: string }).questionId
+                : null;
+            const question = activity.questions.find(
+              (candidate) => candidate.id === questionId,
+            );
+            if (!question || seenQuestionIds.has(questionId ?? '')) {
+              return respondError(400, {
+                code: 'VALIDATION_FAILED',
+                message: 'One answer per published question is required.',
+                correlationId: 'req-exam-answers-create-400-question',
+              });
+            }
+            seenQuestionIds.add(question.id);
+            const selectedOptionIds = Array.isArray(
+              (answer as { selectedOptionIds?: unknown }).selectedOptionIds,
+            )
+              ? ((answer as { selectedOptionIds: unknown[] })
+                  .selectedOptionIds as unknown[])
+              : [];
+            if (
+              selectedOptionIds.length < 1 ||
+              selectedOptionIds.some(
+                (optionId) =>
+                  typeof optionId !== 'string' ||
+                  !question.options.some((option) => option.id === optionId),
+              )
+            ) {
+              return respondError(400, {
+                code: 'VALIDATION_FAILED',
+                message: 'Each answer needs valid selected options.',
+                correlationId: 'req-exam-answers-create-400-options',
+              });
+            }
+            validatedAnswers.push({
+              questionId: question.id,
+              selectedOptionIds: selectedOptionIds as string[],
+            });
+          }
+
+          // Provisional server-side scoring: all-or-nothing per question.
+          const correctQuestions = activity.questions.filter((question) => {
+            const answer = validatedAnswers.find(
+              (candidate) => candidate.questionId === question.id,
+            );
+            if (!answer) {
+              return false;
+            }
+            const correctIds = new Set(
+              question.options
+                .filter((option) => option.isCorrect)
+                .map((option) => option.id),
+            );
+            return answer.selectedOptionIds.every((optionId) =>
+              correctIds.has(optionId),
+            );
+          }).length;
+          const totalQuestions = Math.max(activity.questions.length, 1);
+          const score =
+            Math.round(
+              (activity.maxScore * correctQuestions * 100) / totalQuestions,
+            ) / 100;
+
+          const stored: ExamAnswersStoreItem = {
+            id: globalThis.crypto.randomUUID(),
+            activityId: activity.id,
+            submittedAt: now,
+            isLate,
+            idempotencyKey: key,
+            answers: validatedAnswers,
+            score,
+            maxScore: activity.maxScore,
+          };
+          items.push(stored);
+
+          if (failure === 'drop-response') {
+            // The server stored the attempt but the response was lost.
+            return HttpResponse.error();
+          }
+          return respondJson(
+            {
+              id: stored.id,
+              activityId: stored.activityId,
+              submittedAt: stored.submittedAt,
+              isLate: stored.isLate,
+              status: 'graded',
+              score: stored.score,
+              maxScore: stored.maxScore,
+            },
+            201,
+          );
+        },
+      ),
+      http.get(
+        `${baseUrl}/activities/:activityId/exam-answers/me`,
+        ({ params }) => {
+          const failure = pending.readOwn;
+          pending.readOwn = undefined;
+          if (failure !== undefined) {
+            return fail(failure);
+          }
+
+          if (!activity || params.activityId !== activity.id) {
+            return respondError(404, {
+              code: 'NOT_FOUND',
+              message: 'Activity not found.',
+              correlationId: 'req-exam-answers-me-404-activity',
+            });
+          }
+          if (role !== 'STUDENT') {
+            return respondError(403, {
+              code: 'FORBIDDEN',
+              message: 'Only students can read their own exam attempt.',
+              correlationId: 'req-exam-answers-me-403',
+            });
+          }
+
+          const found = items.find(
+            (item) => item.activityId === params.activityId,
+          );
+          if (!found) {
+            return respondError(404, {
+              code: 'NOT_FOUND',
+              message: 'Exam attempt not found.',
+              correlationId: 'req-exam-answers-me-404-attempt',
+            });
+          }
+
+          return respondJson(
+            {
+              id: found.id,
+              activityId: found.activityId,
+              submittedAt: found.submittedAt,
+              isLate: found.isLate,
+              status: 'graded',
+              score: found.score,
+              maxScore: found.maxScore,
+              answers: found.answers,
+            },
+            200,
+          );
+        },
+      ),
+    ],
+  };
+}
+
 export type TeacherActivityPayload =
   components['schemas']['TeacherActivityResponseDto'];
 export type StudentActivityPayload =
