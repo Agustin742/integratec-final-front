@@ -13,8 +13,11 @@ import {
 export const MAX_SUBMISSION_FILES = 5;
 /** Maximum size of a single file per the contract (10 MB). */
 export const MAX_SUBMISSION_FILE_BYTES = 10 * 1024 * 1024;
-/** Extensions the client pre-checks for usability; the server verifies the bytes. */
-const ALLOWED_EXTENSIONS: ReadonlySet<string> = new Set([
+/**
+ * Extensions the client pre-checks for usability; the server verifies the bytes.
+ * Exported so the submission panel's pre-checks reuse the exact same set.
+ */
+export const ALLOWED_EXTENSIONS: ReadonlySet<string> = new Set([
   'pdf',
   'png',
   'jpg',
