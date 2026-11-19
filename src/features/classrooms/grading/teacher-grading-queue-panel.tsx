@@ -49,28 +49,47 @@ export interface TeacherGradingQueuePanelProps {
   readonly fixedActivityTitle?: string;
   readonly fixedActivityMaxScore?: number;
   readonly fixedActivityFormat?: 'FILE' | 'MULTIPLE_CHOICE';
+  readonly fixedActivityTimeZone?: string;
 }
 
-export function TeacherGradingQueuePanel({
-  classroomId: explicitClassroomId,
+export function TeacherGradingQueuePanel(
+  props: TeacherGradingQueuePanelProps = {},
+) {
+  const { classroomId: routeClassroomId } = useParams();
+  const classroomId = (props.classroomId ?? routeClassroomId ?? '').trim();
+  const sessionSnapshot = useSessionSnapshot();
+  const userId =
+    sessionSnapshot.status === 'authenticated' ? sessionSnapshot.user.id : null;
+
+  return (
+    <TeacherGradingQueuePanelContent
+      key={`${userId ?? 'anon'}:${classroomId}`}
+      {...props}
+      classroomId={classroomId}
+      userId={userId}
+    />
+  );
+}
+
+function TeacherGradingQueuePanelContent({
+  classroomId,
+  userId,
   fixedActivityId,
   fixedActivityTitle,
   fixedActivityMaxScore,
   fixedActivityFormat,
-}: TeacherGradingQueuePanelProps = {}) {
-  const { classroomId: routeClassroomId } = useParams();
-  const classroomId = (explicitClassroomId ?? routeClassroomId ?? '').trim();
+  fixedActivityTimeZone,
+}: TeacherGradingQueuePanelProps & {
+  readonly classroomId: string;
+  readonly userId: string | null;
+}) {
   const { client } = useSessionService();
-  const sessionSnapshot = useSessionSnapshot();
   const queryClient = useQueryClient();
   const context = useClassroomContext(classroomId);
 
   const canGrade =
     context.status === 'ready' &&
     context.classroom.capabilities.includes('publish_content');
-  const userId =
-    sessionSnapshot.status === 'authenticated' ? sessionSnapshot.user.id : null;
-  const schoolTimeZone = DEFAULT_SCHOOL_TIME_ZONE;
 
   const [selectedActivityId, setSelectedActivityId] = useState<string>(
     fixedActivityId ?? '',
@@ -119,18 +138,24 @@ export function TeacherGradingQueuePanel({
   const activityMetaById = useMemo(() => {
     const map = new Map<
       string,
-      { readonly maxScore: number; readonly format: 'FILE' | 'MULTIPLE_CHOICE' }
+      {
+        readonly maxScore: number;
+        readonly format: 'FILE' | 'MULTIPLE_CHOICE';
+        readonly timeZone: string;
+      }
     >();
     if (fixedActivityId && fixedActivityMaxScore !== undefined) {
       map.set(fixedActivityId, {
         maxScore: fixedActivityMaxScore,
         format: fixedActivityFormat ?? 'FILE',
+        timeZone: fixedActivityTimeZone ?? DEFAULT_SCHOOL_TIME_ZONE,
       });
     }
     for (const item of activitiesLookupQuery.data?.items ?? []) {
       map.set(item.id, {
         maxScore: item.maxScore,
         format: item.format,
+        timeZone: item.timeZone,
       });
     }
     return map;
@@ -139,7 +164,13 @@ export function TeacherGradingQueuePanel({
     fixedActivityFormat,
     fixedActivityId,
     fixedActivityMaxScore,
+    fixedActivityTimeZone,
   ]);
+
+  const schoolTimeZone =
+    fixedActivityTimeZone ??
+    activitiesLookupQuery.data?.items[0]?.timeZone ??
+    DEFAULT_SCHOOL_TIME_ZONE;
 
   const queueQueryParams = useMemo(
     () => ({
@@ -169,7 +200,22 @@ export function TeacherGradingQueuePanel({
         signal,
       }),
     enabled: Boolean(userId && classroomId) && canGrade,
-    placeholderData: (previousData) => previousData,
+    placeholderData: (previousData, previousQuery) => {
+      const prevScope = (
+        previousQuery?.queryKey[0] as
+          | {
+              readonly scope?: {
+                readonly userId?: string;
+                readonly classroomId?: string;
+              };
+            }
+          | undefined
+      )?.scope;
+      return prevScope?.userId === (userId ?? 'anonymous') &&
+        prevScope?.classroomId === (classroomId || 'unknown')
+        ? previousData
+        : undefined;
+    },
     retry: false,
   });
 
@@ -549,7 +595,13 @@ export function TeacherGradingQueuePanel({
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <span>
                     {messages.submittedAtLabel}{' '}
-                    {formatActivityDeadline(item.submittedAt, schoolTimeZone)}
+                    <time dateTime={item.submittedAt}>
+                      {formatActivityDeadline(
+                        item.submittedAt,
+                        activityMetaById.get(item.activityId)?.timeZone ??
+                          schoolTimeZone,
+                      )}
+                    </time>
                   </span>
                   <span>{messages.fileCount(item.fileCount)}</span>
                   {item.grade ? (
@@ -607,7 +659,7 @@ export function TeacherGradingQueuePanel({
           submission={effectiveActiveSubmission}
           maxScore={selectedMeta?.maxScore ?? fixedActivityMaxScore}
           activityFormat={selectedMeta?.format ?? fixedActivityFormat}
-          schoolTimeZone={schoolTimeZone}
+          schoolTimeZone={selectedMeta?.timeZone ?? schoolTimeZone}
           onOpenChange={(nextOpen) => {
             if (!nextOpen) {
               setActiveSubmission(null);

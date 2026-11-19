@@ -477,6 +477,7 @@ function ActivityDetailContent({
                 fixedActivityTitle={activity.title}
                 fixedActivityMaxScore={activity.maxScore}
                 fixedActivityFormat={activity.format}
+                fixedActivityTimeZone={activity.timeZone}
               />
             )}
           </TabsContent>

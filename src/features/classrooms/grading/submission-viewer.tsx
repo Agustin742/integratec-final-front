@@ -141,7 +141,9 @@ export function SubmissionViewer({
             {messages.submittedAtLabel}
           </dt>
           <dd className="mt-0.5 text-foreground">
-            {formatActivityDeadline(submission.submittedAt, schoolTimeZone)}
+            <time dateTime={submission.submittedAt}>
+              {formatActivityDeadline(submission.submittedAt, schoolTimeZone)}
+            </time>
           </dd>
         </div>
         <div>
@@ -218,10 +220,12 @@ export function SubmissionViewer({
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {messages.linkExpiresPrefix}{' '}
-                    {formatActivityDeadline(
-                      file.downloadUrlExpiresAt,
-                      schoolTimeZone,
-                    )}
+                    <time dateTime={file.downloadUrlExpiresAt}>
+                      {formatActivityDeadline(
+                        file.downloadUrlExpiresAt,
+                        schoolTimeZone,
+                      )}
+                    </time>
                   </p>
                 </div>
                 <a

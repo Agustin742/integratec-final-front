@@ -396,10 +396,12 @@ export function GradingForm({
               </Badge>
               <span className="text-xs text-muted-foreground">
                 {gradingMessages.panel.gradedAtLabel}{' '}
-                {formatActivityDeadline(
-                  confirmedGrade.gradedAt,
-                  schoolTimeZone,
-                )}
+                <time dateTime={confirmedGrade.gradedAt}>
+                  {formatActivityDeadline(
+                    confirmedGrade.gradedAt,
+                    schoolTimeZone,
+                  )}
+                </time>
               </span>
             </div>
             <p className="mt-2 break-words text-xs text-muted-foreground">
@@ -490,7 +492,7 @@ export function GradingForm({
             name="feedback"
             label={messages.feedbackLabel}
             description={messages.feedbackHelper(
-              feedbackValue.trim().length,
+              (feedbackValue ?? '').trim().length,
               GRADE_LIMITS.feedbackMaxLength,
             )}
           >

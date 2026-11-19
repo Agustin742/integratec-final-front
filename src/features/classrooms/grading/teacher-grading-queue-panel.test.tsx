@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   act,
   fireEvent,
@@ -27,7 +28,9 @@ import {
 import { mswServer } from '@/test/msw/server';
 import { render } from '@/test/render';
 import { ActivityDetailPage } from '../activities/activity-detail-page';
+import { classroomMessages } from '../messages';
 import { ClassroomGradesPanel } from './classroom-grades-panel';
+import { gradingMessages } from './grading-messages';
 import { TeacherGradingQueuePanel } from './teacher-grading-queue-panel';
 
 const CLASSROOM_ID = '00000000-0000-4000-8000-000000000010';
@@ -182,6 +185,7 @@ function renderGradingRoute(options: {
   return {
     ...rendered,
     queryClient,
+    router,
     emitContextInvalidated: async () => {
       await act(async () => {
         streamController?.enqueue(
@@ -628,5 +632,270 @@ describe('TeacherGradingQueuePanel & ClassroomGradesPanel (#44)', () => {
       screen.getByRole('button', { name: 'Volver a la primera página' }),
     );
     expect(await screen.findByText('Estudiante 01')).toBeVisible();
+    await expectAccessible(view.container);
+  });
+
+  it('isolates PARENT role in ClassroomGradesPanel without issuing staff queue requests', async () => {
+    const gradingStore = createClassroomGradingStore({
+      classroomId: CLASSROOM_ID,
+      initialSubmissions: [makeSubmission()],
+    });
+    mswServer.use(...gradingStore.handlers);
+
+    const view = renderGradingRoute({
+      role: 'PARENT',
+      capabilities: [],
+      element: 'grades-panel',
+    });
+
+    expect(
+      await screen.findByText(classroomMessages.pendingPanelTitle),
+    ).toBeVisible();
+    expect(gradingStore.getCounts().queue).toBe(0);
+    await expectAccessible(view.container);
+  });
+
+  it('refreshes signed links via Renovar enlaces and guards unsaved changes on dialog close', async () => {
+    const activitiesStore = createClassroomActivitiesStore({
+      classroomId: CLASSROOM_ID,
+      role: 'TEACHER',
+      initialItems: [makeActivity()],
+    });
+    const gradingStore = createClassroomGradingStore({
+      classroomId: CLASSROOM_ID,
+      initialSubmissions: [makeSubmission()],
+    });
+    mswServer.use(...activitiesStore.handlers, ...gradingStore.handlers);
+
+    renderGradingRoute({ role: 'TEACHER' });
+    expect(await screen.findByText('Sofía Martínez')).toBeVisible();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Revisar y calificar' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText('tp1-sofia.pdf')).toBeVisible();
+
+    const detailCountBefore = gradingStore.getCounts().detail;
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Renovar enlaces' }),
+    );
+    await waitFor(() => {
+      expect(gradingStore.getCounts().detail).toBeGreaterThan(
+        detailCountBefore,
+      );
+    });
+
+    fireEvent.change(within(dialog).getByLabelText('Nota (0 a 100)'), {
+      target: { value: '85' },
+    });
+    fireEvent.click(
+      within(dialog).getAllByRole('button', { name: 'Cerrar' })[0],
+    );
+    expect(
+      await within(dialog).findByText(/cambios sin guardar/i),
+    ).toBeVisible();
+
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Seguir editando' }),
+    );
+    expect(within(dialog).getByLabelText('Nota (0 a 100)')).toHaveValue(85);
+
+    fireEvent.click(
+      within(dialog).getAllByRole('button', { name: 'Cerrar' })[0],
+    );
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Descartar y cerrar' }),
+    );
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
+
+  it('preserves entered grade on 400 server rejection and shows non-gradable notice for MULTIPLE_CHOICE', async () => {
+    const activitiesStore = createClassroomActivitiesStore({
+      classroomId: CLASSROOM_ID,
+      role: 'TEACHER',
+      initialItems: [
+        makeActivity(),
+        makeActivity({
+          id: ACTIVITY_EXAM_ID,
+          title: 'Parcial MCQ',
+          type: 'EXAM',
+          format: 'MULTIPLE_CHOICE',
+          maxScore: 100,
+        }),
+      ],
+    });
+    const gradingStore = createClassroomGradingStore({
+      classroomId: CLASSROOM_ID,
+      initialSubmissions: [
+        makeSubmission(),
+        makeSubmission({
+          id: SUB_2_ID,
+          activityId: ACTIVITY_EXAM_ID,
+          activityTitle: 'Parcial MCQ',
+          activityType: 'EXAM',
+          studentDisplayName: 'Bruno Díaz',
+          files: [],
+        }),
+      ],
+    });
+    mswServer.use(...activitiesStore.handlers, ...gradingStore.handlers);
+
+    renderGradingRoute({ role: 'TEACHER' });
+    expect(await screen.findByText('Sofía Martínez')).toBeVisible();
+
+    // 400 server rejection preserves entered score and feedback
+    const sofiaRow = screen.getByText('Sofía Martínez').closest('li')!;
+    fireEvent.click(
+      within(sofiaRow).getByRole('button', { name: 'Revisar y calificar' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByText('tp1-sofia.pdf');
+
+    gradingStore.failNext('grade', {
+      status: 400,
+      body: {
+        code: 'VALIDATION_FAILED',
+        message: 'Out of bounds',
+        details: [{ field: 'score', messages: ['Score exceeds maxScore.'] }],
+        correlationId: 'req-400-grade',
+      },
+    });
+    const scoreInput = within(dialog).getByLabelText('Nota (0 a 100)');
+    const feedbackInput = within(dialog).getByLabelText(
+      'Devolución para el estudiante',
+    );
+    fireEvent.change(scoreInput, { target: { value: '75' } });
+    fireEvent.change(feedbackInput, { target: { value: 'Buen análisis' } });
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Guardar calificación' }),
+    );
+
+    expect(
+      await within(dialog).findByText('Score exceeds maxScore.'),
+    ).toBeVisible();
+    expect(scoreInput).toHaveValue(75);
+    expect(feedbackInput).toHaveValue('Buen análisis');
+
+    fireEvent.click(
+      within(dialog).getAllByRole('button', { name: 'Cerrar' })[0],
+    );
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Descartar y cerrar' }),
+    );
+
+    // MULTIPLE_CHOICE shows non-gradable notice
+    const brunoRow = screen.getByText('Bruno Díaz').closest('li')!;
+    fireEvent.click(
+      within(brunoRow).getByRole('button', { name: 'Revisar y calificar' }),
+    );
+    const mcqDialog = await screen.findByRole('dialog');
+    expect(
+      await within(mcqDialog).findByText(
+        gradingMessages.form.nonGradableNotice,
+      ),
+    ).toBeVisible();
+  });
+
+  it('resets filters and never leaks placeholderData when switching classrooms', async () => {
+    const CLASSROOM_B_ID = '00000000-0000-4000-8000-000000000099';
+    const activitiesStoreA = createClassroomActivitiesStore({
+      classroomId: CLASSROOM_ID,
+      role: 'TEACHER',
+      initialItems: [makeActivity()],
+    });
+    const gradingStoreA = createClassroomGradingStore({
+      classroomId: CLASSROOM_ID,
+      initialSubmissions: [
+        makeSubmission({ studentDisplayName: 'Alumno Aula A' }),
+      ],
+    });
+    const activitiesStoreB = createClassroomActivitiesStore({
+      classroomId: CLASSROOM_B_ID,
+      role: 'TEACHER',
+      initialItems: [],
+    });
+    const gradingStoreB = createClassroomGradingStore({
+      classroomId: CLASSROOM_B_ID,
+      initialSubmissions: [
+        makeSubmission({
+          id: SUB_2_ID,
+          classroomId: CLASSROOM_B_ID,
+          studentDisplayName: 'Alumno Aula B',
+        }),
+      ],
+    });
+    mswServer.use(
+      ...activitiesStoreA.handlers,
+      ...gradingStoreA.handlers,
+      createClassroomDetailHandler(CLASSROOM_ID, {
+        myRole: 'TEACHER',
+        capabilities: ['publish_content'],
+      }),
+      http.get(
+        `${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}/context-events`,
+        () =>
+          new HttpResponse(new ReadableStream<Uint8Array>(), {
+            headers: { 'Content-Type': 'text/event-stream' },
+          }),
+      ),
+      createClassroomDetailHandler(CLASSROOM_B_ID, {
+        myRole: 'TEACHER',
+        capabilities: ['publish_content'],
+      }),
+      http.get(
+        `${TEST_API_BASE_URL}/classrooms/${CLASSROOM_B_ID}/context-events`,
+        () =>
+          new HttpResponse(new ReadableStream<Uint8Array>(), {
+            headers: { 'Content-Type': 'text/event-stream' },
+          }),
+      ),
+    );
+
+    const client = createApiClient({ baseUrl: TEST_API_BASE_URL });
+    const session = fakeSession(
+      { status: 'authenticated', user: { ...profile, id: 'teacher-user-1' } },
+      client,
+    );
+    const queryClient = createAppQueryClient({
+      defaultOptions: { queries: { retry: false, retryDelay: 0 } },
+    });
+
+    function ClassroomSwitcher() {
+      const [currentClassroomId, setCurrentClassroomId] =
+        useState(CLASSROOM_ID);
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => setCurrentClassroomId(CLASSROOM_B_ID)}
+          >
+            Cambiar aula
+          </button>
+          <TeacherGradingQueuePanel classroomId={currentClassroomId} />
+        </>
+      );
+    }
+
+    render(
+      <SessionProvider service={session.service}>
+        <ApiQueryProvider client={queryClient}>
+          <ClassroomSwitcher />
+        </ApiQueryProvider>
+      </SessionProvider>,
+    );
+    expect(
+      await screen.findByText('Alumno Aula A', {}, { timeout: 500 }),
+    ).toBeVisible();
+
+    mswServer.use(...activitiesStoreB.handlers, ...gradingStoreB.handlers);
+    fireEvent.click(screen.getByRole('button', { name: 'Cambiar aula' }));
+
+    expect(
+      await screen.findByText('Alumno Aula B', {}, { timeout: 500 }),
+    ).toBeVisible();
+    expect(screen.queryByText('Alumno Aula A')).not.toBeInTheDocument();
   });
 });
