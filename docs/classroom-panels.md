@@ -9,11 +9,13 @@ activity inbox and detail navigation unified with
 teacher editor, multiple-choice builder, one-way publish flow, and deactivation — see the [activities feature doc](./classroom-activities.md)),
 `material` renders `MaterialPanel` ([`#40`](https://github.com/Agustin742/integratec-final-front/issues/40)),
 `notices` renders `NoticeBoardPanel` ([`#49`](https://github.com/Agustin742/integratec-final-front/issues/49)),
+`shop` renders `ShopPanel` ([`#48`](https://github.com/Agustin742/integratec-final-front/issues/48)
+student classroom shop catalog, idempotent purchase confirmation, and purchase history — see the [classroom shop doc](./classroom-shop.md)),
 and `members` renders `ClassroomMembersPanel`
 ([`HU-AUL-003`](https://github.com/Agustin742/integratec-final-front/issues/33)
 `ClassroomRosterPanel` and capability-gated [`HU-AUL-002`](https://github.com/Agustin742/integratec-final-front/issues/32)
 `ClassroomInvitationsPanel` for `invite_members`-authorized email invitations and one-time classroom join codes), while the remaining
-five entries display the shared, honest “Funcionalidad pendiente” state until
+four entries display the shared, honest “Funcionalidad pendiente” state until
 their respective stories land.
 
 ## Approved scope reconciliation
@@ -32,7 +34,7 @@ the issue; team acceptance of the reconciled criterion remains part of PR review
 | `grades`       | Calificaciones                                       |
 | `chat`         | Chat                                                 |
 | `notices`      | Avisos (`NoticeBoardPanel`, `#49`)                   |
-| `shop`         | Tienda                                               |
+| `shop`         | Tienda (`ShopPanel`, `#48`)                          |
 | `bot`          | Asistente de estudio                                 |
 | `members`      | Integrantes (`ClassroomMembersPanel`, `#33` + `#32`) |
 | `settings`     | Configuración                                        |
