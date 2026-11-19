@@ -73,6 +73,15 @@ test('keeps the same accessible name on the 2D preview while the 3D chunk loads'
   expect(screen.getByRole('img', { name })).toBeInTheDocument();
 });
 
+test('keeps a visible loading state while the 3D avatar loads', async () => {
+  render(<AvatarPreviewView avatar={avatar} />);
+  await screen.findByTestId('canvas-3d');
+  // The canvas announcement is not suppressed and the model keeps an
+  // in-scene placeholder while the avatar files download.
+  expect(world.canvas?.loading).not.toBeNull();
+  expect(world.model?.fallback).toBeTruthy();
+});
+
 test('falls back to the 2D preview when WebGL is unavailable or lost', async () => {
   const { container } = render(<AvatarPreviewView avatar={avatar} />);
   await screen.findByTestId('canvas-3d');

@@ -22,8 +22,23 @@ function DeferredAvatar({
       avatar={shown}
       scopeKey={PREVIEW_SCOPE}
       animation="Idle"
+      fallback={<AvatarPlaceholder />}
       onBodyError={onBodyError}
     />
+  );
+}
+
+/**
+ * Neutral silhouette shown in the scene while the avatar files download, so
+ * the canvas is never an empty stage (`rules/3d-world-and-camera.md`).
+ */
+function AvatarPlaceholder() {
+  // Capsule spans y 0.1 to 1.66, inside `AVATAR_FRAME` (-0.05 to 1.8).
+  return (
+    <mesh position={[0, 0.88, 0]}>
+      <capsuleGeometry args={[0.28, 1, 8, 16]} />
+      <meshStandardMaterial color="#D8CBB0" roughness={1} />
+    </mesh>
   );
 }
 
@@ -53,7 +68,6 @@ export function AvatarPreview3D({
       framing="avatar"
       scopeKey={PREVIEW_SCOPE}
       canvasClassName="aspect-[4/5] w-full overflow-hidden rounded-xl"
-      loading={null}
       onUnavailable={onUnavailable}
     >
       <color attach="background" args={[BACKGROUND]} />
