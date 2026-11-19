@@ -90,6 +90,20 @@ describe('useKeyboardDirection', () => {
     expect(onChange).toHaveBeenCalled();
   });
 
+  test('releases held keys when a modifier chord starts, even without keyup', () => {
+    const { onChange } = setup();
+    key('keydown', 'KeyW');
+    key('keydown', 'KeyK', { metaKey: true });
+    expect(onChange).toHaveBeenLastCalledWith(ZERO);
+  });
+
+  test('releases held keys when a modifier key itself is pressed', () => {
+    const { onChange } = setup();
+    key('keydown', 'KeyW');
+    key('keydown', 'ControlLeft');
+    expect(onChange).toHaveBeenLastCalledWith(ZERO);
+  });
+
   test('ignores keydown that another handler already prevented', () => {
     const { onChange } = setup();
     const el = document.createElement('div');

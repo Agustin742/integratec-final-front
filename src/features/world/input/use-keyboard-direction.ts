@@ -18,6 +18,8 @@ export interface UseKeyboardDirectionOptions {
   onPress?: () => void;
 }
 
+const MODIFIER_CODE = /^(Meta|Control|Alt)(Left|Right)$/;
+
 const ZERO: Direction = { x: 0, z: 0 };
 
 /**
@@ -48,13 +50,18 @@ export function useKeyboardDirection({
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
+      // A chord may swallow the keyup of held keys (macOS does with Meta), so
+      // release everything instead of leaving a key latched.
       if (
-        event.defaultPrevented ||
         event.ctrlKey ||
         event.metaKey ||
-        event.altKey
-      )
+        event.altKey ||
+        MODIFIER_CODE.test(event.code)
+      ) {
+        clear();
         return;
+      }
+      if (event.defaultPrevented) return;
       if (isEditableTarget(event.target)) return;
       if (isInteractionBlocked()) {
         clear();
