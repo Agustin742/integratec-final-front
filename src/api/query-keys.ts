@@ -335,6 +335,55 @@ export function createClassroomMaterialsPredicate(
     );
   };
 }
+
+/**
+ * Key of `GET /classrooms/{id}/bot/materials`: Study Guide Bot allowed-material
+ * configuration and indexing state scoped by `userId` and `classroomId`
+ * (`rules/state-management.md`, `HU-BOT-001`).
+ */
+export function classroomBotMaterialsQueryKey(
+  userId: string,
+  classroomId: string,
+): ScopedQueryKey<undefined> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'materials',
+    'bot-config',
+    undefined,
+  );
+}
+
+/**
+ * Predicate matching every Study Guide Bot material-config query entry owned by
+ * `userId` and `classroomId`.
+ */
+export function createClassroomBotMaterialsPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'materials' &&
+      segment.resource === 'bot-config'
+    );
+  };
+}
 export type InvitationStateFilter =
   'PENDING' | 'USED' | 'REVOKED' | 'EXPIRED' | 'ALL';
 
@@ -547,6 +596,26 @@ export function classroomActivityDetailQueryKey(
   );
 }
 
+/**
+ * Key of `GET /activities/{activityId}/submissions/me`: the calling student's
+ * own submission to one activity. The contract marks the response as not
+ * cacheable, so consumers keep it fresh rather than relying on cached reads.
+ */
+export function classroomActivitySubmissionQueryKey(
+  userId: string,
+  classroomId: string,
+  activityId: string,
+): ScopedQueryKey<{ readonly activityId: string }> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'activities',
+    'submission',
+    Object.freeze({
+      activityId: normalizeRequiredText(activityId, 'activityId'),
+    }),
+  );
+}
+
 export interface AnnouncementListQueryParams {
   readonly page?: number;
   readonly pageSize?: number;
@@ -744,6 +813,315 @@ export function createNotificationsPredicate(
     );
   };
 }
+
+export type GradingQueueStateFilter = 'submitted' | 'graded';
+export type GradingQueueSortOrder =
+  'submittedAt' | 'gradedAt' | '-submittedAt' | '-gradedAt';
+
+export interface GradingQueueQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+  readonly activityId?: string;
+  readonly state?: GradingQueueStateFilter;
+  readonly sort?: GradingQueueSortOrder;
+}
+
+export interface NormalizedGradingQueueQueryParams {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly activityId: string;
+  readonly state: GradingQueueStateFilter | '';
+  readonly sort: GradingQueueSortOrder;
+}
+
+function normalizeGradingQueueState(
+  value: GradingQueueStateFilter | undefined,
+): GradingQueueStateFilter | '' {
+  return value === 'submitted' || value === 'graded' ? value : '';
+}
+
+function normalizeGradingQueueSort(
+  value: GradingQueueSortOrder | undefined,
+): GradingQueueSortOrder {
+  if (
+    value === 'submittedAt' ||
+    value === 'gradedAt' ||
+    value === '-submittedAt' ||
+    value === '-gradedAt'
+  ) {
+    return value;
+  }
+  return 'submittedAt';
+}
+
+/**
+ * Key of `GET /classrooms/{id}/submissions`: paginated teacher grading queue
+ * scoped by `userId` and `classroomId` (`rules/state-management.md`).
+ */
+export function classroomSubmissionsQueueQueryKey(
+  userId: string,
+  classroomId: string,
+  params: GradingQueueQueryParams = {},
+): ScopedQueryKey<NormalizedGradingQueueQueryParams> {
+  const normalizedParams = Object.freeze({
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+    activityId: (params.activityId ?? '').trim(),
+    state: normalizeGradingQueueState(params.state),
+    sort: normalizeGradingQueueSort(params.sort),
+  });
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'submissions',
+    'queue',
+    normalizedParams,
+  );
+}
+
+/**
+ * Key of `GET /submissions/{submissionId}` (short-lived signed file URLs)
+ * scoped by `userId` and `classroomId`.
+ */
+export function submissionDetailQueryKey(
+  userId: string,
+  classroomId: string,
+  submissionId: string,
+): ScopedQueryKey<{ readonly submissionId: string }> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'submissions',
+    'detail',
+    Object.freeze({
+      submissionId: normalizeRequiredText(submissionId, 'submissionId'),
+    }),
+  );
+}
+
+/**
+ * Key of `GET /submissions/{submissionId}/grade` scoped by `userId` and
+ * `classroomId`.
+ */
+export function submissionGradeQueryKey(
+  userId: string,
+  classroomId: string,
+  submissionId: string,
+): ScopedQueryKey<{ readonly submissionId: string }> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'grades',
+    'detail',
+    Object.freeze({
+      submissionId: normalizeRequiredText(submissionId, 'submissionId'),
+    }),
+  );
+}
+
+/**
+ * Predicate matching every teacher grading queue query entry owned by `userId`
+ * and `classroomId`.
+ */
+export function createClassroomSubmissionsQueuePredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'submissions' &&
+      segment.resource === 'queue'
+    );
+  };
+}
+
+/**
+ * Predicate matching every classroom grading/submission query entry owned by
+ * `userId` and `classroomId`, for write reconciliation and access revocation.
+ */
+export function createClassroomGradesPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    if (
+      segment.scope?.userId !== normalizedUserId ||
+      segment.scope?.classroomId !== normalizedClassroomId
+    ) {
+      return false;
+    }
+    return (
+      (segment.domain === 'submissions' &&
+        (segment.resource === 'queue' || segment.resource === 'detail')) ||
+      (segment.domain === 'grades' && segment.resource === 'detail')
+    );
+  };
+}
+
+/**
+ * Pagination of the HU-ACT-005 read endpoints: every key and outgoing request
+ * agrees on the clamped values (`#46`, `rules/state-management.md`).
+ */
+export interface GradesMetricsQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+}
+
+export interface NormalizedGradesMetricsQueryParams {
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+export function normalizeGradesMetricsQueryParams(
+  params: GradesMetricsQueryParams,
+): NormalizedGradesMetricsQueryParams {
+  return Object.freeze({
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+  });
+}
+
+function createGradesPredicate(
+  userId: string,
+  classroomId: string,
+  resource: 'report-card' | 'own-metrics' | 'classroom-metrics',
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'grades' &&
+      segment.resource === resource
+    );
+  };
+}
+
+/**
+ * Key of `GET /classrooms/{id}/me/report-card`: the signed-in student's graded
+ * activities, scoped by `userId` and `classroomId` so other users and
+ * classrooms read isolated cache entries (`rules/state-management.md`).
+ */
+export function studentReportCardQueryKey(
+  userId: string,
+  classroomId: string,
+  params: GradesMetricsQueryParams = {},
+): ScopedQueryKey<NormalizedGradesMetricsQueryParams> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'grades',
+    'report-card',
+    normalizeGradesMetricsQueryParams(params),
+  );
+}
+
+/**
+ * Predicate matching every student report card entry owned by `userId` in
+ * `classroomId`.
+ */
+export function createStudentReportCardPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  return createGradesPredicate(userId, classroomId, 'report-card');
+}
+
+/**
+ * Key of `GET /classrooms/{id}/me/activity-metrics`: the caller's own daily
+ * activity signals, scoped by `userId` and `classroomId`.
+ */
+export function ownActivityMetricsQueryKey(
+  userId: string,
+  classroomId: string,
+  params: GradesMetricsQueryParams = {},
+): ScopedQueryKey<NormalizedGradesMetricsQueryParams> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'grades',
+    'own-metrics',
+    normalizeGradesMetricsQueryParams(params),
+  );
+}
+
+/**
+ * Predicate matching every own-metrics entry owned by `userId` in
+ * `classroomId`.
+ */
+export function createOwnActivityMetricsPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  return createGradesPredicate(userId, classroomId, 'own-metrics');
+}
+
+/**
+ * Key of `GET /classrooms/{id}/activity-metrics`: the per-student raw totals
+ * for teaching staff, scoped by `userId` and `classroomId`.
+ */
+export function classroomActivityMetricsQueryKey(
+  userId: string,
+  classroomId: string,
+  params: GradesMetricsQueryParams = {},
+): ScopedQueryKey<NormalizedGradesMetricsQueryParams> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'grades',
+    'classroom-metrics',
+    normalizeGradesMetricsQueryParams(params),
+  );
+}
+
+/**
+ * Predicate matching every classroom metrics entry owned by `userId` in
+ * `classroomId`.
+ */
+export function createClassroomActivityMetricsPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  return createGradesPredicate(userId, classroomId, 'classroom-metrics');
+}
+
 
 export type ShopItemKindFilter =
   'CLASSROOM_ITEM' | 'AVATAR_ACCESSORY' | 'DESK_UPGRADE' | 'PET_ACCESSORY';

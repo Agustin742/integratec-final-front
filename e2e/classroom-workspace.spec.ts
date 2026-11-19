@@ -4,6 +4,7 @@ import { messages } from '../src/app/messages';
 import { feedbackMessages } from '../src/components/feedback/messages';
 import { layoutMessages } from '../src/components/layout/messages';
 import { classroomMessages } from '../src/features/classrooms/messages';
+import { gradesMessages } from '../src/features/classrooms/grades/messages';
 
 const apiOrigin = 'https://api.example.invalid';
 const classroomId = '00000000-0000-4000-8000-000000000026';
@@ -157,6 +158,18 @@ test.beforeEach(async ({ page, baseURL }) => {
       expect(request.headers().authorization).toBe('Bearer synthetic-access');
       return route.fulfill({ json: wallet });
     }
+    // The grades panel (#46) reads the student report card and own metrics;
+    // both carry pagination query params, so match on the pathname.
+    if (
+      (url.pathname === `/classrooms/${classroomId}/me/report-card` ||
+        url.pathname === `/classrooms/${classroomId}/me/activity-metrics`) &&
+      request.method() === 'GET'
+    ) {
+      expect(request.headers().authorization).toBe('Bearer synthetic-access');
+      return route.fulfill({
+        json: { items: [], page: 1, pageSize: 20, total: 0 },
+      });
+    }
     await route.abort();
     throw new Error(
       `Unexpected external request: ${url.origin}${url.pathname}`,
@@ -262,7 +275,11 @@ test('default panel entry traps focus, closes to its classroom and fits the view
   });
   await expect(dialog).toBeVisible();
   await expect(
-    dialog.getByText('Funcionalidad pendiente', { exact: true }),
+    dialog.getByRole('heading', {
+      level: 3,
+      name: gradesMessages.student.heading,
+      exact: true,
+    }),
   ).toBeVisible();
   const close = dialog.getByRole('button', { name: 'Cerrar', exact: true });
   await expect(close).toBeFocused();
@@ -415,7 +432,11 @@ test('switches 3D to accessible 2D Classic Mode via button and Alt+M, opens pane
   });
   await expect(dialog).toBeVisible();
   await expect(
-    dialog.getByText(classroomMessages.pendingPanelTitle, { exact: true }),
+    dialog.getByRole('heading', {
+      level: 3,
+      name: gradesMessages.student.heading,
+      exact: true,
+    }),
   ).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);

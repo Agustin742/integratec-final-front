@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSessionService } from '@/session/provider';
 import { useClassroomContext } from '../use-classroom-capabilities';
 import { useClassroomContextEvents } from '../use-classroom-context-events';
+import { TeacherGradingQueuePanel } from '../grading/teacher-grading-queue-panel';
 import type { ActivityDetailDto } from './activity-schema';
 import { getClassroomActivity } from './activity-service';
 import { formatActivityDeadline } from './format-activity-deadline';
@@ -470,10 +471,13 @@ function ActivityDetailContent({
             {renderReviewTab ? (
               renderReviewTab(activity)
             ) : (
-              <EmptyState
-                headingLevel="h3"
-                title={activityMessages.detail.pendingTabTitle}
-                description={activityMessages.detail.reviewPendingDescription}
+              <TeacherGradingQueuePanel
+                classroomId={classroomId}
+                fixedActivityId={activity.id}
+                fixedActivityTitle={activity.title}
+                fixedActivityMaxScore={activity.maxScore}
+                fixedActivityFormat={activity.format}
+                fixedActivityTimeZone={activity.timeZone}
               />
             )}
           </TabsContent>

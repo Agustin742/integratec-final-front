@@ -86,6 +86,24 @@ function setup(
             total: 0,
           });
         }
+        if (url.pathname.endsWith('/submissions')) {
+          return Response.json({
+            items: [],
+            page: 1,
+            pageSize: 10,
+            total: 0,
+          });
+        }
+        // The default catalog maps `grades` to ClassroomGradesPanel (#44 + #46);
+        // the TEACHER context without publish_content reads classroom metrics.
+        if (url.pathname.endsWith('/activity-metrics')) {
+          return Response.json({
+            items: [],
+            page: 1,
+            pageSize: 20,
+            total: 0,
+          });
+        }
         const id = url.pathname.split('/').pop();
         return status !== 200
           ? new Response(null, { status })
@@ -170,7 +188,6 @@ function setup(
   };
 }
 const pendingCatalogCases = [
-  ['grades', 'Calificaciones'],
   ['chat', 'Chat'],
   ['bot', 'Asistente de estudio'],
   ['settings', 'Configuración'],
@@ -228,6 +245,34 @@ test('default catalog opens shop by URL with ShopPanel and closes cleanly', asyn
   expect(
     await within(dialog).findByText('Tienda disponible solo para estudiantes'),
   ).toBeVisible();
+  expect(dialog).not.toHaveTextContent('Funcionalidad pendiente');
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+  await screen.findByRole('button', { name: 'Open grades' });
+  expect(view.router.state.location.pathname).toBe('/classrooms/a');
+  expect(view.router.state.historyAction).toBe('REPLACE');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(document.activeElement).toHaveTextContent('Classroom a');
+});
+
+test('default catalog opens grades with teacher grading queue when publish_content is granted', async () => {
+  setup(['grades'], '/classrooms/a/panels/grades', true, ['publish_content']);
+  const dialog = await screen.findByRole('dialog', { name: 'Calificaciones' });
+  expect(
+    await within(dialog).findByRole('heading', { name: 'Cola de corrección' }),
+  ).toBeVisible();
+  expect(
+    await within(dialog).findByText('Todavía no hay entregas para revisar'),
+  ).toBeVisible();
+  expect(dialog).not.toHaveTextContent('Funcionalidad pendiente');
+});
+
+test('default catalog opens grades by URL with the GradesPanel teacher view', async () => {
+  const view = setup(['grades'], '/classrooms/a/panels/grades', true);
+  const dialog = await screen.findByRole('dialog', { name: 'Calificaciones' });
+  expect(
+    await screen.findByRole('heading', { name: 'Seguimiento del aula' }),
+  ).toBeVisible();
+  expect(dialog).toHaveTextContent('No hay alumnos para mostrar');
   expect(dialog).not.toHaveTextContent('Funcionalidad pendiente');
   fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
   await screen.findByRole('button', { name: 'Open grades' });
