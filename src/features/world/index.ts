@@ -24,3 +24,16 @@ export {
   type ComposedAvatar,
 } from './avatar/compose-avatar';
 export { AvatarModel, type AvatarModelProps } from './avatar/avatar-model';
+export {
+  DEFAULT_CELL_SIZE,
+  INPUT_DEADZONE,
+  directionToward,
+  findPath,
+  isWalkable,
+  stepAvatar,
+  type Direction,
+  type FindPathOptions,
+  type PathFollow,
+  type Pose,
+  type Waypoint,
+} from './movement';
