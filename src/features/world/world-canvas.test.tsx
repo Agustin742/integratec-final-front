@@ -352,3 +352,56 @@ test('preserves scoped caches and KTX2 renderer support across StrictMode and un
   createConfiguredGltfLoader();
   expect(detectSupport).toHaveBeenCalledTimes(1);
 });
+
+test('frames the avatar from the front when asked, keeping the classroom framing as the default', () => {
+  state.size = { width: 224, height: 280 };
+  render(<WorldCanvas label="Avatar" framing="avatar" />);
+  expect(state.camera.position.x).toBeCloseTo(0);
+  expect(state.camera.position.z).toBeGreaterThan(1);
+  state.size = { width: 360, height: 480 };
+  render(<WorldCanvas label="Classroom" />);
+  expect(state.camera.position.x).toBeCloseTo(state.camera.position.z);
+});
+test('lets a host size the canvas and drop the loading line', () => {
+  renderer.delayOnCreated = true;
+  const { container } = render(
+    <WorldCanvas
+      label="Preview"
+      role="img"
+      canvasClassName="aspect-[4/5] w-full"
+      loading={null}
+    />,
+  );
+  expect(screen.getByRole('img', { name: 'Preview' })).toHaveAttribute(
+    'aria-busy',
+    'true',
+  );
+  expect(screen.queryByText('Preparando la vista 3D…')).not.toBeInTheDocument();
+  const sizer = container.querySelector('canvas')!.parentElement!;
+  expect(sizer).toHaveClass('aspect-[4/5]');
+  expect(sizer.style.height).toBe('');
+});
+test('keeps the default sizing and role for existing callers', () => {
+  const { container } = render(<WorldCanvas label="Technical world" />);
+  expect(screen.getByRole('region', { name: 'Technical world' })).toBeVisible();
+  const sizer = container.querySelector('canvas')!.parentElement!;
+  expect(sizer.style.height).toBe('clamp(20rem, 60vh, 32rem)');
+});
+test('reports unavailability once on context loss instead of rendering its own fallback', () => {
+  const onUnavailable = vi.fn();
+  const { container } = render(
+    <WorldCanvas label="Preview" onUnavailable={onUnavailable} />,
+  );
+  expect(onUnavailable).not.toHaveBeenCalled();
+  fireEvent(
+    container.querySelector('canvas')!,
+    new Event('webglcontextlost', { cancelable: true }),
+  );
+  expect(onUnavailable).toHaveBeenCalledTimes(1);
+});
+test('reports unavailability when the renderer cannot be created', () => {
+  renderer.fail = true;
+  const onUnavailable = vi.fn();
+  render(<WorldCanvas label="Preview" onUnavailable={onUnavailable} />);
+  expect(onUnavailable).toHaveBeenCalledTimes(1);
+});

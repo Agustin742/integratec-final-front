@@ -3,6 +3,7 @@ import { Group, type Object3D } from 'three';
 import type { ThreeEvent } from '@react-three/fiber';
 import { Button } from '@/components/ui/button';
 import { WorldCanvas } from './world-canvas';
+import { WarmLighting } from './world-lighting';
 import { selectionIntent, type WorldIntent } from './interactions';
 import { worldMessages as copy } from './messages';
 
@@ -28,8 +29,7 @@ function ReferenceGeometry({
   return (
     <>
       <color attach="background" args={['#FFF9EB']} />
-      <ambientLight color="#A9E7F4" intensity={1.2} />
-      <directionalLight color="#FFF0D8" position={[4, 8, 3]} intensity={2.5} />
+      <WarmLighting />
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[6, 4]} />
         <meshStandardMaterial color="#E9C99B" roughness={0.9} />

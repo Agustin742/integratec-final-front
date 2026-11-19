@@ -14,7 +14,7 @@ import {
   SRGBColorSpace,
   WebGLRenderer,
 } from 'three';
-import { frameCamera } from './camera';
+import { frameAvatarCamera, frameCamera } from './camera';
 import {
   DEFAULT_SCOPE,
   clearAssetCache,
@@ -28,6 +28,20 @@ export interface WorldCanvasProps {
   label: string;
   /** Changing `scopeKey` or unmounting disposes cached scene assets. */
   scopeKey?: string;
+  /** Camera framing: the isometric classroom (default) or one standing avatar. */
+  framing?: 'classroom' | 'avatar';
+  /** Landmark role of the host; `img` suits a decorative preview. */
+  role?: 'region' | 'img';
+  /** Sizing classes for the canvas box; defaults to the classroom height. */
+  canvasClassName?: string;
+  /** Replaces the loading announcement; `null` hides it. */
+  loading?: ReactNode;
+  /**
+   * Called once when 3D cannot be shown (renderer creation failure or context
+   * loss). The host still renders the shared fallback, so a caller that shows
+   * its own alternative should unmount the canvas in response.
+   */
+  onUnavailable?: () => void;
 }
 
 class SceneBoundary extends Component<
@@ -48,24 +62,42 @@ class SceneBoundary extends Component<
   }
 }
 
-function CameraFraming() {
+function CameraFraming({ framing }: { framing: 'classroom' | 'avatar' }) {
   const { camera, size, invalidate } = useThree();
   useLayoutEffect(() => {
     if (camera instanceof OrthographicCamera) {
-      frameCamera(camera, size.width, size.height);
+      const frame = framing === 'avatar' ? frameAvatarCamera : frameCamera;
+      frame(camera, size.width, size.height);
       invalidate();
     }
-  }, [camera, size.width, size.height, invalidate]);
+  }, [camera, framing, size.width, size.height, invalidate]);
   return null;
 }
 
-export function WorldCanvas({ children, label, scopeKey }: WorldCanvasProps) {
+export function WorldCanvas({
+  children,
+  label,
+  scopeKey,
+  framing = 'classroom',
+  role = 'region',
+  canvasClassName,
+  loading,
+  onUnavailable,
+}: WorldCanvasProps) {
   const host = useRef<HTMLDivElement>(null);
   const creationErrors = useRef(new Set<unknown>());
   const [failed, setFailed] = useState(false);
   const [visible, setVisible] = useState(false);
   const [tabVisible, setTabVisible] = useState(() => !document.hidden);
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
+
+  const onUnavailableRef = useRef(onUnavailable);
+  useEffect(() => {
+    onUnavailableRef.current = onUnavailable;
+  }, [onUnavailable]);
+  useEffect(() => {
+    if (failed) onUnavailableRef.current?.();
+  }, [failed]);
 
   useEffect(() => {
     return () => {
@@ -156,10 +188,12 @@ export function WorldCanvas({ children, label, scopeKey }: WorldCanvasProps) {
       {/* The loading announcement lives outside the busy region: a live
           region under an `aria-busy` ancestor can be held back by screen
           readers. `role="status"` already implies polite live semantics. */}
-      {!failed && !canvas && <p role="status">{copy.loading}</p>}
+      {!failed &&
+        !canvas &&
+        (loading === undefined ? <p role="status">{copy.loading}</p> : loading)}
       <div
         ref={host}
-        role="region"
+        role={role}
         aria-label={label}
         aria-busy={!failed && !canvas}
         className="min-w-0"
@@ -168,7 +202,14 @@ export function WorldCanvas({ children, label, scopeKey }: WorldCanvasProps) {
           <WorldFallback />
         ) : (
           <SceneBoundary onError={() => setFailed(true)}>
-            <div style={{ height: 'clamp(20rem, 60vh, 32rem)', width: '100%' }}>
+            <div
+              className={canvasClassName}
+              style={
+                canvasClassName
+                  ? undefined
+                  : { height: 'clamp(20rem, 60vh, 32rem)', width: '100%' }
+              }
+            >
               <Canvas
                 orthographic
                 camera={{ manual: true }}
@@ -180,7 +221,7 @@ export function WorldCanvas({ children, label, scopeKey }: WorldCanvasProps) {
                   setCanvas(gl.domElement);
                 }}
               >
-                <CameraFraming />
+                <CameraFraming framing={framing} />
                 {/* Keep future loader suspensions inside the R3F subtree
                     instead of rethrowing past Canvas and replacing the whole
                     section with the outer loading fallback. */}

@@ -1,4 +1,5 @@
 export { WorldCanvas, type WorldCanvasProps } from './world-canvas';
+export { WarmLighting } from './world-lighting';
 export { WorldReference } from './world-reference';
 export { GlbAsset, type GlbAssetProps } from './glb-asset';
 export {
@@ -15,3 +16,11 @@ export {
   selectionIntent,
   type WorldIntent,
 } from './interactions';
+export { resolveAvatarParts, type AvatarParts } from './avatar/avatar-parts';
+export {
+  composeAvatar,
+  type AvatarPartKind,
+  type ComposeAvatarInput,
+  type ComposedAvatar,
+} from './avatar/compose-avatar';
+export { AvatarModel, type AvatarModelProps } from './avatar/avatar-model';

@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-18 — 3D avatar preview and shared avatar component (front #35)
+
+- **Status:** in-progress (branch `feat/35-avatar-3d-preview`, no PR yet)
+- **Area / files:** `src/features/world/avatar/`, `src/features/world/world-canvas.tsx`, `src/features/world/camera.ts`, `src/features/world/world-lighting.tsx`, `src/features/profile/avatar-preview-view.tsx`, `src/features/profile/avatar-preview-3d.tsx`, `src/features/profile/avatar-form.tsx`, `docs/3d-assets.md`
+- **Change:** Added the shared `AvatarModel` (modular body + hair + top GLBs, per-instance tints, part and body failure handling, Idle clip that respects reduced motion and keeps the demand frame loop alive). The profile avatar form now shows the draft in 3D, with the 2D preview as the fallback when WebGL is unavailable or lost, the body file fails, or the 3D chunk cannot load. `WorldCanvas` gained optional avatar framing, role, sizing, loading and `onUnavailable` props with unchanged defaults. Documented the modular avatar layout in `docs/3d-assets.md`.
+- **Reason:** Every 3D surface (profile, own avatar, remote players, accessories) needs one config-to-model mapping instead of per-screen drawings.
+- **Verification:** Per-task affected tests, lint, typecheck, build, `security:check` and `assets:check`. Framing and look still need a visual check in a real browser.
+- **Next step:** Visual check of the preview framing, then open the PR to `develop`.
+
 ## 2026-11-18 — Review and fixes on PR #92 (#49, announcements notice board)
 
 - **Status:** completed (pending merge of PR #92)
