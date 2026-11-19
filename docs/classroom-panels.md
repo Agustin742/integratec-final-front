@@ -5,12 +5,14 @@ The classroom workspace mounts the reusable panel provider with backend A's
 registers nine panel entries with centralized titles: `activities` renders
 `ActivitiesPanel` ([`#41`](https://github.com/Agustin742/integratec-final-front/issues/41)),
 `material` renders `MaterialPanel` ([`#40`](https://github.com/Agustin742/integratec-final-front/issues/40)),
-`notices` renders `NoticeBoardPanel` ([`#49`](https://github.com/Agustin742/integratec-final-front/issues/49))
-and `members` renders `ClassroomMembersPanel`
+`notices` renders `NoticeBoardPanel` ([`#49`](https://github.com/Agustin742/integratec-final-front/issues/49)),
+`grades` renders `GradesPanel` ([`#46`](https://github.com/Agustin742/integratec-final-front/issues/46),
+see the [grades guide](./ui-grades.md)) and
+`members` renders `ClassroomMembersPanel`
 ([`HU-AUL-003`](https://github.com/Agustin742/integratec-final-front/issues/33)
 `ClassroomRosterPanel` and capability-gated [`HU-AUL-002`](https://github.com/Agustin742/integratec-final-front/issues/32)
 `ClassroomInvitationsPanel` for `invite_members`-authorized email invitations and one-time classroom join codes), while the remaining
-six entries display the shared, honest “Funcionalidad pendiente” state until
+four entries display the shared, honest “Funcionalidad pendiente” state until
 their respective stories land.
 
 ## Approved scope reconciliation
@@ -26,7 +28,7 @@ the issue; team acceptance of the reconciled criterion remains part of PR review
 | -------------- | ---------------------------------------------------- |
 | `activities`   | Actividades (`ActivitiesPanel`, `#41`)               |
 | `material`     | Material (`MaterialPanel`, `#40`)                    |
-| `grades`       | Calificaciones                                       |
+| `grades`       | Calificaciones (`GradesPanel`, `#46`)                |
 | `chat`         | Chat                                                 |
 | `notices`      | Avisos (`NoticeBoardPanel`, `#49`)                   |
 | `shop`         | Tienda                                               |
