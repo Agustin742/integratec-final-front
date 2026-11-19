@@ -268,6 +268,14 @@ export function ownProfileQueryKey(userId: string): ScopedQueryKey {
 }
 
 /**
+ * Key of `GET /users/me/streak-and-badges`: server-confirmed study streak and
+ * earned/locked badges for the authenticated user (`HU-GAM-002`).
+ */
+export function ownStreakAndBadgesQueryKey(userId: string): ScopedQueryKey {
+  return createScopedQueryKey({ userId }, 'gamification', 'streak-and-badges');
+}
+
+/**
  * Key of `GET /classrooms/{id}/bot/status`: Study Guide Bot availability and
  * server-decided exam lockout state scoped by `userId` and `classroomId`
  * (`rules/ai-bot-and-daily-briefing.md`, `HU-BOT-002`).

@@ -103,6 +103,12 @@ Course declaration of AI use in the development process (see [course requirement
 - **Assistance and correction:** AI-assisted implementation and blind RDD audit (`risk`, `resilience`) surfaced and fixed overlapping `GET /bot/materials` cache overwrites (`cancelQueries` around `PUT`), unbounded `4000ms` polling on `403`/`404` errors, focus loss on `disabled` switches (`aria-disabled` + `44x44px` touch target + high-contrast OFF track/thumb), and misleading hint copy on unconfirmed/failed states.
 - **Verification boundary:** Local verification ran lint, typecheck, `material-bot-service.test.ts` + `material-bot-toggle.test.tsx`, production build, `security:check`, Prettier, focused Playwright `e2e/study-materials.spec.ts` (desktop `1280px` and mobile `360px` with screenshot inspection), and `git diff --check` against synthetic MSW/route fixtures. Full Ubuntu CI checks and Node 22 Vitest/E2E runs execute on push; human review and merge approval remain required.
 
+## Daily streak indicator and badge showcase (#47)
+
+- **Human scope decision:** The contributor selected [issue #47](https://github.com/Agustin742/integratec-final-front/issues/47) (`HU-GAM-002`) and approved implementing reusable `StreakIndicator` and `BadgeShowcase` components integrated into `ProfileView` using a provisional `GET /users/me/streak-and-badges` contract until `Agustin742/integratec-final-back#33` lands in `src/api/schema.generated.ts`.
+- **Assistance and correction:** AI-assisted implementation built the `userId`-scoped query hook, jitless Zod schemas, MSW handler, accessible streak/badge cards, and unit/RTL/`axe-core`/Playwright tests; test execution caught a multi-match query assertion in `streak-and-badges-section.test.tsx` (`findAllByText('3 días')`).
+- **Verification boundary:** Local verification ran lint, typecheck, `streak-badge-service.test.ts` + `streak-and-badges-section.test.tsx` + `profile-page.test.tsx`, production build, `security:check`, Prettier, focused Playwright `e2e/profile.spec.ts` (desktop `1280px` and mobile `360px` with screenshot inspection), and `git diff --check` against synthetic MSW/route fixtures. Full Ubuntu CI regression runs on push; human review and merge approval remain required.
+
 ## Data handling
 
 Secrets, credentials, and real personal data are not submitted to AI tools, per [Responsible AI usage](../rules/ai-usage.md#data-handling).
