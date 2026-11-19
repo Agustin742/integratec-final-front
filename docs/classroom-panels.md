@@ -117,7 +117,7 @@ through read-own before any resubmission offer. `MULTIPLE_CHOICE` activities
 keep the pending note (part 2/2 out of scope), and teacher review stays
 `HU-ACT-004`.
 
-Product components beyond the unified `activities` panel (`#41` inbox + `#39` teacher editor, [doc](./classroom-activities.md)), the staff `members` roster (`#33`), capability-gated invitations/join-code tab (`#32`), study `material` manager (`#40`), `notices` announcement board (`#49`), and 2D/3D consumers remain separate stories; this infrastructure does not implement their contents. Note for `#41` (human-approved scope reconciliation on `2026-11-18`): because backend `Agustin742/integratec-final-back#29` is still open, `ActivitySummaryDto` and `StudentActivityResponseDto` do not yet expose a server-derived student work status (`Pending`/`Submitted`/`Graded`/`Overdue`) or `canSubmit` flag, so `ActivitiesPanel` and `ActivityDetailPage` render only server-confirmed metadata and deadlines in the school `timeZone` without deriving overdue state from the browser clock (`rules/activities-and-grading.md`, `rules/data-and-time.md`), deferring student status/overdue/`canSubmit` UI until `back#29` lands. Backend
+Product components beyond the unified `activities` panel (`#41` inbox + `#39` teacher editor, [doc](./classroom-activities.md)), the staff `members` roster (`#33`), capability-gated invitations/join-code tab (`#32`), study `material` manager (`#40` + `#53` `HU-BOT-001` Study Guide Bot material toggle), `notices` announcement board (`#49`), and 2D/3D consumers remain separate stories; this infrastructure does not implement their contents. Note for `#53` (`HU-BOT-001`): because backend `Agustin742/integratec-final-back#40` is still open, `MaterialPanel` consumes a provisional `configure_bot`-gated contract (`GET /classrooms/:id/bot/materials` and `PUT /classrooms/:id/bot/materials/:materialId` returning `{ materialId, classroomId, botEnabled, indexingStatus, indexingError, updatedAt }`) backed by stateful MSW handlers and Zod validation until `back#40` lands in `src/api/schema.generated.ts`; toggling requires server confirmation before changing state, and students/parents never see or fetch bot configuration. Note for `#41` (human-approved scope reconciliation on `2026-11-18`): because backend `Agustin742/integratec-final-back#29` is still open, `ActivitySummaryDto` and `StudentActivityResponseDto` do not yet expose a server-derived student work status (`Pending`/`Submitted`/`Graded`/`Overdue`) or `canSubmit` flag, so `ActivitiesPanel` and `ActivityDetailPage` render only server-confirmed metadata and deadlines in the school `timeZone` without deriving overdue state from the browser clock (`rules/activities-and-grading.md`, `rules/data-and-time.md`), deferring student status/overdue/`canSubmit` UI until `back#29` lands. Backend
 [B (#93)](https://github.com/Agustin742/integratec-final-back/pull/93) is consumed by
 one workspace-owned authenticated fetch stream. Connection, invalidation hints
 (including the initial hint), and EOF reset the shared context query and reload
@@ -149,7 +149,10 @@ The public-route browser check captures the pending entry at
 [360px](./assets/classrooms/invitations-360.png), the `#40` study material
 manager (`MaterialPanel`, `e2e/study-materials.spec.ts`) at
 [1280px](./assets/classrooms/study-materials-1280.png) and
-[360px](./assets/classrooms/study-materials-360.png), and the `#41`
+[360px](./assets/classrooms/study-materials-360.png), the `#53` Study Guide Bot
+material toggle (`MaterialBotToggleSlot`, `e2e/study-materials.spec.ts`) at
+[1280px](./assets/classrooms/bot-materials-1280.png) and
+[360px](./assets/classrooms/bot-materials-360.png), and the `#41`
 student activity inbox (`ActivitiesPanel`, `e2e/activities-inbox.spec.ts`) at
 [1280px](./assets/classrooms/activities-inbox-1280.png) and
 [360px](./assets/classrooms/activities-inbox-360.png), the `#42` student
