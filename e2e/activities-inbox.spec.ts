@@ -150,6 +150,21 @@ test('student views activities inbox in school timeZone, captures responsive vie
         } satisfies components['schemas']['StudentActivityResponseDto'],
       }),
   );
+  // The submission panel reads the student's own submission: none stored yet.
+  await page.route(
+    `${apiOrigin}/activities/${activityId}/submissions/me`,
+    (route) =>
+      route.fulfill({
+        status: 404,
+        json: {
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Sin entrega registrada',
+            correlationId: 'synthetic-submissions-me',
+          },
+        } satisfies components['schemas']['ErrorEnvelope'],
+      }),
+  );
 
   await page.goto(`./classrooms/${classroomId}/panels/activities`);
   const dialog = page.getByRole('dialog', { name: 'Actividades', exact: true });
@@ -179,9 +194,10 @@ test('student views activities inbox in school timeZone, captures responsive vie
     page.getByRole('heading', { name: 'TP 1: Sistemas de ecuaciones' }),
   ).toBeVisible();
   await page.getByRole('tab', { name: 'Entrega' }).click();
+  await expect(page.getByLabel('Elegir archivos')).toBeVisible();
   await expect(
-    page.getByRole('heading', { name: 'Sección disponible próximamente' }),
-  ).toBeVisible();
+    page.getByRole('button', { name: 'Enviar entrega' }),
+  ).toBeDisabled();
 
   expect(cspViolations).toEqual([]);
   expect(pageErrors).toEqual([]);

@@ -1,17 +1,19 @@
 import { useParams } from 'react-router';
-import { EmptyState, LoadingState } from '@/components/feedback/states';
-import { classroomMessages } from '../messages';
+import { LoadingState } from '@/components/feedback/states';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { GradesPanel } from '../grades/grades-panel';
+import { gradesMessages } from '../grades/messages';
 import { useClassroomContext } from '../use-classroom-capabilities';
 import { gradingMessages } from './grading-messages';
 import { TeacherGradingQueuePanel } from './teacher-grading-queue-panel';
 
 /**
- * Classroom `grades` panel (`classroomPanelCatalog` key `'grades'`).
- * - Teaching staff (`publish_content`) get the classroom-wide grading queue,
- *   submission viewer, and grade/regrade workflow (`HU-ACT-004`).
- * - Students and linked parents see an honest pending placeholder without
- *   issuing staff-only requests (leaving the student/parent view cleanly
- *   isolated for `HU-ACT-005` / `HU-ACT-006`).
+ * Unified classroom `grades` panel (`classroomPanelCatalog` key `'grades'`).
+ * - Teaching staff (`publish_content`) get tabs for the classroom grading
+ *   review queue (`HU-ACT-004`) and the per-student participation metrics table
+ *   (`HU-ACT-005`).
+ * - Students and linked parents delegate to `GradesPanel` (`HU-ACT-005`)
+ *   without issuing staff-only requests.
  */
 export function ClassroomGradesPanel() {
   const { classroomId } = useParams();
@@ -26,13 +28,25 @@ export function ClassroomGradesPanel() {
     context.status === 'ready' &&
     context.classroom.capabilities.includes('publish_content')
   ) {
-    return <TeacherGradingQueuePanel classroomId={normalizedClassroomId} />;
+    return (
+      <Tabs defaultValue="review" className="min-w-0 space-y-4">
+        <TabsList>
+          <TabsTrigger value="review">
+            {gradingMessages.panel.title}
+          </TabsTrigger>
+          <TabsTrigger value="metrics">
+            {gradesMessages.teacher.heading}
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="review">
+          <TeacherGradingQueuePanel classroomId={normalizedClassroomId} />
+        </TabsContent>
+        <TabsContent value="metrics">
+          <GradesPanel />
+        </TabsContent>
+      </Tabs>
+    );
   }
 
-  return (
-    <EmptyState
-      title={classroomMessages.pendingPanelTitle}
-      description={classroomMessages.pendingPanelDescription}
-    />
-  );
+  return <GradesPanel />;
 }

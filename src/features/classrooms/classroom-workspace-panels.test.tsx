@@ -94,6 +94,16 @@ function setup(
             total: 0,
           });
         }
+        // The default catalog maps `grades` to ClassroomGradesPanel (#44 + #46);
+        // the TEACHER context without publish_content reads classroom metrics.
+        if (url.pathname.endsWith('/activity-metrics')) {
+          return Response.json({
+            items: [],
+            page: 1,
+            pageSize: 20,
+            total: 0,
+          });
+        }
         const id = url.pathname.split('/').pop();
         return status !== 200
           ? new Response(null, { status })
@@ -178,7 +188,6 @@ function setup(
   };
 }
 const pendingCatalogCases = [
-  ['grades', 'Calificaciones'],
   ['chat', 'Chat'],
   ['shop', 'Tienda'],
   ['bot', 'Asistente de estudio'],
@@ -241,6 +250,22 @@ test('default catalog opens grades with teacher grading queue when publish_conte
     await within(dialog).findByText('Todavía no hay entregas para revisar'),
   ).toBeVisible();
   expect(dialog).not.toHaveTextContent('Funcionalidad pendiente');
+});
+
+test('default catalog opens grades by URL with the GradesPanel teacher view', async () => {
+  const view = setup(['grades'], '/classrooms/a/panels/grades', true);
+  const dialog = await screen.findByRole('dialog', { name: 'Calificaciones' });
+  expect(
+    await screen.findByRole('heading', { name: 'Seguimiento del aula' }),
+  ).toBeVisible();
+  expect(dialog).toHaveTextContent('No hay alumnos para mostrar');
+  expect(dialog).not.toHaveTextContent('Funcionalidad pendiente');
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+  await screen.findByRole('button', { name: 'Open grades' });
+  expect(view.router.state.location.pathname).toBe('/classrooms/a');
+  expect(view.router.state.historyAction).toBe('REPLACE');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(document.activeElement).toHaveTextContent('Classroom a');
 });
 
 test.each(pendingCatalogCases)(

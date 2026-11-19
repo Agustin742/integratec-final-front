@@ -28,7 +28,7 @@ import {
 import { mswServer } from '@/test/msw/server';
 import { render } from '@/test/render';
 import { ActivityDetailPage } from '../activities/activity-detail-page';
-import { classroomMessages } from '../messages';
+import { gradesMessages } from '../grades/messages';
 import { ClassroomGradesPanel } from './classroom-grades-panel';
 import { gradingMessages } from './grading-messages';
 import { TeacherGradingQueuePanel } from './teacher-grading-queue-panel';
@@ -648,9 +648,7 @@ describe('TeacherGradingQueuePanel & ClassroomGradesPanel (#44)', () => {
       element: 'grades-panel',
     });
 
-    expect(
-      await screen.findByText(classroomMessages.pendingPanelTitle),
-    ).toBeVisible();
+    expect(await screen.findByText(gradesMessages.parent.title)).toBeVisible();
     expect(gradingStore.getCounts().queue).toBe(0);
     await expectAccessible(view.container);
   });
