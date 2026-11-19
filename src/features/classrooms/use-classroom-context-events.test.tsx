@@ -455,9 +455,9 @@ test('the client renews the stream before the backend 60s lifetime', async () =>
   const timers = vi.spyOn(globalThis, 'setTimeout');
   const view = setup();
   await ready();
-  expect(timers.mock.calls.map((call) => call[1])).toContain(
-    CONTEXT_RENEWAL_MS,
-  );
+  const delays = timers.mock.calls.map((call) => call[1]);
+  timers.mockRestore();
+  expect(delays).toContain(CONTEXT_RENEWAL_MS);
   expect(view.streams[0].request.signal.aborted).toBe(false);
   await act(async () => {
     await vi.advanceTimersByTimeAsync(CONTEXT_RENEWAL_MS);
