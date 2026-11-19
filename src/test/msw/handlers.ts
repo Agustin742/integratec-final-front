@@ -3130,6 +3130,465 @@ export function createClassroomActivitiesStore(
   };
 }
 
+export interface SubmissionStoreFile {
+  readonly id: string;
+  readonly originalName: string;
+  readonly contentType: string;
+  readonly sizeBytes: number;
+  readonly position: number;
+}
+
+export interface SubmissionStoreItem {
+  readonly id: string;
+  readonly activityId: string;
+  readonly submittedAt: string;
+  readonly isLate: boolean;
+  readonly status: 'submitted' | 'graded';
+  readonly files: readonly SubmissionStoreFile[];
+  readonly idempotencyKey: string;
+}
+
+export type SubmissionStoreOp = 'create' | 'readOwn';
+export type SubmissionStoreFailure =
+  MswErrorResponseSpec | 'network' | 'drop-response';
+
+export interface ClassroomSubmissionsStoreOptions {
+  readonly baseUrl?: string;
+  readonly role?: 'TEACHER' | 'SCHOOL_OWNER' | 'STUDENT' | 'PARENT';
+  /** Published `FILE` activity the store accepts submissions for. */
+  readonly activity?: ActivityStoreItem;
+  /** Server-clock instant used to decide the submission window. */
+  readonly now?: string;
+  /** Per-file size limit the store enforces (contract default: 10 MB). */
+  readonly fileSizeLimitBytes?: number;
+  readonly initialItems?: readonly SubmissionStoreItem[];
+}
+
+export interface SubmissionCreateRequestRecord {
+  readonly idempotencyKey: string | null;
+  readonly authorization: string | null;
+  readonly accessTokenUsed: string | null;
+}
+
+export interface ClassroomSubmissionsStore {
+  readonly handlers: readonly HttpHandler[];
+  getItems: () => readonly SubmissionStoreItem[];
+  getLastCreateRequest: () => SubmissionCreateRequestRecord | null;
+  failNext: (op: SubmissionStoreOp, failure: SubmissionStoreFailure) => void;
+}
+
+async function sniffSubmissionContentType(file: File): Promise<string | null> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const startsWith = (prefix: number[]) =>
+    prefix.every((byte, index) => bytes[index] === byte);
+  if (startsWith([0x25, 0x50, 0x44, 0x46])) return 'application/pdf';
+  if (startsWith([0x89, 0x50, 0x4e, 0x47])) return 'image/png';
+  if (startsWith([0xff, 0xd8, 0xff])) return 'image/jpeg';
+  if (startsWith([0x50, 0x4b, 0x03, 0x04])) {
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  }
+  return null;
+}
+
+/**
+ * Minimal multipart reader for the submissions store. The jsdom XHR interceptor
+ * produces a raw body undici's `formData()` cannot always parse, so the mock
+ * reads the boundary-delimited parts at the byte level (only headers are
+ * decoded as text) so file content and size stay byte-exact.
+ */
+async function readMultipartFiles(request: Request): Promise<File[] | null> {
+  const contentType = request.headers.get('content-type') ?? '';
+  const match = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType);
+  if (!match) {
+    return null;
+  }
+  const boundary = new TextEncoder().encode(
+    `--${(match[1] ?? match[2] ?? '').trim()}`,
+  );
+  const body = new Uint8Array(await request.arrayBuffer());
+
+  const findSequence = (
+    haystack: Uint8Array,
+    needle: Uint8Array,
+    from: number,
+  ): number => {
+    outer: for (let i = from; i <= haystack.length - needle.length; i++) {
+      for (let j = 0; j < needle.length; j++) {
+        if (haystack[i + j] !== needle[j]) {
+          continue outer;
+        }
+      }
+      return i;
+    }
+    return -1;
+  };
+
+  const files: File[] = [];
+  let cursor = 0;
+  while (cursor < body.length) {
+    const start = findSequence(body, boundary, cursor);
+    if (start === -1) {
+      break;
+    }
+    const next = findSequence(body, boundary, start + boundary.length);
+    const partEnd = next === -1 ? body.length : next;
+    let partStart = start + boundary.length;
+    let partStop = partEnd;
+    if (body[partStart] === 0x0d && body[partStart + 1] === 0x0a) {
+      partStart += 2;
+    }
+    if (
+      partStop >= partStart + 2 &&
+      body[partStop - 2] === 0x0d &&
+      body[partStop - 1] === 0x0a
+    ) {
+      partStop -= 2;
+    }
+    const part = body.subarray(partStart, partStop);
+    const headerEnd = findSequence(
+      part,
+      new Uint8Array([0x0d, 0x0a, 0x0d, 0x0a]),
+      0,
+    );
+    if (headerEnd !== -1) {
+      const headerText = new TextDecoder().decode(part.subarray(0, headerEnd));
+      const nameMatch = /filename="([^"]*)"/i.exec(headerText);
+      if (nameMatch) {
+        const typeMatch = /content-type:\s*([^\r\n]+)/i.exec(headerText);
+        files.push(
+          new File([part.subarray(headerEnd + 4)], nameMatch[1] ?? 'file', {
+            type: typeMatch?.[1]?.trim() ?? '',
+          }),
+        );
+      }
+    }
+    cursor = partEnd;
+  }
+  return files;
+}
+
+/**
+ * Stateful contract-faithful MSW store for student file submissions
+ * (`SubmissionsController_create` and `SubmissionsController_readOwn`).
+ * Models the calling student; staff and linked parents answer `403`, and
+ * non-members or unknown/draft activities answer `404` so nothing leaks.
+ */
+export function createClassroomSubmissionsStore(
+  options: ClassroomSubmissionsStoreOptions = {},
+): ClassroomSubmissionsStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const role = options.role ?? 'STUDENT';
+  const activity = options.activity;
+  const now = options.now ?? '2026-11-18T12:00:00.000Z';
+  const fileSizeLimitBytes = options.fileSizeLimitBytes ?? 10 * 1024 * 1024;
+  const items: SubmissionStoreItem[] = [...(options.initialItems ?? [])];
+  const pending: Partial<Record<SubmissionStoreOp, SubmissionStoreFailure>> =
+    {};
+  let lastCreateRequest: SubmissionCreateRequestRecord | null = null;
+
+  // jsdom's XHR enforces CORS, so every store response carries the header a
+  // real API gateway would add; `HttpResponse.error()` stays unwrapped.
+  const withCors = (response: Response): Response => {
+    const headers = new Headers(response.headers);
+    headers.set('access-control-allow-origin', '*');
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  };
+  const respondJson = (body: unknown, status: number): Response =>
+    withCors(
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+  const respondError = (status: number, body: ErrorBodyPayload): Response =>
+    withCors(createErrorEnvelopeResponse(status, body));
+
+  const fail = (failure: SubmissionStoreFailure): Response =>
+    failure === 'network' || failure === 'drop-response'
+      ? HttpResponse.error()
+      : respondError(failure.status, failure.body);
+
+  return {
+    getItems: () => items,
+    getLastCreateRequest: () => lastCreateRequest,
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    handlers: [
+      // jsdom sends a CORS preflight for the XHR upload's custom headers
+      // (`Authorization`, `Idempotency-Key`); answer it like the real API.
+      http.options(
+        `${baseUrl}/activities/:activityId/submissions`,
+        () =>
+          new HttpResponse(null, {
+            status: 204,
+            headers: {
+              'access-control-allow-origin': '*',
+              'access-control-allow-methods': 'POST, GET, OPTIONS',
+              'access-control-allow-headers':
+                'authorization, idempotency-key, accept, content-type',
+            },
+          }),
+      ),
+      http.post(
+        `${baseUrl}/activities/:activityId/submissions`,
+        async ({ params, request }) => {
+          const failure = pending.create;
+          pending.create = undefined;
+          if (failure === 'network') {
+            return HttpResponse.error();
+          }
+          if (failure !== undefined && failure !== 'drop-response') {
+            return respondError(failure.status, failure.body);
+          }
+
+          const idempotencyKey = request.headers.get('Idempotency-Key');
+          const authorization = request.headers.get('Authorization');
+          lastCreateRequest = {
+            idempotencyKey,
+            authorization,
+            accessTokenUsed:
+              authorization?.startsWith('Bearer ') && authorization.length > 7
+                ? authorization.slice(7)
+                : null,
+          };
+
+          const activityNotFound = () =>
+            respondError(404, {
+              code: 'NOT_FOUND',
+              message: 'Activity not found.',
+              correlationId: 'req-submissions-create-404',
+            });
+
+          if (!activity || params.activityId !== activity.id) {
+            return activityNotFound();
+          }
+          if (activity.state !== 'PUBLISHED') {
+            return activityNotFound();
+          }
+          if (role !== 'STUDENT') {
+            return respondError(403, {
+              code: 'FORBIDDEN',
+              message: 'Only students can submit activities.',
+              correlationId: 'req-submissions-create-403',
+            });
+          }
+
+          const key = idempotencyKey?.trim() ?? '';
+          if (key.length < 1 || key.length > 255) {
+            return respondError(400, {
+              code: 'BAD_REQUEST',
+              message: 'Missing or invalid Idempotency-Key.',
+              details: [
+                {
+                  field: 'idempotencyKey',
+                  messages: ['Idempotency-Key is required.'],
+                },
+              ],
+              correlationId: 'req-submissions-create-400-key',
+            });
+          }
+
+          const existing = items.find(
+            (item) => item.activityId === activity.id,
+          );
+          if (existing) {
+            if (existing.idempotencyKey === key) {
+              // Idempotent replay: the stored submission, nothing new stored.
+              return respondJson(existing, 200);
+            }
+            return respondError(409, {
+              code: 'CONFLICT',
+              message: 'Already submitted with another idempotency key.',
+              details: [
+                {
+                  field: 'idempotencyKey',
+                  messages: [
+                    'Already submitted with a different idempotency key.',
+                  ],
+                },
+              ],
+              correlationId: 'req-submissions-create-409-key',
+            });
+          }
+
+          if (activity.format !== 'FILE') {
+            return respondError(409, {
+              code: 'CONFLICT',
+              message: 'Not a file activity.',
+              details: [
+                { field: 'format', messages: ['Not a file activity.'] },
+              ],
+              correlationId: 'req-submissions-create-409-format',
+            });
+          }
+
+          if (activity.opensAt && now < activity.opensAt) {
+            return respondError(409, {
+              code: 'CONFLICT',
+              message: 'Submission window not open yet.',
+              details: [
+                {
+                  field: 'opensAt',
+                  messages: ['Submission window not open yet.'],
+                },
+              ],
+              correlationId: 'req-submissions-create-409-window',
+            });
+          }
+          const isLate = now > activity.dueAt;
+          if (isLate && !activity.allowLate) {
+            return respondError(409, {
+              code: 'CONFLICT',
+              message: 'Submission window closed.',
+              details: [
+                {
+                  field: 'dueAt',
+                  messages: ['Submission window closed.'],
+                },
+              ],
+              correlationId: 'req-submissions-create-409-closed',
+            });
+          }
+
+          const files = await readMultipartFiles(request);
+          if (files === null || files.length < 1 || files.length > 5) {
+            return respondError(400, {
+              code: 'BAD_REQUEST',
+              message: 'Between 1 and 5 files are required.',
+              correlationId: 'req-submissions-create-400-count',
+            });
+          }
+          const validatedFiles: { file: File; contentType: string }[] = [];
+          for (const [index, file] of files.entries()) {
+            if (file.size > fileSizeLimitBytes) {
+              return respondError(413, {
+                code: 'VALIDATION_FAILED',
+                message: 'A file exceeds the size limit.',
+                details: [
+                  {
+                    field: `files.${index}`,
+                    messages: ['A file exceeds the size limit.'],
+                  },
+                ],
+                correlationId: 'req-submissions-create-413',
+              });
+            }
+            const contentType = await sniffSubmissionContentType(file);
+            if (contentType === null) {
+              return respondError(400, {
+                code: 'VALIDATION_FAILED',
+                message: 'Disallowed file content.',
+                details: [
+                  {
+                    field: `files.${index}`,
+                    messages: ['Disallowed content type.'],
+                  },
+                ],
+                correlationId: 'req-submissions-create-400-type',
+              });
+            }
+            validatedFiles.push({ file, contentType });
+          }
+
+          const stored: SubmissionStoreItem = {
+            id: globalThis.crypto.randomUUID(),
+            activityId: activity.id,
+            submittedAt: now,
+            isLate,
+            status: 'submitted',
+            files: validatedFiles.map(({ file, contentType }, index) => ({
+              id: globalThis.crypto.randomUUID(),
+              originalName: file.name
+                .replace(/[\\/:*?"<>|]/g, '_')
+                .split('')
+                .map((character) => (character < ' ' ? '_' : character))
+                .join(''),
+              contentType,
+              sizeBytes: file.size,
+              position: index,
+            })),
+            idempotencyKey: key,
+          };
+          items.push(stored);
+
+          if (failure === 'drop-response') {
+            // The server stored the submission but the response was lost.
+            return HttpResponse.error();
+          }
+          return respondJson(stored, 201);
+        },
+      ),
+      http.get(
+        `${baseUrl}/activities/:activityId/submissions/me`,
+        ({ params }) => {
+          const failure = pending.readOwn;
+          pending.readOwn = undefined;
+          if (failure !== undefined) {
+            return fail(failure);
+          }
+
+          if (!activity || params.activityId !== activity.id) {
+            return respondError(404, {
+              code: 'NOT_FOUND',
+              message: 'Activity not found.',
+              correlationId: 'req-submissions-me-404-activity',
+            });
+          }
+          if (activity.state !== 'PUBLISHED') {
+            return respondError(404, {
+              code: 'NOT_FOUND',
+              message: 'Activity not found.',
+              correlationId: 'req-submissions-me-404-draft',
+            });
+          }
+          if (role !== 'STUDENT') {
+            return respondError(403, {
+              code: 'FORBIDDEN',
+              message: 'Only students can read their own submission.',
+              correlationId: 'req-submissions-me-403',
+            });
+          }
+
+          const found = items.find(
+            (item) => item.activityId === params.activityId,
+          );
+          if (!found) {
+            return respondError(404, {
+              code: 'NOT_FOUND',
+              message: 'Submission not found.',
+              correlationId: 'req-submissions-me-404-submission',
+            });
+          }
+
+          const downloadExpiresAt = new Date(
+            new Date(now).getTime() + 5 * 60 * 1000,
+          ).toISOString();
+          return respondJson(
+            {
+              id: found.id,
+              activityId: found.activityId,
+              submittedAt: found.submittedAt,
+              isLate: found.isLate,
+              status: found.status,
+              files: found.files.map((file) => ({
+                ...file,
+                downloadUrl: `https://storage.example.invalid/signed/${file.id}`,
+                downloadUrlExpiresAt: downloadExpiresAt,
+              })),
+            },
+            200,
+          );
+        },
+      ),
+    ],
+  };
+}
+
 export type TeacherActivityPayload =
   components['schemas']['TeacherActivityResponseDto'];
 export type StudentActivityPayload =

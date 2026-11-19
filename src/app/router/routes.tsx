@@ -140,8 +140,8 @@ export function createAppRoutes({
                       lazy: {
                         Component: async () =>
                           (
-                            await import('@/features/classrooms/activities/activity-detail-page')
-                          ).ActivityDetailPage,
+                            await import('@/features/classrooms/activities/submission/activity-detail-route')
+                          ).ActivityDetailRoute,
                       },
                     },
                     {
