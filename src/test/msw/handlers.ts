@@ -947,15 +947,26 @@ export interface ClassroomMaterialItem {
   readonly createdAt: string;
 }
 
-export type MaterialStoreOp = 'list' | 'upload' | 'download' | 'remove';
+export type MaterialStoreOp =
+  'list' | 'upload' | 'download' | 'remove' | 'botList' | 'botToggle';
 export type MaterialStoreFailure =
   MswErrorResponseSpec | 'network' | 'drop-response';
+
+export interface BotMaterialStateEntry {
+  readonly materialId: string;
+  readonly classroomId: string;
+  readonly botEnabled: boolean;
+  readonly indexingStatus: 'disabled' | 'pending' | 'ready' | 'failed';
+  readonly indexingError?: string | null;
+  readonly updatedAt: string;
+}
 
 export interface ClassroomMaterialsStoreOptions {
   readonly baseUrl?: string;
   readonly classroomId?: string;
   readonly authorId?: string;
   readonly initialItems?: readonly ClassroomMaterialItem[];
+  readonly initialBotStates?: readonly BotMaterialStateEntry[];
   readonly signedUrlBase?: string;
   readonly expiresInSeconds?: number;
 }
@@ -963,6 +974,14 @@ export interface ClassroomMaterialsStoreOptions {
 export interface ClassroomMaterialsStore {
   readonly handlers: readonly HttpHandler[];
   read(): readonly ClassroomMaterialItem[];
+  readBotStates(): readonly BotMaterialStateEntry[];
+  setBotState(
+    materialId: string,
+    state: Pick<
+      BotMaterialStateEntry,
+      'botEnabled' | 'indexingStatus' | 'indexingError'
+    >,
+  ): void;
   failNext(op: MaterialStoreOp, failure: MaterialStoreFailure): void;
 }
 
@@ -989,6 +1008,9 @@ export function createClassroomMaterialsStore(
     options.signedUrlBase ?? 'https://files.example.test/signed';
   const expiresInSeconds = options.expiresInSeconds ?? 120;
   let items: ClassroomMaterialItem[] = [...(options.initialItems ?? [])];
+  const botStates = new Map<string, BotMaterialStateEntry>(
+    (options.initialBotStates ?? []).map((entry) => [entry.materialId, entry]),
+  );
   let seq = items.length + 1;
   const pending: Partial<Record<MaterialStoreOp, MaterialStoreFailure>> = {};
 
@@ -999,6 +1021,17 @@ export function createClassroomMaterialsStore(
 
   return {
     read: () => [...items],
+    readBotStates: () => [...botStates.values()],
+    setBotState(materialId, state) {
+      botStates.set(materialId, {
+        materialId,
+        classroomId,
+        botEnabled: state.botEnabled,
+        indexingStatus: state.indexingStatus,
+        indexingError: state.indexingError ?? null,
+        updatedAt: '2026-11-19T01:30:00.000Z',
+      });
+    },
     failNext(op, failure) {
       pending[op] = failure;
     },
@@ -1149,7 +1182,72 @@ export function createClassroomMaterialsStore(
             });
           }
           items = items.filter((item) => item.id !== params.materialId);
+          botStates.delete(String(params.materialId));
           return new HttpResponse(null, { status: 204 });
+        },
+      ),
+      http.get(`${baseUrl}/classrooms/:id/bot/materials`, ({ params }) => {
+        const failure = pending.botList;
+        pending.botList = undefined;
+        if (failure !== undefined && failure !== 'drop-response') {
+          return fail(failure);
+        }
+        if (options.classroomId && params.id !== classroomId) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Classroom not found.',
+            correlationId: 'req-bot-materials-list-404',
+          });
+        }
+        return HttpResponse.json({
+          items: [...botStates.values()],
+        });
+      }),
+      http.put(
+        `${baseUrl}/classrooms/:id/bot/materials/:materialId`,
+        async ({ params, request }) => {
+          const failure = pending.botToggle;
+          pending.botToggle = undefined;
+          if (failure !== undefined && failure !== 'drop-response') {
+            return fail(failure);
+          }
+          if (options.classroomId && params.id !== classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-bot-materials-toggle-404',
+            });
+          }
+          const materialId = String(params.materialId);
+          const found = items.find((item) => item.id === materialId);
+          if (!found) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Material not found.',
+              correlationId: 'req-bot-materials-toggle-404',
+            });
+          }
+          const body = (await request.json().catch(() => null)) as {
+            enabled?: unknown;
+          } | null;
+          if (!body || typeof body.enabled !== 'boolean') {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'enabled must be a boolean.',
+              correlationId: 'req-bot-materials-toggle-400',
+            });
+          }
+          seq += 1;
+          const nextEntry: BotMaterialStateEntry = {
+            materialId,
+            classroomId: found.classroomId,
+            botEnabled: body.enabled,
+            indexingStatus: body.enabled ? 'pending' : 'disabled',
+            indexingError: null,
+            updatedAt: '2026-11-19T01:30:00.000Z',
+          };
+          botStates.set(materialId, nextEntry);
+          return HttpResponse.json(nextEntry);
         },
       ),
     ],
@@ -3130,4 +3228,2646 @@ export function createClassroomActivitiesStore(
   };
 }
 
-export const defaultHandlers: readonly HttpHandler[] = [createHealthHandler()];
+export interface SubmissionStoreFile {
+  readonly id: string;
+  readonly originalName: string;
+  readonly contentType: string;
+  readonly sizeBytes: number;
+  readonly position: number;
+}
+
+export interface SubmissionStoreItem {
+  readonly id: string;
+  readonly activityId: string;
+  readonly submittedAt: string;
+  readonly isLate: boolean;
+  readonly status: 'submitted' | 'graded';
+  readonly files: readonly SubmissionStoreFile[];
+  readonly idempotencyKey: string;
+}
+
+export type SubmissionStoreOp = 'create' | 'readOwn';
+export type SubmissionStoreFailure =
+  MswErrorResponseSpec | 'network' | 'drop-response';
+
+export interface ClassroomSubmissionsStoreOptions {
+  readonly baseUrl?: string;
+  readonly role?: 'TEACHER' | 'SCHOOL_OWNER' | 'STUDENT' | 'PARENT';
+  /** Published `FILE` activity the store accepts submissions for. */
+  readonly activity?: ActivityStoreItem;
+  /** Server-clock instant used to decide the submission window. */
+  readonly now?: string;
+  /** Per-file size limit the store enforces (contract default: 10 MB). */
+  readonly fileSizeLimitBytes?: number;
+  readonly initialItems?: readonly SubmissionStoreItem[];
+}
+
+export interface SubmissionCreateRequestRecord {
+  readonly idempotencyKey: string | null;
+  readonly authorization: string | null;
+  readonly accessTokenUsed: string | null;
+}
+
+export interface ClassroomSubmissionsStore {
+  readonly handlers: readonly HttpHandler[];
+  getItems: () => readonly SubmissionStoreItem[];
+  getLastCreateRequest: () => SubmissionCreateRequestRecord | null;
+  failNext: (op: SubmissionStoreOp, failure: SubmissionStoreFailure) => void;
+}
+
+async function sniffSubmissionContentType(file: File): Promise<string | null> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const startsWith = (prefix: number[]) =>
+    prefix.every((byte, index) => bytes[index] === byte);
+  if (startsWith([0x25, 0x50, 0x44, 0x46])) return 'application/pdf';
+  if (startsWith([0x89, 0x50, 0x4e, 0x47])) return 'image/png';
+  if (startsWith([0xff, 0xd8, 0xff])) return 'image/jpeg';
+  if (startsWith([0x50, 0x4b, 0x03, 0x04])) {
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  }
+  return null;
+}
+
+/**
+ * Minimal multipart reader for the submissions store. The jsdom XHR interceptor
+ * produces a raw body undici's `formData()` cannot always parse, so the mock
+ * reads the boundary-delimited parts at the byte level (only headers are
+ * decoded as text) so file content and size stay byte-exact.
+ */
+async function readMultipartFiles(request: Request): Promise<File[] | null> {
+  const contentType = request.headers.get('content-type') ?? '';
+  const match = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType);
+  if (!match) {
+    return null;
+  }
+  const boundary = new TextEncoder().encode(
+    `--${(match[1] ?? match[2] ?? '').trim()}`,
+  );
+  const body = new Uint8Array(await request.arrayBuffer());
+
+  const findSequence = (
+    haystack: Uint8Array,
+    needle: Uint8Array,
+    from: number,
+  ): number => {
+    outer: for (let i = from; i <= haystack.length - needle.length; i++) {
+      for (let j = 0; j < needle.length; j++) {
+        if (haystack[i + j] !== needle[j]) {
+          continue outer;
+        }
+      }
+      return i;
+    }
+    return -1;
+  };
+
+  const files: File[] = [];
+  let cursor = 0;
+  while (cursor < body.length) {
+    const start = findSequence(body, boundary, cursor);
+    if (start === -1) {
+      break;
+    }
+    const next = findSequence(body, boundary, start + boundary.length);
+    const partEnd = next === -1 ? body.length : next;
+    let partStart = start + boundary.length;
+    let partStop = partEnd;
+    if (body[partStart] === 0x0d && body[partStart + 1] === 0x0a) {
+      partStart += 2;
+    }
+    if (
+      partStop >= partStart + 2 &&
+      body[partStop - 2] === 0x0d &&
+      body[partStop - 1] === 0x0a
+    ) {
+      partStop -= 2;
+    }
+    const part = body.subarray(partStart, partStop);
+    const headerEnd = findSequence(
+      part,
+      new Uint8Array([0x0d, 0x0a, 0x0d, 0x0a]),
+      0,
+    );
+    if (headerEnd !== -1) {
+      const headerText = new TextDecoder().decode(part.subarray(0, headerEnd));
+      const nameMatch = /filename="([^"]*)"/i.exec(headerText);
+      if (nameMatch) {
+        const typeMatch = /content-type:\s*([^\r\n]+)/i.exec(headerText);
+        files.push(
+          new File([part.subarray(headerEnd + 4)], nameMatch[1] ?? 'file', {
+            type: typeMatch?.[1]?.trim() ?? '',
+          }),
+        );
+      }
+    }
+    cursor = partEnd;
+  }
+  return files;
+}
+
+/**
+ * Stateful contract-faithful MSW store for student file submissions
+ * (`SubmissionsController_create` and `SubmissionsController_readOwn`).
+ * Models the calling student; staff and linked parents answer `403`, and
+ * non-members or unknown/draft activities answer `404` so nothing leaks.
+ */
+export function createClassroomSubmissionsStore(
+  options: ClassroomSubmissionsStoreOptions = {},
+): ClassroomSubmissionsStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const role = options.role ?? 'STUDENT';
+  const activity = options.activity;
+  const now = options.now ?? '2026-11-18T12:00:00.000Z';
+  const fileSizeLimitBytes = options.fileSizeLimitBytes ?? 10 * 1024 * 1024;
+  const items: SubmissionStoreItem[] = [...(options.initialItems ?? [])];
+  const pending: Partial<Record<SubmissionStoreOp, SubmissionStoreFailure>> =
+    {};
+  let lastCreateRequest: SubmissionCreateRequestRecord | null = null;
+
+  // jsdom's XHR enforces CORS, so every store response carries the header a
+  // real API gateway would add; `HttpResponse.error()` stays unwrapped.
+  const withCors = (response: Response): Response => {
+    const headers = new Headers(response.headers);
+    headers.set('access-control-allow-origin', '*');
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  };
+  const respondJson = (body: unknown, status: number): Response =>
+    withCors(
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+  const respondError = (status: number, body: ErrorBodyPayload): Response =>
+    withCors(createErrorEnvelopeResponse(status, body));
+
+  const fail = (failure: SubmissionStoreFailure): Response =>
+    failure === 'network' || failure === 'drop-response'
+      ? HttpResponse.error()
+      : respondError(failure.status, failure.body);
+
+  return {
+    getItems: () => items,
+    getLastCreateRequest: () => lastCreateRequest,
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    handlers: [
+      // jsdom sends a CORS preflight for the XHR upload's custom headers
+      // (`Authorization`, `Idempotency-Key`); answer it like the real API.
+      http.options(
+        `${baseUrl}/activities/:activityId/submissions`,
+        () =>
+          new HttpResponse(null, {
+            status: 204,
+            headers: {
+              'access-control-allow-origin': '*',
+              'access-control-allow-methods': 'POST, GET, OPTIONS',
+              'access-control-allow-headers':
+                'authorization, idempotency-key, accept, content-type',
+            },
+          }),
+      ),
+      http.post(
+        `${baseUrl}/activities/:activityId/submissions`,
+        async ({ params, request }) => {
+          const failure = pending.create;
+          pending.create = undefined;
+          if (failure === 'network') {
+            return HttpResponse.error();
+          }
+          if (failure !== undefined && failure !== 'drop-response') {
+            return respondError(failure.status, failure.body);
+          }
+
+          const idempotencyKey = request.headers.get('Idempotency-Key');
+          const authorization = request.headers.get('Authorization');
+          lastCreateRequest = {
+            idempotencyKey,
+            authorization,
+            accessTokenUsed:
+              authorization?.startsWith('Bearer ') && authorization.length > 7
+                ? authorization.slice(7)
+                : null,
+          };
+
+          const activityNotFound = () =>
+            respondError(404, {
+              code: 'NOT_FOUND',
+              message: 'Activity not found.',
+              correlationId: 'req-submissions-create-404',
+            });
+
+          if (!activity || params.activityId !== activity.id) {
+            return activityNotFound();
+          }
+          if (activity.state !== 'PUBLISHED') {
+            return activityNotFound();
+          }
+          if (role !== 'STUDENT') {
+            return respondError(403, {
+              code: 'FORBIDDEN',
+              message: 'Only students can submit activities.',
+              correlationId: 'req-submissions-create-403',
+            });
+          }
+
+          const key = idempotencyKey?.trim() ?? '';
+          if (key.length < 1 || key.length > 255) {
+            return respondError(400, {
+              code: 'BAD_REQUEST',
+              message: 'Missing or invalid Idempotency-Key.',
+              details: [
+                {
+                  field: 'idempotencyKey',
+                  messages: ['Idempotency-Key is required.'],
+                },
+              ],
+              correlationId: 'req-submissions-create-400-key',
+            });
+          }
+
+          const existing = items.find(
+            (item) => item.activityId === activity.id,
+          );
+          if (existing) {
+            if (existing.idempotencyKey === key) {
+              // Idempotent replay: the stored submission, nothing new stored.
+              return respondJson(existing, 200);
+            }
+            return respondError(409, {
+              code: 'CONFLICT',
+              message: 'Already submitted with another idempotency key.',
+              details: [
+                {
+                  field: 'idempotencyKey',
+                  messages: [
+                    'Already submitted with a different idempotency key.',
+                  ],
+                },
+              ],
+              correlationId: 'req-submissions-create-409-key',
+            });
+          }
+
+          if (activity.format !== 'FILE') {
+            return respondError(409, {
+              code: 'CONFLICT',
+              message: 'Not a file activity.',
+              details: [
+                { field: 'format', messages: ['Not a file activity.'] },
+              ],
+              correlationId: 'req-submissions-create-409-format',
+            });
+          }
+
+          if (activity.opensAt && now < activity.opensAt) {
+            return respondError(409, {
+              code: 'CONFLICT',
+              message: 'Submission window not open yet.',
+              details: [
+                {
+                  field: 'opensAt',
+                  messages: ['Submission window not open yet.'],
+                },
+              ],
+              correlationId: 'req-submissions-create-409-window',
+            });
+          }
+          const isLate = now > activity.dueAt;
+          if (isLate && !activity.allowLate) {
+            return respondError(409, {
+              code: 'CONFLICT',
+              message: 'Submission window closed.',
+              details: [
+                {
+                  field: 'dueAt',
+                  messages: ['Submission window closed.'],
+                },
+              ],
+              correlationId: 'req-submissions-create-409-closed',
+            });
+          }
+
+          const files = await readMultipartFiles(request);
+          if (files === null || files.length < 1 || files.length > 5) {
+            return respondError(400, {
+              code: 'BAD_REQUEST',
+              message: 'Between 1 and 5 files are required.',
+              correlationId: 'req-submissions-create-400-count',
+            });
+          }
+          const validatedFiles: { file: File; contentType: string }[] = [];
+          for (const [index, file] of files.entries()) {
+            if (file.size > fileSizeLimitBytes) {
+              return respondError(413, {
+                code: 'VALIDATION_FAILED',
+                message: 'A file exceeds the size limit.',
+                details: [
+                  {
+                    field: `files.${index}`,
+                    messages: ['A file exceeds the size limit.'],
+                  },
+                ],
+                correlationId: 'req-submissions-create-413',
+              });
+            }
+            const contentType = await sniffSubmissionContentType(file);
+            if (contentType === null) {
+              return respondError(400, {
+                code: 'VALIDATION_FAILED',
+                message: 'Disallowed file content.',
+                details: [
+                  {
+                    field: `files.${index}`,
+                    messages: ['Disallowed content type.'],
+                  },
+                ],
+                correlationId: 'req-submissions-create-400-type',
+              });
+            }
+            validatedFiles.push({ file, contentType });
+          }
+
+          const stored: SubmissionStoreItem = {
+            id: globalThis.crypto.randomUUID(),
+            activityId: activity.id,
+            submittedAt: now,
+            isLate,
+            status: 'submitted',
+            files: validatedFiles.map(({ file, contentType }, index) => ({
+              id: globalThis.crypto.randomUUID(),
+              originalName: file.name
+                .replace(/[\\/:*?"<>|]/g, '_')
+                .split('')
+                .map((character) => (character < ' ' ? '_' : character))
+                .join(''),
+              contentType,
+              sizeBytes: file.size,
+              position: index,
+            })),
+            idempotencyKey: key,
+          };
+          items.push(stored);
+
+          if (failure === 'drop-response') {
+            // The server stored the submission but the response was lost.
+            return HttpResponse.error();
+          }
+          return respondJson(stored, 201);
+        },
+      ),
+      http.get(
+        `${baseUrl}/activities/:activityId/submissions/me`,
+        ({ params }) => {
+          const failure = pending.readOwn;
+          pending.readOwn = undefined;
+          if (failure !== undefined) {
+            return fail(failure);
+          }
+
+          if (!activity || params.activityId !== activity.id) {
+            return respondError(404, {
+              code: 'NOT_FOUND',
+              message: 'Activity not found.',
+              correlationId: 'req-submissions-me-404-activity',
+            });
+          }
+          if (activity.state !== 'PUBLISHED') {
+            return respondError(404, {
+              code: 'NOT_FOUND',
+              message: 'Activity not found.',
+              correlationId: 'req-submissions-me-404-draft',
+            });
+          }
+          if (role !== 'STUDENT') {
+            return respondError(403, {
+              code: 'FORBIDDEN',
+              message: 'Only students can read their own submission.',
+              correlationId: 'req-submissions-me-403',
+            });
+          }
+
+          const found = items.find(
+            (item) => item.activityId === params.activityId,
+          );
+          if (!found) {
+            return respondError(404, {
+              code: 'NOT_FOUND',
+              message: 'Submission not found.',
+              correlationId: 'req-submissions-me-404-submission',
+            });
+          }
+
+          const downloadExpiresAt = new Date(
+            new Date(now).getTime() + 5 * 60 * 1000,
+          ).toISOString();
+          return respondJson(
+            {
+              id: found.id,
+              activityId: found.activityId,
+              submittedAt: found.submittedAt,
+              isLate: found.isLate,
+              status: found.status,
+              files: found.files.map((file) => ({
+                ...file,
+                downloadUrl: `https://storage.example.invalid/signed/${file.id}`,
+                downloadUrlExpiresAt: downloadExpiresAt,
+              })),
+            },
+            200,
+          );
+        },
+      ),
+    ],
+  };
+}
+
+export type TeacherActivityPayload =
+  components['schemas']['TeacherActivityResponseDto'];
+export type StudentActivityPayload =
+  components['schemas']['StudentActivityResponseDto'];
+export type ActivitySummaryPayload =
+  components['schemas']['ActivitySummaryDto'];
+export type CreateActivityRequestPayload =
+  components['schemas']['CreateActivityDto'];
+export type UpdateActivityRequestPayload =
+  components['schemas']['UpdateActivityDto'];
+export type PaginatedClassroomActivitiesPayload =
+  operations['ActivitiesController_list']['responses'][200]['content']['application/json'];
+
+function orderActivitySummaries(
+  items: readonly ActivitySummaryPayload[],
+  sort: string | null,
+): readonly ActivitySummaryPayload[] {
+  const descending = sort !== null && sort.startsWith('-');
+  const field = descending ? (sort as string).slice(1) : sort;
+  const comparable = [...items].sort((a, b) => {
+    if (field === 'createdAt') {
+      const byCreatedAt = a.createdAt.localeCompare(b.createdAt);
+      return byCreatedAt !== 0 ? byCreatedAt : a.id.localeCompare(b.id);
+    }
+    const byDueAt = a.dueAt.localeCompare(b.dueAt);
+    return byDueAt !== 0 ? byDueAt : a.id.localeCompare(b.id);
+  });
+  return descending ? [...comparable].reverse() : comparable;
+}
+
+export interface CreateClassroomActivitiesListHandlerOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly items?: readonly ActivitySummaryPayload[];
+  readonly page?: number;
+  readonly pageSize?: number;
+  readonly total?: number;
+  readonly error?: MswErrorResponseSpec | 'network';
+  readonly resolveResponse?: (args: {
+    readonly classroomId: string;
+    readonly page: number;
+    readonly pageSize: number;
+    readonly sort: string | null;
+    readonly state: 'DRAFT' | 'PUBLISHED' | null;
+    readonly request: Request;
+  }) => Response | void | Promise<Response | void>;
+  readonly onRequest?: (request: Request) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `GET /classrooms/{id}/activities`
+ * (`ActivitiesController_list`): paginated summaries without questions.
+ */
+export function createClassroomActivitiesListHandler(
+  options: CreateClassroomActivitiesListHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomSegment = options.classroomId ?? ':id';
+  return http.get(
+    `${baseUrl}/classrooms/${classroomSegment}/activities`,
+    async ({ params, request }) => {
+      await options.onRequest?.(request);
+
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+
+      const url = new URL(request.url);
+      const parsedPage = Number(
+        url.searchParams.get('page') ?? options.page ?? 1,
+      );
+      const parsedPageSize = Number(
+        url.searchParams.get('pageSize') ?? options.pageSize ?? 20,
+      );
+      const page =
+        Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+      const pageSize =
+        Number.isFinite(parsedPageSize) && parsedPageSize > 0
+          ? parsedPageSize
+          : 20;
+      const rawSort = url.searchParams.get('sort');
+      const sort =
+        rawSort === 'createdAt' ||
+        rawSort === '-createdAt' ||
+        rawSort === '-dueAt' ||
+        rawSort === null
+          ? rawSort
+          : 'dueAt';
+      const rawState = url.searchParams.get('state');
+      const state =
+        rawState === 'DRAFT' || rawState === 'PUBLISHED' ? rawState : null;
+
+      if (options.resolveResponse) {
+        const resolvedClassroomId =
+          options.classroomId ?? String(params.id ?? '');
+        const resolved = await options.resolveResponse({
+          classroomId: resolvedClassroomId,
+          page,
+          pageSize,
+          sort,
+          state,
+          request,
+        });
+        if (resolved !== undefined) {
+          return resolved instanceof Response
+            ? resolved
+            : HttpResponse.json(resolved, { status: 200 });
+        }
+      }
+
+      const filtered = (options.items ?? []).filter(
+        (item) => state === null || item.state === state,
+      );
+      const ordered = orderActivitySummaries(filtered, sort);
+      const start = (page - 1) * pageSize;
+      const payload: PaginatedClassroomActivitiesPayload = {
+        items: ordered.slice(start, start + pageSize),
+        page,
+        pageSize,
+        total: options.total ?? filtered.length,
+      };
+      return HttpResponse.json(payload, { status: 200 });
+    },
+  );
+}
+
+export interface CreateActivityDetailHandlerOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly activityId?: string;
+  /** Teacher view payload (includes `isCorrect` on every option). */
+  readonly activity?: TeacherActivityPayload;
+  /** Student view payload (never includes `isCorrect`). */
+  readonly student?: StudentActivityPayload;
+  readonly error?: MswErrorResponseSpec | 'network';
+  readonly resolveResponse?: (args: {
+    readonly classroomId: string;
+    readonly activityId: string;
+    readonly request: Request;
+  }) => Response | void | Promise<Response | void>;
+  readonly onRequest?: (request: Request) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `GET /classrooms/{id}/activities/{activityId}`
+ * (`ActivitiesController_get`): teacher view for staff, student view for
+ * students, decided by whichever payload the test provides.
+ */
+export function createActivityDetailHandler(
+  options: CreateActivityDetailHandlerOptions,
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomSegment = options.classroomId ?? ':id';
+  const activitySegment = options.activityId ?? ':activityId';
+  return http.get(
+    `${baseUrl}/classrooms/${classroomSegment}/activities/${activitySegment}`,
+    async ({ params, request }) => {
+      await options.onRequest?.(request);
+
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+
+      if (options.resolveResponse) {
+        const resolved = await options.resolveResponse({
+          classroomId: options.classroomId ?? String(params.id ?? ''),
+          activityId: options.activityId ?? String(params.activityId ?? ''),
+          request,
+        });
+        if (resolved instanceof Response) {
+          return resolved;
+        }
+      }
+
+      const payload =
+        options.student !== undefined ? options.student : options.activity;
+      return HttpResponse.json(payload, { status: 200 });
+    },
+  );
+}
+
+export interface CreateCreateActivityHandlerOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly activity?: TeacherActivityPayload;
+  readonly error?: MswErrorResponseSpec | 'network';
+  readonly resolveResponse?: (args: {
+    readonly classroomId: string;
+    readonly request: Request;
+    readonly body: CreateActivityRequestPayload;
+  }) => Response | void | Promise<Response | void>;
+  readonly onRequest?: (
+    request: Request,
+    body: CreateActivityRequestPayload,
+  ) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `POST /classrooms/{id}/activities`
+ * (`ActivitiesController_create`): echoes the created draft activity.
+ */
+export function createCreateActivityHandler(
+  options: CreateCreateActivityHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomSegment = options.classroomId ?? ':id';
+  return http.post(
+    `${baseUrl}/classrooms/${classroomSegment}/activities`,
+    async ({ params, request }) => {
+      const body = (await request.json()) as CreateActivityRequestPayload;
+      await options.onRequest?.(request, body);
+
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+
+      if (options.resolveResponse) {
+        const resolved = await options.resolveResponse({
+          classroomId: options.classroomId ?? String(params.id ?? ''),
+          request,
+          body,
+        });
+        if (resolved instanceof Response) {
+          return resolved;
+        }
+      }
+
+      return HttpResponse.json(options.activity, { status: 201 });
+    },
+  );
+}
+
+export interface CreateUpdateActivityHandlerOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly activityId?: string;
+  readonly activity?: TeacherActivityPayload;
+  readonly error?: MswErrorResponseSpec | 'network';
+  readonly resolveResponse?: (args: {
+    readonly classroomId: string;
+    readonly activityId: string;
+    readonly request: Request;
+    readonly body: UpdateActivityRequestPayload;
+  }) => Response | void | Promise<Response | void>;
+  readonly onRequest?: (
+    request: Request,
+    body: UpdateActivityRequestPayload,
+  ) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `PATCH /classrooms/{id}/activities/{activityId}`
+ * (`ActivitiesController_update`): `409` represents "questions can no longer
+ * change because a submission exists".
+ */
+export function createUpdateActivityHandler(
+  options: CreateUpdateActivityHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomSegment = options.classroomId ?? ':id';
+  const activitySegment = options.activityId ?? ':activityId';
+  return http.patch(
+    `${baseUrl}/classrooms/${classroomSegment}/activities/${activitySegment}`,
+    async ({ params, request }) => {
+      const body = (await request.json()) as UpdateActivityRequestPayload;
+      await options.onRequest?.(request, body);
+
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+
+      if (options.resolveResponse) {
+        const resolved = await options.resolveResponse({
+          classroomId: options.classroomId ?? String(params.id ?? ''),
+          activityId: options.activityId ?? String(params.activityId ?? ''),
+          request,
+          body,
+        });
+        if (resolved instanceof Response) {
+          return resolved;
+        }
+      }
+
+      return HttpResponse.json(options.activity, { status: 200 });
+    },
+  );
+}
+
+export interface CreatePublishActivityHandlerOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly activityId?: string;
+  readonly activity?: TeacherActivityPayload;
+  readonly error?: MswErrorResponseSpec | 'network';
+  readonly resolveResponse?: (args: {
+    readonly classroomId: string;
+    readonly activityId: string;
+    readonly request: Request;
+  }) => Response | void | Promise<Response | void>;
+  readonly onRequest?: (request: Request) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `POST /classrooms/{id}/activities/{activityId}/publish`
+ * (`ActivitiesController_publish`): `400` for not publishable (past `dueAt`,
+ * invalid questions) and `409` for already published.
+ */
+export function createPublishActivityHandler(
+  options: CreatePublishActivityHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomSegment = options.classroomId ?? ':id';
+  const activitySegment = options.activityId ?? ':activityId';
+  return http.post(
+    `${baseUrl}/classrooms/${classroomSegment}/activities/${activitySegment}/publish`,
+    async ({ params, request }) => {
+      await options.onRequest?.(request);
+
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+
+      if (options.resolveResponse) {
+        const resolved = await options.resolveResponse({
+          classroomId: options.classroomId ?? String(params.id ?? ''),
+          activityId: options.activityId ?? String(params.activityId ?? ''),
+          request,
+        });
+        if (resolved instanceof Response) {
+          return resolved;
+        }
+      }
+
+      return HttpResponse.json(options.activity, { status: 200 });
+    },
+  );
+}
+
+export interface CreateDeactivateActivityHandlerOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly activityId?: string;
+  readonly error?: MswErrorResponseSpec | 'network';
+  readonly resolveResponse?: (args: {
+    readonly classroomId: string;
+    readonly activityId: string;
+    readonly request: Request;
+  }) => Response | void | Promise<Response | void>;
+  readonly onRequest?: (request: Request) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `DELETE /classrooms/{id}/activities/{activityId}`
+ * (`ActivitiesController_deactivate`): logical deactivation; `409` means the
+ * activity has submissions and cannot be deleted.
+ */
+export function createDeactivateActivityHandler(
+  options: CreateDeactivateActivityHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomSegment = options.classroomId ?? ':id';
+  const activitySegment = options.activityId ?? ':activityId';
+  return http.delete(
+    `${baseUrl}/classrooms/${classroomSegment}/activities/${activitySegment}`,
+    async ({ params, request }) => {
+      await options.onRequest?.(request);
+
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+
+      if (options.resolveResponse) {
+        const resolved = await options.resolveResponse({
+          classroomId: options.classroomId ?? String(params.id ?? ''),
+          activityId: options.activityId ?? String(params.activityId ?? ''),
+          request,
+        });
+        if (resolved instanceof Response) {
+          return resolved;
+        }
+      }
+
+      return new HttpResponse(null, { status: 204 });
+    },
+  );
+}
+
+export interface NotificationStoreItem {
+  readonly id: string;
+  readonly kind:
+    | 'activity_published'
+    | 'grade_posted'
+    | 'announcement'
+    | 'mention'
+    | 'activity_forum_reply';
+  readonly resourceId: string;
+  readonly classroomId: string;
+  readonly studentId: string | null;
+  readonly readAt: string | null;
+  readonly createdAt: string;
+}
+
+export type NotificationStoreOp = 'list' | 'read' | 'readAll';
+export type NotificationStoreFailure =
+  MswErrorResponseSpec | 'network' | 'drop-response';
+
+export interface NotificationsStoreOptions {
+  readonly baseUrl?: string;
+  readonly initialItems?: readonly NotificationStoreItem[];
+  readonly readTimestamp?: string;
+}
+
+export interface NotificationsStore {
+  readonly handlers: readonly HttpHandler[];
+  getItems: () => readonly NotificationStoreItem[];
+  pushItem: (item: NotificationStoreItem) => void;
+  removeByClassroom: (classroomId: string) => void;
+  failNext: (
+    op: NotificationStoreOp,
+    failure: NotificationStoreFailure,
+  ) => void;
+}
+
+/**
+ * Stateful contract-faithful MSW store for in-app notifications
+ * (`NotificationsController_list`, `NotificationsController_read`,
+ * `NotificationsController_readAll`).
+ */
+export function createNotificationsStore(
+  options: NotificationsStoreOptions = {},
+): NotificationsStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const readTimestamp = options.readTimestamp ?? '2026-11-18T14:00:00.000Z';
+  let items: NotificationStoreItem[] = [...(options.initialItems ?? [])];
+  const pending: Partial<
+    Record<NotificationStoreOp, NotificationStoreFailure>
+  > = {};
+
+  const fail = (failure: NotificationStoreFailure): Response => {
+    if (failure === 'network' || failure === 'drop-response') {
+      return HttpResponse.error();
+    }
+    return createErrorEnvelopeResponse(failure.status, failure.body);
+  };
+
+  return {
+    getItems: () => items,
+    pushItem: (item) => {
+      items = [item, ...items.filter((existing) => existing.id !== item.id)];
+    },
+    removeByClassroom: (classroomId) => {
+      items = items.filter((item) => item.classroomId !== classroomId);
+    },
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    handlers: [
+      http.get(`${baseUrl}/notifications`, ({ request }) => {
+        const failure = pending.list;
+        pending.list = undefined;
+        if (failure !== undefined) {
+          return fail(failure);
+        }
+
+        const url = new URL(request.url);
+        const page = Math.max(1, Number(url.searchParams.get('page') ?? 1));
+        const pageSize = Math.min(
+          100,
+          Math.max(1, Number(url.searchParams.get('pageSize') ?? 20)),
+        );
+        const ordered = [...items].sort((a, b) =>
+          b.createdAt.localeCompare(a.createdAt),
+        );
+        const start = (page - 1) * pageSize;
+        return HttpResponse.json({
+          items: ordered.slice(start, start + pageSize),
+          page,
+          pageSize,
+          total: ordered.length,
+        });
+      }),
+      http.patch(`${baseUrl}/notifications/read-all`, () => {
+        const failure = pending.readAll;
+        pending.readAll = undefined;
+        if (failure !== undefined && failure !== 'drop-response') {
+          return fail(failure);
+        }
+
+        let updated = 0;
+        items = items.map((item) => {
+          if (item.readAt !== null) {
+            return item;
+          }
+          updated += 1;
+          return { ...item, readAt: readTimestamp };
+        });
+
+        return failure === 'drop-response'
+          ? HttpResponse.error()
+          : HttpResponse.json({ updated });
+      }),
+      http.patch(`${baseUrl}/notifications/:id/read`, ({ params }) => {
+        const failure = pending.read;
+        pending.read = undefined;
+        if (failure !== undefined && failure !== 'drop-response') {
+          return fail(failure);
+        }
+
+        const index = items.findIndex((item) => item.id === params.id);
+        if (index === -1) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Notification not found.',
+            correlationId: 'req-notifications-read-404',
+          });
+        }
+
+        const existing = items[index];
+        const next: NotificationStoreItem =
+          existing.readAt !== null
+            ? existing
+            : { ...existing, readAt: readTimestamp };
+        items = items.map((item, idx) => (idx === index ? next : item));
+
+        return failure === 'drop-response'
+          ? HttpResponse.error()
+          : HttpResponse.json(next);
+      }),
+    ],
+  };
+}
+
+export interface GradingStoreFile {
+  readonly id: string;
+  readonly originalName: string;
+  readonly contentType: string;
+  readonly sizeBytes: number;
+  readonly position: number;
+  readonly downloadUrl?: string;
+  readonly downloadUrlExpiresAt?: string;
+}
+
+export interface GradingStoreGrade {
+  readonly id: string;
+  readonly graderId: string;
+  readonly score: number;
+  readonly feedback: string;
+  readonly pointsAwarded: number;
+  readonly pointTransactionId: string | null;
+  readonly version: number;
+  readonly gradedAt: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface GradingStoreSubmission {
+  readonly id: string;
+  readonly classroomId: string;
+  readonly activityId: string;
+  readonly activityTitle: string;
+  readonly activityType: 'TP' | 'EXAM';
+  readonly activityFormat?: 'FILE' | 'MULTIPLE_CHOICE';
+  readonly maxScore?: number;
+  readonly weightMultiplier?: number;
+  readonly studentId: string;
+  readonly studentDisplayName: string;
+  readonly submittedAt: string;
+  readonly isLate: boolean;
+  readonly studentActive?: boolean;
+  readonly files: readonly GradingStoreFile[];
+  readonly grade: GradingStoreGrade | null;
+}
+
+export type GradingStoreOp =
+  'queue' | 'detail' | 'getGrade' | 'grade' | 'regrade';
+
+export type GradingStoreFailure =
+  MswErrorResponseSpec | 'network' | 'drop-response' | 'malformed-2xx';
+
+export interface ClassroomGradingStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId: string;
+  readonly graderId?: string;
+  readonly initialSubmissions?: readonly GradingStoreSubmission[];
+  readonly allowedRoles?: readonly string[];
+  readonly role?: string;
+}
+
+export interface ClassroomGradingStore {
+  readonly handlers: readonly HttpHandler[];
+  getSubmissions: () => readonly GradingStoreSubmission[];
+  setRole: (role: string) => void;
+  setGradeExternally: (submissionId: string, grade: GradingStoreGrade) => void;
+  removeSubmission: (submissionId: string) => void;
+  failNext: (op: GradingStoreOp, failure: GradingStoreFailure) => void;
+  getCounts: () => Record<GradingStoreOp, number>;
+}
+
+/**
+ * Stateful contract-faithful MSW store for teacher grading (`HU-ACT-004`,
+ * backend D18): `GET /classrooms/:id/submissions`, `GET /submissions/:id`, and
+ * `GET`/`POST`/`PATCH /submissions/:id/grade`.
+ */
+export function createClassroomGradingStore(
+  options: ClassroomGradingStoreOptions,
+): ClassroomGradingStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const graderId = options.graderId ?? '00000000-0000-4000-8000-000000000001';
+  let currentRole = options.role ?? 'TEACHER';
+  const staffRoles = new Set(
+    options.allowedRoles ?? ['SCHOOL_OWNER', 'ADMIN', 'TEACHER'],
+  );
+
+  let submissions: GradingStoreSubmission[] = [
+    ...(options.initialSubmissions ?? []),
+  ];
+  let linkGeneration = 0;
+  let gradeSequence = 100;
+  const pending: Partial<Record<GradingStoreOp, GradingStoreFailure>> = {};
+  const counts: Record<GradingStoreOp, number> = {
+    queue: 0,
+    detail: 0,
+    getGrade: 0,
+    grade: 0,
+    regrade: 0,
+  };
+
+  const computeServerPoints = (score: number, weightMultiplier = 1): number =>
+    Math.max(0, Math.round(score * weightMultiplier));
+
+  const consumeFailure = (
+    op: GradingStoreOp,
+  ): GradingStoreFailure | undefined => {
+    const failure = pending[op];
+    pending[op] = undefined;
+    return failure;
+  };
+
+  const respondFailure = (failure: GradingStoreFailure): Response => {
+    if (failure === 'network' || failure === 'drop-response') {
+      return HttpResponse.error();
+    }
+    if (failure === 'malformed-2xx') {
+      return HttpResponse.json({ unexpected: true }, { status: 200 });
+    }
+    return createErrorEnvelopeResponse(failure.status, failure.body);
+  };
+
+  return {
+    getSubmissions: () => submissions,
+    setRole: (role) => {
+      currentRole = role;
+    },
+    setGradeExternally: (submissionId, grade) => {
+      submissions = submissions.map((item) =>
+        item.id === submissionId ? { ...item, grade } : item,
+      );
+    },
+    removeSubmission: (submissionId) => {
+      submissions = submissions.filter((item) => item.id !== submissionId);
+    },
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    getCounts: () => ({ ...counts }),
+    handlers: [
+      http.get(
+        `${baseUrl}/classrooms/:id/submissions`,
+        ({ params, request }) => {
+          counts.queue += 1;
+          const failure = consumeFailure('queue');
+          if (failure !== undefined) {
+            return respondFailure(failure);
+          }
+
+          const requestedClassroomId = String(params.id ?? '');
+          if (requestedClassroomId !== options.classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-grading-queue-404',
+            });
+          }
+
+          if (!staffRoles.has(currentRole)) {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Staff role required.',
+              correlationId: 'req-grading-queue-403',
+            });
+          }
+
+          const url = new URL(request.url);
+          const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+          const pageSize = Math.min(
+            100,
+            Math.max(1, Number(url.searchParams.get('pageSize') ?? '20')),
+          );
+          const activityId = url.searchParams.get('activityId') ?? '';
+          const state = url.searchParams.get('state') ?? '';
+          const sort = url.searchParams.get('sort') ?? 'submittedAt';
+
+          let filtered = submissions.filter(
+            (item) =>
+              item.classroomId === requestedClassroomId &&
+              item.studentActive !== false,
+          );
+          if (activityId) {
+            filtered = filtered.filter(
+              (item) => item.activityId === activityId,
+            );
+          }
+          if (state === 'submitted') {
+            filtered = filtered.filter((item) => item.grade === null);
+          } else if (state === 'graded') {
+            filtered = filtered.filter((item) => item.grade !== null);
+          }
+
+          const sorted = [...filtered].sort((a, b) => {
+            if (sort === '-submittedAt') {
+              const diff =
+                Date.parse(b.submittedAt) - Date.parse(a.submittedAt);
+              return diff !== 0 ? diff : a.id.localeCompare(b.id);
+            }
+            if (sort === 'gradedAt' || sort === '-gradedAt') {
+              const aGraded = a.grade ? Date.parse(a.grade.gradedAt) : null;
+              const bGraded = b.grade ? Date.parse(b.grade.gradedAt) : null;
+              if (aGraded === null && bGraded === null) {
+                return a.id.localeCompare(b.id);
+              }
+              if (aGraded === null) return 1;
+              if (bGraded === null) return -1;
+              const diff =
+                sort === '-gradedAt' ? bGraded - aGraded : aGraded - bGraded;
+              return diff !== 0 ? diff : a.id.localeCompare(b.id);
+            }
+            const diff = Date.parse(a.submittedAt) - Date.parse(b.submittedAt);
+            return diff !== 0 ? diff : a.id.localeCompare(b.id);
+          });
+
+          const start = (page - 1) * pageSize;
+          const items = sorted.slice(start, start + pageSize).map((item) => ({
+            id: item.id,
+            activityId: item.activityId,
+            activityTitle: item.activityTitle,
+            activityType: item.activityType,
+            studentId: item.studentId,
+            studentDisplayName: item.studentDisplayName,
+            submittedAt: item.submittedAt,
+            isLate: item.isLate,
+            status: item.grade ? ('graded' as const) : ('submitted' as const),
+            fileCount: item.files.length,
+            grade: item.grade
+              ? {
+                  id: item.grade.id,
+                  graderId: item.grade.graderId,
+                  score: item.grade.score,
+                  feedback: item.grade.feedback,
+                  pointsAwarded: item.grade.pointsAwarded,
+                  version: item.grade.version,
+                  gradedAt: item.grade.gradedAt,
+                }
+              : null,
+          }));
+
+          return HttpResponse.json({
+            items,
+            page,
+            pageSize,
+            total: sorted.length,
+          });
+        },
+      ),
+      http.get(`${baseUrl}/submissions/:submissionId`, ({ params }) => {
+        counts.detail += 1;
+        const failure = consumeFailure('detail');
+        if (failure !== undefined) {
+          return respondFailure(failure);
+        }
+
+        const submission = submissions.find(
+          (item) =>
+            item.id === params.submissionId &&
+            item.classroomId === options.classroomId,
+        );
+        if (!submission || !staffRoles.has(currentRole)) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Submission not found.',
+            correlationId: 'req-submission-detail-404',
+          });
+        }
+
+        linkGeneration += 1;
+        return HttpResponse.json(
+          {
+            id: submission.id,
+            activityId: submission.activityId,
+            submittedAt: submission.submittedAt,
+            isLate: submission.isLate,
+            status: submission.grade ? 'graded' : 'submitted',
+            files: submission.files.map((file) => ({
+              id: file.id,
+              originalName: file.originalName,
+              contentType: file.contentType,
+              sizeBytes: file.sizeBytes,
+              position: file.position,
+              downloadUrl:
+                file.downloadUrl ??
+                `https://storage.example.invalid/signed/${submission.id}/${file.id}?sig=v${linkGeneration}`,
+              downloadUrlExpiresAt:
+                file.downloadUrlExpiresAt ?? '2026-11-19T18:00:00.000Z',
+            })),
+          },
+          { headers: { 'Cache-Control': 'no-store' } },
+        );
+      }),
+      http.get(`${baseUrl}/submissions/:submissionId/grade`, ({ params }) => {
+        counts.getGrade += 1;
+        const failure = consumeFailure('getGrade');
+        if (failure !== undefined) {
+          return respondFailure(failure);
+        }
+
+        const submission = submissions.find(
+          (item) =>
+            item.id === params.submissionId &&
+            item.classroomId === options.classroomId,
+        );
+        if (!submission || !submission.grade) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Grade not found.',
+            correlationId: 'req-grade-get-404',
+          });
+        }
+        return HttpResponse.json({
+          ...submission.grade,
+          submissionId: submission.id,
+          activityId: submission.activityId,
+          studentId: submission.studentId,
+        });
+      }),
+      http.post(
+        `${baseUrl}/submissions/:submissionId/grade`,
+        async ({ params, request }) => {
+          counts.grade += 1;
+          const failure = consumeFailure('grade');
+          if (
+            failure !== undefined &&
+            failure !== 'drop-response' &&
+            failure !== 'malformed-2xx'
+          ) {
+            return respondFailure(failure);
+          }
+
+          if (!staffRoles.has(currentRole)) {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Staff role required.',
+              correlationId: 'req-grade-post-403',
+            });
+          }
+
+          const submission = submissions.find(
+            (item) =>
+              item.id === params.submissionId &&
+              item.classroomId === options.classroomId,
+          );
+          if (!submission) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Submission not found.',
+              correlationId: 'req-grade-post-404',
+            });
+          }
+          if (submission.activityFormat === 'MULTIPLE_CHOICE') {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message: 'Only file submissions can be graded manually.',
+              details: [
+                {
+                  field: 'activity',
+                  messages: ['Only file submissions can be graded manually'],
+                },
+              ],
+              correlationId: 'req-grade-post-409-activity',
+            });
+          }
+          if (submission.grade !== null || submission.studentActive === false) {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message: 'Submission cannot be graded.',
+              details: [
+                {
+                  field: 'submission',
+                  messages: ['Submission already graded or student inactive'],
+                },
+              ],
+              correlationId: 'req-grade-post-409-submission',
+            });
+          }
+
+          const body = (await request.json()) as {
+            score?: unknown;
+            feedback?: unknown;
+          };
+          const maxScore = submission.maxScore ?? 100;
+          if (
+            typeof body.score !== 'number' ||
+            !Number.isInteger(body.score) ||
+            body.score < 0 ||
+            body.score > 100 ||
+            body.score > maxScore
+          ) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid score.',
+              details: [
+                {
+                  field: 'score',
+                  messages: [
+                    `Score must be an integer between 0 and ${maxScore}`,
+                  ],
+                },
+              ],
+              correlationId: 'req-grade-post-400-score',
+            });
+          }
+          if (
+            typeof body.feedback !== 'string' ||
+            body.feedback.trim().length === 0 ||
+            /[\p{Cc}\p{Zl}\p{Zp}]/u.test(body.feedback)
+          ) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid feedback.',
+              details: [
+                {
+                  field: 'feedback',
+                  messages: ['Feedback must be visible single-line text'],
+                },
+              ],
+              correlationId: 'req-grade-post-400-feedback',
+            });
+          }
+
+          gradeSequence += 1;
+          const now = '2026-11-18T16:30:00.000Z';
+          const nextGrade: GradingStoreGrade = {
+            id: `00000000-0000-4000-8000-00000000${String(gradeSequence).padStart(4, '0')}`,
+            graderId,
+            score: body.score,
+            feedback: body.feedback.trim(),
+            pointsAwarded: computeServerPoints(
+              body.score,
+              submission.weightMultiplier ?? 1,
+            ),
+            pointTransactionId: `00000000-0000-4000-8000-10000000${String(gradeSequence).padStart(4, '0')}`,
+            version: 1,
+            gradedAt: now,
+            createdAt: now,
+            updatedAt: now,
+          };
+
+          submissions = submissions.map((item) =>
+            item.id === submission.id ? { ...item, grade: nextGrade } : item,
+          );
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+          if (failure === 'malformed-2xx') {
+            return HttpResponse.json({ broken: true }, { status: 201 });
+          }
+
+          return HttpResponse.json(
+            {
+              ...nextGrade,
+              submissionId: submission.id,
+              activityId: submission.activityId,
+              studentId: submission.studentId,
+            },
+            { status: 201 },
+          );
+        },
+      ),
+      http.patch(
+        `${baseUrl}/submissions/:submissionId/grade`,
+        async ({ params, request }) => {
+          counts.regrade += 1;
+          const failure = consumeFailure('regrade');
+          if (
+            failure !== undefined &&
+            failure !== 'drop-response' &&
+            failure !== 'malformed-2xx'
+          ) {
+            return respondFailure(failure);
+          }
+
+          if (!staffRoles.has(currentRole)) {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Staff role required.',
+              correlationId: 'req-grade-patch-403',
+            });
+          }
+
+          const submission = submissions.find(
+            (item) =>
+              item.id === params.submissionId &&
+              item.classroomId === options.classroomId,
+          );
+          if (!submission || !submission.grade) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Grade not found.',
+              correlationId: 'req-grade-patch-404',
+            });
+          }
+          if (submission.studentActive === false) {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message: 'Student is no longer active.',
+              details: [
+                {
+                  field: 'submission',
+                  messages: ['Student is no longer active in classroom'],
+                },
+              ],
+              correlationId: 'req-grade-patch-409-submission',
+            });
+          }
+
+          const body = (await request.json()) as {
+            score?: unknown;
+            feedback?: unknown;
+            version?: unknown;
+          };
+
+          if (body.version !== submission.grade.version) {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message: 'Grade version mismatch.',
+              details: [
+                {
+                  field: 'version',
+                  messages: ['Grade was modified by another request'],
+                },
+              ],
+              correlationId: 'req-grade-patch-409-version',
+            });
+          }
+
+          const maxScore = submission.maxScore ?? 100;
+          if (
+            typeof body.score !== 'number' ||
+            !Number.isInteger(body.score) ||
+            body.score < 0 ||
+            body.score > 100 ||
+            (body.score !== submission.grade.score && body.score > maxScore)
+          ) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid score.',
+              details: [
+                {
+                  field: 'score',
+                  messages: [
+                    `Score must be an integer between 0 and ${maxScore}`,
+                  ],
+                },
+              ],
+              correlationId: 'req-grade-patch-400-score',
+            });
+          }
+          if (
+            typeof body.feedback !== 'string' ||
+            body.feedback.trim().length === 0 ||
+            /[\p{Cc}\p{Zl}\p{Zp}]/u.test(body.feedback)
+          ) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid feedback.',
+              details: [
+                {
+                  field: 'feedback',
+                  messages: ['Feedback must be visible single-line text'],
+                },
+              ],
+              correlationId: 'req-grade-patch-400-feedback',
+            });
+          }
+
+          const trimmedFeedback = body.feedback.trim();
+          const unchanged =
+            body.score === submission.grade.score &&
+            trimmedFeedback === submission.grade.feedback;
+
+          const now = '2026-11-18T17:15:00.000Z';
+          const nextGrade: GradingStoreGrade = unchanged
+            ? submission.grade
+            : {
+                ...submission.grade,
+                score: body.score,
+                feedback: trimmedFeedback,
+                pointsAwarded: computeServerPoints(
+                  body.score,
+                  submission.weightMultiplier ?? 1,
+                ),
+                version: submission.grade.version + 1,
+                gradedAt: now,
+                updatedAt: now,
+              };
+
+          submissions = submissions.map((item) =>
+            item.id === submission.id ? { ...item, grade: nextGrade } : item,
+          );
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+          if (failure === 'malformed-2xx') {
+            return HttpResponse.json({ broken: true }, { status: 200 });
+          }
+
+          return HttpResponse.json({
+            ...nextGrade,
+            submissionId: submission.id,
+            activityId: submission.activityId,
+            studentId: submission.studentId,
+          });
+        },
+      ),
+    ],
+  };
+}
+
+export type ShopStoreItemKind =
+  'CLASSROOM_ITEM' | 'AVATAR_ACCESSORY' | 'DESK_UPGRADE' | 'PET_ACCESSORY';
+
+export interface ShopStoreCatalogItem {
+  readonly id: string;
+  readonly code: string;
+  readonly name: string;
+  readonly description: string;
+  readonly kind: ShopStoreItemKind;
+  readonly price: number;
+  readonly isImplemented: boolean;
+  readonly ownedByStudent?: boolean;
+  readonly ownedByClassroom?: boolean;
+  readonly metadata?: Record<string, unknown>;
+  readonly createdAt: string;
+}
+
+export interface ShopStorePurchase {
+  readonly id: string;
+  readonly classroomId: string;
+  readonly studentId: string;
+  readonly shopItemId: string;
+  readonly shopItemCode: string;
+  readonly shopItemName: string;
+  readonly shopItemKind: ShopStoreItemKind;
+  readonly pointTransactionId: string;
+  readonly pricePaid: number;
+  readonly createdAt: string;
+}
+
+export type ShopStoreOp = 'items' | 'purchases' | 'purchase' | 'wallet';
+
+export type ShopStoreFailure =
+  MswErrorResponseSpec | 'network' | 'drop-response' | 'malformed-2xx';
+
+export interface ClassroomShopStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId: string;
+  readonly studentId?: string;
+  readonly role?: string;
+  readonly initialBalance?: number;
+  readonly initialItems?: readonly ShopStoreCatalogItem[];
+  readonly initialPurchases?: readonly ShopStorePurchase[];
+  readonly purchaseDelayMs?: number;
+}
+
+export interface ClassroomShopStore {
+  readonly handlers: readonly HttpHandler[];
+  getBalance: () => number;
+  setBalance: (balance: number) => void;
+  setRole: (role: string) => void;
+  removeItem: (shopItemId: string) => void;
+  markOwnedExternally: (shopItemId: string) => void;
+  failNext: (op: ShopStoreOp, failure: ShopStoreFailure) => void;
+  getCounts: () => Record<ShopStoreOp, number>;
+  getReceivedIdempotencyKeys: () => readonly string[];
+}
+
+/**
+ * Stateful contract-faithful MSW store for classroom shop (`HU-GAM-003`,
+ * backend `#34`) plus synchronized `GET /classrooms/:id/points` wallet view.
+ */
+export function createClassroomShopStore(
+  options: ClassroomShopStoreOptions,
+): ClassroomShopStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const studentId = options.studentId ?? '00000000-0000-4000-8000-000000007001';
+  let currentRole = options.role ?? 'STUDENT';
+  let balance = options.initialBalance ?? 250;
+  let items: ShopStoreCatalogItem[] = [...(options.initialItems ?? [])];
+  let purchases: ShopStorePurchase[] = [...(options.initialPurchases ?? [])];
+  let purchaseSeq = 100;
+
+  const idempotencyRecords = new Map<
+    string,
+    {
+      readonly shopItemId: string;
+      readonly purchase: ShopStorePurchase;
+      readonly classroomItem: {
+        readonly id: string;
+        readonly classroomId: string;
+        readonly shopItemId: string;
+        readonly purchaseId: string;
+        readonly state: 'ACTIVE';
+        readonly createdAt: string;
+      } | null;
+      readonly balanceAfter: number;
+    }
+  >();
+
+  const pending: Partial<Record<ShopStoreOp, ShopStoreFailure>> = {};
+  const counts: Record<ShopStoreOp, number> = {
+    items: 0,
+    purchases: 0,
+    purchase: 0,
+    wallet: 0,
+  };
+  const receivedKeys: string[] = [];
+
+  const consumeFailure = (op: ShopStoreOp): ShopStoreFailure | undefined => {
+    const failure = pending[op];
+    pending[op] = undefined;
+    return failure;
+  };
+
+  const respondFailure = (failure: ShopStoreFailure): Response => {
+    if (failure === 'network' || failure === 'drop-response') {
+      return HttpResponse.error();
+    }
+    if (failure === 'malformed-2xx') {
+      return HttpResponse.json({ broken: true }, { status: 200 });
+    }
+    return createErrorEnvelopeResponse(failure.status, failure.body);
+  };
+
+  const toCatalogDto = (item: ShopStoreCatalogItem) => {
+    const ownedByStudent = Boolean(item.ownedByStudent);
+    const ownedByClassroom = Boolean(item.ownedByClassroom);
+    const isPurchasable =
+      item.isImplemented &&
+      !ownedByStudent &&
+      !(item.kind === 'CLASSROOM_ITEM' && ownedByClassroom);
+    return {
+      id: item.id,
+      code: item.code,
+      name: item.name,
+      description: item.description,
+      kind: item.kind,
+      price: item.price,
+      isImplemented: item.isImplemented,
+      isPurchasable,
+      ownedByStudent,
+      ownedByClassroom,
+      metadata: item.metadata ?? {},
+      createdAt: item.createdAt,
+    };
+  };
+
+  return {
+    getBalance: () => balance,
+    setBalance: (next) => {
+      balance = Math.max(0, next);
+    },
+    setRole: (role) => {
+      currentRole = role;
+    },
+    removeItem: (shopItemId) => {
+      items = items.filter((item) => item.id !== shopItemId);
+    },
+    markOwnedExternally: (shopItemId) => {
+      items = items.map((item) =>
+        item.id === shopItemId
+          ? {
+              ...item,
+              ownedByStudent: true,
+              ownedByClassroom:
+                item.kind === 'CLASSROOM_ITEM' ? true : item.ownedByClassroom,
+            }
+          : item,
+      );
+    },
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    getCounts: () => ({ ...counts }),
+    getReceivedIdempotencyKeys: () => [...receivedKeys],
+    handlers: [
+      http.get(`${baseUrl}/classrooms/:id/points`, ({ params }) => {
+        counts.wallet += 1;
+        const failure = consumeFailure('wallet');
+        if (failure !== undefined) {
+          return respondFailure(failure);
+        }
+        if (String(params.id ?? '') !== options.classroomId) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Classroom not found.',
+            correlationId: 'req-shop-wallet-404',
+          });
+        }
+        if (currentRole !== 'STUDENT') {
+          return createErrorEnvelopeResponse(403, {
+            code: 'FORBIDDEN',
+            message: 'Student role required.',
+            correlationId: 'req-shop-wallet-403',
+          });
+        }
+        return HttpResponse.json({
+          classroomId: options.classroomId,
+          studentId,
+          balance,
+          items: purchases.map((p) => ({
+            id: p.pointTransactionId,
+            entryKind: 'DEBIT',
+            amount: -p.pricePaid,
+            sourceType: 'SHOP_PURCHASE',
+            sourceId: p.id,
+            reason: `Compra en tienda: ${p.shopItemName}`,
+            actorId: studentId,
+            createdAt: p.createdAt,
+          })),
+          page: 1,
+          pageSize: 20,
+          total: purchases.length,
+        });
+      }),
+      http.get(
+        `${baseUrl}/classrooms/:id/shop/items`,
+        ({ params, request }) => {
+          counts.items += 1;
+          const failure = consumeFailure('items');
+          if (failure !== undefined) {
+            return respondFailure(failure);
+          }
+          if (String(params.id ?? '') !== options.classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-shop-items-404',
+            });
+          }
+          if (currentRole !== 'STUDENT') {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Student role required.',
+              correlationId: 'req-shop-items-403',
+            });
+          }
+
+          const url = new URL(request.url);
+          const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+          const pageSize = Math.min(
+            100,
+            Math.max(1, Number(url.searchParams.get('pageSize') ?? '20')),
+          );
+          const kind = url.searchParams.get('kind') ?? '';
+          const sort = url.searchParams.get('sort') ?? 'createdAt';
+          const allowedSorts = new Set([
+            'createdAt',
+            '-createdAt',
+            'defaultPrice',
+            '-defaultPrice',
+            'name',
+            '-name',
+          ]);
+          if (!allowedSorts.has(sort)) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid sort parameter.',
+              details: [{ field: 'sort', messages: ['Invalid sort field'] }],
+              correlationId: 'req-shop-items-400',
+            });
+          }
+
+          let filtered = [...items];
+          if (kind) {
+            filtered = filtered.filter((item) => item.kind === kind);
+          }
+
+          const sorted = filtered.sort((a, b) => {
+            if (sort === 'defaultPrice') {
+              return a.price - b.price || a.id.localeCompare(b.id);
+            }
+            if (sort === '-defaultPrice') {
+              return b.price - a.price || a.id.localeCompare(b.id);
+            }
+            if (sort === 'name') {
+              return a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+            }
+            if (sort === '-name') {
+              return b.name.localeCompare(a.name) || a.id.localeCompare(b.id);
+            }
+            if (sort === '-createdAt') {
+              return (
+                Date.parse(b.createdAt) - Date.parse(a.createdAt) ||
+                a.id.localeCompare(b.id)
+              );
+            }
+            return (
+              Date.parse(a.createdAt) - Date.parse(b.createdAt) ||
+              a.id.localeCompare(b.id)
+            );
+          });
+
+          const start = (page - 1) * pageSize;
+          return HttpResponse.json({
+            items: sorted.slice(start, start + pageSize).map(toCatalogDto),
+            page,
+            pageSize,
+            total: sorted.length,
+          });
+        },
+      ),
+      http.get(
+        `${baseUrl}/classrooms/:id/shop/purchases`,
+        ({ params, request }) => {
+          counts.purchases += 1;
+          const failure = consumeFailure('purchases');
+          if (failure !== undefined) {
+            return respondFailure(failure);
+          }
+          if (String(params.id ?? '') !== options.classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-shop-purchases-404',
+            });
+          }
+          if (currentRole !== 'STUDENT') {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Student role required.',
+              correlationId: 'req-shop-purchases-403',
+            });
+          }
+
+          const url = new URL(request.url);
+          const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+          const pageSize = Math.min(
+            100,
+            Math.max(1, Number(url.searchParams.get('pageSize') ?? '20')),
+          );
+          const sorted = [...purchases].sort(
+            (a, b) =>
+              Date.parse(b.createdAt) - Date.parse(a.createdAt) ||
+              a.id.localeCompare(b.id),
+          );
+          const start = (page - 1) * pageSize;
+          return HttpResponse.json({
+            items: sorted.slice(start, start + pageSize),
+            page,
+            pageSize,
+            total: sorted.length,
+          });
+        },
+      ),
+      http.post(
+        `${baseUrl}/classrooms/:id/shop/purchase`,
+        async ({ params, request }) => {
+          counts.purchase += 1;
+          if (options.purchaseDelayMs) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, options.purchaseDelayMs),
+            );
+          }
+
+          const key = request.headers.get('Idempotency-Key')?.trim() ?? '';
+          if (key) {
+            receivedKeys.push(key);
+          }
+
+          const failure = consumeFailure('purchase');
+          if (
+            failure !== undefined &&
+            failure !== 'drop-response' &&
+            failure !== 'malformed-2xx'
+          ) {
+            return respondFailure(failure);
+          }
+
+          if (String(params.id ?? '') !== options.classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-shop-purchase-404',
+            });
+          }
+          if (currentRole !== 'STUDENT') {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Student role required.',
+              correlationId: 'req-shop-purchase-403',
+            });
+          }
+          if (!key || key.length > 128) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Idempotency-Key header is required.',
+              details: [
+                {
+                  field: 'idempotency-key',
+                  messages: ['Idempotency-Key header is required'],
+                },
+              ],
+              correlationId: 'req-shop-purchase-400-key',
+            });
+          }
+
+          const body = (await request.json()) as Record<string, unknown>;
+          const extraKeys = Object.keys(body).filter((k) => k !== 'shopItemId');
+          if (
+            extraKeys.length > 0 ||
+            typeof body.shopItemId !== 'string' ||
+            body.shopItemId.trim().length === 0
+          ) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'Invalid purchase payload.',
+              details: [
+                { field: 'shopItemId', messages: ['Invalid shopItemId'] },
+              ],
+              correlationId: 'req-shop-purchase-400-body',
+            });
+          }
+
+          const shopItemId = body.shopItemId;
+          const existingRecord = idempotencyRecords.get(key);
+          if (existingRecord) {
+            if (existingRecord.shopItemId !== shopItemId) {
+              return createErrorEnvelopeResponse(409, {
+                code: 'CONFLICT',
+                message: 'Conflict.',
+                correlationId: 'req-shop-purchase-409-key-mismatch',
+              });
+            }
+            return HttpResponse.json(
+              {
+                purchase: existingRecord.purchase,
+                classroomItem: existingRecord.classroomItem,
+                balance,
+                replayed: true,
+              },
+              { status: 200 },
+            );
+          }
+
+          const item = items.find((entry) => entry.id === shopItemId);
+          if (!item) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Item not found.',
+              correlationId: 'req-shop-purchase-404-item',
+            });
+          }
+
+          if (
+            !item.isImplemented ||
+            item.ownedByStudent ||
+            (item.kind === 'CLASSROOM_ITEM' && item.ownedByClassroom) ||
+            balance < item.price
+          ) {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message: 'Conflict.',
+              correlationId: 'req-shop-purchase-409',
+            });
+          }
+
+          purchaseSeq += 1;
+          const now = '2026-11-19T02:30:00.000Z';
+          const purchaseId = `00000000-0000-4000-8000-20000000${String(purchaseSeq).padStart(4, '0')}`;
+          const txId = `00000000-0000-4000-8000-30000000${String(purchaseSeq).padStart(4, '0')}`;
+
+          balance -= item.price;
+          items = items.map((entry) =>
+            entry.id === item.id
+              ? {
+                  ...entry,
+                  ownedByStudent: true,
+                  ownedByClassroom:
+                    entry.kind === 'CLASSROOM_ITEM'
+                      ? true
+                      : entry.ownedByClassroom,
+                }
+              : entry,
+          );
+
+          const purchase: ShopStorePurchase = {
+            id: purchaseId,
+            classroomId: options.classroomId,
+            studentId,
+            shopItemId: item.id,
+            shopItemCode: item.code,
+            shopItemName: item.name,
+            shopItemKind: item.kind,
+            pointTransactionId: txId,
+            pricePaid: item.price,
+            createdAt: now,
+          };
+          purchases = [purchase, ...purchases];
+
+          const classroomItem =
+            item.kind === 'CLASSROOM_ITEM'
+              ? {
+                  id: `00000000-0000-4000-8000-40000000${String(purchaseSeq).padStart(4, '0')}`,
+                  classroomId: options.classroomId,
+                  shopItemId: item.id,
+                  purchaseId,
+                  state: 'ACTIVE' as const,
+                  createdAt: now,
+                }
+              : null;
+
+          idempotencyRecords.set(key, {
+            shopItemId,
+            purchase,
+            classroomItem,
+            balanceAfter: balance,
+          });
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+          if (failure === 'malformed-2xx') {
+            return HttpResponse.json({ broken: true }, { status: 201 });
+          }
+
+          return HttpResponse.json(
+            {
+              purchase,
+              classroomItem,
+              balance,
+              replayed: false,
+            },
+            { status: 201 },
+          );
+        },
+      ),
+    ],
+  };
+}
+
+export const defaultHandlers: readonly HttpHandler[] = [
+  createHealthHandler(),
+  http.get(`${TEST_API_BASE_URL}/notifications`, () =>
+    HttpResponse.json({ items: [], page: 1, pageSize: 20, total: 0 }),
+  ),
+];
+
+export type ReportCardItemPayload = components['schemas']['ReportCardItemDto'];
+export type DailyMetricPayload = components['schemas']['DailyMetricDto'];
+export type StudentMetricSummaryPayload =
+  components['schemas']['StudentMetricSummaryDto'];
+
+export interface CreateGradesHandlerOptions {
+  readonly baseUrl?: string;
+  readonly status?: number;
+  readonly error?: ErrorBodyPayload;
+  readonly response?: Record<string, unknown>;
+  readonly onRequest?: (request: Request) => void | Promise<void>;
+}
+
+/** Synthetic `ErrorBody` matching the status, so failure tests stay valid. */
+function syntheticGradesErrorBody(status: number): ErrorBodyPayload {
+  if (status === 400) {
+    return {
+      code: 'BAD_REQUEST',
+      message: 'Invalid pagination parameters.',
+      correlationId: 'corr-grades-400',
+    };
+  }
+  if (status === 401) {
+    return {
+      code: 'UNAUTHENTICATED',
+      message: 'Missing or invalid session.',
+      correlationId: 'corr-grades-401',
+    };
+  }
+  if (status === 403) {
+    return {
+      code: 'FORBIDDEN',
+      message:
+        'Caller does not have the role this resource requires in this classroom.',
+      correlationId: 'corr-grades-403',
+    };
+  }
+  if (status === 404) {
+    return {
+      code: 'NOT_FOUND',
+      message: 'Classroom not found.',
+      correlationId: 'corr-grades-404',
+    };
+  }
+  return {
+    code: 'INTERNAL_ERROR',
+    message: 'Grades request failed.',
+    correlationId: `corr-grades-${status}`,
+  };
+}
+
+function readGradesPagination(url: URL): {
+  page: number;
+  pageSize: number;
+  start: number;
+} {
+  const rawPage = url.searchParams.get('page');
+  const rawPageSize = url.searchParams.get('pageSize');
+  const parsedPage = rawPage === null ? 1 : Number(rawPage);
+  const parsedPageSize = rawPageSize === null ? 20 : Number(rawPageSize);
+  const page = Number.isInteger(parsedPage) && parsedPage >= 1 ? parsedPage : 1;
+  const pageSize =
+    Number.isInteger(parsedPageSize) && parsedPageSize >= 1
+      ? Math.min(100, parsedPageSize)
+      : 20;
+  return { page, pageSize, start: (page - 1) * pageSize };
+}
+
+const REPORT_CARD_ITEMS: readonly ReportCardItemPayload[] = [
+  {
+    activityId: '00000000-0000-4000-8000-000000000601',
+    activityTitle: 'Fracciones: guía de ejercicios',
+    activityType: 'TP',
+    maxScore: 100,
+    score: 82,
+    feedback: 'Muy buen trabajo. Repasá la simplificación de fracciones.',
+    pointsAwarded: 41,
+    isLate: false,
+    submittedAt: '2026-11-10T12:00:00.000Z',
+    gradedAt: '2026-11-12T15:30:00.000Z',
+  },
+  {
+    activityId: '00000000-0000-4000-8000-000000000602',
+    activityTitle: 'Examen de geometría',
+    activityType: 'EXAM',
+    maxScore: 100,
+    score: 60,
+    feedback: 'Entregado fuera de término. Repasá triángulos y perímetros.',
+    pointsAwarded: 30,
+    isLate: true,
+    submittedAt: '2026-11-15T10:00:00.000Z',
+    gradedAt: '2026-11-16T09:15:00.000Z',
+  },
+  {
+    activityId: '00000000-0000-4000-8000-000000000603',
+    activityTitle: 'Práctica de porcentajes',
+    activityType: 'TP',
+    maxScore: 50,
+    score: 45,
+    feedback: 'Excelente práctica.',
+    pointsAwarded: 22,
+    isLate: false,
+    submittedAt: '2026-11-18T18:45:00.000Z',
+    gradedAt: '2026-11-19T11:05:00.000Z',
+  },
+];
+
+const DAILY_METRICS: readonly DailyMetricPayload[] = [
+  {
+    day: '2026-11-18',
+    connectedSeconds: 4500,
+    submissionCount: 1,
+    messageCount: 3,
+  },
+  {
+    day: '2026-11-17',
+    connectedSeconds: 900,
+    submissionCount: 0,
+    messageCount: 0,
+  },
+  {
+    day: '2026-11-16',
+    connectedSeconds: 7200,
+    submissionCount: 2,
+    messageCount: 5,
+  },
+];
+
+const STUDENT_METRIC_SUMMARIES: readonly StudentMetricSummaryPayload[] = [
+  {
+    studentId: '00000000-0000-4000-8000-000000000611',
+    displayName: 'Ana Sánchez',
+    connectedSeconds: 36_000,
+    submissionCount: 12,
+    messageCount: 27,
+    gradedCount: 10,
+    ungradedCount: 2,
+  },
+  {
+    studentId: '00000000-0000-4000-8000-000000000612',
+    displayName: 'Bruno Díaz',
+    connectedSeconds: 5400,
+    submissionCount: 3,
+    messageCount: 0,
+    gradedCount: 1,
+    ungradedCount: 2,
+  },
+  {
+    studentId: '00000000-0000-4000-8000-000000000613',
+    displayName: 'Carolina Pérez',
+    connectedSeconds: 12_960,
+    submissionCount: 8,
+    messageCount: 12,
+    gradedCount: 8,
+    ungradedCount: 0,
+  },
+];
+
+/**
+ * Contract-faithful MSW handler for `GET /classrooms/{id}/me/report-card`
+ * (`StudentMetricsController_reportCard`): the student's graded activities,
+ * paginated and latest grading first. Works before the backend lands.
+ */
+export function createStudentReportCardHandler(
+  classroomId: string,
+  options: CreateGradesHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  return http.get(
+    `${baseUrl}/classrooms/${classroomId}/me/report-card`,
+    async ({ request }) => {
+      await options.onRequest?.(request);
+
+      const status = options.status ?? 200;
+      if (status >= 400) {
+        return createErrorEnvelopeResponse(
+          status,
+          options.error ?? syntheticGradesErrorBody(status),
+        );
+      }
+
+      const { page, pageSize, start } = readGradesPagination(
+        new URL(request.url),
+      );
+      const payload = {
+        items: REPORT_CARD_ITEMS.slice(start, start + pageSize),
+        page,
+        pageSize,
+        total: REPORT_CARD_ITEMS.length,
+        ...options.response,
+      };
+      return HttpResponse.json(payload, { status });
+    },
+  );
+}
+
+/**
+ * Contract-faithful MSW handler for `GET /classrooms/{id}/me/activity-metrics`
+ * (`StudentMetricsController_myDailyMetrics`): the caller's own raw daily
+ * metric rows, latest day first.
+ */
+export function createOwnDailyMetricsHandler(
+  classroomId: string,
+  options: CreateGradesHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  return http.get(
+    `${baseUrl}/classrooms/${classroomId}/me/activity-metrics`,
+    async ({ request }) => {
+      await options.onRequest?.(request);
+
+      const status = options.status ?? 200;
+      if (status >= 400) {
+        return createErrorEnvelopeResponse(
+          status,
+          options.error ?? syntheticGradesErrorBody(status),
+        );
+      }
+
+      const { page, pageSize, start } = readGradesPagination(
+        new URL(request.url),
+      );
+      const payload = {
+        items: DAILY_METRICS.slice(start, start + pageSize),
+        page,
+        pageSize,
+        total: DAILY_METRICS.length,
+        ...options.response,
+      };
+      return HttpResponse.json(payload, { status });
+    },
+  );
+}
+
+/**
+ * Contract-faithful MSW handler for `GET /classrooms/{id}/activity-metrics`
+ * (`ClassroomMetricsController_classroomMetrics`): raw per-student totals for
+ * teaching staff, display name ascending.
+ */
+export function createClassroomMetricsHandler(
+  classroomId: string,
+  options: CreateGradesHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  return http.get(
+    `${baseUrl}/classrooms/${classroomId}/activity-metrics`,
+    async ({ request }) => {
+      await options.onRequest?.(request);
+
+      const status = options.status ?? 200;
+      if (status >= 400) {
+        return createErrorEnvelopeResponse(
+          status,
+          options.error ?? syntheticGradesErrorBody(status),
+        );
+      }
+
+      const { page, pageSize, start } = readGradesPagination(
+        new URL(request.url),
+      );
+      const payload = {
+        items: STUDENT_METRIC_SUMMARIES.slice(start, start + pageSize),
+        page,
+        pageSize,
+        total: STUDENT_METRIC_SUMMARIES.length,
+        ...options.response,
+      };
+      return HttpResponse.json(payload, { status });
+    },
+  );
+}
+
+export interface StreakBadgePayloadItem {
+  readonly id: string;
+  readonly code: string;
+  readonly name: string;
+  readonly description: string;
+  readonly unlocked: boolean;
+  readonly unlockedAt: string | null;
+}
+
+export interface OwnStreakAndBadgesPayload {
+  readonly currentStreak: number;
+  readonly bestStreak: number;
+  readonly lastQualifiedDate: string | null;
+  readonly badges: readonly StreakBadgePayloadItem[];
+}
+
+export interface CreateOwnStreakAndBadgesHandlerOptions {
+  readonly baseUrl?: string;
+  readonly payload?: OwnStreakAndBadgesPayload;
+  readonly error?: MswErrorResponseSpec | 'network';
+}
+
+export const DEFAULT_STREAK_AND_BADGES_PAYLOAD: OwnStreakAndBadgesPayload = {
+  currentStreak: 0,
+  bestStreak: 0,
+  lastQualifiedDate: null,
+  badges: [],
+};
+
+/**
+ * Contract-faithful MSW handler for `GET /users/me/streak-and-badges` (`HU-GAM-002`).
+ */
+export function createOwnStreakAndBadgesHandler(
+  options: CreateOwnStreakAndBadgesHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const payload = options.payload ?? DEFAULT_STREAK_AND_BADGES_PAYLOAD;
+  return http.get(`${baseUrl}/users/me/streak-and-badges`, () => {
+    if (options.error === 'network') {
+      return HttpResponse.error();
+    }
+    if (options.error) {
+      return createErrorEnvelopeResponse(
+        options.error.status,
+        options.error.body,
+      );
+    }
+    return HttpResponse.json(payload);
+  });
+}
+
+export type BotStoreOp = 'status' | 'ask';
+
+export interface BotStoreCitation {
+  readonly materialId: string;
+  readonly filename: string;
+  readonly excerpt?: string | null;
+}
+
+export interface ClassroomBotStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly initialAvailable?: boolean;
+  readonly initialReason?:
+    'exam_in_progress' | 'no_materials' | 'disabled' | null;
+  readonly initialMessage?: string | null;
+  readonly onAsk?: (question: string) =>
+    | {
+        readonly answer: string;
+        readonly outcome?: 'answered' | 'out_of_scope' | 'guided_only';
+        readonly citations?: readonly BotStoreCitation[];
+      }
+    | Promise<{
+        readonly answer: string;
+        readonly outcome?: 'answered' | 'out_of_scope' | 'guided_only';
+        readonly citations?: readonly BotStoreCitation[];
+      }>;
+}
+
+export interface ClassroomBotStore {
+  readonly handlers: readonly HttpHandler[];
+  setExamLocked(locked: boolean, message?: string | null): void;
+  failNext(op: BotStoreOp, failure: MswErrorResponseSpec | 'network'): void;
+}
+
+/**
+ * Stateful, contract-faithful MSW store for `HU-BOT-002` (`GET /bot/status`,
+ * `POST /bot/messages`).
+ */
+export function createClassroomBotStore(
+  options: ClassroomBotStoreOptions = {},
+): ClassroomBotStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomId =
+    options.classroomId ?? '00000000-0000-4000-8000-000000000010';
+  let available = options.initialAvailable ?? true;
+  let reason: 'exam_in_progress' | 'no_materials' | 'disabled' | null =
+    options.initialReason ?? null;
+  let message: string | null = options.initialMessage ?? null;
+  let seq = 1;
+  const pending: Partial<Record<BotStoreOp, MswErrorResponseSpec | 'network'>> =
+    {};
+
+  const fail = (failure: MswErrorResponseSpec | 'network'): Response =>
+    failure === 'network'
+      ? HttpResponse.error()
+      : createErrorEnvelopeResponse(failure.status, failure.body);
+
+  return {
+    setExamLocked(locked, nextMessage) {
+      available = !locked;
+      reason = locked ? 'exam_in_progress' : null;
+      message = locked
+        ? (nextMessage ??
+          'El asistente está pausado porque tenés un examen en curso.')
+        : null;
+    },
+    failNext(op, failure) {
+      pending[op] = failure;
+    },
+    handlers: [
+      http.get(`${baseUrl}/classrooms/:id/bot/status`, ({ params }) => {
+        const failure = pending.status;
+        pending.status = undefined;
+        if (failure) {
+          return fail(failure);
+        }
+        if (options.classroomId && params.id !== classroomId) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Classroom not found.',
+            correlationId: 'req-bot-status-404',
+          });
+        }
+        return HttpResponse.json({
+          available,
+          reason,
+          message,
+        });
+      }),
+      http.post(
+        `${baseUrl}/classrooms/:id/bot/messages`,
+        async ({ params, request }) => {
+          const failure = pending.ask;
+          pending.ask = undefined;
+          if (failure) {
+            return fail(failure);
+          }
+          if (options.classroomId && params.id !== classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-bot-ask-404',
+            });
+          }
+          if (!available && reason === 'exam_in_progress') {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message:
+                message ??
+                'El asistente está pausado porque tenés un examen en curso.',
+              correlationId: 'req-bot-exam-409',
+            });
+          }
+          const body = (await request.json().catch(() => null)) as {
+            question?: unknown;
+          } | null;
+          const question =
+            typeof body?.question === 'string' ? body.question.trim() : '';
+          if (!question) {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'question is required.',
+              correlationId: 'req-bot-ask-400',
+            });
+          }
+          const custom = options.onAsk ? await options.onAsk(question) : null;
+          if (!available && reason === 'exam_in_progress') {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message:
+                message ??
+                'El asistente está pausado porque tenés un examen en curso.',
+              correlationId: 'req-bot-exam-inflight-409',
+            });
+          }
+          const id = `bot-msg-${seq}`;
+          seq += 1;
+          return HttpResponse.json({
+            id,
+            answer:
+              custom?.answer ??
+              'Revisá la definición de fracciones equivalentes en el apunte de la unidad.',
+            outcome: custom?.outcome ?? 'answered',
+            citations: custom?.citations ?? [
+              {
+                materialId: '00000000-0000-4000-8000-000000001001',
+                filename: 'guia-unidad-1.pdf',
+                excerpt:
+                  'Dos fracciones son equivalentes cuando representan la misma parte.',
+              },
+            ],
+            createdAt: '2026-11-19T02:25:00.000Z',
+          });
+        },
+      ),
+    ],
+  };
+}

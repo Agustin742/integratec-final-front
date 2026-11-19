@@ -43,4 +43,39 @@ export const pointsMessages = {
     unexpected:
       'No pudimos interpretar los datos de tu billetera. Intentá de nuevo.',
   },
+  streakAndBadges: {
+    sectionTitle: 'Racha de estudio y medallas',
+    sectionSubtitle:
+      'La racha y las medallas se calculan en el servidor a partir de tus entregas, exámenes y repasos diarios.',
+    loading: 'Cargando tu racha y medallas…',
+    errorTitle: 'No pudimos cargar tu racha ni tus medallas',
+    errorDescription: 'Revisá tu conexión e intentá de nuevo.',
+    retryAction: 'Reintentar',
+    staleTitle: 'Racha y medallas pendientes de sincronización',
+    staleDescription:
+      'Mostrando los últimos datos confirmados. Falló la actualización en segundo plano.',
+    unexpectedError:
+      'No pudimos interpretar los datos de tu racha y medallas. Intentá de nuevo.',
+    streak: {
+      regionLabel: 'Indicador de racha diaria',
+      currentLabel: 'Racha actual',
+      bestLabel: 'Mejor racha',
+      daysCount: (days: number) => (days === 1 ? '1 día' : `${days} días`),
+      lastQualifiedLabel: (date: string) => `Último día calificado: ${date}`,
+      zeroHint:
+        'Completá una actividad o repaso diario para iniciar tu racha. Iniciar sesión por sí solo no suma días.',
+    },
+    badges: {
+      regionLabel: 'Vitrina de medallas',
+      heading: 'Medallas',
+      emptyTitle: 'Todavía no tenés medallas disponibles',
+      emptyDescription:
+        'Cuando el servidor registre logros o medallas desbloqueables, van a aparecer acá.',
+      unlockedLabel: 'Desbloqueada',
+      lockedLabel: 'Bloqueada',
+      unlockedAtPrefix: 'Obtenida el',
+      summaryCount: (unlocked: number, total: number) =>
+        `${unlocked} de ${total} desbloqueadas`,
+    },
+  },
 } as const;

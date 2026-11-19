@@ -6,6 +6,7 @@ import {
   StaleDataNotice,
 } from '@/components/feedback/states';
 import { useSessionSnapshot } from '@/session/provider';
+import { StreakAndBadgesSection } from '@/features/points/streak-and-badges-section';
 import { AvatarForm } from './avatar-form';
 import { DisplayNameForm } from './display-name-form';
 import { profileMessages } from './messages';
@@ -117,6 +118,7 @@ export function ProfileView({ title }: ProfileViewProps) {
             reconcile={reconcile}
             onDirtyChange={onAvatarDirty}
           />
+          <StreakAndBadgesSection key={`gamification-${profile.id}`} />
         </>
       )}
     </section>

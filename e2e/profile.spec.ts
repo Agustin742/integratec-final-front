@@ -32,7 +32,7 @@ async function attachRuntimeMonitors(page: Page) {
 
 test('edits display name and base avatar on /profile and persists across reload without CSP or overflow errors', async ({
   page,
-}) => {
+}, testInfo) => {
   const { cspViolations, pageErrors } = await attachRuntimeMonitors(page);
 
   let serverProfile = {
@@ -71,6 +71,36 @@ test('edits display name and base avatar on /profile and persists across reload 
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(serverProfile),
+    });
+  });
+
+  await page.route('**/users/me/streak-and-badges', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        currentStreak: 4,
+        bestStreak: 9,
+        lastQualifiedDate: '2026-11-18',
+        badges: [
+          {
+            id: 'badge-1',
+            code: 'FIRST_SUBMISSION',
+            name: 'Primera entrega',
+            description: 'Completaste tu primera entrega a tiempo.',
+            unlocked: true,
+            unlockedAt: '2026-11-15T14:00:00.000Z',
+          },
+          {
+            id: 'badge-2',
+            code: 'STREAK_7',
+            name: 'Semana constante',
+            description: 'Mantené una racha de 7 días calificados.',
+            unlocked: false,
+            unlockedAt: null,
+          },
+        ],
+      }),
     });
   });
 
@@ -155,6 +185,32 @@ test('edits display name and base avatar on /profile and persists across reload 
   await expect(
     page.getByText(profileMessages.avatar.previewSaved),
   ).toBeVisible();
+
+  const streakHeading = page.getByRole('heading', {
+    name: 'Racha de estudio y medallas',
+  });
+  await streakHeading.scrollIntoViewIfNeeded();
+  await expect(streakHeading).toBeVisible();
+  await expect(page.getByText('4 días')).toBeVisible();
+  await expect(page.getByText('9 días')).toBeVisible();
+  await expect(
+    page.getByText('Primera entrega', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Semana constante', { exact: true }),
+  ).toBeVisible();
+
+  if (testInfo.project.name === 'desktop') {
+    await page.screenshot({
+      path: 'docs/assets/profile/streak-badges-1280.png',
+      fullPage: false,
+    });
+  } else if (testInfo.project.name === 'mobile') {
+    await page.screenshot({
+      path: 'docs/assets/profile/streak-badges-360.png',
+      fullPage: false,
+    });
+  }
 
   // Verify zero horizontal overflow at current viewport (desktop 1280 / mobile 360+)
   expect(
