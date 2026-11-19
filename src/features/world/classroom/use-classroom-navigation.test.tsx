@@ -115,4 +115,21 @@ describe('useClassroomNavigation', () => {
     act(() => result.current.onFloorClick(click(-4, 5)));
     expect(onIntentChange).toHaveBeenCalled();
   });
+
+  test('a keyboard press wakes the demand frameloop and forwards the intent', () => {
+    const onIntentChange = vi.fn();
+    setup({ scopeKey: 'room-1', onIntentChange });
+    three.invalidate.mockClear();
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          code: 'KeyD',
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+    expect(three.invalidate).toHaveBeenCalled();
+    expect(onIntentChange).toHaveBeenCalledTimes(1);
+  });
 });

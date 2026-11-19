@@ -1,5 +1,5 @@
 import { useThree } from '@react-three/fiber';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { AvatarInput } from '@/realtime';
 import { CLASSROOM_LAYOUT } from '@/realtime';
 import { useEscapeKey } from '../input/use-escape-key';
@@ -37,12 +37,25 @@ export function useClassroomNavigation({
 }: UseClassroomNavigationOptions) {
   const invalidate = useThree((state) => state.invalidate);
   const enabled = useThree((state) => state.frameloop) !== 'never';
+  // A key press from rest must wake the demand loop itself; nothing else
+  // (placeholder body, reduced motion) is guaranteed to be requesting frames.
+  const listener = useRef(onIntentChange);
+  useEffect(() => {
+    listener.current = onIntentChange;
+  });
+  const wakeAndForward = useCallback(
+    (intent: AvatarInput) => {
+      invalidate();
+      listener.current?.(intent);
+    },
+    [invalidate],
+  );
   const controller = useLocalAvatarController({
     layout: CLASSROOM_LAYOUT,
     spawn: LOCAL_SPAWN,
     enabled,
     resetKey: scopeKey ?? '',
-    onIntentChange,
+    onIntentChange: wakeAndForward,
   });
   const marker = useMemo(() => createDestinationMarker(), []);
   useEffect(() => () => marker.dispose(), [marker]);
