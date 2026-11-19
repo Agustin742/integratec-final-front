@@ -2,7 +2,7 @@
 
 ## 2026-11-19 — Daily streak indicator and badge showcase (#47)
 
-- **Status:** in-progress (ready for PR approval)
+- **Status:** in-progress (reviewed; scope item 4 deferred on `Agustin742/integratec-final-back#33`, see `docs/streak-and-badges.md`)
 - **Area / files:** `src/api/query-keys.ts`, `src/features/points/`, `src/features/profile/`, `src/test/msw/handlers.ts`, `e2e/profile.spec.ts`, `docs/streak-and-badges.md`, `docs/threat-model.md`, `docs/ai-usage.md`, `docs/assets/profile/streak-badges-*.png`, `changelogs/tracker-mati.md`
 - **Change:** Implemented [issue #47](https://github.com/Agustin742/integratec-final-front/issues/47) (`HU-GAM-002`) on `feat/47-streak-and-badges`:
   1. Added `userId`-scoped `ownStreakAndBadgesQueryKey` (`src/api/query-keys.ts`), jitless Zod schemas (`src/features/points/streak-badge-schema.ts`), typed read-only service (`src/features/points/streak-badge-service.ts`), `useOwnStreakAndBadges` hook (`src/features/points/use-streak-and-badges.ts`), centralized `es-AR` copy (`src/features/points/messages.ts`), contract-faithful MSW handler `createOwnStreakAndBadgesHandler` (`src/test/msw/handlers.ts`), and 3 unit tests (`streak-badge-service.test.ts`).
@@ -10,7 +10,7 @@
   3. Extended `e2e/profile.spec.ts` with streak & badge assertions and `1280px`/`360px` screenshots (`docs/assets/profile/streak-badges-*.png`), and documented the provisional contract (`Agustin742/integratec-final-back#33`) in `docs/streak-and-badges.md`, `docs/threat-model.md`, and `docs/ai-usage.md`.
 - **Reason:** Display server-confirmed current/best study streak and locked/unlocked badges in reusable components integrated into the profile page, never mutating or simulating streaks on login (`rules/points-and-shop.md`, `rules/data-and-time.md`, `rules/ui-and-accessibility.md`, `rules/state-management.md`).
 - **Verification:** On local Node `v24.16.0` (with `--config.engine-strict=false`): `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm build`, `pnpm security:check`, `vitest run` on `streak-badge-service.test.ts`, `streak-and-badges-section.test.tsx`, and `profile-page.test.tsx` (`29/29` passed, `0` axe-core violations), Playwright `e2e/profile.spec.ts` (`2/2` desktop and mobile passed with `0` CSP violations, `0` page errors, and `0` horizontal overflow), and `git diff --check origin/develop..HEAD --` passed. Disclosed gaps: full `pnpm test` / `pnpm e2e` suites were not run locally, and `python` CI scripts (`scripts/ci/check_docs.py`, `scripts/ci/test_*.py`) are unavailable on this Windows workstation and run in Ubuntu CI.
-- **Next step:** Await explicit user approval (Pause #2) before pushing `feat/47-streak-and-badges` or opening the PR against `develop`.
+- **Next step:** Review verdict: 5/6 scope items complete, no code findings; the new-badge notification item (HU-COM-004 consumption) is deferred until `Agustin742/integratec-final-back#33` publishes the badge-award notification kind, declared in `docs/streak-and-badges.md`; the report-card display follows #46. Resolve conflicts with `develop` and merge PR #105.
 
 ## 2026-11-18 — Implement in-app notification center with unread count and read state (#50)
 
