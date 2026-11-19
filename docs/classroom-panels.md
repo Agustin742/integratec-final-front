@@ -11,6 +11,8 @@ teacher editor, multiple-choice builder, one-way publish flow, and deactivation 
 `grades` renders `ClassroomGradesPanel` ([`#44`](https://github.com/Agustin742/integratec-final-front/issues/44)
 teacher grading queue, submission viewer, and grading/regrading workflow for `publish_content`-authorized staff, while showing the honest pending state to students and parents — see the [grading feature doc](./classroom-grading.md)),
 `notices` renders `NoticeBoardPanel` ([`#49`](https://github.com/Agustin742/integratec-final-front/issues/49)),
+`shop` renders `ShopPanel` ([`#48`](https://github.com/Agustin742/integratec-final-front/issues/48)
+student classroom shop catalog, idempotent purchase confirmation, and purchase history — see the [classroom shop doc](./classroom-shop.md)),
 `grades` renders `GradesPanel` ([`#46`](https://github.com/Agustin742/integratec-final-front/issues/46),
 see the [grades guide](./ui-grades.md)) and
 `members` renders `ClassroomMembersPanel`
@@ -18,7 +20,7 @@ see the [grades guide](./ui-grades.md)) and
 `ClassroomRosterPanel` and capability-gated [`HU-AUL-002`](https://github.com/Agustin742/integratec-final-front/issues/32)
 `ClassroomInvitationsPanel` for `invite_members`-authorized email invitations and one-time classroom join codes), and
 `bot` renders `StudyGuideBotPanel` ([#54](https://github.com/Agustin742/integratec-final-front/issues/54)), while the remaining
-three entries display the shared, honest “Funcionalidad pendiente” state until
+two entries display the shared, honest “Funcionalidad pendiente” state until
 their respective stories land.
 
 ## Approved scope reconciliation
@@ -37,7 +39,7 @@ the issue; team acceptance of the reconciled criterion remains part of PR review
 | `grades`       | Calificaciones (`ClassroomGradesPanel`, `#44` + `#46`) |
 | `chat`         | Chat                                                   |
 | `notices`      | Avisos (`NoticeBoardPanel`, `#49`)                     |
-| `shop`         | Tienda                                                 |
+| `shop`         | Tienda (`ShopPanel`, `#48`)                            |
 | `bot`          | Asistente de estudio (`StudyGuideBotPanel`, `#54`)     |
 | `members`      | Integrantes (`ClassroomMembersPanel`, `#33` + `#32`)   |
 | `settings`     | Configuración                                          |
@@ -118,7 +120,7 @@ through read-own before any resubmission offer. `MULTIPLE_CHOICE` activities
 keep the pending note (part 2/2 out of scope), and teacher review stays
 `HU-ACT-004`.
 
-Product components beyond the unified `activities` panel (`#41` inbox + `#39` teacher editor, [doc](./classroom-activities.md)), the staff `members` roster (`#33`), capability-gated invitations/join-code tab (`#32`), study `material` manager (`#40`), `notices` announcement board (`#49`), Study Guide Bot conversation (`bot` panel, `#54` `HU-BOT-002`), and 2D/3D consumers remain separate stories; this infrastructure does not implement their contents. Note for `#54` (`HU-BOT-002`): because `Agustin742/integratec-final-back#41` is still open, `StudyGuideBotPanel` consumes a provisional contract (`GET /classrooms/:id/bot/status` and `POST /classrooms/:id/bot/messages` returning `{ id, answer, outcome, citations, createdAt }`) backed by stateful MSW handlers (`createClassroomBotStore`) until `back#41` lands in `src/api/schema.generated.ts`; `PARENT` accounts are denied without querying bot status, server `409`/`423` exam lockout blocks both initial and in-flight queries, and model output is rendered strictly as plain text. Note for `#41` (human-approved scope reconciliation on `2026-11-18`): because backend `Agustin742/integratec-final-back#29` is still open, `ActivitySummaryDto` and `StudentActivityResponseDto` do not yet expose a server-derived student work status (`Pending`/`Submitted`/`Graded`/`Overdue`) or `canSubmit` flag, so `ActivitiesPanel` and `ActivityDetailPage` render only server-confirmed metadata and deadlines in the school `timeZone` without deriving overdue state from the browser clock (`rules/activities-and-grading.md`, `rules/data-and-time.md`), deferring student status/overdue/`canSubmit` UI until `back#29` lands. Backend
+Product components beyond the unified `activities` panel (`#41` inbox + `#39` teacher editor, [doc](./classroom-activities.md)), the staff `members` roster (`#33`), capability-gated invitations/join-code tab (`#32`), study `material` manager (`#40` + `#53` `HU-BOT-001` Study Guide Bot material toggle), `notices` announcement board (`#49`), Study Guide Bot conversation (`bot` panel, `#54` `HU-BOT-002`), and 2D/3D consumers remain separate stories; this infrastructure does not implement their contents. Note for `#53` (`HU-BOT-001`): because backend `Agustin742/integratec-final-back#40` is still open, `MaterialPanel` consumes a provisional `configure_bot`-gated contract (`GET /classrooms/:id/bot/materials` and `PUT /classrooms/:id/bot/materials/:materialId` returning `{ materialId, classroomId, botEnabled, indexingStatus, indexingError, updatedAt }`) backed by stateful MSW handlers and Zod validation until `back#40` lands in `src/api/schema.generated.ts`; toggling requires server confirmation before changing state, and students/parents never see or fetch bot configuration. Note for `#54` (`HU-BOT-002`): because `Agustin742/integratec-final-back#41` is still open, `StudyGuideBotPanel` consumes a provisional contract (`GET /classrooms/:id/bot/status` and `POST /classrooms/:id/bot/messages` returning `{ id, answer, outcome, citations, createdAt }`) backed by stateful MSW handlers (`createClassroomBotStore`) until `back#41` lands in `src/api/schema.generated.ts`; `PARENT` accounts are denied without querying bot status, server `409`/`423` exam lockout blocks both initial and in-flight queries, and model output is rendered strictly as plain text. Note for `#41` (human-approved scope reconciliation on `2026-11-18`): because backend `Agustin742/integratec-final-back#29` is still open, `ActivitySummaryDto` and `StudentActivityResponseDto` do not yet expose a server-derived student work status (`Pending`/`Submitted`/`Graded`/`Overdue`) or `canSubmit` flag, so `ActivitiesPanel` and `ActivityDetailPage` render only server-confirmed metadata and deadlines in the school `timeZone` without deriving overdue state from the browser clock (`rules/activities-and-grading.md`, `rules/data-and-time.md`), deferring student status/overdue/`canSubmit` UI until `back#29` lands. Backend
 [B (#93)](https://github.com/Agustin742/integratec-final-back/pull/93) is consumed by
 one workspace-owned authenticated fetch stream. Connection, invalidation hints
 (including the initial hint), and EOF reset the shared context query and reload
@@ -150,7 +152,10 @@ The public-route browser check captures the pending entry at
 [360px](./assets/classrooms/invitations-360.png), the `#40` study material
 manager (`MaterialPanel`, `e2e/study-materials.spec.ts`) at
 [1280px](./assets/classrooms/study-materials-1280.png) and
-[360px](./assets/classrooms/study-materials-360.png), and the `#41`
+[360px](./assets/classrooms/study-materials-360.png), the `#53` Study Guide Bot
+material toggle (`MaterialBotToggleSlot`, `e2e/study-materials.spec.ts`) at
+[1280px](./assets/classrooms/bot-materials-1280.png) and
+[360px](./assets/classrooms/bot-materials-360.png), and the `#41`
 student activity inbox (`ActivitiesPanel`, `e2e/activities-inbox.spec.ts`) at
 [1280px](./assets/classrooms/activities-inbox-1280.png) and
 [360px](./assets/classrooms/activities-inbox-360.png), the `#42` student

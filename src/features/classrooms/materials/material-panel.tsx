@@ -3,7 +3,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import { ApiError } from '@/api/errors';
 import {
+  classroomBotMaterialsQueryKey,
+  classroomDetailQueryKey,
   classroomMaterialsQueryKey,
+  createClassroomBotMaterialsPredicate,
   createClassroomMaterialsPredicate,
 } from '@/api/query-keys';
 import {
@@ -21,6 +24,16 @@ import {
   useClassroomCapabilities,
   useClassroomContext,
 } from '../use-classroom-capabilities';
+import type {
+  BotAllowedMaterialDto,
+  BotAllowedMaterialListDto,
+} from './material-bot-schema';
+import {
+  isUncertainBotMaterialError,
+  listClassroomBotMaterials,
+  setClassroomBotMaterialEnabled,
+} from './material-bot-service';
+import { MaterialBotToggleSlot } from './material-bot-toggle';
 import { MaterialList } from './material-list';
 import type { MaterialDto } from './material-schema';
 import {
@@ -78,6 +91,11 @@ function MaterialPanelContent({
     readonly title: string;
     readonly description: string;
   } | null>(null);
+  const [togglingBotIds, setTogglingBotIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const togglingBotRef = useRef<Set<string>>(new Set());
+  const terminalBotReconciledRef = useRef(false);
   const unmountAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -92,6 +110,8 @@ function MaterialPanelContent({
   const userId = context.status === 'ready' ? context.userId : null;
   const canManage =
     capabilities.status === 'ready' && capabilities.can('publish_content');
+  const canConfigureBot =
+    capabilities.status === 'ready' && capabilities.can('configure_bot');
 
   const query = useQuery({
     queryKey: classroomMaterialsQueryKey(userId ?? 'signed-out', classroomId, {
@@ -109,6 +129,58 @@ function MaterialPanelContent({
     enabled: userId !== null,
   });
 
+  const botQuery = useQuery({
+    queryKey: classroomBotMaterialsQueryKey(
+      userId ?? 'signed-out',
+      classroomId,
+    ),
+    queryFn: ({ signal }) =>
+      listClassroomBotMaterials(client, classroomId, { signal }),
+    enabled: userId !== null && canConfigureBot,
+    refetchInterval: (currentQuery) => {
+      if (currentQuery.state.status === 'error') {
+        return false;
+      }
+      const hasPending = currentQuery.state.data?.items.some(
+        (entry) => entry.indexingStatus === 'pending',
+      );
+      return hasPending ? 4000 : false;
+    },
+  });
+
+  const isTerminalBotConfigError =
+    botQuery.isError &&
+    botQuery.error instanceof ApiError &&
+    (botQuery.error.kind === 'forbidden' ||
+      botQuery.error.kind === 'not-found');
+
+  useEffect(() => {
+    if (userId === null) return;
+    if (!canConfigureBot) {
+      terminalBotReconciledRef.current = false;
+      void queryClient.removeQueries({
+        predicate: createClassroomBotMaterialsPredicate(userId, classroomId),
+      });
+      return;
+    }
+    if (!isTerminalBotConfigError) {
+      terminalBotReconciledRef.current = false;
+      return;
+    }
+    if (!terminalBotReconciledRef.current) {
+      terminalBotReconciledRef.current = true;
+      void queryClient.invalidateQueries({
+        queryKey: classroomDetailQueryKey(userId, classroomId),
+      });
+    }
+  }, [
+    canConfigureBot,
+    classroomId,
+    isTerminalBotConfigError,
+    queryClient,
+    userId,
+  ]);
+
   async function reconcileMaterials(resetPage = false) {
     if (resetPage) {
       setPage(1);
@@ -117,6 +189,109 @@ function MaterialPanelContent({
     await queryClient.invalidateQueries({
       predicate: createClassroomMaterialsPredicate(userId, classroomId),
     });
+    if (canConfigureBot) {
+      await queryClient.invalidateQueries({
+        predicate: createClassroomBotMaterialsPredicate(userId, classroomId),
+      });
+    }
+  }
+
+  async function handleToggleBotMaterial(
+    material: MaterialDto,
+    nextEnabled: boolean,
+  ) {
+    if (userId === null || !canConfigureBot) return;
+    if (togglingBotRef.current.has(material.id)) return;
+    const signal = unmountAbortRef.current?.signal;
+    if (signal?.aborted) return;
+
+    togglingBotRef.current.add(material.id);
+    setTogglingBotIds((prev) => new Set(prev).add(material.id));
+    setActionNotice(null);
+
+    try {
+      await queryClient.cancelQueries({
+        predicate: createClassroomBotMaterialsPredicate(userId, classroomId),
+      });
+      const confirmed = await setClassroomBotMaterialEnabled(
+        client,
+        classroomId,
+        material.id,
+        { enabled: nextEnabled },
+        { signal },
+      );
+      if (signal?.aborted) return;
+
+      await queryClient.cancelQueries({
+        predicate: createClassroomBotMaterialsPredicate(userId, classroomId),
+      });
+      if (signal?.aborted) return;
+
+      queryClient.setQueryData<BotAllowedMaterialListDto>(
+        classroomBotMaterialsQueryKey(userId, classroomId),
+        (previous) => {
+          const existing = previous?.items ?? [];
+          const withoutCurrent = existing.filter(
+            (entry) => entry.materialId !== confirmed.materialId,
+          );
+          return {
+            items: [...withoutCurrent, confirmed],
+          };
+        },
+      );
+
+      setActionNotice({
+        kind: 'success',
+        title: confirmed.botEnabled
+          ? materialMessages.list.bot.confirmedEnabledTitle
+          : materialMessages.list.bot.confirmedDisabledTitle,
+        description: confirmed.botEnabled
+          ? materialMessages.list.bot.confirmedEnabledDescription(
+              material.filename,
+            )
+          : materialMessages.list.bot.confirmedDisabledDescription(
+              material.filename,
+            ),
+      });
+    } catch (error) {
+      if (
+        (error instanceof Error || error instanceof DOMException) &&
+        error.name === 'AbortError'
+      ) {
+        return;
+      }
+      const description =
+        error instanceof ApiError
+          ? error.userMessage
+          : materialMessages.list.bot.toggleErrors.unexpected;
+      setActionNotice({
+        kind: 'error',
+        title: materialMessages.list.bot.toggleErrorTitle,
+        description,
+      });
+      if (
+        error instanceof ApiError &&
+        (error.kind === 'forbidden' || error.kind === 'not-found')
+      ) {
+        await queryClient.invalidateQueries({
+          queryKey: classroomDetailQueryKey(userId, classroomId),
+        });
+        if (error.kind === 'not-found') {
+          await reconcileMaterials();
+        }
+      } else if (isUncertainBotMaterialError(error)) {
+        await reconcileMaterials();
+      }
+    } finally {
+      togglingBotRef.current.delete(material.id);
+      if (!signal?.aborted) {
+        setTogglingBotIds((prev) => {
+          const next = new Set(prev);
+          next.delete(material.id);
+          return next;
+        });
+      }
+    }
   }
 
   async function handleUploaded(filename: string) {
@@ -242,6 +417,27 @@ function MaterialPanelContent({
     total: data.total,
   });
 
+  const botStateByMaterialId = new Map<string, BotAllowedMaterialDto>(
+    (botQuery.data?.items ?? []).map((entry) => [entry.materialId, entry]),
+  );
+
+  const effectiveRenderItemSlot =
+    renderItemSlot ??
+    (canConfigureBot
+      ? (material: MaterialDto) => (
+          <MaterialBotToggleSlot
+            material={material}
+            botState={botStateByMaterialId.get(material.id)}
+            isConfigPending={botQuery.isPending}
+            isConfigError={botQuery.isError}
+            isToggling={togglingBotIds.has(material.id)}
+            onToggle={(target, nextEnabled) =>
+              void handleToggleBotMaterial(target, nextEnabled)
+            }
+          />
+        )
+      : undefined);
+
   return (
     <div className="min-w-0 space-y-5">
       <p className="text-sm text-muted-foreground">
@@ -265,6 +461,29 @@ function MaterialPanelContent({
         >
           <AlertTitle>{actionNotice.title}</AlertTitle>
           <AlertDescription>{actionNotice.description}</AlertDescription>
+        </Alert>
+      )}
+
+      {canConfigureBot && botQuery.isError && (
+        <Alert variant="destructive" role="alert">
+          <AlertTitle>{materialMessages.list.bot.loadErrorTitle}</AlertTitle>
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+            <span>
+              {botQuery.error instanceof ApiError && isTerminalBotConfigError
+                ? botQuery.error.userMessage
+                : materialMessages.list.bot.loadErrorNotice}
+            </span>
+            {!isTerminalBotConfigError && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void botQuery.refetch()}
+              >
+                {materialMessages.list.bot.retryLoadAction}
+              </Button>
+            )}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -314,7 +533,7 @@ function MaterialPanelContent({
             onRequestRemove={(materialId) => setPendingConfirmId(materialId)}
             onConfirmRemove={(material) => void handleConfirmRemove(material)}
             onCancelRemove={() => setPendingConfirmId(null)}
-            renderItemSlot={renderItemSlot}
+            renderItemSlot={effectiveRenderItemSlot}
           />
 
           {pagination.totalPages > 1 && (

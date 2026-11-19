@@ -6,6 +6,7 @@ import { StudyGuideBotPanel } from '../bot/study-guide-bot-panel';
 import { ClassroomGradesPanel } from '../grading/classroom-grades-panel';
 import { MaterialPanel } from '../materials/material-panel';
 import { ClassroomMembersPanel } from '../classroom-members-panel';
+import { ShopPanel } from '../../shop/shop-panel';
 import { classroomMessages as messages } from '../messages';
 import type { PanelDescriptor } from './classroom-panels';
 
@@ -48,7 +49,11 @@ export const classroomPanelCatalog = [
     title: messages.panels.notices,
     component: NoticeBoardPanel,
   },
-  entry('shop'),
+  {
+    key: 'shop',
+    title: messages.panels.shop,
+    component: ShopPanel,
+  },
   {
     key: 'bot',
     title: messages.panels.bot,

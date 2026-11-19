@@ -352,6 +352,55 @@ export function createClassroomMaterialsPredicate(
     );
   };
 }
+
+/**
+ * Key of `GET /classrooms/{id}/bot/materials`: Study Guide Bot allowed-material
+ * configuration and indexing state scoped by `userId` and `classroomId`
+ * (`rules/state-management.md`, `HU-BOT-001`).
+ */
+export function classroomBotMaterialsQueryKey(
+  userId: string,
+  classroomId: string,
+): ScopedQueryKey<undefined> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'materials',
+    'bot-config',
+    undefined,
+  );
+}
+
+/**
+ * Predicate matching every Study Guide Bot material-config query entry owned by
+ * `userId` and `classroomId`.
+ */
+export function createClassroomBotMaterialsPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'materials' &&
+      segment.resource === 'bot-config'
+    );
+  };
+}
 export type InvitationStateFilter =
   'PENDING' | 'USED' | 'REVOKED' | 'EXPIRED' | 'ALL';
 
@@ -1088,4 +1137,166 @@ export function createClassroomActivityMetricsPredicate(
   classroomId: string,
 ): (query: { readonly queryKey: readonly unknown[] }) => boolean {
   return createGradesPredicate(userId, classroomId, 'classroom-metrics');
+}
+
+export type ShopItemKindFilter =
+  'CLASSROOM_ITEM' | 'AVATAR_ACCESSORY' | 'DESK_UPGRADE' | 'PET_ACCESSORY';
+
+export type ShopItemsSortOrder =
+  | 'createdAt'
+  | '-createdAt'
+  | 'defaultPrice'
+  | '-defaultPrice'
+  | 'name'
+  | '-name';
+
+export type ShopPurchasesSortOrder =
+  '-createdAt' | 'createdAt' | 'pricePaid' | '-pricePaid';
+
+export interface ShopItemsQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+  readonly sort?: ShopItemsSortOrder;
+  readonly kind?: ShopItemKindFilter;
+}
+
+export interface NormalizedShopItemsQueryParams {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly sort: ShopItemsSortOrder;
+  readonly kind: ShopItemKindFilter | '';
+}
+
+export interface ShopPurchasesQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+  readonly sort?: ShopPurchasesSortOrder;
+}
+
+export interface NormalizedShopPurchasesQueryParams {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly sort: ShopPurchasesSortOrder;
+}
+
+function normalizeShopItemKind(
+  value: ShopItemKindFilter | undefined,
+): ShopItemKindFilter | '' {
+  if (
+    value === 'CLASSROOM_ITEM' ||
+    value === 'AVATAR_ACCESSORY' ||
+    value === 'DESK_UPGRADE' ||
+    value === 'PET_ACCESSORY'
+  ) {
+    return value;
+  }
+  return '';
+}
+
+function normalizeShopItemsSort(
+  value: ShopItemsSortOrder | undefined,
+): ShopItemsSortOrder {
+  if (
+    value === 'createdAt' ||
+    value === '-createdAt' ||
+    value === 'defaultPrice' ||
+    value === '-defaultPrice' ||
+    value === 'name' ||
+    value === '-name'
+  ) {
+    return value;
+  }
+  return 'createdAt';
+}
+
+function normalizeShopPurchasesSort(
+  value: ShopPurchasesSortOrder | undefined,
+): ShopPurchasesSortOrder {
+  if (
+    value === '-createdAt' ||
+    value === 'createdAt' ||
+    value === 'pricePaid' ||
+    value === '-pricePaid'
+  ) {
+    return value;
+  }
+  return '-createdAt';
+}
+
+/**
+ * Key of `GET /classrooms/{id}/shop/items`: paginated classroom shop catalog
+ * scoped by `userId` and `classroomId` (`rules/state-management.md`).
+ */
+export function shopItemsQueryKey(
+  userId: string,
+  classroomId: string,
+  params: ShopItemsQueryParams = {},
+): ScopedQueryKey<NormalizedShopItemsQueryParams> {
+  const normalizedParams = Object.freeze({
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 12, 1, 100),
+    sort: normalizeShopItemsSort(params.sort),
+    kind: normalizeShopItemKind(params.kind),
+  });
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'shop',
+    'items',
+    normalizedParams,
+  );
+}
+
+/**
+ * Key of `GET /classrooms/{id}/shop/purchases`: paginated student purchase
+ * history scoped by `userId` and `classroomId` (`rules/state-management.md`).
+ */
+export function shopPurchasesQueryKey(
+  userId: string,
+  classroomId: string,
+  params: ShopPurchasesQueryParams = {},
+): ScopedQueryKey<NormalizedShopPurchasesQueryParams> {
+  const normalizedParams = Object.freeze({
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 10, 1, 100),
+    sort: normalizeShopPurchasesSort(params.sort),
+  });
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'shop',
+    'purchases',
+    normalizedParams,
+  );
+}
+
+/**
+ * Predicate matching every classroom shop query entry (catalog and purchases)
+ * owned by `userId` and `classroomId`, for post-purchase reconciliation and
+ * access-revocation cleanup.
+ */
+export function createClassroomShopPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'shop' &&
+      (segment.resource === 'items' || segment.resource === 'purchases')
+    );
+  };
 }
