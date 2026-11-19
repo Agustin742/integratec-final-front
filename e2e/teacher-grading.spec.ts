@@ -1,5 +1,6 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import type { components } from '../src/api/schema.generated';
+import { gradesMessages } from '../src/features/classrooms/grades/messages';
 import { gradingMessages } from '../src/features/classrooms/grading/grading-messages';
 
 const apiOrigin = 'https://api.example.invalid';
@@ -224,6 +225,53 @@ async function interceptGradingApi(
           page: 1,
           pageSize: 10,
           total: filtered.length,
+        },
+      });
+    }
+
+    if (
+      url.pathname === `/classrooms/${classroomId}/me/report-card` &&
+      request.method() === 'GET'
+    ) {
+      return route.fulfill({
+        json: {
+          items: [
+            {
+              activityId: activityExamId,
+              activityTitle: 'Examen 1: Sistemas de ecuaciones',
+              activityType: 'EXAM',
+              maxScore: 100,
+              score: 75,
+              feedback: 'Buen procedimiento general.',
+              pointsAwarded: 150,
+              isLate: true,
+              submittedAt: '2026-11-18T14:30:00.000Z',
+              gradedAt: '2026-11-18T15:10:00.000Z',
+            },
+          ],
+          page: 1,
+          pageSize: 10,
+          total: 1,
+        },
+      });
+    }
+    if (
+      url.pathname === `/classrooms/${classroomId}/me/activity-metrics` &&
+      request.method() === 'GET'
+    ) {
+      return route.fulfill({
+        json: {
+          items: [
+            {
+              day: '2026-11-18',
+              connectedSeconds: 1200,
+              submissionCount: 1,
+              messageCount: 0,
+            },
+          ],
+          page: 1,
+          pageSize: 10,
+          total: 1,
         },
       });
     }
@@ -510,7 +558,16 @@ test('student cannot see teacher grading controls or trigger staff queue request
   await page.goto(`/classrooms/${classroomId}/panels/grades`);
 
   const panelDialog = page.getByRole('dialog', { name: 'Calificaciones' });
-  await expect(panelDialog.getByText('Funcionalidad pendiente')).toBeVisible();
+  // Since #103 unified the grades panel, the student sees the report card
+  // fed by `GET /classrooms/{id}/me/report-card` (and `me/activity-metrics`),
+  // not the former "Funcionalidad pendiente" placeholder.
+  await expect(
+    panelDialog.getByRole('heading', { name: gradesMessages.student.heading }),
+  ).toBeVisible();
+  await expect(
+    panelDialog.getByText('Examen 1: Sistemas de ecuaciones'),
+  ).toBeVisible();
+  await expect(panelDialog.getByText('75 / 100')).toBeVisible();
   await expect(
     panelDialog.getByRole('heading', { name: gradingMessages.panel.heading }),
   ).not.toBeVisible();

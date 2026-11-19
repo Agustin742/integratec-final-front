@@ -475,3 +475,12 @@
 - **Reason:** Establish shared development expectations aligned with the course requirements.
 - **Verification:** Checked six documents and 28 local links/anchors; `git diff --check` passed. Application tests are not applicable (documentation only, no package). Native review assessment was unavailable because untracked files require explicit scope selection; no review started.
 - **Next step:** Agree on when to enforce the documented policy in GitHub settings and CI. The initial PDF retention assumption was superseded by the correction recorded above; no GitHub settings, workflow changes, or commits were made.
+
+## 2026-11-19 — Review and fix follow-up for PR #108 (activity forum, #52)
+
+- **Status:** completed
+- **Area / files:** `e2e/teacher-grading.spec.ts` (student TC fix); review of `src/features/classrooms/activities/forum/**`, `src/test/msw/handlers.ts`, `e2e/activity-forum.spec.ts` on branch `fix/52-activity-forum-review` (worktree `odd/worktrees/52-activity-forum`, off `origin/feat/52-activity-forum`).
+- **Change:** Review teammate PR #108 (Calegaris, closes #52) against the issue acceptance criteria and routed rules, then apply corrections. Includes the PR-author note fix: `e2e/teacher-grading.spec.ts` "student cannot see teacher grading controls" fails on desktop and mobile because #103 unified the grades panel (students now see the report card fed by `GET /classrooms/{id}/me/report-card` + `me/activity-metrics`) while the spec still expects "Funcionalidad pendiente" and does not mock those endpoints.
+- **Reason:** Tarjeta 52: the user (Alejo) asked to correct the PR in an isolated worktree and to take the author's note into account.
+- **Verification:** RED reproduced on desktop 1280 and mobile 360 (spec failed at the old `Funcionalidad pendiente` expectation); fix mocks `GET /classrooms/{id}/me/report-card` + `me/activity-metrics` and asserts the unified report-card view. Full spec GREEN 4/4; `pnpm lint`, `pnpm typecheck`, Prettier (`--end-of-line auto`, CRLF worktree), `git diff --check` pass; `e2e/activity-forum.spec.ts` unaffected (2/2). Vitest not applicable (e2e-only change touches no application code). Screenshot churn from reruns reverted (`docs/assets/grading/`).
+- **Next step:** User decides push/merge: branch `fix/52-activity-forum-review` (1 commit) can be pushed and merged into `feat/52-activity-forum` (PR #108) or cherry-picked into a separate follow-up PR to `develop`, per Calegaris's note.
