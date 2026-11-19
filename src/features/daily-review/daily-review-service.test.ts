@@ -106,7 +106,10 @@ describe('daily-review-service', () => {
 
   it('models the server once-per-day record with deliverOnce handlers', async () => {
     server.use(
-      createDailyReviewHandler({ payload: DUE_STUDENT_REVIEW, deliverOnce: true }),
+      createDailyReviewHandler({
+        payload: DUE_STUDENT_REVIEW,
+        deliverOnce: true,
+      }),
     );
 
     const client = createApiClient({ baseUrl: TEST_API_BASE_URL });
@@ -171,9 +174,9 @@ describe('daily-review-service', () => {
     }).catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(DailyReviewServiceError);
-    expect(
-      error instanceof DailyReviewServiceError && error.category,
-    ).toBe('already_answered');
+    expect(error instanceof DailyReviewServiceError && error.category).toBe(
+      'already_answered',
+    );
   });
 
   it('rejects malformed answer results', async () => {
@@ -191,9 +194,9 @@ describe('daily-review-service', () => {
     }).catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(DailyReviewServiceError);
-    expect(
-      error instanceof DailyReviewServiceError && error.category,
-    ).toBe('unexpected');
+    expect(error instanceof DailyReviewServiceError && error.category).toBe(
+      'unexpected',
+    );
   });
 
   it('scopes the daily-review query key by userId', () => {

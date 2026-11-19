@@ -6323,10 +6323,7 @@ export function createActivityForumStore(
 
 export interface DailyReviewPayloadItem {
   readonly kind:
-    | 'pending_activity'
-    | 'recent_grade'
-    | 'announcement'
-    | 'teacher_review';
+    'pending_activity' | 'recent_grade' | 'announcement' | 'teacher_review';
   readonly title: string;
   readonly detail: string | null;
   readonly classroomName: string | null;
@@ -6407,10 +6404,7 @@ export interface DailyQuestionAnswerResultPayload {
 export interface CreateDailyQuestionAnswerHandlerOptions {
   readonly baseUrl?: string;
   readonly result?: DailyQuestionAnswerResultPayload;
-  readonly onAnswer?: (body: {
-    questionId: string;
-    answer: string;
-  }) => void;
+  readonly onAnswer?: (body: { questionId: string; answer: string }) => void;
   readonly error?: MswErrorResponseSpec | 'network';
 }
 

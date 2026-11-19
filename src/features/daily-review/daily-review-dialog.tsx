@@ -39,9 +39,7 @@ export function DailyReviewDialog() {
   }
 
   const due =
-    review.data?.status === 'due'
-      ? (review.data as DueDailyReview)
-      : null;
+    review.data?.status === 'due' ? (review.data as DueDailyReview) : null;
   const open = due !== null && !dismissed;
 
   return (
@@ -159,9 +157,7 @@ function itemMetadata(item: DailyReviewSectionDto['items'][number]): string {
   if (item.dueAt !== null) {
     // Deadlines arrive as UTC instants and are displayed in the school time
     // zone (FD11); the browser time zone never decides the shown value.
-    parts.push(
-      `${m.dialog.sections.duePrefix} ${formatDeadline(item.dueAt)}`,
-    );
+    parts.push(`${m.dialog.sections.duePrefix} ${formatDeadline(item.dueAt)}`);
   }
   if (item.detail !== null) {
     parts.push(item.detail);
@@ -244,7 +240,9 @@ function DailyQuestionCard({
               }
             }}
           >
-            {isPending ? m.dialog.question.submitting : m.dialog.question.submit}
+            {isPending
+              ? m.dialog.question.submitting
+              : m.dialog.question.submit}
           </Button>
         </div>
       ) : null}

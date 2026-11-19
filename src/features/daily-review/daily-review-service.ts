@@ -15,9 +15,7 @@ export interface DailyReviewServiceOptions {
 }
 
 export type DailyReviewErrorCategory =
-  | 'already_answered'
-  | 'network'
-  | 'unexpected';
+  'already_answered' | 'network' | 'unexpected';
 
 export class DailyReviewServiceError extends Error {
   readonly category: DailyReviewErrorCategory;
@@ -59,9 +57,7 @@ interface DailyReviewPaths {
   };
 }
 
-function asDailyReviewClient(
-  client: TypedApiClient,
-): Client<DailyReviewPaths> {
+function asDailyReviewClient(client: TypedApiClient): Client<DailyReviewPaths> {
   return client as unknown as Client<DailyReviewPaths>;
 }
 

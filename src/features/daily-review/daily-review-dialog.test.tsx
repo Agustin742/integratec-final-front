@@ -1,9 +1,20 @@
 import { QueryClient } from '@tanstack/react-query';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import axe from 'axe-core';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { createApiClient } from '@/api/client';
-import { ownDailyReviewQueryKey, ownStreakAndBadgesQueryKey } from '@/api/query-keys';
+import {
+  ownDailyReviewQueryKey,
+  ownStreakAndBadgesQueryKey,
+} from '@/api/query-keys';
 import { fakeSession } from '@/app/router/fake-session';
 import { profile } from '@/session/test-fixtures';
 import { SessionProvider } from '@/session/provider';
@@ -145,13 +156,9 @@ function renderDailyReviewDialog() {
   };
 }
 
-async function waitForReviewQuery(
-  queryClient: QueryClient,
-): Promise<void> {
+async function waitForReviewQuery(queryClient: QueryClient): Promise<void> {
   await waitFor(() => {
-    const state = queryClient.getQueryState(
-      ownDailyReviewQueryKey(profile.id),
-    );
+    const state = queryClient.getQueryState(ownDailyReviewQueryKey(profile.id));
     expect(state?.status).toBe('success');
   });
 }
@@ -255,9 +262,7 @@ describe('DailyReviewDialog (HU-BOT-003, #55)', () => {
 
     expect(await screen.findByText('¡Respuesta correcta!')).toBeInTheDocument();
     expect(screen.getByText(/Tu racha llegó a 5 días/)).toBeInTheDocument();
-    expect(
-      screen.getByRole('radio', { name: 'Cloroplasto' }),
-    ).toBeDisabled();
+    expect(screen.getByRole('radio', { name: 'Cloroplasto' })).toBeDisabled();
 
     // The read-only streak cache is invalidated so indicators refetch.
     await waitFor(() => {
@@ -331,9 +336,7 @@ describe('DailyReviewDialog (HU-BOT-003, #55)', () => {
       screen.getByText(/Resumen estructurado con tus datos guardados/),
     ).toBeInTheDocument();
     expect(screen.getByText('Salida al museo de ciencias')).toBeInTheDocument();
-    expect(
-      screen.queryByText(/Tenés dos actividades pendientes/),
-    ).toBeNull();
+    expect(screen.queryByText(/Tenés dos actividades pendientes/)).toBeNull();
     expect(screen.queryByRole('radio')).toBeNull();
   });
 
@@ -352,8 +355,6 @@ describe('DailyReviewDialog (HU-BOT-003, #55)', () => {
       screen.getByText('5 entregas esperan tu calificación'),
     ).toBeInTheDocument();
     expect(screen.queryByRole('radio')).toBeNull();
-    expect(
-      screen.queryByRole('button', { name: 'Responder' }),
-    ).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Responder' })).toBeNull();
   });
 });

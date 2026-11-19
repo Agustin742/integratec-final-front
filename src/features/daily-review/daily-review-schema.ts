@@ -13,7 +13,9 @@ z.config({ jitless: true });
 
 export const dailyReviewSectionKindSchema = z.enum(['pending', 'news']);
 
-export type DailyReviewSectionKind = z.infer<typeof dailyReviewSectionKindSchema>;
+export type DailyReviewSectionKind = z.infer<
+  typeof dailyReviewSectionKindSchema
+>;
 
 export const dailyReviewItemKindSchema = z.enum([
   'pending_activity',
