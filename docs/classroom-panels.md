@@ -95,6 +95,26 @@ controller and default entry catalog. Denied keys share a
 not-found presentation. Close replaces the nested URL with the workspace URL;
 revocation and scope changes discard the intent and draft without reopening.
 
+Student file submission (`#42`, `HU-ACT-003` part 1/2) fills the `Entrega` tab
+of `ActivityDetailPage` via the `ActivityDetailRoute` wrapper
+(`submission/activity-detail-route.tsx`). The panel
+(`SubmissionPanel`) reads only `GET /activities/{activityId}/submissions/me`
+(non-cacheable: `staleTime 0`, `gcTime 0`, user+classroom+activity-scoped
+query key) and renders the server-confirmed submission — status, files, late
+badge — with the short-lived signed `downloadUrl` opened as a link and never
+logged, persisted, or composed client-side. A `404` renders the upload form:
+native multiple file input with inline contract pre-checks (1–5 files,
+pdf/png/jpg/jpeg/docx, ≤ 10 MB each, selection preserved), an
+aria-announced progress bar with expected cancellation, synchronous
+duplicate-click guards, and window pre-checks (not open yet / closed without
+late allowance) that disable the submit with the reason for display only — the
+server clock remains the authority. Uploads go through the XHR-based
+`submitActivityFiles` with one client-generated `Idempotency-Key` per attempt
+reused across retries; uncertain outcomes (network, `5xx`) are reconciled
+through read-own before any resubmission offer. `MULTIPLE_CHOICE` activities
+keep the pending note (part 2/2 out of scope), and teacher review stays
+`HU-ACT-004`.
+
 Product components beyond the unified `activities` panel (`#41` inbox + `#39` teacher editor, [doc](./classroom-activities.md)), the staff `members` roster (`#33`), capability-gated invitations/join-code tab (`#32`), study `material` manager (`#40`), `notices` announcement board (`#49`), and 2D/3D consumers remain separate stories; this infrastructure does not implement their contents. Note for `#41` (human-approved scope reconciliation on `2026-11-18`): because backend `Agustin742/integratec-final-back#29` is still open, `ActivitySummaryDto` and `StudentActivityResponseDto` do not yet expose a server-derived student work status (`Pending`/`Submitted`/`Graded`/`Overdue`) or `canSubmit` flag, so `ActivitiesPanel` and `ActivityDetailPage` render only server-confirmed metadata and deadlines in the school `timeZone` without deriving overdue state from the browser clock (`rules/activities-and-grading.md`, `rules/data-and-time.md`), deferring student status/overdue/`canSubmit` UI until `back#29` lands. Backend
 [B (#93)](https://github.com/Agustin742/integratec-final-back/pull/93) is consumed by
 one workspace-owned authenticated fetch stream. Connection, invalidation hints
@@ -130,7 +150,10 @@ manager (`MaterialPanel`, `e2e/study-materials.spec.ts`) at
 [360px](./assets/classrooms/study-materials-360.png), and the `#41`
 student activity inbox (`ActivitiesPanel`, `e2e/activities-inbox.spec.ts`) at
 [1280px](./assets/classrooms/activities-inbox-1280.png) and
-[360px](./assets/classrooms/activities-inbox-360.png), and the `#49`
+[360px](./assets/classrooms/activities-inbox-360.png), the `#42` student
+file submission tab (`SubmissionPanel`, `e2e/activity-submission.spec.ts`) at
+[1280px](./assets/classrooms/activity-submission-1280.png) and
+[360px](./assets/classrooms/activity-submission-360.png), and the `#49`
 announcements notice board (`NoticeBoardPanel`, `e2e/announcements.spec.ts`) at
 [1280px](./assets/classrooms/announcements-1280.png) and
 [360px](./assets/classrooms/announcements-360.png). Pending entries show
