@@ -75,3 +75,13 @@ handlers `createStudentReportCardHandler`, `createOwnDailyMetricsHandler` and
 contract-shaped fixtures with `400`/`401`/`403`/`404` failure options, so UI
 work runs before the backend implementation lands (FD9). A passing mock is not
 integration proof.
+
+## UI evidence
+
+Desktop 1280px, student view (report card section):
+
+![Student report card at 1280px](./assets/grades/grades-1280.png)
+
+Mobile 360px, student view (report card section):
+
+![Student report card at 360px](./assets/grades/grades-360.png)
