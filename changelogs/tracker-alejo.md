@@ -484,3 +484,12 @@
 - **Reason:** Tarjeta 52: the user (Alejo) asked to correct the PR in an isolated worktree and to take the author's note into account.
 - **Verification:** RED reproduced on desktop 1280 and mobile 360 (spec failed at the old `Funcionalidad pendiente` expectation); fix mocks `GET /classrooms/{id}/me/report-card` + `me/activity-metrics` and asserts the unified report-card view. Full spec GREEN 4/4; `pnpm lint`, `pnpm typecheck`, Prettier (`--end-of-line auto`, CRLF worktree), `git diff --check` pass; `e2e/activity-forum.spec.ts` unaffected (2/2). Vitest not applicable (e2e-only change touches no application code). Screenshot churn from reruns reverted (`docs/assets/grading/`).
 - **Next step:** User decides push/merge: branch `fix/52-activity-forum-review` (1 commit) can be pushed and merged into `feat/52-activity-forum` (PR #108) or cherry-picked into a separate follow-up PR to `develop`, per Calegaris's note.
+
+## 2026-11-19 — Daily review modal and daily question for the streak (#55)
+
+- **Status:** in-progress
+- **Area / files:** `src/features/daily-review/` (new), `src/app/router/app-shell.tsx`, `src/test/msw/handlers.ts`, `e2e/daily-review.spec.ts`, docs.
+- **Change:** Implement issue #55 (HU-BOT-003): once-per-day daily review modal after first authenticated connection; student daily question with server-confirmed streak feedback; teacher review-only; parent excluded; structured fallback rendering. Server decides eligibility; FD9 provisional contract until back#42 lands.
+- **Reason:** Card #55 requested by the user; isolated worktree `odd/worktrees/55-daily-review` on branch `feat/55-daily-review-modal` to avoid conflicts with other agents.
+- **Verification:** Pending — planned: RED-first service/component tests, full local check suite per `rules/quality-and-testing.md`.
+- **Next step:** T1 contract layer (zod schemas, service, MSW handlers).
