@@ -1122,7 +1122,6 @@ export function createClassroomActivityMetricsPredicate(
   return createGradesPredicate(userId, classroomId, 'classroom-metrics');
 }
 
-
 export type ShopItemKindFilter =
   'CLASSROOM_ITEM' | 'AVATAR_ACCESSORY' | 'DESK_UPGRADE' | 'PET_ACCESSORY';
 
