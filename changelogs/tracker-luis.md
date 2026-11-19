@@ -1,5 +1,14 @@
 # Tracker — Luis
 
+## 2026-11-19 — Per-activity query forum tab (#52)
+
+- **Status:** completed (`feat/52-activity-forum` branched from `origin/develop` `3e2961d`; Ubuntu CI full suite runs on push).
+- **Area / files:** `src/api/query-keys.ts`, `src/features/classrooms/activities/forum/*` (`forum-messages.ts`, `forum-schema.ts`, `forum-service.ts`, `activity-forum-panel.tsx` and tests), `src/features/classrooms/activities/activity-detail-page.tsx` (`forum` tab gating only), `src/features/classrooms/activities/submission/activity-detail-route.tsx` (`renderForumTab` wiring), `src/test/msw/handlers.ts`, `e2e/activity-forum.spec.ts`, `docs/assets/forum/*.png`, `docs/classroom-forum.md`, `docs/classroom-activities.md`, `docs/threat-model.md` (`TM-043`–`TM-044`, Focus Path `#22`, renumbered after merging `develop` with `#44`/`#48`/`#53`/`#54`/`#47`), `docs/ai-usage.md`, and this tracker.
+- **Change:** Implemented [#52](https://github.com/Agustin742/integratec-final-front/issues/52) (`HU-COM-003` MVP Core forum tab): per-activity thread list and thread detail with paginated/sorted posts, body-only thread creation and replies (backend `#39` contract has no `title`), multiline plain-text rendering, jitless Zod validation (trimmed `1..2000`, control characters rejected except `\n`/`\r`/`\t`), optional non-blocking `/members` enrichment for author names and role badges, uncertain-write reconciliation, draft preservation, out-of-range recovery, and bounded `403`/`404` cleanup. Parents (no `publish_content`/`participate_activities`) never see the forum tab.
+- **Reason:** Deliver the per-activity communication loop for MVP Core without conflicting with open PRs `#101` (`#44`) and `#102` (`#48`).
+- **Verification:** Local Windows checks: `pnpm.cmd lint` and `pnpm.cmd typecheck` passed; targeted Vitest passed **34/34 across 5 files (`0` skipped)** (`forum-schema.test.ts` 2/2, `forum-service.test.ts` 2/2, `activity-forum-panel.test.tsx` 5/5, `activities-panel.test.tsx` 10/10, `submission-panel.test.tsx` 15/15); `pnpm.cmd build` (`536` modules), `pnpm.cmd security:check`, `pnpm.cmd assets:check` (`22` pass, `3` recorded exceptions), and `pnpm.cmd build:e2e` (`538` modules) passed; Playwright E2E `e2e/activity-forum.spec.ts` passed **2/2** (desktop `1280px` and mobile `360px`) and the four screenshots were visually inspected. Disclosure: full Vitest regression, `actionlint`, and bash-dependent CI tests are delegated to Ubuntu GitHub Actions; all unit/RTL/MSW/Playwright checks use synthetic responses rather than a live backend.
+- **Next step:** Open PR against `develop`, move `#52` to `In review`, and monitor Ubuntu CI.
+
 ## 2026-11-19 — Classroom shop catalog and idempotent purchase flow (#48)
 
 - **Status:** completed (local implementation, DoD audit fixes, Playwright E2E desktop/mobile captures, and verification complete on `feat/48-classroom-shop`; Ubuntu CI full regression suite runs on push).

@@ -5871,3 +5871,452 @@ export function createClassroomBotStore(
     ],
   };
 }
+
+export interface ForumStorePost {
+  readonly id: string;
+  readonly threadId: string;
+  readonly authorId: string;
+  readonly body: string;
+  readonly createdAt: string;
+}
+
+export interface ForumStoreThread {
+  readonly id: string;
+  readonly classroomId: string;
+  readonly activityId: string;
+  readonly authorId: string;
+  readonly createdAt: string;
+  readonly posts: readonly ForumStorePost[];
+}
+
+export interface ForumStoreMember {
+  readonly id: string;
+  readonly userId: string;
+  readonly displayName: string;
+  readonly role: 'TEACHER' | 'STUDENT';
+}
+
+export type ForumStoreOp =
+  'listThreads' | 'createThread' | 'listPosts' | 'createPost' | 'members';
+
+export type ForumStoreFailure =
+  MswErrorResponseSpec | 'network' | 'drop-response' | 'malformed-2xx';
+
+export interface ActivityForumStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId: string;
+  readonly activityId: string;
+  readonly currentUserId?: string;
+  readonly role?: 'TEACHER' | 'STUDENT' | 'PARENT';
+  readonly adultMode?: boolean;
+  readonly members?: readonly ForumStoreMember[];
+  readonly initialThreads?: readonly ForumStoreThread[];
+  readonly writeDelayMs?: number;
+}
+
+export interface ActivityForumStore {
+  readonly handlers: readonly HttpHandler[];
+  getThreads: () => readonly ForumStoreThread[];
+  setRole: (role: 'TEACHER' | 'STUDENT' | 'PARENT') => void;
+  setCurrentUserId: (userId: string) => void;
+  failNext: (op: ForumStoreOp, failure: ForumStoreFailure) => void;
+  getCounts: () => Record<ForumStoreOp, number>;
+}
+
+/**
+ * Stateful contract-faithful MSW store for per-activity query forum
+ * (`HU-COM-003`, backend `#39`) plus directory lookup (`GET /members`).
+ */
+export function createActivityForumStore(
+  options: ActivityForumStoreOptions,
+): ActivityForumStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  let currentUserId =
+    options.currentUserId ?? '00000000-0000-4000-8000-000000007001';
+  let currentRole = options.role ?? 'STUDENT';
+  const adultMode = options.adultMode ?? false;
+  let threads: ForumStoreThread[] = [...(options.initialThreads ?? [])];
+  const members: ForumStoreMember[] = [...(options.members ?? [])];
+  let seq = 100;
+
+  const pending: Partial<Record<ForumStoreOp, ForumStoreFailure>> = {};
+  const counts: Record<ForumStoreOp, number> = {
+    listThreads: 0,
+    createThread: 0,
+    listPosts: 0,
+    createPost: 0,
+    members: 0,
+  };
+
+  const consumeFailure = (op: ForumStoreOp): ForumStoreFailure | undefined => {
+    const failure = pending[op];
+    pending[op] = undefined;
+    return failure;
+  };
+
+  const respondFailure = (failure: ForumStoreFailure): Response => {
+    if (failure === 'network' || failure === 'drop-response') {
+      return HttpResponse.error();
+    }
+    if (failure === 'malformed-2xx') {
+      return HttpResponse.json({ broken: true }, { status: 200 });
+    }
+    return createErrorEnvelopeResponse(failure.status, failure.body);
+  };
+
+  const checkAccess = (
+    classroomId: string,
+    activityId: string,
+  ): Response | null => {
+    if (
+      classroomId !== options.classroomId ||
+      activityId !== options.activityId
+    ) {
+      return createErrorEnvelopeResponse(404, {
+        code: 'NOT_FOUND',
+        message: 'Activity not found.',
+        correlationId: 'req-forum-404',
+      });
+    }
+    if (currentRole === 'PARENT') {
+      if (adultMode) {
+        return createErrorEnvelopeResponse(404, {
+          code: 'NOT_FOUND',
+          message: 'Activity not found.',
+          correlationId: 'req-forum-parent-404',
+        });
+      }
+      return createErrorEnvelopeResponse(403, {
+        code: 'FORBIDDEN',
+        message: 'Parents cannot access the activity forum.',
+        correlationId: 'req-forum-parent-403',
+      });
+    }
+    return null;
+  };
+
+  const validateForumBody = (
+    raw: unknown,
+  ): { ok: true; body: string } | { ok: false; response: Response } => {
+    if (typeof raw !== 'string') {
+      return {
+        ok: false,
+        response: createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Invalid body.',
+          details: [{ field: 'body', messages: ['Body must be a string'] }],
+          correlationId: 'req-forum-400',
+        }),
+      };
+    }
+    if (
+      [...raw].some((char) => {
+        const code = char.charCodeAt(0);
+        return (
+          (code <= 0x1f && code !== 0x09 && code !== 0x0a && code !== 0x0d) ||
+          (code >= 0x7f && code <= 0x9f)
+        );
+      })
+    ) {
+      return {
+        ok: false,
+        response: createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Invalid control characters.',
+          details: [
+            { field: 'body', messages: ['Disallowed control characters'] },
+          ],
+          correlationId: 'req-forum-400-ctrl',
+        }),
+      };
+    }
+    const trimmed = raw.trim();
+    if (trimmed.length < 1 || trimmed.length > 2000) {
+      return {
+        ok: false,
+        response: createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Invalid length.',
+          details: [
+            { field: 'body', messages: ['Length must be between 1 and 2000'] },
+          ],
+          correlationId: 'req-forum-400-len',
+        }),
+      };
+    }
+    return { ok: true, body: trimmed };
+  };
+
+  return {
+    getThreads: () => threads,
+    setRole: (role) => {
+      currentRole = role;
+    },
+    setCurrentUserId: (userId) => {
+      currentUserId = userId;
+    },
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    getCounts: () => ({ ...counts }),
+    handlers: [
+      http.get(`${baseUrl}/classrooms/:id/members`, ({ params }) => {
+        counts.members += 1;
+        const failure = consumeFailure('members');
+        if (failure !== undefined) {
+          return respondFailure(failure);
+        }
+        if (String(params.id ?? '') !== options.classroomId) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Classroom not found.',
+            correlationId: 'req-forum-members-404',
+          });
+        }
+        if (currentRole === 'PARENT') {
+          return createErrorEnvelopeResponse(403, {
+            code: 'FORBIDDEN',
+            message: 'Forbidden.',
+            correlationId: 'req-forum-members-403',
+          });
+        }
+        return HttpResponse.json({
+          items: members,
+          page: 1,
+          pageSize: 100,
+          total: members.length,
+        });
+      }),
+      http.get(
+        `${baseUrl}/classrooms/:id/activities/:activityId/forum/threads`,
+        ({ params, request }) => {
+          counts.listThreads += 1;
+          const failure = consumeFailure('listThreads');
+          if (failure !== undefined) {
+            return respondFailure(failure);
+          }
+
+          const denied = checkAccess(
+            String(params.id ?? ''),
+            String(params.activityId ?? ''),
+          );
+          if (denied) return denied;
+
+          const url = new URL(request.url);
+          const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+          const pageSize = Math.min(
+            100,
+            Math.max(1, Number(url.searchParams.get('pageSize') ?? '20')),
+          );
+          const sort = url.searchParams.get('sort') ?? '-createdAt';
+
+          const sorted = [...threads].sort((a, b) => {
+            const diff =
+              sort === 'createdAt'
+                ? Date.parse(a.createdAt) - Date.parse(b.createdAt)
+                : Date.parse(b.createdAt) - Date.parse(a.createdAt);
+            return diff !== 0 ? diff : a.id.localeCompare(b.id);
+          });
+
+          const start = (page - 1) * pageSize;
+          const items = sorted.slice(start, start + pageSize).map((t) => ({
+            id: t.id,
+            activityId: t.activityId,
+            authorId: t.authorId,
+            firstPostBody: t.posts[0]?.body ?? '',
+            replyCount: Math.max(0, t.posts.length - 1),
+            createdAt: t.createdAt,
+          }));
+
+          return HttpResponse.json({
+            items,
+            page,
+            pageSize,
+            total: sorted.length,
+          });
+        },
+      ),
+      http.post(
+        `${baseUrl}/classrooms/:id/activities/:activityId/forum/threads`,
+        async ({ params, request }) => {
+          counts.createThread += 1;
+          if (options.writeDelayMs) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, options.writeDelayMs),
+            );
+          }
+          const failure = consumeFailure('createThread');
+          if (
+            failure !== undefined &&
+            failure !== 'drop-response' &&
+            failure !== 'malformed-2xx'
+          ) {
+            return respondFailure(failure);
+          }
+
+          const denied = checkAccess(
+            String(params.id ?? ''),
+            String(params.activityId ?? ''),
+          );
+          if (denied) return denied;
+
+          const payload = (await request.json()) as { body?: unknown };
+          const validated = validateForumBody(payload.body);
+          if (!validated.ok) return validated.response;
+
+          seq += 1;
+          const now = new Date(
+            Date.parse('2026-11-19T03:00:00.000Z') + seq * 1000,
+          ).toISOString();
+          const threadId = `00000000-0000-4000-8000-40000000${String(seq).padStart(4, '0')}`;
+          const postId = `00000000-0000-4000-8000-50000000${String(seq).padStart(4, '0')}`;
+          const post: ForumStorePost = {
+            id: postId,
+            threadId,
+            authorId: currentUserId,
+            body: validated.body,
+            createdAt: now,
+          };
+          const created: ForumStoreThread = {
+            id: threadId,
+            classroomId: options.classroomId,
+            activityId: options.activityId,
+            authorId: currentUserId,
+            createdAt: now,
+            posts: [post],
+          };
+          threads = [created, ...threads];
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+          if (failure === 'malformed-2xx') {
+            return HttpResponse.json({ broken: true }, { status: 201 });
+          }
+
+          return HttpResponse.json(
+            {
+              id: created.id,
+              activityId: created.activityId,
+              authorId: created.authorId,
+              posts: created.posts,
+              createdAt: created.createdAt,
+            },
+            { status: 201 },
+          );
+        },
+      ),
+      http.get(
+        `${baseUrl}/classrooms/:id/activities/:activityId/forum/threads/:threadId/posts`,
+        ({ params, request }) => {
+          counts.listPosts += 1;
+          const failure = consumeFailure('listPosts');
+          if (failure !== undefined) {
+            return respondFailure(failure);
+          }
+
+          const denied = checkAccess(
+            String(params.id ?? ''),
+            String(params.activityId ?? ''),
+          );
+          if (denied) return denied;
+
+          const thread = threads.find((t) => t.id === params.threadId);
+          if (!thread) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Thread not found.',
+              correlationId: 'req-forum-thread-404',
+            });
+          }
+
+          const url = new URL(request.url);
+          const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+          const pageSize = Math.min(
+            100,
+            Math.max(1, Number(url.searchParams.get('pageSize') ?? '20')),
+          );
+          const sort = url.searchParams.get('sort') ?? 'createdAt';
+
+          const sorted = [...thread.posts].sort((a, b) => {
+            const diff =
+              sort === '-createdAt'
+                ? Date.parse(b.createdAt) - Date.parse(a.createdAt)
+                : Date.parse(a.createdAt) - Date.parse(b.createdAt);
+            return diff !== 0 ? diff : a.id.localeCompare(b.id);
+          });
+
+          const start = (page - 1) * pageSize;
+          return HttpResponse.json({
+            items: sorted.slice(start, start + pageSize),
+            page,
+            pageSize,
+            total: sorted.length,
+          });
+        },
+      ),
+      http.post(
+        `${baseUrl}/classrooms/:id/activities/:activityId/forum/threads/:threadId/posts`,
+        async ({ params, request }) => {
+          counts.createPost += 1;
+          if (options.writeDelayMs) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, options.writeDelayMs),
+            );
+          }
+          const failure = consumeFailure('createPost');
+          if (
+            failure !== undefined &&
+            failure !== 'drop-response' &&
+            failure !== 'malformed-2xx'
+          ) {
+            return respondFailure(failure);
+          }
+
+          const denied = checkAccess(
+            String(params.id ?? ''),
+            String(params.activityId ?? ''),
+          );
+          if (denied) return denied;
+
+          const thread = threads.find((t) => t.id === params.threadId);
+          if (!thread) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Thread not found.',
+              correlationId: 'req-forum-thread-404',
+            });
+          }
+
+          const payload = (await request.json()) as { body?: unknown };
+          const validated = validateForumBody(payload.body);
+          if (!validated.ok) return validated.response;
+
+          seq += 1;
+          const now = new Date(
+            Date.parse('2026-11-19T03:00:00.000Z') + seq * 1000,
+          ).toISOString();
+          const post: ForumStorePost = {
+            id: `00000000-0000-4000-8000-50000000${String(seq).padStart(4, '0')}`,
+            threadId: thread.id,
+            authorId: currentUserId,
+            body: validated.body,
+            createdAt: now,
+          };
+          threads = threads.map((t) =>
+            t.id === thread.id ? { ...t, posts: [...t.posts, post] } : t,
+          );
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+          if (failure === 'malformed-2xx') {
+            return HttpResponse.json({ broken: true }, { status: 201 });
+          }
+
+          return HttpResponse.json(post, { status: 201 });
+        },
+      ),
+    ],
+  };
+}

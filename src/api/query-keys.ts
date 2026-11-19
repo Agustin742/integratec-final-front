@@ -1308,3 +1308,154 @@ export function createClassroomShopPredicate(
     );
   };
 }
+
+export type ForumSortOrder = 'createdAt' | '-createdAt';
+
+export interface ForumListQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+  readonly sort?: ForumSortOrder;
+}
+
+export interface NormalizedForumThreadsQueryParams {
+  readonly activityId: string;
+  readonly page: number;
+  readonly pageSize: number;
+  readonly sort: ForumSortOrder;
+}
+
+export interface NormalizedForumPostsQueryParams {
+  readonly activityId: string;
+  readonly threadId: string;
+  readonly page: number;
+  readonly pageSize: number;
+  readonly sort: ForumSortOrder;
+}
+
+export interface ClassroomDirectoryQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+}
+
+export interface NormalizedClassroomDirectoryQueryParams {
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+function normalizeForumSort(
+  value: ForumSortOrder | undefined,
+  fallback: ForumSortOrder,
+): ForumSortOrder {
+  if (value === 'createdAt' || value === '-createdAt') {
+    return value;
+  }
+  return fallback;
+}
+
+/**
+ * Key of `GET /classrooms/{id}/activities/{activityId}/forum/threads` scoped
+ * by `userId` and `classroomId` (`rules/state-management.md`).
+ */
+export function activityForumThreadsQueryKey(
+  userId: string,
+  classroomId: string,
+  activityId: string,
+  params: ForumListQueryParams = {},
+): ScopedQueryKey<NormalizedForumThreadsQueryParams> {
+  const normalizedParams = Object.freeze({
+    activityId: normalizeRequiredText(activityId, 'activityId'),
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 10, 1, 100),
+    sort: normalizeForumSort(params.sort, '-createdAt'),
+  });
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'activities',
+    'forum-threads',
+    normalizedParams,
+  );
+}
+
+/**
+ * Key of `GET /classrooms/{id}/activities/{activityId}/forum/threads/{threadId}/posts`
+ * scoped by `userId` and `classroomId`.
+ */
+export function activityForumPostsQueryKey(
+  userId: string,
+  classroomId: string,
+  activityId: string,
+  threadId: string,
+  params: ForumListQueryParams = {},
+): ScopedQueryKey<NormalizedForumPostsQueryParams> {
+  const normalizedParams = Object.freeze({
+    activityId: normalizeRequiredText(activityId, 'activityId'),
+    threadId: normalizeRequiredText(threadId, 'threadId'),
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+    sort: normalizeForumSort(params.sort, 'createdAt'),
+  });
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'activities',
+    'forum-posts',
+    normalizedParams,
+  );
+}
+
+/**
+ * Predicate matching all forum thread/post query entries for one activity owned
+ * by `userId` and `classroomId`.
+ */
+export function createActivityForumPredicate(
+  userId: string,
+  classroomId: string,
+  activityId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  const normalizedActivityId = normalizeRequiredText(activityId, 'activityId');
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+      params?: { activityId?: unknown };
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'activities' &&
+      (segment.resource === 'forum-threads' ||
+        segment.resource === 'forum-posts') &&
+      segment.params?.activityId === normalizedActivityId
+    );
+  };
+}
+
+/**
+ * Key of `GET /classrooms/{id}/members` directory lookup scoped by `userId`
+ * and `classroomId`.
+ */
+export function classroomDirectoryMembersQueryKey(
+  userId: string,
+  classroomId: string,
+  params: ClassroomDirectoryQueryParams = {},
+): ScopedQueryKey<NormalizedClassroomDirectoryQueryParams> {
+  const normalizedParams = Object.freeze({
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 100, 1, 100),
+  });
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'classrooms',
+    'members-directory',
+    normalizedParams,
+  );
+}

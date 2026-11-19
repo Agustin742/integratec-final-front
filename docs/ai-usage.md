@@ -109,6 +109,12 @@ Course declaration of AI use in the development process (see [course requirement
 - **Assistance and correction:** AI-assisted implementation built the `userId`-scoped query hook, jitless Zod schemas, MSW handler, accessible streak/badge cards, and unit/RTL/`axe-core`/Playwright tests; test execution caught a multi-match query assertion in `streak-and-badges-section.test.tsx` (`findAllByText('3 días')`).
 - **Verification boundary:** Local verification ran lint, typecheck, `streak-badge-service.test.ts` + `streak-and-badges-section.test.tsx` + `profile-page.test.tsx`, production build, `security:check`, Prettier, focused Playwright `e2e/profile.spec.ts` (desktop `1280px` and mobile `360px` with screenshot inspection), and `git diff --check` against synthetic MSW/route fixtures. Full Ubuntu CI regression runs on push; human review and merge approval remain required.
 
+## Per-activity query forum tab (#52)
+
+- **Human scope decision:** The contributor selected [issue #52](https://github.com/Agustin742/integratec-final-front/issues/52) (`HU-COM-003` MVP Core part) on `feat/52-activity-forum`, implementing an isolated module under `src/features/classrooms/activities/forum/` wired via `renderForumTab` in `ActivityDetailRoute` alongside `#42`'s `renderSubmissionTab` without touching `review` or grading/shop paths.
+- **Useful assistance:** AI-assisted triangulation against `schema.generated.ts` and backend `#39` (`activity-forum.dto.ts` / `activity-forum.service.ts`) verified that threads have no `title` field (`{ body }` only), `ForumBody()` permits multiline text (`\n`/`\r`/`\t`) with a `2000`-char limit, forum DTOs return only `authorId` (so optional `/members` enrichment degrades gracefully when absent), and `PARENT` callers are denied with `403`/`404`.
+- **Verification boundary:** Local verification runs lint, typecheck, targeted Vitest suites, production build, `security:check`, Prettier, `check_docs.py`, Playwright E2E (`e2e/activity-forum.spec.ts` desktop `1280px` and mobile `360px` with inspected screenshots), and `git diff --check` against synthetic MSW/route fixtures. Full Ubuntu CI regression runs on push; human review and merge approval remain required.
+
 ## Data handling
 
 Secrets, credentials, and real personal data are not submitted to AI tools, per [Responsible AI usage](../rules/ai-usage.md#data-handling).
