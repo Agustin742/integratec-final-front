@@ -8,12 +8,14 @@ activity inbox and detail navigation unified with
 [`#39`](https://github.com/Agustin742/integratec-final-front/issues/39)
 teacher editor, multiple-choice builder, one-way publish flow, and deactivation — see the [activities feature doc](./classroom-activities.md)),
 `material` renders `MaterialPanel` ([`#40`](https://github.com/Agustin742/integratec-final-front/issues/40)),
+`grades` renders `ClassroomGradesPanel` ([`#44`](https://github.com/Agustin742/integratec-final-front/issues/44)
+teacher grading queue, submission viewer, and grading/regrading workflow for `publish_content`-authorized staff, while showing the honest pending state to students and parents — see the [grading feature doc](./classroom-grading.md)),
 `notices` renders `NoticeBoardPanel` ([`#49`](https://github.com/Agustin742/integratec-final-front/issues/49)),
 and `members` renders `ClassroomMembersPanel`
 ([`HU-AUL-003`](https://github.com/Agustin742/integratec-final-front/issues/33)
 `ClassroomRosterPanel` and capability-gated [`HU-AUL-002`](https://github.com/Agustin742/integratec-final-front/issues/32)
 `ClassroomInvitationsPanel` for `invite_members`-authorized email invitations and one-time classroom join codes), while the remaining
-five entries display the shared, honest “Funcionalidad pendiente” state until
+four entries display the shared, honest “Funcionalidad pendiente” state until
 their respective stories land.
 
 ## Approved scope reconciliation
@@ -29,7 +31,7 @@ the issue; team acceptance of the reconciled criterion remains part of PR review
 | -------------- | ---------------------------------------------------- |
 | `activities`   | Actividades (`ActivitiesPanel`, `#41` + `#39`)       |
 | `material`     | Material (`MaterialPanel`, `#40`)                    |
-| `grades`       | Calificaciones                                       |
+| `grades`       | Calificaciones (`ClassroomGradesPanel`, `#44`)       |
 | `chat`         | Chat                                                 |
 | `notices`      | Avisos (`NoticeBoardPanel`, `#49`)                   |
 | `shop`         | Tienda                                               |

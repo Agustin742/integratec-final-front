@@ -86,6 +86,14 @@ function setup(
             total: 0,
           });
         }
+        if (url.pathname.endsWith('/submissions')) {
+          return Response.json({
+            items: [],
+            page: 1,
+            pageSize: 10,
+            total: 0,
+          });
+        }
         const id = url.pathname.split('/').pop();
         return status !== 200
           ? new Response(null, { status })
@@ -221,6 +229,18 @@ test('default catalog opens members with tabs when invite_members is granted', a
   expect(
     await screen.findByRole('heading', { name: 'Código de acceso al aula' }),
   ).toBeVisible();
+});
+
+test('default catalog opens grades with teacher grading queue when publish_content is granted', async () => {
+  setup(['grades'], '/classrooms/a/panels/grades', true, ['publish_content']);
+  const dialog = await screen.findByRole('dialog', { name: 'Calificaciones' });
+  expect(
+    await within(dialog).findByRole('heading', { name: 'Cola de corrección' }),
+  ).toBeVisible();
+  expect(
+    await within(dialog).findByText('Todavía no hay entregas para revisar'),
+  ).toBeVisible();
+  expect(dialog).not.toHaveTextContent('Funcionalidad pendiente');
 });
 
 test.each(pendingCatalogCases)(
