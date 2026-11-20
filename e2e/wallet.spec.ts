@@ -156,6 +156,9 @@ test.beforeEach(async ({ page, baseURL }) => {
       expect(request.headers().authorization).toBe('Bearer synthetic-access');
       return route.fulfill({ json: profile });
     }
+    if (url.origin === apiOrigin && url.pathname === '/users/me/daily-review') {
+      return route.fulfill({ json: { status: 'not_due' } });
+    }
     if (
       url.origin === apiOrigin &&
       url.pathname === '/notifications' &&
