@@ -3,7 +3,10 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { StrictMode, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiQueryProvider, createAppQueryClient } from '@/api/query-client';
-import { classroomChatHistoryQueryKey } from '@/api/query-keys';
+import {
+  chatInboxQueryKey,
+  classroomChatHistoryQueryKey,
+} from '@/api/query-keys';
 import { fakeSession } from '@/app/router/fake-session';
 import { ClassroomRealtimeProvider } from '@/realtime/classroom-realtime-provider';
 import { SessionProvider } from '@/session/provider';
@@ -129,6 +132,19 @@ describe('useClassroomChatLive', () => {
       hiddenById: null,
     });
     expect(t.sdk.joinedClassrooms).toEqual([CLASSROOM_ID]);
+  });
+
+  it('marks the chat inbox stale when a message arrives', async () => {
+    const t = setup();
+    const room = await t.room();
+    t.invalidate.mockClear();
+
+    act(() => room.emitMessage('chat:message', livePayload(3)));
+
+    expect(t.invalidate).toHaveBeenCalledWith({
+      queryKey: chatInboxQueryKey(profile.id),
+      exact: true,
+    });
   });
 
   it('shows a duplicated event (same id) once', async () => {

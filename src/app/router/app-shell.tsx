@@ -4,6 +4,7 @@ import { LoadingState } from '@/components/feedback/states';
 import { BaseLayout } from '@/components/layout/base-layout';
 import { Button } from '@/components/ui/button';
 import { Toast, toast } from '@/components/ui/toast';
+import { ChatDock } from '@/features/chat-dock/chat-dock';
 import { resetClassroomModeStore } from '@/features/classrooms/classroom-mode-store';
 import { DailyReviewDialog } from '@/features/daily-review/daily-review-dialog';
 import { NotificationCenter } from '@/features/notifications/notification-center';
@@ -109,7 +110,10 @@ export function AppShell() {
       >
         <Outlet />
       </BaseLayout>
-      <Toast />
+      {/* The chat dock owns the bottom-right corner, so toasts move to the
+          bottom-left and never sit on a conversation or its composer. */}
+      <ChatDock />
+      <Toast position="bottom-left" />
     </>
   );
 }

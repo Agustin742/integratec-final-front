@@ -12,11 +12,24 @@ never fabricates, aggregates, or broadcasts anything on its own authority
 
 ## Where it mounts
 
-`ChatPanel` (with its composer slot) registers under the server `chat` panel
-key in `classroomPanelCatalog`
-([classroom panels](./classroom-panels.md)), so it opens from the same 2D
-Classic Mode navigation buttons and URL intents
-(`/classrooms/{id}/panels/chat`) as every other panel. A 3D chat object is not
+The chat has two hosts that share ONE conversation component
+(`ChatConversation`, with the real composer through
+`ChatConversationWithComposer`):
+
+- the workspace panel: `ChatPanel` (with its composer slot) registers under the
+  server `chat` panel key in `classroomPanelCatalog`
+  ([classroom panels](./classroom-panels.md)), so it opens from the same 2D
+  Classic Mode navigation buttons and URL intents
+  (`/classrooms/{id}/panels/chat`) as every other panel. It renders the
+  conversation (`variant="panel"`) filling the dialog, with no extra header;
+- the [floating chat dock](#floating-chat-dock), app-wide (`variant="dock"`).
+
+The panel was kept as a conversation host instead of delegating to the dock:
+the catalog contract is a dialog that renders a prop-less component, so
+"open the dock and close the dialog" would couple the panel registry, focus
+restoration and the route to a widget that does not exist in every render
+tree. Both hosts share the same history cache and the same realtime
+connection, so they never disagree. A 3D chat object is not
 required by the issue. Panel visibility comes only from the server's
 `availablePanels` on `GET /classrooms/{id}`; the panel content then branches
 on the server-resolved `myRole`:
@@ -29,11 +42,14 @@ on the server-resolved `myRole`:
 
 ## Read side: conversation with infinite history
 
-`src/features/classrooms/chat/chat-panel.tsx`:
+`src/features/classrooms/chat/chat-conversation.tsx` (the workspace wrapper
+`chat-panel.tsx` only binds it to the route's classroom):
 
-- Layout: the panel fills the dialog as a flex column. Header and composer
-  keep their size and only the message list scrolls, so the composer is always
-  visible (also at 360px). The scroll container disables the browser's own
+- Layout: the conversation fills its host (the panel dialog, or the height of
+  the dock window) as a flex column. There is no inner header: the host
+  titles it, and the section keeps its accessible name (`Chat del aula`) with a
+  visually hidden heading. The composer keeps its size and only the message
+  list scrolls, so the composer is always visible (also at 360px). The scroll container disables the browser's own
   scroll anchoring and keeps the reader's position manually.
 - History comes from `GET /classrooms/{id}/messages` (`ChatController_list`,
   20 rows per page, server-fixed order `createdAt DESC, id DESC`, latest
@@ -90,8 +106,8 @@ New messages and moderation hides arrive through the Colyseus classroom room
   (`src/realtime/classroom-realtime-manager.ts`): at most one Colyseus
   connection per classroom, reference-counted by subscribers and capped at
   `MAX_CONNECTIONS_PER_USER`. It closes shortly after the last subscriber
-  leaves and retries transient failures with backoff. Any chat UI (this panel
-  today, a floating chat later) calls `useClassroomChatLive(classroomId)`
+  leaves and retries transient failures with backoff. Any chat UI (the panel
+  and the floating dock) calls `useClassroomChatLive(classroomId)`
   and shares that connection.
 - **Cache first.** Every payload is validated against the generated contract
   (`chatMessagePayloadSchema`, `chatMessageHiddenPayloadSchema`) and ignored
@@ -107,7 +123,14 @@ New messages and moderation hides arrive through the Colyseus classroom room
   query domain).
 - **Presence side effect.** Joining the classroom room registers the user's
   avatar and connected time on the server for as long as the connection is
-  open, whether or not the 3D view is shown.
+  open, whether or not the 3D view is shown. For that reason the dock joins a
+  classroom room ONLY while that conversation is open and expanded: listing
+  the chats, minimizing or closing the window releases the connection (the
+  manager closes it right after the last subscriber leaves). Unread counts for
+  chats that are not open come from polling the inbox, not from the room.
+- **Inbox follows.** Each `chat:message` also marks the chat inbox stale, so
+  the last message and unread count of an open chat refresh without waiting
+  for the poll.
 
 REST stays the rendering authority
 ([communication and notifications](../rules/communication-and-notifications.md)).
@@ -138,6 +161,12 @@ REST stays the rendering authority
   option, Escape closes the list without changing the text, and a mouse click
   selects without stealing focus. Selecting inserts `@DisplayName ` as plain
   text; the server resolves or ignores it.
+- Compact layout: the draft starts at one row and grows up to about five rows
+  (then scrolls); the send button sits next to it; the label is visually
+  hidden. A single small muted line below holds the send hint, and the
+  character counter appears on that same line only from 90% of the limit
+  (1800 of 2000, raw length including whitespace, the same count `maxLength`
+  applies). The hint and counter are the textbox description.
 - Enter sends and Shift+Enter inserts a newline (Enter during IME composition
   or while the mention list is open never sends); a short hint is visible.
   While sending, the button shows `Enviando…` and the textarea is read-only
@@ -159,6 +188,52 @@ REST stays the rendering authority
   ([error handling](../rules/error-handling-and-feedback.md)).
 - Typing in the composer never triggers world movement or shortcuts: the
   workspace shortcut listener ignores editable targets and open dialogs.
+
+## Floating chat dock
+
+`src/features/chat-dock/` mounts once in the authenticated `AppShell`
+(`ChatDock`): a LinkedIn / Facebook style messenger fixed at the bottom-right
+of every screen. It shows nothing for signed-out visitors, parents (the inbox
+returns no chats for them) and users without chats.
+
+- **Launcher.** A compact bar `Mensajes` with the total unread badge; a button
+  with `aria-expanded`, named `Mensajes, N mensajes sin leer`. It expands a
+  list of the user's classroom chats, latest activity first (server order):
+  classroom name, last message as `Author: preview` (own messages read
+  `Vos`), time (`HH:mm` today, `Ayer` or the date) and an unread badge. Each
+  entry is a button whose accessible name includes the unread count.
+- **Conversation window.** Choosing a chat opens ONE window (22rem wide, up to
+  `min(32rem, 70vh)` tall) next to the launcher: a slim header (back on small
+  screens, classroom name, minimize/expand, close) over the shared
+  conversation, which takes the remaining height. Minimized it collapses to
+  its header bar (with the unread badge); closing removes it. Choosing another
+  chat replaces the open one. Expanded it is a non-modal
+  `role="dialog"` (focus moves into the draft when it opens, Escape minimizes
+  it, the page stays usable, so it has dialog semantics without a focus
+  trap); minimized it is a labelled `region`. Escape pressed inside the
+  mention list or a portaled moderation dialog does not minimize it.
+- **Focus.** Opening a chat focuses the draft; Escape or minimize keeps focus
+  on the header control; closing returns focus to the chat's list entry (or the
+  launcher when the list is closed); back returns to the list entry.
+- **Small screens (< `sm`).** The expanded list and the conversation are
+  full-screen sheets (`dvh`, safe-area padding) with a back/close button and the
+  composer always visible; the launcher is a floating pill.
+- **State.** List open/closed, open chat and minimized state are remembered for
+  the browser session per user (`sessionStorage`, every access guarded; without
+  storage the dock simply starts closed).
+- **Inbox data.** `src/features/chat-inbox/`: `GET /chats` through jitless Zod
+  schemas and a typed service, one user-scoped query (`chatInboxQueryKey`, its
+  own `chat-inbox` domain so per-classroom chat revalidations never refetch
+  it) polled every 30 seconds and on window focus.
+- **Read markers.** While a conversation is open, the page visible and the
+  newest visible message in view (near the bottom), the newest message id is
+  sent with `PUT /classrooms/{id}/messages/read-marker` after a one second
+  debounce and only when it advances. A `204` zeroes that chat's cached unread
+  count and revalidates the inbox; a `404` (the message was hidden) or `403`
+  is ignored. Hidden rows are never used as the marker.
+- **Layers.** The dock sits at `z-40`, below modal dialogs and sheets (`z-50`)
+  so those still cover it; toasts moved from the bottom-right to the
+  bottom-left so they never cover a conversation or its composer.
 
 ## Muted chat
 
@@ -208,6 +283,10 @@ scope for #51.
   the action is unambiguous for screen-reader users; focus returns to the
   row control when a moderation is denied and to the history list when the
   row's control is gone after a confirmed hide.
+- The dock launcher, list entries and window controls are native buttons with
+  the 44px minimum target height; the window is labelled `Chat de {aula}`, and
+  unread counts are part of the accessible names (the visual badges are
+  hidden from assistive technology to avoid reading them twice).
 - Composer and dialog actions keep the shared 44px minimum target height, and
   the muted state explains itself instead of only disabling the control
   ([UI and accessibility](../rules/ui-and-accessibility.md)).
@@ -221,7 +300,10 @@ mirroring the backend DTOs (`ChatMessageDto`, `ChatHistoryMessageDto`,
 directory rows). The stateful MSW store in `src/test/msw/handlers.ts`
 (`createClassroomChatStore`) serves contract-shaped fixtures with
 `403`/`404`/`429`, muted, and uncertain-write failure options so UI work and
-tests run against the committed contract (FD9). A passing mock is not
+tests run against the committed contract (FD9). `createChatInboxStore` serves
+`GET /chats` and the forward-only read marker (`204`, `404` for unknown or
+hidden messages, `403` for parents) from the same message data, with the
+unread count derived from the marker like the backend does. A passing mock is not
 integration proof.
 
 ## UI evidence

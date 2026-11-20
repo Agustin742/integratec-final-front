@@ -262,7 +262,6 @@ export const classroomMessages = {
   },
   chat: {
     heading: 'Chat del aula',
-    subtitle: (name: string) => `Charlá con tu aula, «${name}».`,
     loading: 'Cargando el chat del aula…',
     listRegionLabel: 'Historial de mensajes del chat',
     scrollRegionLabel: 'Conversación del chat',

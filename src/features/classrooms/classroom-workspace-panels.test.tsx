@@ -356,7 +356,9 @@ test('default catalog opens chat with the composer wired: typing never triggers 
     name: 'Mensaje del chat',
   });
   expect(within(dialog).getByRole('button', { name: 'Enviar' })).toBeVisible();
-  expect(within(dialog).getByText('0/2000 caracteres')).toBeVisible();
+  expect(
+    within(dialog).getByText('Enter envía, Shift+Enter agrega una línea.'),
+  ).toBeVisible();
 
   // Typing in the composer is an editable target: the workspace mode
   // shortcut (Alt+M) must never fire from the chat draft (S4).

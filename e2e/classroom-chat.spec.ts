@@ -338,11 +338,6 @@ test('student reads paginated history, mentions a classmate, sends a server-conf
       exact: true,
     }),
   ).toBeVisible();
-  await expect(
-    dialog.getByText('Charlá con tu aula, «Aula sintética del chat».', {
-      exact: true,
-    }),
-  ).toBeVisible();
 
   const historyList = dialog.getByRole('list', {
     name: 'Historial de mensajes del chat',

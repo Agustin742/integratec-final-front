@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -62,6 +63,8 @@ const RATE_LIMIT_FALLBACK_COOLDOWN_SECONDS = 5;
 const RATE_LIMIT_MAX_COOLDOWN_SECONDS = 60;
 /** Tolerated difference between the browser clock and the server `createdAt`. */
 const CLOCK_SKEW_TOLERANCE_MS = 5_000;
+/** The character counter only appears once the draft is this close to the limit. */
+const COUNTER_VISIBLE_RATIO = 0.9;
 
 /**
  * The `@token` currently being typed at the caret: `tokenStart` points at the
@@ -112,15 +115,34 @@ interface UncertainSend {
  * or ignores it (`rules/communication-and-notifications.md`). The picker is a
  * listbox popup driven from the textarea: focus never leaves it.
  */
-export function ChatComposer() {
-  const { classroomId } = useParams();
+export function ChatComposer({
+  classroomId: classroomIdProp,
+  focusOnMount = false,
+}: ChatComposerProps = {}) {
+  const { classroomId: routeClassroomId } = useParams();
+  const classroomId = (classroomIdProp ?? routeClassroomId)?.trim();
   if (!classroomId) {
     return null;
   }
-  return <ChatComposerHost classroomId={classroomId.trim()} />;
+  return (
+    <ChatComposerHost classroomId={classroomId} focusOnMount={focusOnMount} />
+  );
 }
 
-function ChatComposerHost({ classroomId }: { readonly classroomId: string }) {
+export interface ChatComposerProps {
+  /** Classroom to write to; defaults to the one of the current route. */
+  readonly classroomId?: string;
+  /** Focus the draft as soon as it mounts (the dock does it on open). */
+  readonly focusOnMount?: boolean;
+}
+
+function ChatComposerHost({
+  classroomId,
+  focusOnMount,
+}: {
+  readonly classroomId: string;
+  readonly focusOnMount: boolean;
+}) {
   const context = useClassroomContext(classroomId);
   // The read panel gates this slot: without a server-confirmed classroom
   // context there is no authorized send context to render (S5 parents are
@@ -132,6 +154,7 @@ function ChatComposerHost({ classroomId }: { readonly classroomId: string }) {
     <ChatComposerForm
       key={`${context.userId}:${classroomId}`}
       classroomId={classroomId}
+      focusOnMount={focusOnMount}
       userId={context.userId}
       myRole={context.classroom.myRole}
       chatMuted={context.classroom.chatMuted}
@@ -144,12 +167,14 @@ function ChatComposerHost({ classroomId }: { readonly classroomId: string }) {
 
 function ChatComposerForm({
   classroomId,
+  focusOnMount,
   userId,
   myRole,
   chatMuted,
   canListDirectory,
 }: {
   readonly classroomId: string;
+  readonly focusOnMount: boolean;
   readonly userId: string;
   readonly myRole: ClassroomRole;
   readonly chatMuted: boolean;
@@ -186,6 +211,23 @@ function ChatComposerForm({
   const isMountedRef = useRef(true);
   const abortControllerRef = useRef<AbortController | null>(null);
   const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Auto-grow: one row at rest, up to about five rows (the CSS max height),
+  // then the textarea scrolls. Skipped where layout is unavailable.
+  useLayoutEffect(() => {
+    const element = textareaRef.current;
+    if (element === null) return;
+    element.style.height = 'auto';
+    if (element.scrollHeight > 0) {
+      element.style.height = `${String(element.scrollHeight)}px`;
+    }
+  }, [bodyValue]);
+
+  useEffect(() => {
+    if (focusOnMount) {
+      textareaRef.current?.focus();
+    }
+  }, [focusOnMount]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -506,7 +548,7 @@ function ChatComposerForm({
       }}
       noValidate
       aria-label={chat.composer.regionLabel}
-      className="space-y-3"
+      className="space-y-2"
     >
       <LiveRegion message={announcement} visuallyHidden />
 
@@ -523,11 +565,29 @@ function ChatComposerForm({
       <FormField
         control={form.control}
         name="body"
-        label={chat.composer.bodyLabel}
-        description={chat.composer.charCounter(
-          bodyValue.trim().length,
-          CHAT_MESSAGE_BODY_MAX_LENGTH,
-        )}
+        label={<span className="sr-only">{chat.composer.bodyLabel}</span>}
+        className="gap-1"
+        description={
+          // ONE small muted line: the send hint always, the counter only once
+          // the draft nears the limit (raw length, what `maxLength` counts).
+          <span className="flex flex-wrap justify-between gap-x-3 text-xs">
+            <span>{chat.composer.sendHint}</span>
+            {bodyValue.length >=
+            CHAT_MESSAGE_BODY_MAX_LENGTH * COUNTER_VISIBLE_RATIO ? (
+              <span
+                className={cn(
+                  bodyValue.length >= CHAT_MESSAGE_BODY_MAX_LENGTH &&
+                    'font-semibold text-destructive',
+                )}
+              >
+                {chat.composer.charCounter(
+                  bodyValue.length,
+                  CHAT_MESSAGE_BODY_MAX_LENGTH,
+                )}
+              </span>
+            ) : null}
+          </span>
+        }
       >
         {(field) => {
           const selectSuggestion = (index: number): void => {
@@ -593,50 +653,61 @@ function ChatComposerForm({
 
           return (
             <div className="space-y-2">
-              <textarea
-                {...field}
-                rows={2}
-                maxLength={CHAT_MESSAGE_BODY_MAX_LENGTH}
-                placeholder={chat.composer.bodyPlaceholder}
-                // Read-only (not disabled) while sending: a disabled control
-                // drops focus, and the author keeps typing the next message.
-                readOnly={isSubmitting}
-                aria-busy={isSubmitting}
-                // Stays a native textbox (`combobox` is not allowed on a
-                // textarea): only textbox-valid attributes link the popup.
-                {...(hasMentionPicker
-                  ? {
-                      'aria-autocomplete': 'list' as const,
-                      'aria-controls': isMentionOpen ? listboxId : undefined,
-                      'aria-activedescendant':
-                        activeIndex >= 0 ? optionId(activeIndex) : undefined,
-                    }
-                  : {})}
-                ref={(element) => {
-                  field.ref(element);
-                  textareaRef.current = element;
-                }}
-                onChange={(event) => {
-                  field.onChange(event);
-                  const target = event.currentTarget;
-                  updateActiveMention(
-                    hasMentionPicker
-                      ? findActiveMentionToken(
-                          target.value,
-                          target.selectionStart ?? target.value.length,
-                        )
-                      : null,
-                  );
-                }}
-                onKeyDown={handleKeyDown}
-                className={cn(
-                  'w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors',
-                  'placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  'disabled:cursor-not-allowed disabled:opacity-50',
-                  isSubmitting && 'opacity-70',
-                  field['aria-invalid'] && 'border-destructive',
-                )}
-              />
+              <div className="flex items-end gap-2">
+                <textarea
+                  {...field}
+                  rows={1}
+                  maxLength={CHAT_MESSAGE_BODY_MAX_LENGTH}
+                  placeholder={chat.composer.bodyPlaceholder}
+                  // Read-only (not disabled) while sending: a disabled control
+                  // drops focus, and the author keeps typing the next message.
+                  readOnly={isSubmitting}
+                  aria-busy={isSubmitting}
+                  // Stays a native textbox (`combobox` is not allowed on a
+                  // textarea): only textbox-valid attributes link the popup.
+                  {...(hasMentionPicker
+                    ? {
+                        'aria-autocomplete': 'list' as const,
+                        'aria-controls': isMentionOpen ? listboxId : undefined,
+                        'aria-activedescendant':
+                          activeIndex >= 0 ? optionId(activeIndex) : undefined,
+                      }
+                    : {})}
+                  ref={(element) => {
+                    field.ref(element);
+                    textareaRef.current = element;
+                  }}
+                  onChange={(event) => {
+                    field.onChange(event);
+                    const target = event.currentTarget;
+                    updateActiveMention(
+                      hasMentionPicker
+                        ? findActiveMentionToken(
+                            target.value,
+                            target.selectionStart ?? target.value.length,
+                          )
+                        : null,
+                    );
+                  }}
+                  onKeyDown={handleKeyDown}
+                  className={cn(
+                    'max-h-[7.5rem] min-w-0 flex-1 resize-none overflow-y-auto rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground shadow-xs transition-colors',
+                    'placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    'disabled:cursor-not-allowed disabled:opacity-50',
+                    isSubmitting && 'opacity-70',
+                    field['aria-invalid'] && 'border-destructive',
+                  )}
+                />
+                <Button
+                  type="submit"
+                  className="min-h-11 shrink-0"
+                  disabled={sendBlocked}
+                >
+                  {isSubmitting
+                    ? chat.composer.submitting
+                    : chat.composer.submit}
+                </Button>
+              </div>
 
               {isMentionOpen ? (
                 <ul
@@ -672,10 +743,6 @@ function ChatComposerForm({
                 </ul>
               ) : null}
 
-              <p className="text-xs text-muted-foreground">
-                {chat.composer.sendHint}
-              </p>
-
               {/* Screen-reader notice: suggestions exist and are reachable. */}
               <LiveRegion
                 message={
@@ -687,12 +754,6 @@ function ChatComposerForm({
           );
         }}
       </FormField>
-
-      <div className="flex justify-end">
-        <Button type="submit" className="min-h-11" disabled={sendBlocked}>
-          {isSubmitting ? chat.composer.submitting : chat.composer.submit}
-        </Button>
-      </div>
     </form>
   );
 }

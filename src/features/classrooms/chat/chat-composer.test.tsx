@@ -414,8 +414,25 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
     const textarea = await screen.findByRole('textbox', {
       name: /Mensaje del chat/,
     });
-    expect(screen.getByText('0/2000 caracteres')).toBeVisible();
     expect(textarea).toHaveAttribute('maxlength', '2000');
+    expect(textarea).toHaveAttribute('rows', '1');
+    // One compact footer line: the hint always, the counter only near the limit.
+    const hint = 'Enter envía, Shift+Enter agrega una línea.';
+    expect(screen.getByText(hint)).toBeVisible();
+    expect(screen.queryByText(/caracteres$/)).not.toBeInTheDocument();
+    fireEvent.change(textarea, { target: { value: 'x'.repeat(1799) } });
+    expect(screen.queryByText(/caracteres$/)).not.toBeInTheDocument();
+    fireEvent.change(textarea, { target: { value: 'x'.repeat(1800) } });
+    expect(screen.getByText('1800/2000 caracteres')).toBeVisible();
+    expect(screen.getByText(hint)).toBeVisible();
+    // Raw length, not the trimmed one: whitespace counts toward `maxLength`.
+    fireEvent.change(textarea, { target: { value: ' '.repeat(1800) } });
+    expect(screen.getByText('1800/2000 caracteres')).toBeVisible();
+    // The hint and the counter share the one description of the textbox.
+    const describedBy = textarea.getAttribute('aria-describedby') ?? '';
+    expect(
+      document.getElementById(describedBy.split(' ')[0]),
+    ).toHaveTextContent(hint);
 
     // The browser maxLength blocks typing past the contract limit; a
     // programmatic over-limit value still cannot reach the server.

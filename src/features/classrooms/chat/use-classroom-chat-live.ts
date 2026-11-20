@@ -5,6 +5,7 @@ import {
   type QueryClient,
 } from '@tanstack/react-query';
 import {
+  chatInboxQueryKey,
   createClassroomChatHistoryPredicate,
   createClassroomChatPredicate,
 } from '@/api/query-keys';
@@ -125,6 +126,12 @@ export function useClassroomChatLive(
           { predicate: historyPredicate },
           (data) => prependLiveMessage(data, message),
         );
+        // The chat inbox (last message, unread count) follows the new message;
+        // a no-op fetch-wise unless a dock or inbox view is mounted.
+        void queryClient.invalidateQueries({
+          queryKey: chatInboxQueryKey(userId),
+          exact: true,
+        });
       },
     );
     const offHidden = client.onMessage(

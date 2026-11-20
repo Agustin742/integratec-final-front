@@ -269,6 +269,27 @@ describe('ChatPanel (#51, read side)', () => {
   });
   afterAll(() => mswServer.close());
 
+  it('spends no space on a repeated header: the section keeps its accessible name', async () => {
+    const store = createClassroomChatStore({
+      classroomId: CLASSROOM_ID,
+      currentUserId: STUDENT_ID,
+      role: 'STUDENT',
+      initialMessages: [makeMessage({ body: 'Un mensaje' })],
+      members: makeMembers(),
+    });
+    mswServer.use(...store.handlers);
+
+    renderChatRoute({ role: 'STUDENT', userId: STUDENT_ID });
+
+    expect(await screen.findByText('Un mensaje')).toBeVisible();
+    const section = screen.getByRole('region', { name: 'Chat del aula' });
+    // The heading stays for assistive technology only.
+    expect(
+      within(section).getByRole('heading', { name: 'Chat del aula' }),
+    ).toHaveClass('sr-only');
+    expect(screen.queryByText(/Charlá con tu aula/)).not.toBeInTheDocument();
+  });
+
   it('renders history oldest to newest as safe plain text, with no pager', async () => {
     const history = makeNumberedHistory(25);
     // Created last, so it is the newest message and renders at the bottom.
