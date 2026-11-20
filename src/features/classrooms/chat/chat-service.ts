@@ -46,6 +46,29 @@ export function isUncertainChatWriteError(error: unknown): boolean {
   );
 }
 
+const retryAfterSecondsByError = new WeakMap<ApiError, number>();
+
+/**
+ * Whole seconds the server asked to wait (`Retry-After`) on a rate-limited
+ * chat write, or `null` when the header was absent, not exposed to the
+ * browser or not a plain seconds value.
+ */
+export function chatRetryAfterSeconds(error: unknown): number | null {
+  return error instanceof ApiError
+    ? (retryAfterSecondsByError.get(error) ?? null)
+    : null;
+}
+
+function parseRetryAfterSeconds(
+  value: string | null | undefined,
+): number | null {
+  const trimmed = value?.trim();
+  if (trimmed === undefined || !/^\d+$/.test(trimmed)) {
+    return null;
+  }
+  return Number.parseInt(trimmed, 10);
+}
+
 function markUncertain(error: ApiError): ApiError {
   uncertainChatWriteErrors.add(error);
   return error;
@@ -149,7 +172,18 @@ async function executeChatWrite<T>(
   }
 
   if (result.error !== undefined || !result.response.ok) {
-    throw translateChatWriteError(mapApiError(result.error, result.response));
+    const translated = translateChatWriteError(
+      mapApiError(result.error, result.response),
+    );
+    if (translated.kind === 'rate-limited') {
+      const retryAfter = parseRetryAfterSeconds(
+        result.response.headers?.get('retry-after'),
+      );
+      if (retryAfter !== null) {
+        retryAfterSecondsByError.set(translated, retryAfter);
+      }
+    }
+    throw translated;
   }
 
   const parsed = parse(result.data);

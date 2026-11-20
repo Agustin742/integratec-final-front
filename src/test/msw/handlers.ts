@@ -6806,6 +6806,11 @@ export interface ClassroomChatStoreOptions {
    */
   readonly members?: readonly ChatStoreMember[];
   readonly writeDelayMs?: number;
+  /**
+   * Stamp sent messages with the wall clock instead of the fixed 2026-11-19
+   * timeline, for flows that compare `createdAt` with the real send instant.
+   */
+  readonly wallClockCreatedAt?: boolean;
 }
 
 export interface ClassroomChatStore {
@@ -7300,9 +7305,11 @@ export function createClassroomChatStore(
                   };
                 } else {
                   seq += 1;
-                  const createdAt = new Date(
-                    Date.parse('2026-11-19T03:00:00.000Z') + seq * 1000,
-                  ).toISOString();
+                  const createdAt = options.wallClockCreatedAt
+                    ? new Date(now).toISOString()
+                    : new Date(
+                        Date.parse('2026-11-19T03:00:00.000Z') + seq * 1000,
+                      ).toISOString();
                   const created: ChatStoreMessage = {
                     id: `00000000-0000-4000-8000-60000000${String(seq).padStart(4, '0')}`,
                     authorId: currentUserId,

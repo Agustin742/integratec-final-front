@@ -1,18 +1,22 @@
+import { http } from 'msw';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createApiClient } from '@/api/client';
 import { ApiError } from '@/api/errors';
 import {
+  chatMentionDirectoryQueryKey,
   classroomAnnouncementsQueryKey,
   classroomChatHistoryQueryKey,
   createClassroomChatPredicate,
 } from '@/api/query-keys';
 import {
   createClassroomChatStore,
+  createErrorEnvelopeResponse,
   TEST_API_BASE_URL,
   type ChatStoreMessage,
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
 import {
+  chatRetryAfterSeconds,
   hideClassroomChatMessage,
   isAbortError,
   isUncertainChatWriteError,
@@ -386,6 +390,62 @@ describe('chat-service', () => {
       (error: unknown) =>
         error instanceof ApiError && error.kind === 'unexpected',
     );
+  });
+
+  it('keeps the mention directory key out of the chat domain but scoped by user and classroom', () => {
+    const key = chatMentionDirectoryQueryKey(STUDENT_ID, CLASSROOM_ID, {
+      q: ' sof ',
+      page: 1,
+      pageSize: 20,
+    });
+    // Chat invalidations (send, hide, reconnect) must not touch it.
+    expect(
+      createClassroomChatPredicate(STUDENT_ID, CLASSROOM_ID)({ queryKey: key }),
+    ).toBe(false);
+    expect(key[0].scope).toMatchObject({
+      userId: STUDENT_ID,
+      classroomId: CLASSROOM_ID,
+    });
+    expect(key[0].params).toEqual({ q: 'sof', page: 1, pageSize: 20 });
+    expect(
+      chatMentionDirectoryQueryKey(TEACHER_ID, CLASSROOM_ID, {
+        q: 'sof',
+        page: 1,
+        pageSize: 20,
+      }),
+    ).not.toEqual(key);
+  });
+
+  it('exposes the Retry-After seconds of a rate-limited send, and nothing otherwise', async () => {
+    const store = createClassroomChatStore({
+      classroomId: CLASSROOM_ID,
+      currentUserId: STUDENT_ID,
+      role: 'STUDENT',
+    });
+    mswServer.use(
+      http.post(
+        `${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}/messages`,
+        () => {
+          const response = createErrorEnvelopeResponse(429, {
+            code: 'TOO_MANY_REQUESTS',
+            message: 'Slow down.',
+            correlationId: 'req-retry-after',
+          });
+          response.headers.set('Retry-After', '3');
+          return response;
+        },
+      ),
+      ...store.handlers,
+    );
+    const client = createApiClient({ baseUrl: TEST_API_BASE_URL });
+    const error = await sendClassroomChatMessage(
+      client,
+      CLASSROOM_ID,
+      'hola',
+    ).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ApiError);
+    expect(chatRetryAfterSeconds(error)).toBe(3);
+    expect(chatRetryAfterSeconds(new Error('x'))).toBeNull();
   });
 
   it('scopes chat query keys by userId and classroomId', () => {

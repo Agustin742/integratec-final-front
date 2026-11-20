@@ -1536,10 +1536,10 @@ export function classroomChatHistoryQueryKey(
  * with the `q` case-insensitive display-name prefix filter, backend decision
  * D12) scoped by `userId` and `classroomId`.
  *
- * It deliberately shares the `chat` query domain of the history keys, so the
- * workspace `createClassroomChatPredicate` revalidations (SSE
- * `classroom.context-invalidated` seam, confirmed sends, uncertain-write
- * reconciliation) cover the suggestion source together with the history.
+ * It deliberately lives OUTSIDE the `chat` query domain of the history keys:
+ * the `createClassroomChatPredicate` revalidations (confirmed sends, hides,
+ * live reconnects, SSE context hints) must reconcile the conversation, not
+ * refetch the member directory the mention picker reads on demand.
  */
 export interface ChatMentionDirectoryQueryParams {
   readonly q: string;
@@ -1554,8 +1554,8 @@ export function chatMentionDirectoryQueryKey(
 ): ScopedQueryKey<ChatMentionDirectoryQueryParams> {
   return createScopedQueryKey(
     { userId, classroomId },
-    'chat',
-    'mention-directory',
+    'chat-mentions',
+    'directory',
     Object.freeze({
       q: params.q.trim().slice(0, 100),
       page: params.page,
@@ -1593,4 +1593,18 @@ export function createClassroomChatPredicate(
       segment.domain === 'chat'
     );
   };
+}
+
+/**
+ * Predicate matching only the infinite history entries (any page size) of one
+ * user + classroom, the cache the live delivery and the composer read.
+ */
+export function createClassroomChatHistoryPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const isClassroomChat = createClassroomChatPredicate(userId, classroomId);
+  return (query) =>
+    isClassroomChat(query) &&
+    (query.queryKey[0] as { resource?: unknown }).resource === 'history';
 }

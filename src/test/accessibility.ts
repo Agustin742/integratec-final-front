@@ -1,9 +1,22 @@
 import axe from 'axe-core';
 
-export async function expectAccessible(container: HTMLElement): Promise<void> {
+export interface ExpectAccessibleOptions {
+  /** Axe rule ids to skip, each justified at the call site. */
+  readonly disabledRules?: readonly string[];
+}
+
+export async function expectAccessible(
+  container: HTMLElement,
+  { disabledRules = [] }: ExpectAccessibleOptions = {},
+): Promise<void> {
   const { violations } = await axe.run(container, {
-    // jsdom has no layout/canvas support; check contrast in a real browser.
-    rules: { 'color-contrast': { enabled: false } },
+    rules: {
+      // jsdom has no layout/canvas support; check contrast in a real browser.
+      'color-contrast': { enabled: false },
+      ...Object.fromEntries(
+        disabledRules.map((rule) => [rule, { enabled: false }]),
+      ),
+    },
   });
 
   if (violations.length > 0) {

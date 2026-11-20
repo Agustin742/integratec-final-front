@@ -4,7 +4,10 @@ import {
   type InfiniteData,
   type QueryClient,
 } from '@tanstack/react-query';
-import { createClassroomChatPredicate } from '@/api/query-keys';
+import {
+  createClassroomChatHistoryPredicate,
+  createClassroomChatPredicate,
+} from '@/api/query-keys';
 import { useClassroomRealtimeManager } from '@/realtime/classroom-realtime-provider';
 import {
   CHAT_MESSAGE_EVENT,
@@ -24,15 +27,6 @@ export interface UseClassroomChatLiveOptions {
    * only the REST history carries; students never keep a hidden message.
    */
   readonly canModerate?: boolean;
-}
-
-/** Matches every infinite history entry (any page size) of one user + classroom. */
-function createChatHistoryPredicate(userId: string, classroomId: string) {
-  const isClassroomChat = createClassroomChatPredicate(userId, classroomId);
-  return (query: { readonly queryKey: readonly unknown[] }) => {
-    if (!isClassroomChat(query)) return false;
-    return (query.queryKey[0] as { resource?: unknown }).resource === 'history';
-  };
 }
 
 function prependLiveMessage(
@@ -117,7 +111,10 @@ export function useClassroomChatLive(
     const lease = manager.acquire(classroomId);
     if (lease === null) return undefined;
     const { client } = lease;
-    const historyPredicate = createChatHistoryPredicate(userId, classroomId);
+    const historyPredicate = createClassroomChatHistoryPredicate(
+      userId,
+      classroomId,
+    );
 
     const offMessage = client.onMessage(
       CHAT_MESSAGE_EVENT,

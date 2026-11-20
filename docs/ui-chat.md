@@ -122,11 +122,21 @@ REST stays the rendering authority
   mention resolution.
 - `@mention` autocomplete: typing `@` plus a prefix queries
   `GET /classrooms/{id}/members` with the `q` case-insensitive display-name
-  prefix filter (backend decision D12), offered as a keyboard-accessible
-  listbox (ArrowDown/ArrowUp/Enter/Escape, focus returns to the textarea).
-  Selecting a suggestion inserts `@DisplayName ` as plain text; the server
-  resolves or ignores it. Suggestions never expose users outside the roster
-  the server returns.
+  prefix filter (backend decision D12), debounced by about 200 ms (one request
+  per burst of keystrokes, the in-flight one is aborted). Its query key lives
+  outside the `chat` domain, so chat reconciliation (sends, hides, reconnects)
+  never refetches the member directory. Suggestions never expose users outside
+  the roster the server returns.
+- The picker is a WAI-ARIA combobox: the textarea has `role="combobox"`,
+  `aria-autocomplete="list"`, `aria-expanded`, `aria-controls` (the popup) and
+  `aria-activedescendant` (the highlighted option); the popup is a
+  `role="listbox"` of `role="option"` items. Focus never leaves the textarea.
+  ArrowDown/ArrowUp move the highlight (wrapping), Enter selects the
+  highlighted option (the first one when none is highlighted; it never sends
+  or adds a newline while the list is open), Tab selects the highlighted
+  option, Escape closes the list without changing the text, and a mouse click
+  selects without stealing focus. Selecting inserts `@DisplayName ` as plain
+  text; the server resolves or ignores it.
 - Enter sends and Shift+Enter inserts a newline (Enter during IME composition
   or while the mention list is open never sends); a short hint is visible.
   While sending, the button shows `Enviando…` and the textarea is read-only
@@ -135,10 +145,16 @@ REST stays the rendering authority
   announced once through a visually hidden live region (no toast). The message
   only becomes history after the server confirms (201), and the draft clears
   only then. Definite
-  rejections keep the draft: a `429` is shown as the rate-limit feedback, a
-  `400` maps onto the body field. Transport-uncertain outcomes keep the draft,
-  reconcile the history against the server, and report the uncertainty —
-  never a blind retry
+  rejections keep the draft: a `400` maps onto the body field, and a `429` is
+  shown as the rate-limit feedback while send stays disabled for the
+  `Retry-After` seconds (5 seconds when the header is not exposed) and
+  re-enables by itself. Transport-uncertain outcomes keep send disabled while
+  the history is reconciled; the send has no idempotency key, so the composer
+  then looks for the current user's message with the same body created since
+  the send began (5 seconds of clock-skew tolerance, also when it arrives
+  later through live delivery): if found the draft is treated as sent (cleared
+  and announced once), otherwise the draft is kept with the uncertainty
+  notice — never a blind retry
   ([error handling](../rules/error-handling-and-feedback.md)).
 - Typing in the composer never triggers world movement or shortcuts: the
   workspace shortcut listener ignores editable targets and open dialogs.
@@ -151,7 +167,8 @@ and no send control, but the confirmed history stays readable;
 teacher-level staff keep the active composer. The disabled control is never
 the enforcement: a send that still reaches the server is rejected and that
 outcome is presented, with the explanation always coming from the revalidated
-context, never from a `403` body.
+context, never from a `403` body. The disabled textarea is described by the
+muted explanation (`aria-describedby`).
 
 ## Moderation
 
