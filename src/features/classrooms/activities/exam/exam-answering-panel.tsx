@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ApiError } from '@/api/errors';
 import { classroomExamAttemptQueryKey } from '@/api/query-keys';
@@ -121,6 +121,17 @@ export function ExamAnsweringPanel({ activity }: ExamAnsweringPanelProps) {
   const submitInFlightRef = useRef(false);
   const headingId = useId();
   const formErrorId = useId();
+  const questionPromptBaseId = useId();
+  // Set when a submission is confirmed (or reconciled) so the result heading
+  // takes focus once it renders in place of the unmounted form.
+  const focusResultRef = useRef(false);
+  const resultHeadingRef = useCallback((node: HTMLHeadingElement | null) => {
+    if (node !== null && focusResultRef.current) {
+      focusResultRef.current = false;
+      node.focus();
+    }
+  }, []);
+  const formErrorRef = useRef<HTMLDivElement | null>(null);
 
   const { client } = useSessionService();
 
@@ -146,6 +157,13 @@ export function ExamAnsweringPanel({ activity }: ExamAnsweringPanelProps) {
       abortRef.current?.abort();
     };
   }, []);
+
+  // The alert renders far from the submit button: bring it into focus.
+  useEffect(() => {
+    if (formError !== null) {
+      formErrorRef.current?.focus();
+    }
+  }, [formError]);
 
   const questions: readonly RenderQuestion[] = [...activity.questions]
     .sort((left, right) => left.position - right.position)
@@ -186,6 +204,7 @@ export function ExamAnsweringPanel({ activity }: ExamAnsweringPanelProps) {
     }
     if (result.data) {
       // The server says the attempt exists: show it as confirmed.
+      focusResultRef.current = true;
       setConfirmed(null);
       setNotice(copy.reconciledNotice);
       setPhase({ kind: 'idle' });
@@ -244,6 +263,7 @@ export function ExamAnsweringPanel({ activity }: ExamAnsweringPanelProps) {
         signal: controller.signal,
       });
       // 200/201: the server confirmed the stored, auto-graded attempt.
+      focusResultRef.current = true;
       setConfirmed(result);
       setPhase({ kind: 'idle' });
       // Refresh the own-attempt query from server data.
@@ -325,7 +345,9 @@ export function ExamAnsweringPanel({ activity }: ExamAnsweringPanelProps) {
         <div className="flex flex-wrap items-center gap-2">
           <h3
             id={headingId}
-            className="font-display text-base font-semibold text-foreground"
+            ref={resultHeadingRef}
+            tabIndex={-1}
+            className="font-display text-base font-semibold text-foreground outline-none"
           >
             {copy.heading}
           </h3>
@@ -379,8 +401,9 @@ export function ExamAnsweringPanel({ activity }: ExamAnsweringPanelProps) {
   const isSubmitting = phase.kind === 'submitting';
   const isReconciling = phase.kind === 'reconciling';
   const isUnverifiable = phase.kind === 'unverifiable';
-  const inputsDisabled = isSubmitting || isReconciling || isUnverifiable;
-  const submitDisabled = inputsDisabled || windowInfo.blocked;
+  const inputsDisabled =
+    isSubmitting || isReconciling || isUnverifiable || windowInfo.blocked;
+  const submitDisabled = inputsDisabled;
 
   return (
     <section
@@ -400,7 +423,14 @@ export function ExamAnsweringPanel({ activity }: ExamAnsweringPanelProps) {
       </div>
 
       {formError !== null ? (
-        <Alert id={formErrorId} variant="destructive" role="alert">
+        <Alert
+          id={formErrorId}
+          ref={formErrorRef}
+          tabIndex={-1}
+          variant="destructive"
+          role="alert"
+          className="outline-none focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
+        >
           <AlertDescription>{formError}</AlertDescription>
         </Alert>
       ) : null}
@@ -484,12 +514,16 @@ export function ExamAnsweringPanel({ activity }: ExamAnsweringPanelProps) {
         {questions.map((question, index) => (
           <fieldset
             key={question.id}
+            aria-describedby={`${questionPromptBaseId}-${question.id}`}
             className="min-w-0 space-y-3 rounded-xl border border-border bg-card p-4"
           >
             <legend className="px-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               {copy.questionLegend(index + 1, questions.length)}
             </legend>
-            <p className="text-sm font-medium text-foreground wrap-anywhere">
+            <p
+              id={`${questionPromptBaseId}-${question.id}`}
+              className="text-sm font-medium text-foreground wrap-anywhere"
+            >
               {question.prompt}
             </p>
             <div className="space-y-2">
@@ -497,8 +531,9 @@ export function ExamAnsweringPanel({ activity }: ExamAnsweringPanelProps) {
                 const optionInputId = `${activity.id}:${question.id}:${option.id}`;
                 return (
                   <label
+                    key={option.id}
                     htmlFor={optionInputId}
-                    className="group block cursor-pointer rounded-2xl border-2 border-border bg-background p-3.5 motion-safe:transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5 has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-3 has-[:focus-visible]:outline-ring"
+                    className="group block cursor-pointer has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60 rounded-2xl border-2 border-border bg-background p-3.5 motion-safe:transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5 has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-3 has-[:focus-visible]:outline-ring"
                   >
                     <input
                       id={optionInputId}
@@ -531,6 +566,7 @@ export function ExamAnsweringPanel({ activity }: ExamAnsweringPanelProps) {
             type="button"
             busy={isSubmitting}
             disabled={submitDisabled}
+            aria-describedby={formError !== null ? formErrorId : undefined}
             onClick={handleOpenConfirm}
           >
             {copy.submitLabel}

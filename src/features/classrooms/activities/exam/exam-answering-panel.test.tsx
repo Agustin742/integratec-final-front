@@ -510,4 +510,76 @@ describe('ExamAnsweringPanel', () => {
     // No answering form is offered once the attempt exists.
     expect(screen.queryByRole('radio', { name: '4' })).not.toBeInTheDocument();
   });
+
+  test('describes each radio group with its question prompt', async () => {
+    const store = makeStore();
+    mswServer.use(...store.handlers);
+    renderPanel(makeExamActivityDto());
+    await waitForAnswerForm();
+
+    expect(
+      screen.getByRole('group', { name: COPY.questionLegend(1, 2) }),
+    ).toHaveAccessibleDescription('¿Cuánto es 2 + 2?');
+    expect(
+      screen.getByRole('group', { name: COPY.questionLegend(2, 2) }),
+    ).toHaveAccessibleDescription('¿Cuál es la capital de Francia?');
+  });
+
+  test('renders the options without React key warnings', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const store = makeStore();
+    mswServer.use(...store.handlers);
+    renderPanel(makeExamActivityDto());
+    await waitForAnswerForm();
+
+    const keyWarnings = errorSpy.mock.calls.filter((call) =>
+      String(call[0]).includes('unique "key" prop'),
+    );
+    errorSpy.mockRestore();
+    expect(keyWarnings).toHaveLength(0);
+  });
+
+  test('moves focus to the result heading after a successful submission', async () => {
+    const store = makeStore();
+    mswServer.use(...store.handlers);
+    renderPanel(makeExamActivityDto());
+    await waitForAnswerForm();
+
+    selectCorrectAnswers();
+    await confirmSubmission();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: COPY.heading })).toHaveFocus();
+    });
+  });
+
+  test('moves focus to the validation alert when questions are unanswered', async () => {
+    const store = makeStore();
+    mswServer.use(...store.handlers);
+    renderPanel(makeExamActivityDto());
+    await waitForAnswerForm();
+
+    fireEvent.click(screen.getByRole('radio', { name: '4' }));
+    fireEvent.click(screen.getByRole('button', { name: COPY.submitLabel }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(examMessages.validation.answers);
+    await waitFor(() => {
+      expect(alert).toHaveFocus();
+    });
+    expect(
+      screen.getByRole('button', { name: COPY.submitLabel }),
+    ).toHaveAccessibleDescription(examMessages.validation.answers);
+  });
+
+  test('disables the radio inputs while the answering window is closed', async () => {
+    const store = makeStore();
+    mswServer.use(...store.handlers);
+    renderPanel(makeExamActivityDto({ dueAt: '2000-01-01T00:00:00.000Z' }));
+    await waitForAnswerForm();
+
+    for (const radio of screen.getAllByRole('radio')) {
+      expect(radio).toBeDisabled();
+    }
+  });
 });
