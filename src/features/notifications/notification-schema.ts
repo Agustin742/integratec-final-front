@@ -3,7 +3,18 @@ import type { components } from '@/api/schema.generated';
 
 z.config({ jitless: true });
 
-export type NotificationDto = components['schemas']['NotificationDto'];
+/**
+ * Narrow adaptation for `NotificationDto` (`schema.generated.ts` emits
+ * `classroomId: Record<string, never> | null` from Swagger `nullable: true`;
+ * the wire format is a UUID string or null for classroom-free notices such as
+ * badge awards).
+ */
+export type NotificationDto = Omit<
+  components['schemas']['NotificationDto'],
+  'classroomId'
+> & {
+  readonly classroomId: string | null;
+};
 export type NotificationKind = NotificationDto['kind'];
 export type NotificationsReadResultDto =
   components['schemas']['NotificationsReadResultDto'];
@@ -14,6 +25,7 @@ export const NOTIFICATION_KINDS = [
   'announcement',
   'mention',
   'activity_forum_reply',
+  'badge_awarded',
 ] as const satisfies readonly NotificationKind[];
 
 export const notificationKindSchema = z.enum(NOTIFICATION_KINDS);
@@ -22,7 +34,7 @@ export const notificationDtoSchema: z.ZodType<NotificationDto> = z.object({
   id: z.string().uuid(),
   kind: notificationKindSchema,
   resourceId: z.string().uuid(),
-  classroomId: z.string().uuid(),
+  classroomId: z.string().uuid().nullable(),
   studentId: z.string().uuid().nullable(),
   readAt: z.string().datetime({ offset: true }).nullable(),
   createdAt: z.string().datetime({ offset: true }),

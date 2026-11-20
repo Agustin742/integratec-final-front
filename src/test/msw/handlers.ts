@@ -4117,9 +4117,10 @@ export interface NotificationStoreItem {
     | 'grade_posted'
     | 'announcement'
     | 'mention'
-    | 'activity_forum_reply';
+    | 'activity_forum_reply'
+    | 'badge_awarded';
   readonly resourceId: string;
-  readonly classroomId: string;
+  readonly classroomId: string | null;
   readonly studentId: string | null;
   readonly readAt: string | null;
   readonly createdAt: string;
