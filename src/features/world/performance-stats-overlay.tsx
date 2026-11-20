@@ -29,9 +29,13 @@ function formatMemory(bytes: number): string {
   return `${bytes}B`;
 }
 
-function budget(value: number | string, limit: number | string): string {
-  const isOver =
-    typeof value === 'number' && typeof limit === 'number' && value > limit;
+function budget(
+  value: number | string,
+  limit: number | string,
+  isOver = typeof value === 'number' &&
+    typeof limit === 'number' &&
+    value > limit,
+): string {
   return `${value}/${limit}${isOver ? ' (over budget)' : ' (ok)'}`;
 }
 
@@ -76,7 +80,12 @@ export function PerformanceStatsOverlay({
       <p>draw calls {budget(snapshot.drawCalls, FD8_BUDGET.maxDrawCalls)}</p>
       <p>triangles {budget(snapshot.triangles, FD8_BUDGET.maxTriangles)}</p>
       <p>
-        gpu memory est. {budget(formatMemory(snapshot.gpuMemoryBytes), '256MB')}
+        gpu memory est.{' '}
+        {budget(
+          formatMemory(snapshot.gpuMemoryBytes),
+          formatMemory(FD8_BUDGET.maxGpuMemoryBytes),
+          snapshot.gpuMemoryBytes > FD8_BUDGET.maxGpuMemoryBytes,
+        )}
       </p>
       <p>
         textures {snapshot.gpuTextures} · geometries {snapshot.gpuGeometries}

@@ -34,7 +34,7 @@ describe('PerformanceStatsOverlay (#56, dev-only)', () => {
     expect(panel.textContent).toContain('20');
     expect(panel.textContent).toContain('120');
     expect(panel.textContent).toContain('240000');
-    expect(panel.textContent).toContain('300');
+    expect(panel.textContent).toContain('300MB/256MB (over budget)');
     // Values over the FD8 limits are visibly flagged.
     expect(panel.textContent).toMatch(/over budget/i);
   });
