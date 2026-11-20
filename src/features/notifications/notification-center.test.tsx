@@ -118,7 +118,7 @@ describe('NotificationCenter', () => {
       name: 'Notificaciones',
     });
     expect(
-      within(dialog).getByText('Nueva insignia desbloqueada'),
+      within(dialog).getByText('Obtuviste una nueva insignia'),
     ).toBeInTheDocument();
     expect(
       within(dialog).queryByRole('link', { name: 'Abrir' }),
