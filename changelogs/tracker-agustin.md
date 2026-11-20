@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-20 — Review and fixes on PR #113 (#51, classroom chat)
+
+- **Status:** completed (pending CI and Agustin's visual check before merging PR #113)
+- **Area / files:** `src/features/classrooms/chat/`, `src/features/chat-dock/`, `src/features/chat-inbox/`, `src/features/chat-page/`, `src/app/pages/chats-page.tsx`, `src/app/router/`, `src/realtime/classroom-realtime-manager.ts`, `src/realtime/classroom-realtime-provider.tsx`, `src/api/query-keys.ts`, `src/api/schema.generated.ts`, `src/realtime/contracts.generated.ts`, `docs/ui-chat.md`
+- **Change:** Merged `develop` (MSW handlers conflict, both sides kept). The chat now reads like a messenger: oldest to newest with infinite scroll up, fixed composer, Enter sends. Messages arrive live through the classroom Colyseus room (one ref-counted connection per classroom). Composer hardening: uncertain sends reconcile instead of duplicating, debounced mention lookup in its own query domain, accessible mention listbox, 429 cooldown. New floating chat dock (bottom-right, unread counts, read markers) and an all-chats page `/chats` reached from a navbar button next to notifications. Toasts moved to the bottom-left so they don't cover the dock.
+- **Reason:** Review findings on PR #113 plus Agustin's product decision (2026-11-20) to turn the chat into LinkedIn/Facebook-style messaging with unread counts. Backend counterpart: back PR #125 (issue #124), merged.
+- **Verification:** Per-task strict TDD; `--changed origin/develop` up to 887/887 (only known load timeouts that pass in isolation on some runs); lint, typecheck, build, `security:check`, `check_docs.py`. Native review approved on each task commit. Browser smoke tests (desktop 1366x768 and mobile 375x740) of the dock and the `/chats` page against the local backend.
+- **Next step:** CI green, Agustin's visual check, merge.
+
 ## 2026-11-19 — Review and fixes on PR #110 (#55, daily review modal)
 
 - **Status:** completed (pending CI and merge of PR #110)

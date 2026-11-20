@@ -96,6 +96,35 @@ describe('NotificationCenter', () => {
     mswServer.close();
   });
 
+  it('renders a classroom-free badge_awarded notice with its title and no classroom link', async () => {
+    const badge = makeItem({
+      id: '00000000-0000-4000-8000-000000003103',
+      kind: 'badge_awarded',
+      resourceId: '00000000-0000-4000-8000-000000004003',
+      classroomId: null,
+      createdAt: '2026-11-18T12:00:00.000Z',
+    });
+    const store = createNotificationsStore({ initialItems: [badge] });
+    mswServer.use(...store.handlers);
+
+    renderNotificationCenter();
+
+    const bell = await screen.findByRole('button', {
+      name: 'Notificaciones, 1 sin leer',
+    });
+    fireEvent.click(bell);
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Notificaciones',
+    });
+    expect(
+      within(dialog).getByText('Obtuviste una nueva insignia'),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole('link', { name: 'Abrir' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('shows unread count, opens tray, marks one/all read, and persists across reload', async () => {
     const n1 = makeItem({
       id: '00000000-0000-4000-8000-000000003101',

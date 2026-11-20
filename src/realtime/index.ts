@@ -12,6 +12,17 @@ export {
   type RealtimeSnapshot,
 } from './client';
 export {
+  createClassroomRealtimeManager,
+  type ClassroomRealtimeLease,
+  type ClassroomRealtimeManager,
+  type CreateClassroomRealtimeManagerOptions,
+} from './classroom-realtime-manager';
+export {
+  ClassroomRealtimeProvider,
+  useClassroomRealtimeManager,
+  type ClassroomRealtimeProviderProps,
+} from './classroom-realtime-provider';
+export {
   useClassroomRealtime,
   type UseClassroomRealtimeOptions,
   type UseClassroomRealtimeResult,
