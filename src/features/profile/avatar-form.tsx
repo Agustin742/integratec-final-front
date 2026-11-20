@@ -10,7 +10,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AvatarPreview } from './avatar-preview';
+import { AvatarPreviewView } from './avatar-preview-view';
 import {
   AVATAR_FIELDS,
   avatarsEqual,
@@ -171,7 +171,7 @@ export function AvatarForm({
             className="mx-auto w-40 rounded-2xl border border-edge bg-tray/60 p-3 md:w-full"
             data-avatar-preview-frame={isDirty ? 'draft' : 'saved'}
           >
-            <AvatarPreview avatar={draft} />
+            <AvatarPreviewView avatar={draft} />
           </div>
           <div className="flex flex-wrap items-center justify-center gap-2 md:justify-start">
             <Badge variant={isDirty ? 'warning' : 'success'}>
