@@ -260,6 +260,46 @@ export const classroomMessages = {
     rosterTab: 'Nómina',
     invitationsTab: 'Invitaciones y código',
   },
+  chat: {
+    heading: 'Chat del aula',
+    subtitle: (name: string) =>
+      `Conversación de «${name}» con el historial confirmado por el servidor.`,
+    newestFirstNote: 'Los mensajes más recientes aparecen primero.',
+    loading: 'Cargando el chat del aula…',
+    listRegionLabel: 'Historial de mensajes del chat',
+    resultsSummary: (shown: number, total: number) =>
+      `Mostrando ${shown} de ${total} mensajes.`,
+    createdAtPrefix: 'Enviado',
+    authorFallback: 'Integrante del aula',
+    authorSelf: 'Vos',
+    roleTeacherBadge: 'Docente',
+    hiddenBadge: 'Ocultado',
+    hiddenAudit: (moderator: string, formattedDate: string) =>
+      `Ocultado por ${moderator} el ${formattedDate}`,
+    hiddenModeratorFallback: 'personal del aula',
+    states: {
+      emptyTitle: 'Todavía no hay mensajes en el chat',
+      emptyDescription:
+        'Cuando alguien del aula escriba, vas a ver el mensaje acá.',
+      loadErrorTitle: 'No pudimos cargar el chat',
+      loadErrorDescription: 'Revisá tu conexión e intentá actualizar el chat.',
+      forbiddenTitle: 'Sin acceso al chat del aula',
+      forbiddenDescription: 'No tenés permiso para leer el chat de este aula.',
+      notFoundTitle: 'No encontramos el chat del aula',
+      notFoundDescription:
+        'El aula ya no está disponible o perdiste el acceso.',
+      staleTitle: 'Chat pendiente de sincronización',
+      staleDescription:
+        'Mostrando los últimos mensajes confirmados. Falló la actualización en segundo plano.',
+      outOfRangeTitle: 'No hay mensajes en esta página',
+      outOfRangeDescription:
+        'Volvé a la primera página para ver los mensajes del chat.',
+      backToFirstPage: 'Volver a la primera página',
+      parentDeniedTitle: 'El chat del aula no está disponible para tu rol',
+      parentDeniedDescription:
+        'El chat es para estudiantes y personal del aula. Las familias no participan de esta conversación.',
+    },
+  },
   invitations: {
     forbiddenTitle: 'Sin permisos para gestionar invitaciones',
     forbiddenDescription:

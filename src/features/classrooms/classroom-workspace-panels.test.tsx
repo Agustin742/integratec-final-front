@@ -94,6 +94,35 @@ function setup(
             total: 0,
           });
         }
+        // The default catalog maps `chat` to ChatPanel (#51); the TEACHER
+        // context reads one confirmed message.
+        if (url.pathname.endsWith('/messages')) {
+          return Response.json({
+            items: [
+              {
+                id: 'chat-message-workspace-1',
+                classroomId: 'a',
+                authorId: '00000000-0000-4000-8000-000000007001',
+                body: 'Bienvenidos al chat del aula',
+                mentionedUserIds: [],
+                createdAt: '2026-11-19T03:00:00.000Z',
+                hiddenAt: null,
+                hiddenById: null,
+              },
+            ],
+            page: 1,
+            pageSize: 20,
+            total: 1,
+          });
+        }
+        if (url.pathname.endsWith('/members')) {
+          return Response.json({
+            items: [],
+            page: 1,
+            pageSize: 20,
+            total: 0,
+          });
+        }
         // The default catalog maps `grades` to ClassroomGradesPanel (#44 + #46);
         // the TEACHER context without publish_content reads classroom metrics.
         if (url.pathname.endsWith('/activity-metrics')) {
@@ -187,11 +216,7 @@ function setup(
     },
   };
 }
-const pendingCatalogCases = [
-  ['chat', 'Chat'],
-
-  ['settings', 'Configuración'],
-] as const;
+const pendingCatalogCases = [['settings', 'Configuración']] as const;
 
 test('default catalog opens activities by URL with ActivitiesPanel and closes cleanly', async () => {
   const view = setup(['activities'], '/classrooms/a/panels/activities', true);
@@ -300,6 +325,22 @@ test.each(pendingCatalogCases)(
     expect(document.activeElement).toHaveTextContent('Classroom a');
   },
 );
+
+test('default catalog opens chat by URL with the chat history panel and closes cleanly', async () => {
+  const view = setup(['chat'], '/classrooms/a/panels/chat', true);
+  const dialog = await screen.findByRole('dialog', { name: 'Chat' });
+  expect(
+    await within(dialog).findByText('Bienvenidos al chat del aula'),
+  ).toBeVisible();
+  expect(dialog).toHaveTextContent('Chat del aula');
+  expect(dialog).not.toHaveTextContent('Funcionalidad pendiente');
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+  await screen.findByRole('button', { name: 'Open grades' });
+  expect(view.router.state.location.pathname).toBe('/classrooms/a');
+  expect(view.router.state.historyAction).toBe('REPLACE');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(document.activeElement).toHaveTextContent('Classroom a');
+});
 
 test('default catalog opens material by URL with MaterialPanel and closes cleanly', async () => {
   const view = setup(['material'], '/classrooms/a/panels/material', true);

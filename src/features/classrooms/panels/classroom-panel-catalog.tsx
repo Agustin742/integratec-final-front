@@ -3,6 +3,7 @@ import { EmptyState } from '@/components/feedback/states';
 import { ActivitiesPanel } from '../activities/activities-panel';
 import { NoticeBoardPanel } from '../announcements/notice-board-panel';
 import { StudyGuideBotPanel } from '../bot/study-guide-bot-panel';
+import { ChatPanel } from '../chat/chat-panel';
 import { ClassroomGradesPanel } from '../grading/classroom-grades-panel';
 import { MaterialPanel } from '../materials/material-panel';
 import { ClassroomMembersPanel } from '../classroom-members-panel';
@@ -43,7 +44,11 @@ export const classroomPanelCatalog = [
     title: messages.panels.grades,
     component: ClassroomGradesPanel,
   },
-  entry('chat'),
+  {
+    key: 'chat',
+    title: messages.panels.chat,
+    component: ChatPanel,
+  },
   {
     key: 'notices',
     title: messages.panels.notices,

@@ -6342,6 +6342,17 @@ export interface ChatStoreMessage {
 export type ChatStoreRole =
   'OWNER' | 'ADMIN' | 'TEACHER' | 'STUDENT' | 'PARENT';
 
+/**
+ * One `GET /classrooms/{id}/members` row served by the chat store: the
+ * display-name directory used to label authors and moderation auditors.
+ */
+export interface ChatStoreMember {
+  readonly id: string;
+  readonly userId: string;
+  readonly displayName: string;
+  readonly role: 'TEACHER' | 'STUDENT';
+}
+
 export type ChatStoreOp = 'list' | 'send' | 'hide';
 
 export type ChatStoreFailure =
@@ -6359,6 +6370,12 @@ export interface ClassroomChatStoreOptions {
    * mirroring the server-side resolution of active classroom members.
    */
   readonly mentionDirectory?: Readonly<Record<string, string>>;
+  /**
+   * Member rows served by `GET /classrooms/{id}/messages`-adjacent
+   * `GET /classrooms/{id}/members`, so chat panel tests can label authors and
+   * moderation auditors with server-confirmed display names.
+   */
+  readonly members?: readonly ChatStoreMember[];
   readonly writeDelayMs?: number;
 }
 
@@ -6409,6 +6426,7 @@ export function createClassroomChatStore(
   const chatMuted = options.chatMuted ?? false;
   const mentionDirectory: Readonly<Record<string, string>> =
     options.mentionDirectory ?? {};
+  const members: readonly ChatStoreMember[] = [...(options.members ?? [])];
   let messages: ChatStoreMessage[] = [...(options.initialMessages ?? [])];
   let admittedSendAts: number[] = [];
   let seq = 100;
@@ -6641,6 +6659,28 @@ export function createClassroomChatStore(
     },
     getCounts: () => ({ ...counts }),
     handlers: [
+      http.get(`${baseUrl}/classrooms/:id/members`, ({ params }) => {
+        if (String(params.id ?? '') !== options.classroomId) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Classroom not found.',
+            correlationId: 'req-chat-members-404',
+          });
+        }
+        if (currentRole === 'PARENT') {
+          return createErrorEnvelopeResponse(403, {
+            code: 'FORBIDDEN',
+            message: 'Forbidden.',
+            correlationId: 'req-chat-members-403',
+          });
+        }
+        return HttpResponse.json({
+          items: [...members],
+          page: 1,
+          pageSize: 100,
+          total: members.length,
+        });
+      }),
       http.get(`${baseUrl}/classrooms/:id/messages`, ({ params, request }) => {
         counts.list += 1;
         const failure = consumeFailure('list');

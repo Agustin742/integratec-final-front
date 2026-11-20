@@ -101,6 +101,37 @@ export type PaginatedChatHistoryDto = z.infer<
 >;
 
 /**
+ * One `GET /classrooms/{id}/members` row (`ClassroomDirectoryController_list`,
+ * backend #52 / D12): display name and classroom role only. The panel uses this
+ * optional lookup to label chat authors and moderation auditors; it never
+ * assumes emails or other personal data are available.
+ */
+export const chatDirectoryMemberSchema = z.object({
+  id: z.string().min(1),
+  userId: z.string().min(1),
+  displayName: z.string().min(1),
+  role: z.enum(['TEACHER', 'STUDENT']),
+});
+
+export type ChatDirectoryMemberDto = z.infer<typeof chatDirectoryMemberSchema>;
+
+export const paginatedChatDirectorySchema = z.object({
+  items: z.array(chatDirectoryMemberSchema),
+  page: z.number().int().min(1),
+  pageSize: z.number().int().min(1),
+  total: z.number().int().min(0),
+});
+
+export type PaginatedChatDirectoryDto = z.infer<
+  typeof paginatedChatDirectorySchema
+>;
+
+export interface ChatDirectoryQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+}
+
+/**
  * Composer input validated against `SendMessageDto` before the request: only
  * `body` is sent; trimming and mention resolution happen on the server.
  */

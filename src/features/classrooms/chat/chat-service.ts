@@ -12,8 +12,11 @@ import {
 import { chatMessages } from './chat-messages';
 import {
   chatMessageDtoSchema,
+  paginatedChatDirectorySchema,
   paginatedChatHistorySchema,
+  type ChatDirectoryQueryParams,
   type ChatMessageDto,
+  type PaginatedChatDirectoryDto,
   type PaginatedChatHistoryDto,
 } from './chat-schema';
 
@@ -197,6 +200,49 @@ export async function listClassroomChatHistory(
   );
 
   const parsed = paginatedChatHistorySchema.safeParse(data);
+  if (!parsed.success) {
+    throw new ApiError({
+      kind: 'unexpected',
+      status: null,
+      code: null,
+      userMessage: chatMessages.errors.invalidResponse,
+      details: [],
+      fieldErrors: {},
+      correlationId: null,
+    });
+  }
+
+  return parsed.data;
+}
+
+/**
+ * `GET /classrooms/{id}/members` (`ClassroomDirectoryController_list`).
+ * Optional non-blocking lookup so the panel can label chat authors and
+ * moderation auditors with server-confirmed display names; absent or denied
+ * rows fall back to neutral labels instead of guesses.
+ */
+export async function listClassroomChatMembers(
+  client: TypedApiClient,
+  classroomId: string,
+  params: ChatDirectoryQueryParams = {},
+  options: ChatServiceOptions = {},
+): Promise<PaginatedChatDirectoryDto> {
+  const data = await requestApi(() =>
+    client.GET('/classrooms/{id}/members', {
+      params: {
+        path: { id: classroomId },
+        query: {
+          ...(params.page !== undefined ? { page: params.page } : {}),
+          ...(params.pageSize !== undefined
+            ? { pageSize: params.pageSize }
+            : {}),
+        },
+      },
+      signal: options.signal,
+    }),
+  );
+
+  const parsed = paginatedChatDirectorySchema.safeParse(data);
   if (!parsed.success) {
     throw new ApiError({
       kind: 'unexpected',
