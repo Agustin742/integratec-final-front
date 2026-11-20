@@ -177,6 +177,13 @@ export function ExamAnsweringPanel({ activity }: ExamAnsweringPanelProps) {
   async function reconcileUncertainOutcome(): Promise<void> {
     setPhase({ kind: 'reconciling' });
     const result = await ownAttempt.refetch();
+    if (result.isError) {
+      // A failed refetch keeps the previous `data` (`null` after the initial
+      // 404), so check the error first: it must never read as "nothing stored".
+      // Never offer a blind resubmission.
+      setPhase({ kind: 'unverifiable' });
+      return;
+    }
     if (result.data) {
       // The server says the attempt exists: show it as confirmed.
       setConfirmed(null);
@@ -189,7 +196,7 @@ export function ExamAnsweringPanel({ activity }: ExamAnsweringPanelProps) {
       setPhase({ kind: 'retryable' });
       return;
     }
-    // The verification itself failed; never offer a blind resubmission.
+    // Unreachable for a settled successful read; stay on the safe side.
     setPhase({ kind: 'unverifiable' });
   }
 
@@ -285,8 +292,10 @@ export function ExamAnsweringPanel({ activity }: ExamAnsweringPanelProps) {
   const isReconcilePhase =
     phase.kind === 'reconciling' || phase.kind === 'unverifiable';
 
+  // A confirmed POST result stays visible even if the background refresh fails.
   if (
     readOwnError !== null &&
+    (confirmed === null || readOwnError.status === 403) &&
     (!isReconcilePhase || readOwnError.status === 403)
   ) {
     return (

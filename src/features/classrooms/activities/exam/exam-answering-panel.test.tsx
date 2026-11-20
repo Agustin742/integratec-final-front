@@ -377,6 +377,50 @@ describe('ExamAnsweringPanel', () => {
     expect(store.getItems()).toHaveLength(1);
   });
 
+  test('reports an unverifiable outcome when the verification read also fails, never "nothing stored"', async () => {
+    const store = makeStore();
+    mswServer.use(...store.handlers);
+    renderPanel(makeExamActivityDto());
+    await waitForAnswerForm();
+
+    // The uncertain POST failure is followed by a failed verification GET.
+    store.failNext('create', 'network');
+    store.failNext('readOwn', 'network');
+    selectCorrectAnswers();
+    await confirmSubmission();
+
+    await waitFor(() => {
+      expect(screen.getByText(COPY.uncertainUnverified)).toBeVisible();
+    });
+    expect(
+      screen.queryByText(COPY.uncertainNothingStored),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: COPY.retryAction }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: COPY.verifyAgainAction }),
+    ).toBeVisible();
+  });
+
+  test('keeps the confirmed result visible when the follow-up own-attempt refresh fails', async () => {
+    const store = makeStore();
+    mswServer.use(...store.handlers);
+    renderPanel(makeExamActivityDto());
+    await waitForAnswerForm();
+
+    // The POST succeeds; the background read-own refresh then fails.
+    store.failNext('readOwn', 'network');
+    selectCorrectAnswers();
+    await confirmSubmission();
+
+    await waitFor(() => {
+      expect(screen.getByText('10 de 10 puntos')).toBeVisible();
+    });
+    expect(screen.queryByText(COPY.errorTitle)).not.toBeInTheDocument();
+    expect(store.getItems()).toHaveLength(1);
+  });
+
   test('reconciles a dropped response by showing the stored attempt with its retained answers', async () => {
     const store = makeStore();
     store.failNext('create', 'drop-response');
