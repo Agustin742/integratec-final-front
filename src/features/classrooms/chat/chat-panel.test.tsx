@@ -611,7 +611,6 @@ describe('ChatPanel (#51, read side)', () => {
         { key: 'chat', title: 'Chat', component: ChatProbePanel },
       ] as const;
 
-      const detail = buildDetail('a');
       const session = fakeSession(
         { status: 'authenticated', user: profile },
         createApiClient({
