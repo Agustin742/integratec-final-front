@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import { ApiError } from '@/api/errors';
@@ -6,6 +13,7 @@ import {
   classroomChatHistoryQueryKey,
   classroomDetailQueryKey,
   classroomDirectoryMembersQueryKey,
+  createClassroomChatPredicate,
 } from '@/api/query-keys';
 import { PaginationControls } from '@/components/pagination/pagination-controls';
 import {
@@ -20,9 +28,11 @@ import { formatInstant } from '@/lib/dates';
 import { useSessionService } from '@/session/provider';
 import { classroomMessages as messages } from '../messages';
 import { useClassroomContext } from '../use-classroom-capabilities';
+import { ChatModerationDialog } from './chat-moderation-dialog';
 import type {
   ChatDirectoryMemberDto,
   ChatHistoryMessageDto,
+  PaginatedChatHistoryDto,
 } from './chat-schema';
 import {
   listClassroomChatHistory,
@@ -115,6 +125,11 @@ function ChatPanelHost({
       canListDirectory={context.classroom.capabilities.includes(
         'list_directory',
       )}
+      // Moderation is offered only to teacher-level staff of THIS classroom:
+      // the gate is the server-granted `moderate_chat` capability on the
+      // classroom context, never a role name embedded in client code, and the
+      // server still denies every unauthorized hide (S3/S10).
+      canModerateChat={context.classroom.capabilities.includes('moderate_chat')}
       composer={composer}
     />
   );
@@ -158,12 +173,14 @@ function ChatPanelConversation({
   classroomId,
   classroomName,
   canListDirectory,
+  canModerateChat,
   composer,
 }: {
   readonly userId: string;
   readonly classroomId: string;
   readonly classroomName: string;
   readonly canListDirectory: boolean;
+  readonly canModerateChat: boolean;
   readonly composer?: ReactNode;
 }) {
   const chat = messages.chat;
@@ -171,6 +188,14 @@ function ChatPanelConversation({
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const terminalReconciledRef = useRef(false);
+  // Moderation target: the row chosen for the hide confirmation. While a
+  // confirmation is open (pending included) every row control is disabled so
+  // at most one moderation is in flight per panel.
+  const [hideTarget, setHideTarget] = useState<ChatHistoryMessageDto | null>(
+    null,
+  );
+  const hideTriggerRef = useRef<HTMLElement | null>(null);
+  const historyListRef = useRef<HTMLOListElement | null>(null);
 
   // Optional non-blocking directory lookup: server-confirmed display names for
   // authors and moderation auditors. Absent, denied or failed lookups degrade
@@ -257,6 +282,26 @@ function ChatPanelConversation({
   const totalPages = Math.max(1, Math.ceil(total / CHAT_HISTORY_PAGE_SIZE));
   const isOutOfRangePage = page > 1 && historyItems.length === 0 && total > 0;
 
+  // Moderation reconciliation: invalidate every chat query of this user and
+  // classroom (shared `chat` domain, `createClassroomChatPredicate`) and
+  // resolve the revalidated row, so confirmed and uncertain hides read the
+  // server truth instead of a local assumption or a blind retry.
+  const reconcileModeratedRow = useCallback(
+    async (messageId: string): Promise<ChatHistoryMessageDto | null> => {
+      await queryClient.invalidateQueries({
+        predicate: createClassroomChatPredicate(userId, classroomId),
+      });
+      const data = queryClient.getQueryData<PaginatedChatHistoryDto>(
+        classroomChatHistoryQueryKey(userId, classroomId, {
+          page,
+          pageSize: CHAT_HISTORY_PAGE_SIZE,
+        }),
+      );
+      return data?.items.find((item) => item.id === messageId) ?? null;
+    },
+    [classroomId, page, queryClient, userId],
+  );
+
   return (
     <section aria-label={chat.heading} className="min-w-0 space-y-5">
       <div className="space-y-1">
@@ -335,7 +380,12 @@ function ChatPanelConversation({
             {chat.resultsSummary(historyItems.length, total)}
           </p>
 
-          <ol aria-label={chat.listRegionLabel} className="space-y-3">
+          <ol
+            ref={historyListRef}
+            tabIndex={-1}
+            aria-label={chat.listRegionLabel}
+            className="space-y-3"
+          >
             {historyItems.map((message) => {
               const author = resolveChatAuthor(
                 message.authorId,
@@ -368,9 +418,31 @@ function ChatPanelConversation({
                         <Badge variant="secondary">{chat.hiddenBadge}</Badge>
                       ) : null}
                     </div>
-                    <span className="text-xs text-muted-foreground">
-                      {chat.createdAtPrefix} {formatInstant(message.createdAt)}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {chat.createdAtPrefix}{' '}
+                        {formatInstant(message.createdAt)}
+                      </span>
+                      {canModerateChat && !isHidden ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          aria-label={chat.moderation.hideAriaLabel(
+                            author.label,
+                            formatInstant(message.createdAt),
+                          )}
+                          aria-expanded={hideTarget?.id === message.id}
+                          disabled={hideTarget !== null}
+                          onClick={(event) => {
+                            hideTriggerRef.current = event.currentTarget;
+                            setHideTarget(message);
+                          }}
+                        >
+                          {chat.moderation.hideAction}
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
 
                   {/* Strict plain text node rendering (never dangerouslySetInnerHTML). */}
@@ -404,6 +476,21 @@ function ChatPanelConversation({
           {composer}
         </div>
       ) : null}
+
+      <ChatModerationDialog
+        open={hideTarget !== null}
+        message={hideTarget}
+        classroomId={classroomId}
+        userId={userId}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setHideTarget(null);
+          }
+        }}
+        onReconcile={reconcileModeratedRow}
+        getTriggerElement={() => hideTriggerRef.current}
+        fallbackFocus={() => historyListRef.current}
+      />
     </section>
   );
 }

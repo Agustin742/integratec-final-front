@@ -317,6 +317,26 @@ export const classroomMessages = {
       mutedDescription:
         'El personal del aula silenció el chat por ahora. No podés enviar mensajes, pero el historial sigue visible.',
     },
+    moderation: {
+      hideAction: 'Ocultar',
+      hideAriaLabel: (author: string, sentAt: string) =>
+        `Ocultar el mensaje de ${author} del ${sentAt}`,
+      dialogTitle: 'Ocultar mensaje del chat',
+      dialogDescription:
+        'El mensaje deja de verse para el alumnado y queda registrado como oculto. Vos segués viéndolo con la información de quién lo ocultó y cuándo.',
+      messageLabel: 'Mensaje que vas a ocultar',
+      confirmAction: 'Ocultar mensaje',
+      confirmingAction: 'Ocultando…',
+      cancelAction: 'Cancelar',
+      pendingNotice: 'Ocultando el mensaje…',
+      confirmedToast: 'Mensaje ocultado: el alumnado deja de verlo.',
+      deniedToastTitle: 'No pudimos ocultar el mensaje',
+      uncertainTitle: 'No pudimos confirmar la ocultación',
+      uncertainBody:
+        'No sabemos si el mensaje quedó oculto en el servidor. Verificamos el chat: si el mensaje sigue visible, podés volver a intentarlo.',
+      uncertainReconciledToast:
+        'Confirmamos con el servidor que el mensaje ya está oculto.',
+    },
   },
   invitations: {
     forbiddenTitle: 'Sin permisos para gestionar invitaciones',
