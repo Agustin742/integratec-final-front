@@ -102,6 +102,10 @@ test('teacher creates and configures a classroom, navigates to F16 workspace, an
       return route.fulfill({ json: profile });
     }
 
+    if (url.origin === apiOrigin && url.pathname === '/users/me/daily-review') {
+      return route.fulfill({ json: { status: 'not_due' } });
+    }
+
     if (
       url.origin === apiOrigin &&
       url.pathname === '/me/classrooms' &&
@@ -380,6 +384,10 @@ test('student sees enrolled classroom link without create or configure controls'
 
     if (request.url() === `${apiOrigin}/users/me`) {
       return route.fulfill({ json: profile });
+    }
+
+    if (url.origin === apiOrigin && url.pathname === '/users/me/daily-review') {
+      return route.fulfill({ json: { status: 'not_due' } });
     }
 
     if (

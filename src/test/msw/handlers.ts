@@ -7425,3 +7425,123 @@ export function createClassroomChatStore(
     ],
   };
 }
+
+export interface DailyReviewPayloadItem {
+  readonly kind:
+    'pending_activity' | 'recent_grade' | 'announcement' | 'teacher_review';
+  readonly title: string;
+  readonly detail: string | null;
+  readonly classroomName: string | null;
+  readonly dueAt: string | null;
+}
+
+export interface DailyReviewPayloadSection {
+  readonly kind: 'pending' | 'news';
+  readonly items: readonly DailyReviewPayloadItem[];
+}
+
+export interface DailyReviewPayloadQuestion {
+  readonly id: string;
+  readonly prompt: string;
+  readonly options: readonly string[];
+  readonly materialTitle: string | null;
+}
+
+export type DailyReviewPayload =
+  | { readonly status: 'not_due' }
+  | {
+      readonly status: 'due';
+      readonly audience: 'STUDENT' | 'TEACHER';
+      readonly contentKind: 'generated' | 'structured';
+      readonly summary: string | null;
+      readonly sections: readonly DailyReviewPayloadSection[];
+      readonly dailyQuestion: DailyReviewPayloadQuestion | null;
+    };
+
+export interface CreateDailyReviewHandlerOptions {
+  readonly baseUrl?: string;
+  readonly payload?: DailyReviewPayload;
+  /** Models the persistent once-per-day delivery record: first call delivers, later calls answer `not_due`. */
+  readonly deliverOnce?: boolean;
+  readonly error?: MswErrorResponseSpec | 'network';
+}
+
+/**
+ * Contract-faithful MSW handler for `GET /users/me/daily-review`
+ * (`HU-BOT-003`). Eligibility is decided here, as the server would: parents,
+ * reloads, and concurrent tabs receive `not_due` unless the payload says
+ * otherwise.
+ */
+export function createDailyReviewHandler(
+  options: CreateDailyReviewHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const payload = options.payload ?? { status: 'not_due' as const };
+  let delivered = false;
+  return http.get(`${baseUrl}/users/me/daily-review`, () => {
+    if (options.error === 'network') {
+      return HttpResponse.error();
+    }
+    if (options.error) {
+      return createErrorEnvelopeResponse(
+        options.error.status,
+        options.error.body,
+      );
+    }
+    if (options.deliverOnce === true && delivered) {
+      return HttpResponse.json({ status: 'not_due' });
+    }
+    delivered = true;
+    return HttpResponse.json(payload);
+  });
+}
+
+export interface DailyQuestionAnswerResultPayload {
+  readonly correct: boolean;
+  readonly feedback: string | null;
+  readonly streak: {
+    readonly currentStreak: number;
+    readonly bestStreak: number;
+    readonly lastQualifiedDate: string | null;
+  } | null;
+}
+
+export interface CreateDailyQuestionAnswerHandlerOptions {
+  readonly baseUrl?: string;
+  readonly result?: DailyQuestionAnswerResultPayload;
+  readonly onAnswer?: (body: { questionId: string; answer: string }) => void;
+  readonly error?: MswErrorResponseSpec | 'network';
+}
+
+/**
+ * Contract-faithful MSW handler for
+ * `POST /users/me/daily-review/daily-question` (`HU-BOT-003`). The result and
+ * the streak credit are decided here, as the server would.
+ */
+export function createDailyQuestionAnswerHandler(
+  options: CreateDailyQuestionAnswerHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  return http.post(
+    `${baseUrl}/users/me/daily-review/daily-question`,
+    async ({ request }) => {
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+      const body = (await request.json()) as {
+        questionId: string;
+        answer: string;
+      };
+      options.onAnswer?.(body);
+      return HttpResponse.json(
+        options.result ?? { correct: false, feedback: null, streak: null },
+      );
+    },
+  );
+}
