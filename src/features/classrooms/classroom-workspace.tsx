@@ -27,6 +27,8 @@ import { useClassroomViewMode } from './classroom-mode-store';
 import { joinMessages } from './join-messages';
 import { readClassroomJoinOutcome } from './join-schema';
 import { classroomMessages as messages } from './messages';
+import { PerformanceOfferBanner } from './performance-offer-banner';
+import { beginPerformanceOffer } from './performance-offer-store';
 import { useClassroomContext } from './use-classroom-capabilities';
 import { useClassroomContextEvents } from './use-classroom-context-events';
 import { classroomPanelCatalog } from './panels/classroom-panel-catalog';
@@ -159,7 +161,7 @@ function WorkspaceContext({
   const snapshot = useSessionSnapshot();
   const sessionUserId =
     snapshot.status === 'authenticated' ? snapshot.user.id : null;
-  const { mode, toggleMode } = useClassroomViewMode(sessionUserId);
+  const { mode, setMode, toggleMode } = useClassroomViewMode(sessionUserId);
 
   const isParent =
     context.status === 'ready' && context.classroom.myRole === 'PARENT';
@@ -350,10 +352,21 @@ function WorkspaceContext({
               headingRef={activeViewHeadingRef}
             />
           ) : (
-            <Classroom3DStage
-              headingRef={activeViewHeadingRef}
-              scopeKey={classroomId}
-            />
+            <>
+              {/* Sustained low fps shows a non-blocking offer (#56); the
+                  app never switches modes without the user's choice. */}
+              <PerformanceOfferBanner
+                onAccept={() => {
+                  pendingFocusSwitchRef.current = true;
+                  setMode('2d');
+                }}
+              />
+              <Classroom3DStage
+                headingRef={activeViewHeadingRef}
+                scopeKey={classroomId}
+                onSustainedLowFps={beginPerformanceOffer}
+              />
+            </>
           ))}
         <Outlet
           key={location.key}
