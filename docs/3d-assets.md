@@ -12,6 +12,34 @@ This guide defines how GLB/glTF assets are compressed, loaded, cached, disposed,
 - **Caching & isolation**: `loadGlbAsset()` / `readCachedGlbAsset()` deduplicate fetches and parses per URL. `<GlbAsset />` (`src/features/world/glb-asset.tsx`) wraps each asset in its own `Suspense` and error boundary so a failing GLB renders a placeholder without breaking the rest of the scene.
 - **Disposal**: `disposeObject3D()` and `clearAssetCache()` release geometries, materials, textures, and skeletons when `WorldCanvas` unmounts, when `scopeKey` (classroom) changes, or when `ClassroomWorkspace` runs its `SessionController` logout cleanup (which also disposes shared Draco/KTX2 decoders). Individual `WebGLRenderTarget` instances are disposed via `disposeObject3D(renderTarget)`.
 
+## Modular Avatars
+
+The base avatar is modular: one skinned body plus optional hair and top parts, all sharing the same skeleton (female 41 joints, male 34).
+
+```text
+public/models/avatars/<male|female>/
+  body.glb          skinned body, animation clips (for example Idle), morph targets
+  hair-<id>.glb     hair part; its material is named AvatarHairTint
+  top-<id>.glb      top part; its material is named AvatarTopTint
+```
+
+- **Tinting**: `hairColor` and `clothingColor` recolor the materials named `AvatarHairTint` and `AvatarTopTint`. `composeAvatar()` clones those materials per avatar instance, so two avatars with different colors never share state, and everything it creates is released by its `dispose()`. Other materials (skin, shoes) keep their authored look.
+- **Composition**: `composeAvatar()` (`src/features/world/avatar/compose-avatar.ts`) carries every part mesh onto the body, skinned or static, preserving its authored world placement (a mesh nested under a transform group keeps its place). Skinned meshes are bound to the body skeleton by bone name. A part that does not match the body skeleton is skipped and reported, never half-bound. `resolveAvatarParts()` maps a saved configuration to the three URLs and the two tints.
+- **`AvatarModel`** (`src/features/world/avatar/avatar-model.tsx`) is the single component every 3D surface uses to draw a configured avatar:
+
+| Prop                            | Purpose                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `avatar`                        | The five saved fields (`bodyId`, `hairId`, `topId`, `hairColor`, `clothingColor`).                                                                                                                                                                                                                                                                   |
+| `scopeKey`                      | Asset-cache scope; the host's `WorldCanvas` frees it on unmount.                                                                                                                                                                                                                                                                                     |
+| `position`, `rotation`, `scale` | Placement of the composed avatar.                                                                                                                                                                                                                                                                                                                    |
+| `animation`                     | Clip name in `body.glb` (for example `Idle`). Under `prefers-reduced-motion`, or when the clip does not exist, the avatar is posed at the clip's first frame (or left in the bind pose when there is no clip) and does not move. A playing clip invalidates the `demand` frame loop every frame, so it keeps animating without `frameloop="always"`. |
+| `fallback`, `errorFallback`     | Scene content while files load and when the body fails.                                                                                                                                                                                                                                                                                              |
+| `onBodyError`, `onPartsSkipped` | Lets a DOM host react to a failed body or to omitted parts.                                                                                                                                                                                                                                                                                          |
+
+- **Fallbacks**: a hair or top that fails to load (or does not fit the body) is left out and the body still renders; its rejected cache entry is evicted so a later mount retries. A failing body shows `errorFallback` and calls `onBodyError`; the profile preview then shows the 2D `AvatarPreview`. WebGL being unavailable or lost also shows the 2D preview, through `WorldCanvas`'s `onUnavailable`. An asset failure never blocks saving the avatar.
+- **Profile preview**: `AvatarPreviewView` (`src/features/profile/avatar-preview-view.tsx`) shows the draft in 3D, loaded as a lazy chunk (the 2D preview is shown while it loads), using `WorldCanvas` with `framing="avatar"` (front view, head to feet; bounds in `AVATAR_FRAME`, `camera.ts`) and the shared `WarmLighting`. It uses its own `scopeKey` (`profile-avatar-preview`). While the avatar files download, the canvas shows a neutral placeholder silhouette (`AvatarModel`'s `fallback`), and the loading announcement stays visible, so the preview is never an empty stage.
+- **Budget**: each part counts as an avatar GLB (`<= 1 MB`); the two `body.glb` files are recorded exceptions below until #91.
+
 ## Authoring & Compression Pipeline
 
 All production `.glb` assets under `public/models/` should be compressed before committing:

@@ -59,7 +59,7 @@ export const profileMessages = {
       'Elegí cómo te ven en el aula. Los cambios son un borrador hasta que los guardes.',
     previewHeading: 'Vista previa',
     previewNote:
-      'Vista previa 2D de tu selección. El modelo 3D llega en una entrega posterior.',
+      'Vista previa de tu selección. Si tu dispositivo no puede mostrar 3D, ves una versión 2D simplificada.',
     previewDraft: 'Borrador sin guardar',
     previewSaved: 'Avatar guardado',
     previewAlt: 'Vista previa del avatar:',

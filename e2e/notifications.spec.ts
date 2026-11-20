@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { components } from '../src/api/schema.generated';
+import type { NotificationDto } from '../src/features/notifications/notification-schema';
 
 const apiOrigin = 'https://api.example.invalid';
 const userId = '00000000-0000-4000-8000-000000000001';
@@ -77,7 +78,7 @@ test('notification center shows unread count, persists mark-read/mark-all across
   await page.setViewportSize({ width, height: 800 });
   const { cspViolations, pageErrors } = await setupAuthSession(page);
 
-  let items: components['schemas']['NotificationDto'][] = [
+  let items: NotificationDto[] = [
     {
       id: '00000000-0000-4000-8000-000000003501',
       kind: 'announcement',
