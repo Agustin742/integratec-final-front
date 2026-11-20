@@ -82,8 +82,99 @@ export const avatarInputSchema = z.strictObject({
 
 export type AvatarInput = z.infer<typeof avatarInputSchema>;
 
+/** Server to client: a persisted classroom chat message, announced after its database commit. */
+export const CHAT_MESSAGE_EVENT = 'chat:message';
+export const CHAT_MESSAGE_MAX_BODY_LENGTH = 2000;
+export const CHAT_MESSAGE_MAX_MENTIONED_USERS = 20;
+export const chatMessagePayloadSchema = z.strictObject({
+  id: z.uuid(),
+  classroomId: z.uuid(),
+  authorId: z.uuid(),
+  body: z.string().min(1).max(CHAT_MESSAGE_MAX_BODY_LENGTH),
+  mentionedUserIds: z.array(z.uuid()).max(CHAT_MESSAGE_MAX_MENTIONED_USERS),
+  createdAt: z.iso.datetime(),
+});
+export type ChatMessagePayload = z.infer<typeof chatMessagePayloadSchema>;
+
+/** Server to client: a persisted moderation change; REST history supplies staff audit details. */
+export const CHAT_MESSAGE_HIDDEN_EVENT = 'chat:message.hidden';
+export const chatMessageHiddenPayloadSchema = z.strictObject({
+  messageId: z.uuid(),
+  hiddenAt: z.iso.datetime(),
+});
+export type ChatMessageHiddenPayload = z.infer<typeof chatMessageHiddenPayloadSchema>;
+
+/** Authenticated NestJS-to-Colyseus service request; the public event payload stays nested. */
+export const chatRealtimeBroadcastSchema = z
+  .discriminatedUnion('event', [
+    z.strictObject({
+      classroomId: z.uuid(),
+      event: z.literal(CHAT_MESSAGE_EVENT),
+      payload: chatMessagePayloadSchema,
+    }),
+    z.strictObject({
+      classroomId: z.uuid(),
+      event: z.literal(CHAT_MESSAGE_HIDDEN_EVENT),
+      payload: chatMessageHiddenPayloadSchema,
+    }),
+  ])
+  .refine(
+    (broadcast) =>
+      broadcast.event !== CHAT_MESSAGE_EVENT ||
+      broadcast.payload.classroomId === broadcast.classroomId,
+    { message: 'Message classroomId must match the broadcast classroomId' },
+  );
+export type ChatRealtimeBroadcast = z.infer<typeof chatRealtimeBroadcastSchema>;
+
 export const AVATAR_STATUSES = ['online', 'reconnecting'] as const;
 export type AvatarStatus = (typeof AVATAR_STATUSES)[number];
+
+/**
+ * Slot names of avatar equipment as carried in appearance payloads. They match the API's
+ * equipment URL slot names; duplicated here so the realtime service can validate the payload
+ * without importing server code.
+ */
+export const APPEARANCE_SLOT_NAMES = ['head', 'face', 'back', 'desk_decor'] as const;
+export type AppearanceSlotName = (typeof APPEARANCE_SLOT_NAMES)[number];
+
+/** Public projection of one equipped item: catalog fields only, no purchase or price data. */
+export const equippedItemPayloadSchema = z.strictObject({
+  slot: z.enum(APPEARANCE_SLOT_NAMES),
+  shopItemId: z.string().min(1),
+  shopItemCode: z.string().min(1).max(80),
+  shopItemName: z.string().min(1).max(120),
+  kind: z.string().min(1).max(40),
+});
+export type EquippedItemPayload = z.infer<typeof equippedItemPayloadSchema>;
+
+/**
+ * Public appearance of one classroom member: base avatar plus equipped items per slot (#114).
+ * Unknown fields are rejected at every consumer so no private data can ride along.
+ */
+export const memberAppearanceSchema = z
+  .strictObject({
+    baseAvatar: z.strictObject({
+      bodyId: z.string().min(1).max(40),
+      hairId: z.string().min(1).max(40),
+      topId: z.string().min(1).max(40),
+      hairColor: z.string().min(1).max(40),
+      clothingColor: z.string().min(1).max(40),
+    }),
+    items: z.strictObject({
+      head: equippedItemPayloadSchema.nullable(),
+      face: equippedItemPayloadSchema.nullable(),
+      back: equippedItemPayloadSchema.nullable(),
+      desk_decor: equippedItemPayloadSchema.nullable(),
+    }),
+  })
+  .refine(
+    (appearance) =>
+      (Object.keys(appearance.items) as AppearanceSlotName[]).every(
+        (slot) => appearance.items[slot] === null || appearance.items[slot].slot === slot,
+      ),
+    { message: 'equipped item slot must match its items key' },
+  );
+export type MemberAppearance = z.infer<typeof memberAppearanceSchema>;
 
 /** Axis-aligned box on the floor plane (x, z), in layout units. */
 export interface LayoutBox {
