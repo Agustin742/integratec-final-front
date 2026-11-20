@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -68,7 +68,6 @@ export function DailyReviewDialog() {
     >
       {open && due !== null ? (
         <DialogContent
-          aria-describedby={undefined}
           onEscapeKeyDown={keepOpen}
           onInteractOutside={keepOpen}
         >
@@ -140,19 +139,28 @@ function DailyReviewSections({
   return (
     <div className="flex flex-col gap-4">
       {sections.map((section) => (
-        <section key={section.kind} aria-label={sectionTitle(section.kind)}>
-          <h2 className="font-display text-lg font-semibold">
+        <section
+          key={section.kind}
+          aria-labelledby={`daily-review-section-${section.kind}`}
+        >
+          <h3
+            id={`daily-review-section-${section.kind}`}
+            className="font-display text-lg font-semibold"
+          >
             {sectionTitle(section.kind)}
-          </h2>
+          </h3>
           {section.items.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              {m.dialog.sections.emptyTitle}
+              {section.kind === 'pending'
+                ? m.dialog.sections.emptyPending
+                : m.dialog.sections.emptyNews}
             </p>
           ) : (
             <ul className="flex flex-col gap-2">
-              {section.items.map((item) => (
+              {/* Static list: the index only disambiguates identical items. */}
+              {section.items.map((item, index) => (
                 <li
-                  key={item.title}
+                  key={`${item.kind}|${item.classroomName ?? ''}|${item.dueAt ?? ''}|${item.title}|${String(index)}`}
                   className="rounded-2xl border border-edge bg-card p-3"
                 >
                   <p className="font-medium text-foreground">{item.title}</p>
@@ -206,18 +214,28 @@ function DailyQuestionCard({
   const inFlight = useRef(false);
   // A 409 means the server already holds today's answer: lock like a success.
   const answered = data !== null || error?.category === 'already_answered';
+  const resultHeadingRef = useRef<HTMLHeadingElement>(null);
+  const lockMessageRef = useRef<HTMLParagraphElement>(null);
+
+  // The submit button unmounts once answered, so focus would fall to the page
+  // body; move it to the result (or the lock message) instead.
+  useEffect(() => {
+    if (answered) {
+      (resultHeadingRef.current ?? lockMessageRef.current)?.focus();
+    }
+  }, [answered]);
 
   return (
     <section
       aria-labelledby="daily-review-question-heading"
       className="rounded-2xl border border-edge bg-card p-4"
     >
-      <h2
+      <h3
         id="daily-review-question-heading"
         className="font-display text-lg font-semibold"
       >
         {m.dialog.question.title}
-      </h2>
+      </h3>
       <p className="text-sm text-muted-foreground">
         {m.dialog.question.description}
       </p>
@@ -226,15 +244,12 @@ function DailyQuestionCard({
           {m.dialog.question.materialPrefix} {question.materialTitle}
         </p>
       ) : null}
-      <p className="mt-2 font-medium text-foreground">{question.prompt}</p>
 
       <fieldset disabled={answered || isPending} className="mt-2">
-        <legend className="sr-only">{m.dialog.question.optionsLegend}</legend>
-        <div
-          role="radiogroup"
-          aria-label={question.prompt}
-          className="flex flex-col gap-2"
-        >
+        <legend className="font-medium text-foreground">
+          {question.prompt}
+        </legend>
+        <div className="mt-2 flex flex-col gap-2">
           {question.options.map((option) => (
             <label
               key={option}
@@ -285,10 +300,20 @@ function DailyQuestionCard({
         </div>
       ) : null}
 
-      {answered && data !== null ? <AnswerResult result={data} /> : null}
+      {/* Persistent live region: content injected into it gets announced. */}
+      <div role="status" aria-live="polite">
+        {data !== null ? (
+          <AnswerResult result={data} headingRef={resultHeadingRef} />
+        ) : null}
+      </div>
 
       {error !== null ? (
-        <p role="alert" className="mt-2 text-sm text-destructive">
+        <p
+          ref={lockMessageRef}
+          tabIndex={-1}
+          role="alert"
+          className="mt-2 text-sm text-destructive outline-none"
+        >
           {error.category === 'already_answered'
             ? m.dialog.question.alreadyAnswered
             : m.dialog.question.submitFailed}
@@ -300,16 +325,22 @@ function DailyQuestionCard({
 
 function AnswerResult({
   result,
+  headingRef,
 }: {
   readonly result: DailyQuestionAnswerResultDto;
+  readonly headingRef: RefObject<HTMLHeadingElement | null>;
 }) {
   return (
-    <div role="status" className="mt-3 rounded-xl border border-edge p-3">
-      <h3 className="font-display text-base font-semibold">
+    <div className="mt-3 rounded-xl border border-edge p-3">
+      <h4
+        ref={headingRef}
+        tabIndex={-1}
+        className="font-display text-base font-semibold outline-none"
+      >
         {result.correct
           ? m.dialog.question.correctTitle
           : m.dialog.question.incorrectTitle}
-      </h3>
+      </h4>
       {result.feedback !== null ? (
         <p className="text-sm text-foreground">{result.feedback}</p>
       ) : null}

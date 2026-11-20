@@ -18,6 +18,8 @@ export const dailyReviewMessages = {
     sections: {
       pending: 'Pendientes',
       news: 'Novedades',
+      emptyPending: 'Sin pendientes por ahora.',
+      emptyNews: 'Sin novedades por ahora.',
       emptyTitle: 'No tenés pendientes ni novedades',
       emptyDescription:
         'Cuando haya actividades, calificaciones o avisos nuevos, van a aparecer en tu repaso diario.',
@@ -28,7 +30,6 @@ export const dailyReviewMessages = {
       description:
         'Respondé correctamente para sumar un día a tu racha de estudio.',
       materialPrefix: 'Material de referencia:',
-      optionsLegend: 'Opciones de respuesta',
       submit: 'Responder',
       submitting: 'Enviando…',
       correctTitle: '¡Respuesta correcta!',

@@ -530,4 +530,156 @@ describe('DailyReviewDialog (HU-BOT-003, #55)', () => {
     expect(screen.queryByRole('radio')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Responder' })).toBeNull();
   });
+
+  describe('accessibility and content', () => {
+    it('links the visible description to the dialog', async () => {
+      mswServer.use(
+        createDailyReviewHandler({ payload: DUE_STUDENT_REVIEW }),
+        createOwnStreakAndBadgesHandler(),
+      );
+
+      renderDailyReviewDialog();
+
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Tu repaso diario',
+      });
+      expect(dialog).toHaveAccessibleDescription(
+        'Un resumen de tus pendientes y novedades para organizar tu jornada.',
+      );
+    });
+
+    it('renders items with duplicate titles without key warnings', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const duplicated: DailyReviewPayload = {
+        ...DUE_TEACHER_REVIEW,
+        sections: [
+          {
+            kind: 'pending',
+            items: [
+              {
+                kind: 'pending_activity',
+                title: 'Guía de ejercicios',
+                classroomName: 'Biología 3°B',
+                dueAt: null,
+                detail: null,
+              },
+              {
+                kind: 'pending_activity',
+                title: 'Guía de ejercicios',
+                classroomName: 'Química 4°A',
+                dueAt: null,
+                detail: null,
+              },
+            ],
+          },
+        ],
+      };
+      mswServer.use(
+        createDailyReviewHandler({ payload: duplicated }),
+        createOwnStreakAndBadgesHandler(),
+      );
+
+      renderDailyReviewDialog();
+
+      expect(await screen.findAllByText('Guía de ejercicios')).toHaveLength(2);
+      const keyWarnings = errorSpy.mock.calls.filter((call) =>
+        String(call[0]).includes('same key'),
+      );
+      expect(keyWarnings).toEqual([]);
+      errorSpy.mockRestore();
+    });
+
+    it('exposes a single radio group named by the question prompt', async () => {
+      mswServer.use(
+        createDailyReviewHandler({ payload: DUE_STUDENT_REVIEW }),
+        createOwnStreakAndBadgesHandler(),
+      );
+
+      renderDailyReviewDialog();
+
+      await screen.findByRole('dialog', { name: 'Tu repaso diario' });
+      const groups = screen.getAllByRole('group');
+      expect(groups).toHaveLength(1);
+      expect(groups[0]).toHaveAccessibleName(
+        '¿Qué organelo realiza la fotosíntesis?',
+      );
+      expect(screen.queryByRole('radiogroup')).toBeNull();
+    });
+
+    it('nests section headings under the dialog title as level 3', async () => {
+      mswServer.use(
+        createDailyReviewHandler({ payload: DUE_STUDENT_REVIEW }),
+        createOwnStreakAndBadgesHandler(),
+      );
+
+      renderDailyReviewDialog();
+
+      await screen.findByRole('dialog', { name: 'Tu repaso diario' });
+      expect(
+        screen.getByRole('heading', { level: 3, name: 'Pendientes' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 3, name: 'Novedades' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', {
+          level: 3,
+          name: 'Pregunta diaria de repaso',
+        }),
+      ).toBeInTheDocument();
+    });
+
+    it('moves focus to the result heading and announces it in the live region', async () => {
+      mswServer.use(
+        createDailyReviewHandler({ payload: DUE_STUDENT_REVIEW }),
+        createDailyQuestionAnswerHandler({
+          result: {
+            correct: true,
+            feedback: '¡Correcto! El cloroplasto realiza la fotosíntesis.',
+            streak: null,
+          },
+        }),
+        createOwnStreakAndBadgesHandler(),
+      );
+
+      renderDailyReviewDialog();
+
+      await screen.findByRole('dialog', { name: 'Tu repaso diario' });
+      const liveRegion = screen.getByRole('status');
+      expect(liveRegion).toBeEmptyDOMElement();
+      fireEvent.click(screen.getByRole('radio', { name: 'Cloroplasto' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Responder' }));
+
+      const heading = await screen.findByRole('heading', {
+        level: 4,
+        name: '¡Respuesta correcta!',
+      });
+      await waitFor(() => {
+        expect(heading).toHaveFocus();
+      });
+      expect(screen.getByRole('status')).toBe(liveRegion);
+      expect(liveRegion).toContainElement(heading);
+    });
+
+    it('uses per-section empty copy when only one section is empty', async () => {
+      const onlyNews: DailyReviewPayload = {
+        ...STRUCTURED_STUDENT_REVIEW,
+        sections: [
+          { kind: 'pending', items: [] },
+          STRUCTURED_STUDENT_REVIEW.sections[1],
+        ],
+      };
+      mswServer.use(
+        createDailyReviewHandler({ payload: onlyNews }),
+        createOwnStreakAndBadgesHandler(),
+      );
+
+      renderDailyReviewDialog();
+
+      expect(
+        await screen.findByText('Sin pendientes por ahora.'),
+      ).toBeInTheDocument();
+      expect(screen.queryByText('No tenés pendientes ni novedades')).toBeNull();
+    });
+  });
 });
