@@ -176,7 +176,8 @@ The backend repository records decisions D1-D12 in its `docs/technical-justifica
 - **Alternatives:** A standard budget (60 fps on mid-range, 300 draw calls, 500k triangles, 20 MB), rejected because school devices would stutter.
 - **Trade-offs:** Less visual richness and tighter asset authoring; the runtime measurement adds code and needs tuning.
 - **Affected contracts:** [3D world and camera](../rules/3d-world-and-camera.md), [Art direction](../rules/art-direction.md), [Classrooms, roles, and permissions](../rules/classrooms-and-roles.md) for the 2D mode.
-- **Open:** The runtime measurement method and thresholds that trigger the offer are defined during implementation; the budget numbers are limits to verify, not yet measured results.
+- **Runtime measurement (#56):** The offer trigger samples the rendered frame cadence of the demand-loop canvas over a rolling `8000 ms` window (at least `30` frames) and fires when the mean is below `24 fps` (80% of the `30 fps` conservative target); the `60 fps` mid-range figure is reported by the dev overlay but never triggers the offer. A decline is remembered per app session. Details and measured reference-scene numbers: [3D performance monitor](./3d-performance-monitor.md).
+- **Open:** The budget numbers are limits to verify; the reference scene is currently empty (0 draw calls, 0 triangles), so the measured numbers must be repeated when the classroom scene gains content.
 - **Approval:** Approved by Agustin (decision owner) on 2026-11-02.
 
 ### FD9. Contract mocks
