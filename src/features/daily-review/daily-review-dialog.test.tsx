@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import axe from 'axe-core';
 import {
   afterAll,
@@ -168,7 +168,7 @@ describe('DailyReviewDialog (HU-BOT-003, #55)', () => {
   afterEach(() => mswServer.resetHandlers());
   afterAll(() => mswServer.close());
 
-  it('shows the daily review on the first authenticated connection and closes on escape', async () => {
+  it('shows the daily review on the first authenticated connection and closes with the close button', async () => {
     mswServer.use(
       createDailyReviewHandler({
         payload: DUE_STUDENT_REVIEW,
@@ -195,7 +195,7 @@ describe('DailyReviewDialog (HU-BOT-003, #55)', () => {
     const axeResults = await axe.run(container.ownerDocument.body);
     expect(axeResults.violations).toEqual([]);
 
-    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).toBeNull();
     });
@@ -319,6 +319,179 @@ describe('DailyReviewDialog (HU-BOT-003, #55)', () => {
     expect(
       await screen.findByText('Ya respondiste la pregunta de hoy.'),
     ).toBeInTheDocument();
+    // A 409 means the day is already answered: the card locks instead of
+    // inviting retries that can only hit the same conflict.
+    expect(screen.getByRole('radio', { name: 'Cloroplasto' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Responder' })).toBeNull();
+  });
+
+  it('shows a dedicated submit-failure message, not the load error copy', async () => {
+    mswServer.use(
+      createDailyReviewHandler({ payload: DUE_STUDENT_REVIEW }),
+      createDailyQuestionAnswerHandler({ error: 'network' }),
+      createOwnStreakAndBadgesHandler(),
+    );
+
+    renderDailyReviewDialog();
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Tu repaso diario' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: 'Cloroplasto' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Responder' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'No pudimos enviar tu respuesta. Revisá tu conexión e intentá de nuevo.',
+    );
+    expect(screen.queryByText(/interpretar tu repaso diario/)).toBeNull();
+    // The student can retry after a transient failure.
+    expect(screen.getByRole('button', { name: 'Responder' })).toBeEnabled();
+  });
+
+  it('keeps an unanswered question open on escape and outside click, closing only with the close button', async () => {
+    mswServer.use(
+      createDailyReviewHandler({ payload: DUE_STUDENT_REVIEW }),
+      createOwnStreakAndBadgesHandler(),
+    );
+
+    renderDailyReviewDialog();
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Tu repaso diario',
+    });
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    fireEvent.pointerDown(document.body);
+    fireEvent.pointerUp(document.body);
+    fireEvent.click(document.body);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+  });
+
+  it('closes on escape once the question was answered', async () => {
+    mswServer.use(
+      createDailyReviewHandler({ payload: DUE_STUDENT_REVIEW }),
+      createDailyQuestionAnswerHandler({
+        result: { correct: false, feedback: null, streak: null },
+      }),
+      createOwnStreakAndBadgesHandler(),
+    );
+
+    renderDailyReviewDialog();
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Tu repaso diario' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: 'Mitocondria' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Responder' }));
+    expect(await screen.findByText('Respuesta incorrecta')).toBeInTheDocument();
+
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+  });
+
+  it('closes on escape after an already-answered conflict', async () => {
+    mswServer.use(
+      createDailyReviewHandler({ payload: DUE_STUDENT_REVIEW }),
+      createDailyQuestionAnswerHandler({ error: CONFLICT_ENVELOPE }),
+      createOwnStreakAndBadgesHandler(),
+    );
+
+    renderDailyReviewDialog();
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Tu repaso diario' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: 'Cloroplasto' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Responder' }));
+    expect(
+      await screen.findByText('Ya respondiste la pregunta de hoy.'),
+    ).toBeInTheDocument();
+
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+  });
+
+  it('closes on escape for a teacher review', async () => {
+    mswServer.use(
+      createDailyReviewHandler({ payload: DUE_TEACHER_REVIEW }),
+      createOwnStreakAndBadgesHandler(),
+    );
+
+    renderDailyReviewDialog();
+
+    fireEvent.keyDown(
+      await screen.findByRole('dialog', { name: 'Tu repaso diario' }),
+      { key: 'Escape' },
+    );
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+  });
+
+  it('submits the answer once when the button is clicked twice in the same tick', async () => {
+    const onAnswer = vi.fn();
+    mswServer.use(
+      createDailyReviewHandler({ payload: DUE_STUDENT_REVIEW }),
+      createDailyQuestionAnswerHandler({
+        onAnswer,
+        result: { correct: false, feedback: null, streak: null },
+      }),
+      createOwnStreakAndBadgesHandler(),
+    );
+
+    renderDailyReviewDialog();
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Tu repaso diario' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: 'Mitocondria' }));
+    const submit = screen.getByRole('button', { name: 'Responder' });
+    // Both clicks run inside one batched update, before `isPending` re-renders.
+    act(() => {
+      submit.click();
+      submit.click();
+    });
+
+    expect(await screen.findByText('Respuesta incorrecta')).toBeInTheDocument();
+    expect(onAnswer).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [
+      '404',
+      {
+        status: 404,
+        body: {
+          code: 'NOT_FOUND' as const,
+          message: 'Not found.',
+          correlationId: '3f2b8c1e-0d1a-4f4e-9a55-6f0c2f9c1a12',
+        },
+      },
+    ],
+    ['network error', 'network' as const],
+  ])('stays closed when the daily review request fails (%s)', async (_label, error) => {
+    mswServer.use(
+      createDailyReviewHandler({ error }),
+      createOwnStreakAndBadgesHandler(),
+    );
+
+    const { queryClient } = renderDailyReviewDialog();
+    await waitFor(() => {
+      const state = queryClient.getQueryState(
+        ownDailyReviewQueryKey(profile.id),
+      );
+      expect(state?.status).toBe('error');
+    });
+
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('renders the structured fallback without generated text or a question card', async () => {

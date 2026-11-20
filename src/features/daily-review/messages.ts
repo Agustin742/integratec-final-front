@@ -38,7 +38,8 @@ export const dailyReviewMessages = {
           days === 1 ? '1 día' : `${days} días`
         }.`,
       alreadyAnswered: 'Ya respondiste la pregunta de hoy.',
-      retryHint: 'Revisá tu conexión e intentá de nuevo.',
+      submitFailed:
+        'No pudimos enviar tu respuesta. Revisá tu conexión e intentá de nuevo.',
     },
   },
 } as const;

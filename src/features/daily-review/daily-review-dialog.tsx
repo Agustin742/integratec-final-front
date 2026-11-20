@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -21,6 +21,7 @@ import {
 } from './use-daily-review';
 
 type DueDailyReview = Extract<DailyReviewResponseDto, { status: 'due' }>;
+type AnswerState = ReturnType<typeof useAnswerDailyReviewQuestion>;
 
 /**
  * Once-per-day daily review dialog (`HU-BOT-003`, #55). Mounted once in the
@@ -32,6 +33,7 @@ type DueDailyReview = Extract<DailyReviewResponseDto, { status: 'due' }>;
 export function DailyReviewDialog() {
   const snapshot = useSessionSnapshot();
   const review = useOwnDailyReview();
+  const answerState = useAnswerDailyReviewQuestion();
   const [dismissed, setDismissed] = useState(false);
 
   if (snapshot.status !== 'authenticated') {
@@ -41,6 +43,19 @@ export function DailyReviewDialog() {
   const due =
     review.data?.status === 'due' ? (review.data as DueDailyReview) : null;
   const open = due !== null && !dismissed;
+  // An unanswered daily question must not be lost to a stray Escape or click
+  // outside; only the explicit close button dismisses the dialog meanwhile.
+  const questionPending =
+    due !== null &&
+    due.audience === 'STUDENT' &&
+    due.dailyQuestion !== null &&
+    answerState.data === null &&
+    answerState.error?.category !== 'already_answered';
+  const keepOpen = (event: Event) => {
+    if (questionPending) {
+      event.preventDefault();
+    }
+  };
 
   return (
     <Dialog
@@ -52,15 +67,25 @@ export function DailyReviewDialog() {
       }}
     >
       {open && due !== null ? (
-        <DialogContent aria-describedby={undefined}>
-          <DailyReviewContent review={due} />
+        <DialogContent
+          aria-describedby={undefined}
+          onEscapeKeyDown={keepOpen}
+          onInteractOutside={keepOpen}
+        >
+          <DailyReviewContent review={due} answerState={answerState} />
         </DialogContent>
       ) : null}
     </Dialog>
   );
 }
 
-function DailyReviewContent({ review }: { readonly review: DueDailyReview }) {
+function DailyReviewContent({
+  review,
+  answerState,
+}: {
+  readonly review: DueDailyReview;
+  readonly answerState: AnswerState;
+}) {
   const isStudent = review.audience === 'STUDENT';
 
   return (
@@ -83,7 +108,10 @@ function DailyReviewContent({ review }: { readonly review: DueDailyReview }) {
       <DailyReviewSections sections={review.sections} />
 
       {isStudent && review.dailyQuestion !== null ? (
-        <DailyQuestionCard question={review.dailyQuestion} />
+        <DailyQuestionCard
+          question={review.dailyQuestion}
+          answerState={answerState}
+        />
       ) : null}
     </>
   );
@@ -167,12 +195,17 @@ function itemMetadata(item: DailyReviewSectionDto['items'][number]): string {
 
 function DailyQuestionCard({
   question,
+  answerState,
 }: {
   readonly question: DailyQuestionDto;
+  readonly answerState: AnswerState;
 }) {
-  const { answer, isPending, data, error } = useAnswerDailyReviewQuestion();
+  const { answer, isPending, data, error } = answerState;
   const [selected, setSelected] = useState<string | null>(null);
-  const answered = data !== null;
+  // Two clicks in the same tick can both pass before `isPending` re-renders.
+  const inFlight = useRef(false);
+  // A 409 means the server already holds today's answer: lock like a success.
+  const answered = data !== null || error?.category === 'already_answered';
 
   return (
     <section
@@ -230,13 +263,18 @@ function DailyQuestionCard({
             disabled={selected === null || isPending}
             busy={isPending}
             onClick={() => {
-              if (selected !== null) {
+              if (selected !== null && !inFlight.current) {
+                inFlight.current = true;
                 void answer({
                   questionId: question.id,
                   answer: selected,
-                }).catch(() => {
-                  // Failures surface through the hook's `error` field.
-                });
+                })
+                  .catch(() => {
+                    // Failures surface through the hook's `error` field.
+                  })
+                  .finally(() => {
+                    inFlight.current = false;
+                  });
               }
             }}
           >
@@ -253,7 +291,7 @@ function DailyQuestionCard({
         <p role="alert" className="mt-2 text-sm text-destructive">
           {error.category === 'already_answered'
             ? m.dialog.question.alreadyAnswered
-            : `${m.errors.unexpected} ${m.dialog.question.retryHint}`}
+            : m.dialog.question.submitFailed}
         </p>
       ) : null}
     </section>
