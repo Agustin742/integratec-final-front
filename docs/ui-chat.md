@@ -127,11 +127,12 @@ REST stays the rendering authority
   outside the `chat` domain, so chat reconciliation (sends, hides, reconnects)
   never refetches the member directory. Suggestions never expose users outside
   the roster the server returns.
-- The picker is a WAI-ARIA combobox: the textarea has `role="combobox"`,
-  `aria-autocomplete="list"`, `aria-expanded`, `aria-controls` (the popup) and
-  `aria-activedescendant` (the highlighted option); the popup is a
-  `role="listbox"` of `role="option"` items. Focus never leaves the textarea.
-  ArrowDown/ArrowUp move the highlight (wrapping), Enter selects the
+- The draft stays a native `textbox` (`combobox` is not an allowed role on a
+  `<textarea>`): it carries `aria-autocomplete="list"`, `aria-controls` (the
+  popup, only while open) and `aria-activedescendant` (the highlighted
+  option); the popup is a `role="listbox"` of `role="option"` items and the
+  polite suggestions notice tells screen readers when it opens. Focus never
+  leaves the textarea. ArrowDown/ArrowUp move the highlight (wrapping), Enter selects the
   highlighted option (the first one when none is highlighted; it never sends
   or adds a newline while the list is open), Tab selects the highlighted
   option, Escape closes the list without changing the text, and a mouse click

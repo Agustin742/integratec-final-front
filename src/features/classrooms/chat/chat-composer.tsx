@@ -110,7 +110,7 @@ interface UncertainSend {
  * Mentions stay server-authoritative: selecting a suggestion only inserts
  * `@DisplayName ` as plain text and only `body` is sent; the server resolves
  * or ignores it (`rules/communication-and-notifications.md`). The picker is a
- * WAI-ARIA combobox: focus never leaves the textarea.
+ * listbox popup driven from the textarea: focus never leaves it.
  */
 export function ChatComposer() {
   const { classroomId } = useParams();
@@ -602,12 +602,11 @@ function ChatComposerForm({
                 // drops focus, and the author keeps typing the next message.
                 readOnly={isSubmitting}
                 aria-busy={isSubmitting}
+                // Stays a native textbox (`combobox` is not allowed on a
+                // textarea): only textbox-valid attributes link the popup.
                 {...(hasMentionPicker
                   ? {
-                      role: 'combobox',
                       'aria-autocomplete': 'list' as const,
-                      'aria-haspopup': 'listbox' as const,
-                      'aria-expanded': isMentionOpen,
                       'aria-controls': isMentionOpen ? listboxId : undefined,
                       'aria-activedescendant':
                         activeIndex >= 0 ? optionId(activeIndex) : undefined,

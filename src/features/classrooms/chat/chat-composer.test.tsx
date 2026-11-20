@@ -213,16 +213,8 @@ function renderComposerRoute(
   };
 }
 
-/**
- * The mention picker follows the WAI-ARIA 1.2 combobox pattern on the draft
- * textarea (agreed with the product owner for the chat). axe's
- * `aria-allowed-role` only lists `input` elements for `combobox`, so that one
- * rule is skipped for the composer; every other rule still runs.
- */
-const COMBOBOX_TEXTAREA_AXE = { disabledRules: ['aria-allowed-role'] };
-
 function getDraftTextarea() {
-  return screen.getByRole('combobox', {
+  return screen.getByRole('textbox', {
     name: 'Mensaje del chat',
   }) as HTMLTextAreaElement;
 }
@@ -299,7 +291,7 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
       'Mensaje nuevo del estudiante',
     );
 
-    await expectAccessible(view.container, COMBOBOX_TEXTAREA_AXE);
+    await expectAccessible(view.container);
   });
 
   it('does not duplicate the own message when the room echoes it after the REST send', async () => {
@@ -312,7 +304,7 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
     mswServer.use(...store.handlers);
 
     const view = renderComposerRoute({ role: 'STUDENT', userId: STUDENT_ID });
-    await screen.findByRole('combobox', { name: 'Mensaje del chat' });
+    await screen.findByRole('textbox', { name: 'Mensaje del chat' });
 
     typeDraft('Mensaje propio con eco');
     await submitDraft();
@@ -346,7 +338,7 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
     mswServer.use(...store.handlers);
 
     renderComposerRoute({ role: 'STUDENT', userId: STUDENT_ID });
-    const textarea = await screen.findByRole('combobox', {
+    const textarea = await screen.findByRole('textbox', {
       name: 'Mensaje del chat',
     });
     expect(
@@ -376,7 +368,7 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
     mswServer.use(...store.handlers);
 
     renderComposerRoute({ role: 'STUDENT', userId: STUDENT_ID });
-    await screen.findByRole('combobox', { name: 'Mensaje del chat' });
+    await screen.findByRole('textbox', { name: 'Mensaje del chat' });
     getDraftTextarea().focus();
     typeDraft('Mensaje con foco');
     fireEvent.keyDown(getDraftTextarea(), { key: 'Enter' });
@@ -397,7 +389,7 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
 
     renderComposerRoute({ role: 'STUDENT', userId: STUDENT_ID });
     expect(
-      await screen.findByRole('combobox', { name: 'Mensaje del chat' }),
+      await screen.findByRole('textbox', { name: 'Mensaje del chat' }),
     ).toBeVisible();
 
     await submitDraft();
@@ -419,7 +411,7 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
     mswServer.use(...store.handlers);
 
     renderComposerRoute({ role: 'STUDENT', userId: STUDENT_ID });
-    const textarea = await screen.findByRole('combobox', {
+    const textarea = await screen.findByRole('textbox', {
       name: /Mensaje del chat/,
     });
     expect(screen.getByText('0/2000 caracteres')).toBeVisible();
@@ -451,7 +443,7 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
     mswServer.use(...store.handlers);
 
     const view = renderComposerRoute({ role: 'STUDENT', userId: STUDENT_ID });
-    await screen.findByRole('combobox', { name: 'Mensaje del chat' });
+    await screen.findByRole('textbox', { name: 'Mensaje del chat' });
 
     typeDraft('Hola @sof');
     const listbox = await screen.findByRole('listbox', {
@@ -467,7 +459,7 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
       within(listbox).queryByText('Lucía Fernández'),
     ).not.toBeInTheDocument();
 
-    // Keyboard selection keeps focus in the textarea (combobox) and inserts
+    // Keyboard selection keeps focus in the textarea and inserts
     // `@DisplayName ` as plain editable text.
     getDraftTextarea().focus();
     fireEvent.keyDown(getDraftTextarea(), { key: 'ArrowDown' });
@@ -484,7 +476,7 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
     expect(sent?.mentionedUserIds).toEqual([STUDENT_ID_2]);
     expect(getDraftTextarea()).toHaveValue('');
 
-    await expectAccessible(view.container, COMBOBOX_TEXTAREA_AXE);
+    await expectAccessible(view.container);
   });
 
   it('keeps an unresolved @token as plain text: no suggestion, no client-side mention claim', async () => {
@@ -497,7 +489,7 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
     mswServer.use(...store.handlers);
 
     renderComposerRoute({ role: 'STUDENT', userId: STUDENT_ID });
-    await screen.findByRole('combobox', { name: 'Mensaje del chat' });
+    await screen.findByRole('textbox', { name: 'Mensaje del chat' });
 
     typeDraft('Hola @nadie del aula');
     await waitFor(() => {
@@ -554,7 +546,7 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
     ).not.toBeInTheDocument();
     expect(store.getCounts().send).toBe(0);
 
-    await expectAccessible(view.container, COMBOBOX_TEXTAREA_AXE);
+    await expectAccessible(view.container);
   });
 
   it('lets a teacher send while the chat is muted', async () => {
@@ -605,7 +597,7 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
       chatMuted: false,
     });
     expect(
-      await screen.findByRole('combobox', { name: 'Mensaje del chat' }),
+      await screen.findByRole('textbox', { name: 'Mensaje del chat' }),
     ).toBeVisible();
 
     typeDraft('Envío forzado mientras está silenciado');
@@ -650,7 +642,7 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
     mswServer.use(...store.handlers);
 
     renderComposerRoute({ role: 'STUDENT', userId: STUDENT_ID });
-    await screen.findByRole('combobox', { name: 'Mensaje del chat' });
+    await screen.findByRole('textbox', { name: 'Mensaje del chat' });
 
     // Five admitted sends inside the rolling ten-second window (the contract
     // limit, staff included); the next send from this user is a 429.
@@ -696,7 +688,7 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
     mswServer.use(...store.handlers);
 
     renderComposerRoute({ role: 'STUDENT', userId: STUDENT_ID });
-    await screen.findByRole('combobox', { name: 'Mensaje del chat' });
+    await screen.findByRole('textbox', { name: 'Mensaje del chat' });
 
     typeDraft('Mensaje que nunca llegó');
     await submitDraft();
@@ -729,7 +721,7 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
     mswServer.use(...store.handlers);
 
     renderComposerRoute({ role: 'STUDENT', userId: STUDENT_ID });
-    await screen.findByRole('combobox', { name: 'Mensaje del chat' });
+    await screen.findByRole('textbox', { name: 'Mensaje del chat' });
 
     typeDraft('Mensaje con confirmación perdida');
     await submitDraft();
@@ -795,7 +787,7 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
     mswServer.use(...store.handlers);
 
     renderComposerRoute({ role: 'STUDENT', userId: STUDENT_ID });
-    await screen.findByRole('combobox', { name: 'Mensaje del chat' });
+    await screen.findByRole('textbox', { name: 'Mensaje del chat' });
 
     typeDraft('Mensaje que el servidor rechaza');
     await submitDraft();
@@ -831,7 +823,7 @@ function trackMemberRequests() {
   };
 }
 
-describe('ChatComposer hardening (#113: mentions, combobox, cooldown)', () => {
+describe('ChatComposer hardening (#113: mentions, cooldown)', () => {
   beforeAll(() => mswServer.listen());
   afterEach(() => mswServer.resetHandlers());
   afterAll(() => mswServer.close());
@@ -855,7 +847,7 @@ describe('ChatComposer hardening (#113: mentions, combobox, cooldown)', () => {
     const tracker = trackMemberRequests();
     try {
       renderComposerRoute();
-      await screen.findByRole('combobox', { name: 'Mensaje del chat' });
+      await screen.findByRole('textbox', { name: 'Mensaje del chat' });
 
       typeDraft('@s');
       typeDraft('@so');
@@ -877,7 +869,7 @@ describe('ChatComposer hardening (#113: mentions, combobox, cooldown)', () => {
     const tracker = trackMemberRequests();
     try {
       const view = renderComposerRoute();
-      await screen.findByRole('combobox', { name: 'Mensaje del chat' });
+      await screen.findByRole('textbox', { name: 'Mensaje del chat' });
       typeDraft('@sof');
       await screen.findByRole('listbox', {
         name: 'Integrantes sugeridos para mencionar',
@@ -899,14 +891,18 @@ describe('ChatComposer hardening (#113: mentions, combobox, cooldown)', () => {
     }
   });
 
-  it('exposes the mention picker as a combobox with a listbox popup', async () => {
+  it('keeps the draft a native textbox that points at the listbox popup', async () => {
     setupStore();
     const view = renderComposerRoute();
-    const textarea = await screen.findByRole('combobox', {
+    const textarea = await screen.findByRole('textbox', {
       name: 'Mensaje del chat',
     });
+    // Native textbox: only attributes valid on it, no combobox semantics.
+    expect(textarea).not.toHaveAttribute('role');
+    expect(textarea).not.toHaveAttribute('aria-expanded');
+    expect(textarea).not.toHaveAttribute('aria-haspopup');
     expect(textarea).toHaveAttribute('aria-autocomplete', 'list');
-    expect(textarea).toHaveAttribute('aria-expanded', 'false');
+    expect(textarea).not.toHaveAttribute('aria-controls');
     expect(textarea).not.toHaveAttribute('aria-activedescendant');
 
     textarea.focus();
@@ -914,8 +910,11 @@ describe('ChatComposer hardening (#113: mentions, combobox, cooldown)', () => {
     const listbox = await screen.findByRole('listbox', {
       name: 'Integrantes sugeridos para mencionar',
     });
-    expect(textarea).toHaveAttribute('aria-expanded', 'true');
     expect(textarea).toHaveAttribute('aria-controls', listbox.id);
+    // The polite notice tells screen readers the suggestions are open.
+    expect(
+      screen.getByText(/Hay sugerencias de mención disponibles/),
+    ).toBeVisible();
     const options = within(listbox).getAllByRole('option');
     expect(options).toHaveLength(1);
     expect(options[0]).toHaveAttribute('aria-selected', 'false');
@@ -926,7 +925,7 @@ describe('ChatComposer hardening (#113: mentions, combobox, cooldown)', () => {
     expect(options[0].id).not.toBe('');
     expect(textarea).toHaveAttribute('aria-activedescendant', options[0].id);
 
-    await expectAccessible(view.container, COMBOBOX_TEXTAREA_AXE);
+    await expectAccessible(view.container);
   });
 
   it('moves the highlight with the arrows (wrapping) and selects with Enter without sending', async () => {
@@ -942,7 +941,7 @@ describe('ChatComposer hardening (#113: mentions, combobox, cooldown)', () => {
       ],
     });
     renderComposerRoute();
-    const textarea = await screen.findByRole('combobox', {
+    const textarea = await screen.findByRole('textbox', {
       name: 'Mensaje del chat',
     });
 
@@ -973,7 +972,7 @@ describe('ChatComposer hardening (#113: mentions, combobox, cooldown)', () => {
   it('closes the picker with Escape without changing the text, and Tab selects the highlighted option', async () => {
     setupStore();
     renderComposerRoute();
-    const textarea = await screen.findByRole('combobox', {
+    const textarea = await screen.findByRole('textbox', {
       name: 'Mensaje del chat',
     });
 
@@ -982,7 +981,7 @@ describe('ChatComposer hardening (#113: mentions, combobox, cooldown)', () => {
     await screen.findByRole('listbox');
     fireEvent.keyDown(textarea, { key: 'Escape' });
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
-    expect(textarea).toHaveAttribute('aria-expanded', 'false');
+    expect(textarea).not.toHaveAttribute('aria-controls');
     expect(getDraftTextarea()).toHaveValue('Hola @sof');
     expect(textarea).toHaveFocus();
 
@@ -997,7 +996,7 @@ describe('ChatComposer hardening (#113: mentions, combobox, cooldown)', () => {
   it('selects an option with the mouse without stealing focus from the textarea', async () => {
     setupStore();
     renderComposerRoute();
-    const textarea = await screen.findByRole('combobox', {
+    const textarea = await screen.findByRole('textbox', {
       name: 'Mensaje del chat',
     });
     textarea.focus();
@@ -1042,7 +1041,7 @@ describe('ChatComposer hardening (#113: mentions, combobox, cooldown)', () => {
       ),
     );
     renderComposerRoute();
-    await screen.findByRole('combobox', { name: 'Mensaje del chat' });
+    await screen.findByRole('textbox', { name: 'Mensaje del chat' });
 
     typeDraft('Demasiado rápido');
     await submitDraft();
@@ -1084,7 +1083,7 @@ describe('ChatComposer hardening (#113: mentions, combobox, cooldown)', () => {
     });
     try {
       renderComposerRoute();
-      await screen.findByRole('combobox', { name: 'Mensaje del chat' });
+      await screen.findByRole('textbox', { name: 'Mensaje del chat' });
       typeDraft('Otra vez demasiado rápido');
       await submitDraft();
       await screen.findByText(/Enviaste varios mensajes en poco tiempo/);
