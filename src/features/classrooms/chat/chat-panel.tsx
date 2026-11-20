@@ -1,12 +1,18 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type ReactNode,
 } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+} from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import { ApiError } from '@/api/errors';
 import {
@@ -15,7 +21,6 @@ import {
   classroomDirectoryMembersQueryKey,
   createClassroomChatPredicate,
 } from '@/api/query-keys';
-import { PaginationControls } from '@/components/pagination/pagination-controls';
 import {
   EmptyState,
   ErrorState,
@@ -23,12 +28,18 @@ import {
   StaleDataNotice,
 } from '@/components/feedback/states';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { formatInstant } from '@/lib/dates';
+import {
+  formatDayLabel,
+  formatInstant,
+  formatTimeOfDay,
+  getSchoolDayKey,
+} from '@/lib/dates';
+import { cn } from '@/lib/utils';
 import { useSessionService } from '@/session/provider';
 import { classroomMessages as messages } from '../messages';
 import { useClassroomContext } from '../use-classroom-capabilities';
 import { ChatModerationDialog } from './chat-moderation-dialog';
+import { ChatScrollContext } from './chat-scroll-context';
 import type {
   ChatDirectoryMemberDto,
   ChatHistoryMessageDto,
@@ -43,7 +54,7 @@ const CHAT_HISTORY_PAGE_SIZE = 20;
 
 export interface ChatPanelProps {
   /**
-   * Send-side composer slot rendered below the history. The read panel owns
+   * Send-side composer slot pinned below the history. The read panel owns
    * the history, gating and states; the composer (length limits, mentions,
    * rate-limit and muted behavior) is injected here by the follow-up tasks so
    * both sides share one classroom-scoped view.
@@ -53,8 +64,9 @@ export interface ChatPanelProps {
 
 /**
  * Read side of the classroom chat (`HU-COM-002`, issue #51): server-authorized
- * paginated history rendered as safe plain text, with loading, empty, denied,
- * stale and out-of-range states (`rules/error-handling-and-feedback.md`).
+ * history rendered as a real conversation (oldest to newest, anchored at the
+ * newest message, older pages loaded by scrolling up) as safe plain text, with
+ * loading, empty, denied and stale states (`rules/error-handling-and-feedback.md`).
  *
  * Live updates: the committed contract has no per-message broadcast yet
  * (back #48), so new messages arrive by revalidating this panel's queries
@@ -168,6 +180,47 @@ function resolveChatAuthor(
   };
 }
 
+/** Distance from the bottom (px) within which the view still follows new messages. */
+const STICK_TO_BOTTOM_THRESHOLD_PX = 80;
+
+function flattenChatPages(
+  pages: readonly PaginatedChatHistoryDto[] | undefined,
+): ChatHistoryMessageDto[] {
+  // Pages arrive latest first (createdAt DESC, id DESC) and page N+1 holds
+  // OLDER messages. Offset pagination shifts when messages arrive between
+  // requests, so repeated ids are dropped by their server identity (first
+  // occurrence wins, i.e. the freshest page), then the list is reversed to
+  // read oldest to newest like a chat.
+  const seen = new Set<string>();
+  const newestFirst: ChatHistoryMessageDto[] = [];
+  for (const page of pages ?? []) {
+    for (const message of page.items) {
+      if (seen.has(message.id)) continue;
+      seen.add(message.id);
+      newestFirst.push(message);
+    }
+  }
+  return newestFirst.reverse();
+}
+
+function HideIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+      className="size-4 fill-none stroke-current stroke-2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M9.9 4.2A10 10 0 0 1 12 4c6 0 9.5 6 9.5 8a9.8 9.8 0 0 1-2.2 3.2" />
+      <path d="M6.6 6.6A9.7 9.7 0 0 0 2.5 12C2.5 14 6 20 12 20a9.6 9.6 0 0 0 4.4-1.1" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+      <path d="m3 3 18 18" />
+    </svg>
+  );
+}
+
 function ChatPanelConversation({
   userId,
   classroomId,
@@ -186,7 +239,6 @@ function ChatPanelConversation({
   const chat = messages.chat;
   const { client } = useSessionService();
   const queryClient = useQueryClient();
-  const [page, setPage] = useState(1);
   const terminalReconciledRef = useRef(false);
   // Moderation target: the row chosen for the hide confirmation. While a
   // confirmation is open (pending included) every row control is disabled so
@@ -196,6 +248,17 @@ function ChatPanelConversation({
   );
   const hideTriggerRef = useRef<HTMLElement | null>(null);
   const historyListRef = useRef<HTMLOListElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  // Scroll bookkeeping: `stickToBottom` says whether the reader follows the
+  // newest message; `prependAnchor` is the scroll height captured right before
+  // older messages are requested; `snapshot` tracks the ends of the list.
+  const stickToBottomRef = useRef(true);
+  const prependAnchorRef = useRef<number | null>(null);
+  const snapshotRef = useRef<{
+    firstId: string | null;
+    lastId: string | null;
+  }>({ firstId: null, lastId: null });
 
   // Optional non-blocking directory lookup: server-confirmed display names for
   // authors and moderation auditors. Absent, denied or failed lookups degrade
@@ -228,19 +291,29 @@ function ChatPanelConversation({
     return map;
   }, [membersQuery.data?.items]);
 
-  const historyQuery = useQuery({
+  const historyQuery = useInfiniteQuery({
     queryKey: classroomChatHistoryQueryKey(userId, classroomId, {
-      page,
       pageSize: CHAT_HISTORY_PAGE_SIZE,
     }),
-    queryFn: ({ signal }) =>
+    queryFn: ({ signal, pageParam }) =>
       listClassroomChatHistory(
         client,
         classroomId,
-        { page, pageSize: CHAT_HISTORY_PAGE_SIZE },
+        { page: pageParam, pageSize: CHAT_HISTORY_PAGE_SIZE },
         { signal },
       ),
-    placeholderData: (previousData) => previousData,
+    initialPageParam: 1,
+    // Page N + 1 holds OLDER messages: keep asking while fewer rows than the
+    // server total were loaded. An empty page ends the walk (rows may have
+    // vanished since the total was computed).
+    getNextPageParam: (lastPage, allPages, lastPageParam) => {
+      if (lastPage.items.length === 0) return undefined;
+      const loaded = allPages.reduce(
+        (count, page) => count + page.items.length,
+        0,
+      );
+      return loaded < lastPage.total ? lastPageParam + 1 : undefined;
+    },
     retry: false,
   });
 
@@ -265,22 +338,107 @@ function ChatPanelConversation({
     }
   }, [classroomId, isTerminalChatError, queryClient, userId]);
 
-  // Contract order (createdAt DESC, id DESC) is preserved; repeated ids from a
-  // revalidated page are deduplicated by their server identity.
-  const historyItems = useMemo(() => {
-    const seen = new Set<string>();
-    const items: ChatHistoryMessageDto[] = [];
-    for (const message of historyQuery.data?.items ?? []) {
-      if (seen.has(message.id)) continue;
-      seen.add(message.id);
-      items.push(message);
-    }
-    return items;
-  }, [historyQuery.data?.items]);
+  const historyItems = useMemo(
+    () => flattenChatPages(historyQuery.data?.pages),
+    [historyQuery.data?.pages],
+  );
 
-  const total = historyQuery.data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / CHAT_HISTORY_PAGE_SIZE));
-  const isOutOfRangePage = page > 1 && historyItems.length === 0 && total > 0;
+  // Day separators and time stamps are resolved in the school time zone; the
+  // client clock only drives the `Hoy`/`Ayer` presentation labels.
+  const timeline = useMemo(() => {
+    const now = new Date();
+    const entries: (
+      | { kind: 'day'; key: string; label: string }
+      | { kind: 'message'; key: string; message: ChatHistoryMessageDto }
+    )[] = [];
+    let previousDay: string | null = null;
+    for (const message of historyItems) {
+      const day = getSchoolDayKey(message.createdAt);
+      if (day !== previousDay) {
+        entries.push({
+          kind: 'day',
+          key: `day:${day}`,
+          label: formatDayLabel(message.createdAt, now),
+        });
+        previousDay = day;
+      }
+      entries.push({ kind: 'message', key: message.id, message });
+    }
+    return entries;
+  }, [historyItems]);
+
+  const { fetchNextPage, hasNextPage, isFetching, isError } = historyQuery;
+  const hasHistory = historyItems.length > 0;
+  const canLoadOlder = hasHistory && hasNextPage && !isFetching && !isError;
+
+  // Keep the reader's position through list changes, before paint:
+  // - first load: anchor at the newest message (bottom);
+  // - a newer message: follow it only when the reader is at the bottom (or just
+  //   sent one);
+  // - older messages prepended: add the new height above to scrollTop, so the
+  //   visible content does not jump (browser scroll anchoring is disabled on
+  //   the container to avoid correcting twice).
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current;
+    const firstId = historyItems[0]?.id ?? null;
+    const lastId = historyItems.at(-1)?.id ?? null;
+    const previous = snapshotRef.current;
+    snapshotRef.current = { firstId, lastId };
+    if (scroller === null || lastId === null) return;
+
+    if (previous.lastId === null) {
+      scroller.scrollTop = scroller.scrollHeight;
+    } else if (lastId !== previous.lastId) {
+      if (stickToBottomRef.current) {
+        scroller.scrollTop = scroller.scrollHeight;
+      }
+    } else if (firstId !== previous.firstId) {
+      const anchor = prependAnchorRef.current;
+      if (anchor !== null) {
+        scroller.scrollTop += scroller.scrollHeight - anchor;
+      }
+    }
+    prependAnchorRef.current = null;
+  }, [historyItems]);
+
+  // Infinite scroll up: when the top sentinel nears the viewport, request the
+  // next (older) page. The observer is re-armed after every fetch so a list
+  // still shorter than the viewport keeps loading until it overflows.
+  useEffect(() => {
+    const root = scrollRef.current;
+    const sentinel = sentinelRef.current;
+    if (
+      !canLoadOlder ||
+      root === null ||
+      sentinel === null ||
+      typeof IntersectionObserver === 'undefined'
+    ) {
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        prependAnchorRef.current = root.scrollHeight;
+        void fetchNextPage();
+      },
+      { root, rootMargin: '160px 0px 0px 0px' },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [canLoadOlder, fetchNextPage, historyItems.length]);
+
+  const scrollApi = useMemo(
+    () => ({
+      scrollToLatest: () => {
+        stickToBottomRef.current = true;
+        const scroller = scrollRef.current;
+        if (scroller !== null) {
+          scroller.scrollTop = scroller.scrollHeight;
+        }
+      },
+    }),
+    [],
+  );
 
   // Moderation reconciliation: invalidate every chat query of this user and
   // classroom (shared `chat` domain, `createClassroomChatPredicate`) and
@@ -291,206 +449,259 @@ function ChatPanelConversation({
       await queryClient.invalidateQueries({
         predicate: createClassroomChatPredicate(userId, classroomId),
       });
-      const data = queryClient.getQueryData<PaginatedChatHistoryDto>(
+      const data = queryClient.getQueryData<
+        InfiniteData<PaginatedChatHistoryDto, number>
+      >(
         classroomChatHistoryQueryKey(userId, classroomId, {
-          page,
           pageSize: CHAT_HISTORY_PAGE_SIZE,
         }),
       );
-      return data?.items.find((item) => item.id === messageId) ?? null;
+      return (
+        flattenChatPages(data?.pages).find((item) => item.id === messageId) ??
+        null
+      );
     },
-    [classroomId, page, queryClient, userId],
+    [classroomId, queryClient, userId],
   );
 
   return (
-    <section aria-label={chat.heading} className="min-w-0 space-y-5">
-      <div className="space-y-1">
-        <h3 className="text-base font-semibold text-foreground">
-          {chat.heading}
-        </h3>
-        <p className="text-sm text-muted-foreground">
-          {chat.subtitle(classroomName)}
-        </p>
-        <p className="text-xs text-muted-foreground">{chat.newestFirstNote}</p>
-      </div>
-
-      {historyQuery.isError &&
-      historyQuery.data !== undefined &&
-      !isTerminalChatError ? (
-        <StaleDataNotice
-          headingLevel="h4"
-          title={chat.states.staleTitle}
-          description={chat.states.staleDescription}
-          onRetry={() => {
-            void historyQuery.refetch();
-          }}
-        />
-      ) : null}
-
-      {historyQuery.isPending && historyQuery.data === undefined ? (
-        <LoadingState label={chat.loading} />
-      ) : isTerminalChatError ? (
-        <ErrorState
-          headingLevel="h4"
-          title={
-            errorStatus === 403
-              ? chat.states.forbiddenTitle
-              : chat.states.notFoundTitle
-          }
-          description={
-            errorStatus === 403
-              ? chat.states.forbiddenDescription
-              : chat.states.notFoundDescription
-          }
-        />
-      ) : historyQuery.isError && historyQuery.data === undefined ? (
-        <ErrorState
-          headingLevel="h4"
-          title={chat.states.loadErrorTitle}
-          description={chat.states.loadErrorDescription}
-          onRetry={() => {
-            void historyQuery.refetch();
-          }}
-        />
-      ) : isOutOfRangePage ? (
-        <EmptyState
-          headingLevel="h4"
-          title={chat.states.outOfRangeTitle}
-          description={chat.states.outOfRangeDescription}
-          action={
-            <Button
-              type="button"
-              variant="outline"
-              className="min-h-11"
-              onClick={() => setPage(1)}
-            >
-              {chat.states.backToFirstPage}
-            </Button>
-          }
-        />
-      ) : historyItems.length === 0 ? (
-        <EmptyState
-          headingLevel="h4"
-          title={chat.states.emptyTitle}
-          description={chat.states.emptyDescription}
-        />
-      ) : (
-        <div className="space-y-3">
-          <p className="text-xs text-muted-foreground">
-            {chat.resultsSummary(historyItems.length, total)}
+    <ChatScrollContext.Provider value={scrollApi}>
+      {/* The panel fills the dialog: header and composer keep their size and
+          ONLY the message list scrolls (`min-h-0` lets the flex child shrink). */}
+      <section
+        aria-label={chat.heading}
+        className="flex h-[calc(100dvh-14rem)] max-h-[40rem] min-h-[20rem] min-w-0 flex-col gap-3"
+      >
+        <div className="shrink-0 space-y-0.5">
+          <h3 className="text-base font-semibold text-foreground">
+            {chat.heading}
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            {chat.subtitle(classroomName)}
           </p>
+        </div>
 
-          <ol
-            ref={historyListRef}
-            tabIndex={-1}
-            aria-label={chat.listRegionLabel}
-            className="space-y-3"
-          >
-            {historyItems.map((message) => {
-              const author = resolveChatAuthor(
-                message.authorId,
-                userId,
-                membersByUserId,
-              );
-              const isHidden = message.hiddenAt !== null;
-              const hiddenAt = message.hiddenAt;
-              const moderator =
-                message.hiddenById !== null
-                  ? (membersByUserId.get(message.hiddenById)?.displayName ??
-                    chat.hiddenModeratorFallback)
-                  : chat.hiddenModeratorFallback;
-              return (
-                <li
-                  key={message.id}
-                  className="space-y-2 rounded-xl border border-edge bg-card p-4 shadow-xs"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs font-semibold text-foreground">
-                        {author.label}
-                      </span>
-                      {author.roleLabel !== null ? (
-                        <Badge variant={author.roleVariant}>
-                          {author.roleLabel}
-                        </Badge>
-                      ) : null}
-                      {isHidden ? (
-                        <Badge variant="secondary">{chat.hiddenBadge}</Badge>
-                      ) : null}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs text-muted-foreground">
-                        {chat.createdAtPrefix}{' '}
-                        {formatInstant(message.createdAt)}
-                      </span>
-                      {canModerateChat && !isHidden ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          aria-label={chat.moderation.hideAriaLabel(
-                            author.label,
-                            formatInstant(message.createdAt),
-                          )}
-                          aria-expanded={hideTarget?.id === message.id}
-                          disabled={hideTarget !== null}
-                          onClick={(event) => {
-                            hideTriggerRef.current = event.currentTarget;
-                            setHideTarget(message);
-                          }}
-                        >
-                          {chat.moderation.hideAction}
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  {/* Strict plain text node rendering (never dangerouslySetInnerHTML). */}
-                  <p className="whitespace-pre-wrap break-words text-sm text-foreground">
-                    {message.body}
-                  </p>
-
-                  {hiddenAt !== null ? (
-                    <p className="text-xs text-muted-foreground">
-                      {chat.hiddenAudit(moderator, formatInstant(hiddenAt))}
-                    </p>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ol>
-
-          {totalPages > 1 ? (
-            <PaginationControls
-              page={page}
-              pageSize={CHAT_HISTORY_PAGE_SIZE}
-              total={total}
-              onPageChange={setPage}
+        {historyQuery.isError &&
+        historyQuery.data !== undefined &&
+        !isTerminalChatError ? (
+          <div className="shrink-0">
+            <StaleDataNotice
+              headingLevel="h4"
+              title={chat.states.staleTitle}
+              description={chat.states.staleDescription}
+              onRetry={() => {
+                void historyQuery.refetch();
+              }}
             />
-          ) : null}
-        </div>
-      )}
+          </div>
+        ) : null}
 
-      {composer !== undefined ? (
-        <div className="space-y-2 rounded-xl border border-edge bg-card p-4 shadow-xs">
-          {composer}
-        </div>
-      ) : null}
+        {historyQuery.isPending ? (
+          <LoadingState label={chat.loading} />
+        ) : isTerminalChatError ? (
+          <ErrorState
+            headingLevel="h4"
+            title={
+              errorStatus === 403
+                ? chat.states.forbiddenTitle
+                : chat.states.notFoundTitle
+            }
+            description={
+              errorStatus === 403
+                ? chat.states.forbiddenDescription
+                : chat.states.notFoundDescription
+            }
+          />
+        ) : historyQuery.isError && historyQuery.data === undefined ? (
+          <ErrorState
+            headingLevel="h4"
+            title={chat.states.loadErrorTitle}
+            description={chat.states.loadErrorDescription}
+            onRetry={() => {
+              void historyQuery.refetch();
+            }}
+          />
+        ) : !hasHistory ? (
+          <EmptyState
+            headingLevel="h4"
+            title={chat.states.emptyTitle}
+            description={chat.states.emptyDescription}
+          />
+        ) : (
+          <div
+            ref={scrollRef}
+            data-testid="chat-scroll"
+            role="region"
+            aria-label={chat.scrollRegionLabel}
+            // The named overflow region must be focusable for keyboard scrolling.
+            // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+            tabIndex={0}
+            onScroll={(event) => {
+              const element = event.currentTarget;
+              stickToBottomRef.current =
+                element.scrollHeight -
+                  element.scrollTop -
+                  element.clientHeight <
+                STICK_TO_BOTTOM_THRESHOLD_PX;
+            }}
+            className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-edge bg-muted/40 px-3 py-2 [overflow-anchor:none] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <div
+              ref={sentinelRef}
+              data-testid="chat-history-top"
+              aria-hidden="true"
+              className="h-px"
+            />
+            {/* Constant-height row: the indicator never shifts the list. */}
+            <p className="flex h-6 items-center justify-center text-xs text-muted-foreground">
+              {historyQuery.isFetchingNextPage
+                ? chat.loadingOlder
+                : !hasNextPage
+                  ? chat.startOfConversation
+                  : null}
+            </p>
 
-      <ChatModerationDialog
-        open={hideTarget !== null}
-        message={hideTarget}
-        classroomId={classroomId}
-        userId={userId}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            setHideTarget(null);
-          }
-        }}
-        onReconcile={reconcileModeratedRow}
-        getTriggerElement={() => hideTriggerRef.current}
-        fallbackFocus={() => historyListRef.current}
-      />
-    </section>
+            <ol
+              ref={historyListRef}
+              tabIndex={-1}
+              aria-label={chat.listRegionLabel}
+              className="space-y-2"
+            >
+              {timeline.map((entry) => {
+                if (entry.kind === 'day') {
+                  return (
+                    <li
+                      key={entry.key}
+                      className="flex justify-center py-1 text-xs font-medium text-muted-foreground"
+                    >
+                      <span className="rounded-full bg-tray px-3 py-0.5">
+                        {entry.label}
+                      </span>
+                    </li>
+                  );
+                }
+                const { message } = entry;
+                const author = resolveChatAuthor(
+                  message.authorId,
+                  userId,
+                  membersByUserId,
+                );
+                const isOwn = message.authorId === userId;
+                const isHidden = message.hiddenAt !== null;
+                const hiddenAt = message.hiddenAt;
+                const moderator =
+                  message.hiddenById !== null
+                    ? (membersByUserId.get(message.hiddenById)?.displayName ??
+                      chat.hiddenModeratorFallback)
+                    : chat.hiddenModeratorFallback;
+                return (
+                  <li
+                    key={message.id}
+                    data-own={isOwn ? 'true' : 'false'}
+                    className={cn(
+                      'flex min-w-0',
+                      isOwn ? 'justify-end' : 'justify-start',
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        'group min-w-0 max-w-[88%] space-y-1 rounded-2xl border px-3 py-2 shadow-xs',
+                        isOwn
+                          ? 'rounded-br-md border-success-edge bg-success text-success-foreground'
+                          : 'rounded-bl-md border-edge bg-card text-foreground',
+                      )}
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="min-w-0 truncate text-xs font-semibold">
+                          {author.label}
+                        </span>
+                        {author.roleLabel !== null ? (
+                          <Badge variant={author.roleVariant}>
+                            {author.roleLabel}
+                          </Badge>
+                        ) : null}
+                        {isHidden ? (
+                          <Badge variant="secondary">{chat.hiddenBadge}</Badge>
+                        ) : null}
+                        {canModerateChat && !isHidden ? (
+                          <button
+                            type="button"
+                            aria-label={chat.moderation.hideAriaLabel(
+                              author.label,
+                              formatInstant(message.createdAt),
+                            )}
+                            aria-expanded={hideTarget?.id === message.id}
+                            disabled={hideTarget !== null}
+                            onClick={(event) => {
+                              hideTriggerRef.current = event.currentTarget;
+                              setHideTarget(message);
+                            }}
+                            // Always visible on touch; on hover-capable
+                            // pointers it appears on row hover or keyboard
+                            // focus, and stays reachable by Tab either way.
+                            className="ml-auto inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-opacity hover:bg-tray hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 pointer-fine:opacity-0 pointer-fine:group-focus-within:opacity-100 pointer-fine:group-hover:opacity-100"
+                          >
+                            <HideIcon />
+                          </button>
+                        ) : null}
+                      </div>
+
+                      {/* Strict plain text node rendering (never dangerouslySetInnerHTML). */}
+                      <p
+                        data-hidden={isHidden ? 'true' : 'false'}
+                        className={cn(
+                          'whitespace-pre-wrap break-words text-sm',
+                          isHidden && 'italic text-muted-foreground',
+                        )}
+                      >
+                        {message.body}
+                      </p>
+
+                      <div className="flex flex-wrap items-center justify-end gap-x-2 text-[11px] opacity-80">
+                        {hiddenAt !== null ? (
+                          <span className="mr-auto">
+                            {chat.hiddenAudit(
+                              moderator,
+                              formatInstant(hiddenAt),
+                            )}
+                          </span>
+                        ) : null}
+                        <time
+                          dateTime={message.createdAt}
+                          title={formatInstant(message.createdAt)}
+                        >
+                          {formatTimeOfDay(message.createdAt)}
+                        </time>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        )}
+
+        {composer !== undefined ? (
+          <div className="shrink-0 rounded-xl border border-edge bg-card p-3 shadow-xs">
+            {composer}
+          </div>
+        ) : null}
+
+        <ChatModerationDialog
+          open={hideTarget !== null}
+          message={hideTarget}
+          classroomId={classroomId}
+          userId={userId}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              setHideTarget(null);
+            }
+          }}
+          onReconcile={reconcileModeratedRow}
+          getTriggerElement={() => hideTriggerRef.current}
+          fallbackFocus={() => historyListRef.current}
+        />
+      </section>
+    </ChatScrollContext.Provider>
   );
 }

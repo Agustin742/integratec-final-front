@@ -231,6 +231,9 @@ describe('ChatPanel moderation (#51, S3/S10: teacher-level hide)', () => {
       name: hideButtonName('Sofía Martínez', target.createdAt),
     });
     expect(trigger).toBeVisible();
+    // Compact icon control: named for assistive tech, no visible text label.
+    expect(trigger.textContent?.trim()).toBe('');
+    expect(trigger.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
     expect(screen.queryByText('Ocultado')).not.toBeInTheDocument();
     expect(store.getCounts().hide).toBe(0);
 

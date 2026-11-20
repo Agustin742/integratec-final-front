@@ -262,14 +262,12 @@ export const classroomMessages = {
   },
   chat: {
     heading: 'Chat del aula',
-    subtitle: (name: string) =>
-      `Conversación de «${name}» con el historial confirmado por el servidor.`,
-    newestFirstNote: 'Los mensajes más recientes aparecen primero.',
+    subtitle: (name: string) => `Charlá con tu aula, «${name}».`,
     loading: 'Cargando el chat del aula…',
     listRegionLabel: 'Historial de mensajes del chat',
-    resultsSummary: (shown: number, total: number) =>
-      `Mostrando ${shown} de ${total} mensajes.`,
-    createdAtPrefix: 'Enviado',
+    scrollRegionLabel: 'Conversación del chat',
+    loadingOlder: 'Cargando mensajes anteriores…',
+    startOfConversation: 'Inicio de la conversación',
     authorFallback: 'Integrante del aula',
     authorSelf: 'Vos',
     roleTeacherBadge: 'Docente',
@@ -291,10 +289,6 @@ export const classroomMessages = {
       staleTitle: 'Chat pendiente de sincronización',
       staleDescription:
         'Mostrando los últimos mensajes confirmados. Falló la actualización en segundo plano.',
-      outOfRangeTitle: 'No hay mensajes en esta página',
-      outOfRangeDescription:
-        'Volvé a la primera página para ver los mensajes del chat.',
-      backToFirstPage: 'Volver a la primera página',
       parentDeniedTitle: 'El chat del aula no está disponible para tu rol',
       parentDeniedDescription:
         'El chat es para estudiantes y personal del aula. Las familias no participan de esta conversación.',
@@ -308,7 +302,7 @@ export const classroomMessages = {
       charCounter: (used: number, max: number) => `${used}/${max} caracteres`,
       submit: 'Enviar',
       submitting: 'Enviando…',
-      pendingNotice: 'Enviando el mensaje…',
+      sendHint: 'Enter envía, Shift+Enter agrega una línea.',
       sentToast: 'Mensaje enviado.',
       mentionListboxLabel: 'Integrantes sugeridos para mencionar',
       mentionAvailableNotice:
@@ -323,7 +317,7 @@ export const classroomMessages = {
         `Ocultar el mensaje de ${author} del ${sentAt}`,
       dialogTitle: 'Ocultar mensaje del chat',
       dialogDescription:
-        'El mensaje deja de verse para el alumnado y queda registrado como oculto. Vos segués viéndolo con la información de quién lo ocultó y cuándo.',
+        'El mensaje deja de verse para el alumnado y queda registrado como oculto. Vos seguís viéndolo con la información de quién lo ocultó y cuándo.',
       messageLabel: 'Mensaje que vas a ocultar',
       confirmAction: 'Ocultar mensaje',
       confirmingAction: 'Ocultando…',

@@ -390,7 +390,6 @@ describe('chat-service', () => {
 
   it('scopes chat query keys by userId and classroomId', () => {
     const keyA = classroomChatHistoryQueryKey(STUDENT_ID, CLASSROOM_ID, {
-      page: 1,
       pageSize: 20,
     });
     const keyB = classroomChatHistoryQueryKey(TEACHER_ID, CLASSROOM_ID);
@@ -409,10 +408,13 @@ describe('chat-service', () => {
       }),
     ).toBe(false);
 
+    // The page is the infinite-query page param, never part of the key.
     const clamped = classroomChatHistoryQueryKey(STUDENT_ID, CLASSROOM_ID, {
-      page: 0,
       pageSize: 1000,
     });
-    expect(clamped[0].params).toEqual({ page: 1, pageSize: 100 });
+    expect(clamped[0].params).toEqual({ pageSize: 100 });
+    expect(
+      classroomChatHistoryQueryKey(STUDENT_ID, CLASSROOM_ID)[0].params,
+    ).toEqual({ pageSize: 20 });
   });
 });

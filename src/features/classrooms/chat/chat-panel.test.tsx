@@ -17,12 +17,13 @@ import {
   describe,
   expect,
   it,
+  vi,
 } from 'vitest';
 import { createApiClient } from '@/api/client';
 import { ApiQueryProvider, createAppQueryClient } from '@/api/query-client';
 import type { components } from '@/api/schema.generated';
 import { fakeSession } from '@/app/router/fake-session';
-import { formatInstant } from '@/lib/dates';
+import { formatInstant, formatTimeOfDay } from '@/lib/dates';
 import { SessionProvider } from '@/session/provider';
 import { profile } from '@/session/test-fixtures';
 import { expectAccessible } from '@/test/accessibility';
@@ -197,14 +198,88 @@ function renderChatRoute(
   return { ...view, queryClient, hint };
 }
 
+/**
+ * Controllable `IntersectionObserver`: jsdom has no layout, so the test fires
+ * the top-sentinel intersection itself, like the browser would when the user
+ * scrolls near the oldest loaded message.
+ */
+interface FakeObserver {
+  readonly callback: IntersectionObserverCallback;
+  readonly targets: Set<Element>;
+  disconnected: boolean;
+}
+const fakeObservers: FakeObserver[] = [];
+
+class FakeIntersectionObserver {
+  private readonly record: FakeObserver;
+  constructor(callback: IntersectionObserverCallback) {
+    this.record = { callback, targets: new Set(), disconnected: false };
+    fakeObservers.push(this.record);
+  }
+  observe(target: Element) {
+    this.record.targets.add(target);
+  }
+  unobserve(target: Element) {
+    this.record.targets.delete(target);
+  }
+  disconnect() {
+    this.record.disconnected = true;
+    this.record.targets.clear();
+  }
+  takeRecords() {
+    return [];
+  }
+}
+
+async function scrollToTopSentinel() {
+  const sentinel = await screen.findByTestId('chat-history-top');
+  await act(async () => {
+    for (const observer of fakeObservers) {
+      if (observer.disconnected || !observer.targets.has(sentinel)) continue;
+      observer.callback(
+        [
+          {
+            isIntersecting: true,
+            target: sentinel,
+          } as unknown as IntersectionObserverEntry,
+        ],
+        {} as IntersectionObserver,
+      );
+    }
+  });
+}
+
+/** Message bodies starting with `prefix`, in DOM order (oldest first). */
+function renderedBodies(prefix: string): string[] {
+  const list = screen.getByRole('list', {
+    name: 'Historial de mensajes del chat',
+  });
+  return within(list)
+    .queryAllByText(new RegExp(`^${prefix}`))
+    .map((node) => node.textContent ?? '');
+}
+
+function makeNumberedHistory(count: number) {
+  return Array.from({ length: count }, (_, index) =>
+    makeMessage({ body: `Historial ${String(index + 1).padStart(2, '0')}` }),
+  );
+}
+
 describe('ChatPanel (#51, read side)', () => {
   beforeAll(() => mswServer.listen());
-  afterEach(() => mswServer.resetHandlers());
+  beforeEach(() => {
+    fakeObservers.length = 0;
+    vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver);
+  });
+  afterEach(() => {
+    mswServer.resetHandlers();
+    vi.unstubAllGlobals();
+  });
   afterAll(() => mswServer.close());
 
-  it('renders paginated history newest first as safe plain text and paginates', async () => {
-    const history = Array.from({ length: 25 }, () => makeMessage());
-    // Created last, so the server orders it newest first on page 1.
+  it('renders history oldest to newest as safe plain text, with no pager', async () => {
+    const history = makeNumberedHistory(25);
+    // Created last, so it is the newest message and renders at the bottom.
     const xssMessage = makeMessage({
       body: 'Hola <script>alert(1)</script>',
     });
@@ -219,49 +294,74 @@ describe('ChatPanel (#51, read side)', () => {
 
     const view = renderChatRoute({ role: 'STUDENT', userId: STUDENT_ID });
 
-    // Newest first: the last-created message leads the first page.
-    expect(
-      await screen.findByText(/<script>alert\(1\)<\/script>/),
-    ).toBeVisible();
+    const xssNode = await screen.findByText(/<script>alert\(1\)<\/script>/);
+    expect(xssNode).toBeVisible();
     // Message bodies render as plain text, never as markup.
     expect(document.querySelector('script')).toBeNull();
-    expect(screen.getAllByText('Sofía Martínez (Vos)')).toHaveLength(20);
-    expect(
-      screen.getByText(`Enviado ${formatInstant(xssMessage.createdAt)}`),
-    ).toBeVisible();
-    expect(screen.getByText('Mostrando 20 de 26 mensajes.')).toBeVisible();
 
-    // Second page keeps the oldest messages and drops the newest.
-    fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
-    expect(await screen.findByText('Mensaje 1 del chat')).toBeVisible();
-    expect(screen.getByText('Mensaje 6 del chat')).toBeVisible();
+    // Only the newest page is loaded, rendered oldest first.
+    const bodies = renderedBodies('Historial');
+    expect(bodies).toHaveLength(19);
+    expect(bodies[0]).toBe('Historial 07');
+    expect(bodies.at(-1)).toBe('Historial 25');
     expect(
-      screen.queryByText(/<script>alert\(1\)<\/script>/),
+      screen.getByText('Historial 25').compareDocumentPosition(xssNode) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    // No pager, no results summary: older history loads by scrolling up.
+    expect(
+      screen.queryByRole('button', { name: /Página (siguiente|anterior)/ }),
     ).not.toBeInTheDocument();
-
-    // Back to the first page.
-    fireEvent.click(screen.getByRole('button', { name: 'Página anterior' }));
-    expect(
-      await screen.findByText(/<script>alert\(1\)<\/script>/),
-    ).toBeVisible();
+    expect(screen.queryByText(/Mostrando \d+ de/)).not.toBeInTheDocument();
 
     await expectAccessible(view.container);
   });
 
-  it('recovers when the current page falls out of range after a live refresh', async () => {
-    let liveMessages = Array.from({ length: 45 }, () => makeMessage());
+  it('loads older messages when the top sentinel intersects, prepending them without duplicates', async () => {
+    const store = createClassroomChatStore({
+      classroomId: CLASSROOM_ID,
+      currentUserId: STUDENT_ID,
+      role: 'STUDENT',
+      initialMessages: makeNumberedHistory(25),
+      members: makeMembers(),
+    });
+    mswServer.use(...store.handlers);
+
+    renderChatRoute({ role: 'STUDENT', userId: STUDENT_ID });
+    expect(await screen.findByText('Historial 25')).toBeVisible();
+    expect(screen.queryByText('Historial 05')).not.toBeInTheDocument();
+    expect(store.getCounts().list).toBe(1);
+
+    await scrollToTopSentinel();
+
+    expect(await screen.findByText('Historial 01')).toBeVisible();
+    expect(store.getCounts().list).toBe(2);
+    const bodies = renderedBodies('Historial');
+    expect(bodies).toHaveLength(25);
+    expect(new Set(bodies).size).toBe(25);
+    expect(bodies[0]).toBe('Historial 01');
+    expect(bodies.at(-1)).toBe('Historial 25');
+
+    // Everything is loaded: the conversation start is marked and no further
+    // page is ever requested.
+    expect(await screen.findByText('Inicio de la conversación')).toBeVisible();
+    await scrollToTopSentinel();
+    expect(store.getCounts().list).toBe(2);
+  });
+
+  it('deduplicates by id when new messages shift the offset pagination', async () => {
+    const liveMessages = makeNumberedHistory(25);
     mswServer.use(
       http.get(
         `${TEST_API_BASE_URL}/classrooms/:id/messages`,
         ({ request }) => {
           const url = new URL(request.url);
-          const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
-          const pageSize = Math.max(
-            1,
-            Number(url.searchParams.get('pageSize') ?? '20'),
-          );
+          const page = Number(url.searchParams.get('page') ?? '1');
+          const pageSize = Number(url.searchParams.get('pageSize') ?? '20');
+          const newestFirst = [...liveMessages].reverse();
           return HttpResponse.json({
-            items: liveMessages
+            items: newestFirst
               .slice((page - 1) * pageSize, page * pageSize)
               .map(toHistoryPayload),
             page,
@@ -272,28 +372,106 @@ describe('ChatPanel (#51, read side)', () => {
       ),
     );
 
-    const view = renderChatRoute({ role: 'STUDENT', userId: STUDENT_ID });
-    expect(
-      await screen.findByText('Mostrando 20 de 45 mensajes.'),
-    ).toBeVisible();
+    renderChatRoute({ role: 'STUDENT', userId: STUDENT_ID });
+    expect(await screen.findByText('Historial 25')).toBeVisible();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
-    expect(await screen.findByText('Página 3 de 3')).toBeVisible();
+    // A classmate writes while page 1 is already on screen: page 2 now starts
+    // with the message that used to close page 1.
+    liveMessages.push(makeMessage({ body: 'Historial 26' }));
+    await scrollToTopSentinel();
 
-    // The server drops the newest messages; page 3 no longer exists.
-    liveMessages = liveMessages.slice(0, 10);
-    await view.hint();
+    expect(await screen.findByText('Historial 01')).toBeVisible();
+    expect(screen.getAllByText('Historial 06')).toHaveLength(1);
+    const bodies = renderedBodies('Historial');
+    expect(new Set(bodies).size).toBe(bodies.length);
+    expect(bodies).toHaveLength(25);
+  });
 
-    expect(
-      await screen.findByText('No hay mensajes en esta página'),
-    ).toBeVisible();
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Volver a la primera página' }),
-    );
-    expect(
-      await screen.findByText('Mostrando 10 de 10 mensajes.'),
-    ).toBeVisible();
+  it('anchors at the newest message and keeps the scroll position stable when older messages are prepended', async () => {
+    // jsdom has no layout: model each message row as 100px of content.
+    const scrollHeight = vi
+      .spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
+      .mockImplementation(function (this: HTMLElement) {
+        return this.dataset.testid === 'chat-scroll'
+          ? this.querySelectorAll('li').length * 100
+          : 0;
+      });
+    try {
+      const store = createClassroomChatStore({
+        classroomId: CLASSROOM_ID,
+        currentUserId: STUDENT_ID,
+        role: 'STUDENT',
+        initialMessages: makeNumberedHistory(25),
+        members: makeMembers(),
+      });
+      mswServer.use(...store.handlers);
+
+      renderChatRoute({ role: 'STUDENT', userId: STUDENT_ID });
+      expect(await screen.findByText('Historial 25')).toBeVisible();
+
+      // Opening anchors the view at the newest message (bottom).
+      const scroller = screen.getByTestId('chat-scroll');
+      const rowsBefore = scroller.querySelectorAll('li').length;
+      expect(scroller.scrollTop).toBe(rowsBefore * 100);
+
+      // The user scrolls up near the top and older messages arrive: the
+      // visible content must not jump, so scrollTop grows by the added height.
+      scroller.scrollTop = 40;
+      await scrollToTopSentinel();
+      expect(await screen.findByText('Historial 01')).toBeVisible();
+      const rowsAfter = scroller.querySelectorAll('li').length;
+      expect(rowsAfter).toBeGreaterThan(rowsBefore);
+      expect(scroller.scrollTop).toBe(40 + (rowsAfter - rowsBefore) * 100);
+    } finally {
+      scrollHeight.mockRestore();
+    }
+  });
+
+  it('distinguishes own messages from others and separates days', async () => {
+    const store = createClassroomChatStore({
+      classroomId: CLASSROOM_ID,
+      currentUserId: STUDENT_ID,
+      role: 'STUDENT',
+      initialMessages: [
+        makeMessage({
+          body: 'Mensaje de ayer',
+          authorId: TEACHER_ID,
+          createdAt: '2026-11-17T13:23:00.000Z',
+        }),
+        makeMessage({
+          body: 'Respuesta de hoy',
+          authorId: STUDENT_ID,
+          createdAt: '2026-11-18T13:30:00.000Z',
+        }),
+      ],
+      members: makeMembers(),
+    });
+    mswServer.use(...store.handlers);
+    vi.useFakeTimers({
+      toFake: ['Date'],
+      now: new Date('2026-11-18T15:00:00Z'),
+    });
+
+    try {
+      renderChatRoute({ role: 'STUDENT', userId: STUDENT_ID });
+      const own = (await screen.findByText('Respuesta de hoy')).closest('li');
+      const other = screen.getByText('Mensaje de ayer').closest('li');
+
+      expect(own).toHaveAttribute('data-own', 'true');
+      expect(other).toHaveAttribute('data-own', 'false');
+      expect(within(other as HTMLElement).getByText('Docente')).toBeVisible();
+
+      // Time-only stamps inside <time>, day separators between days.
+      const time = within(own as HTMLElement).getByText(
+        formatTimeOfDay('2026-11-18T13:30:00.000Z'),
+      );
+      expect(time.tagName).toBe('TIME');
+      expect(time).toHaveAttribute('datetime', '2026-11-18T13:30:00.000Z');
+      expect(screen.getByText('Ayer')).toBeVisible();
+      expect(screen.getByText('Hoy')).toBeVisible();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('distinguishes an empty history from a pending first load', async () => {
@@ -390,7 +568,6 @@ describe('ChatPanel (#51, read side)', () => {
     expect(await screen.findByText('Mensaje visible')).toBeVisible();
     expect(screen.queryByText('Mensaje moderado')).not.toBeInTheDocument();
     expect(screen.queryByText('Ocultado')).not.toBeInTheDocument();
-    expect(screen.getByText('Mostrando 1 de 1 mensajes.')).toBeVisible();
   });
 
   it('keeps hidden rows with the moderation audit for staff roles', async () => {
@@ -420,7 +597,10 @@ describe('ChatPanel (#51, read side)', () => {
         `Ocultado por Prof. Ana García el ${formatInstant(hiddenAt)}`,
       ),
     ).toBeVisible();
-    expect(screen.getByText('Mostrando 2 de 2 mensajes.')).toBeVisible();
+    expect(screen.getByText('Mensaje moderado')).toHaveAttribute(
+      'data-hidden',
+      'true',
+    );
   });
 
   it('denies parents up front without issuing any chat request', async () => {
@@ -519,7 +699,7 @@ describe('ChatPanel (#51, read side)', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('revalidates on a context-invalidated SSE event so a new message appears once, newest first', async () => {
+  it('revalidates on a context-invalidated SSE event so a new message appears once, at the bottom', async () => {
     const store = createClassroomChatStore({
       classroomId: CLASSROOM_ID,
       currentUserId: STUDENT_ID,
@@ -555,11 +735,11 @@ describe('ChatPanel (#51, read side)', () => {
     expect(liveMessage).toBeVisible();
     // Deduplicated by id even if the revalidated page repeats it.
     expect(screen.getAllByText('Nuevo mensaje en vivo')).toHaveLength(1);
-    // Contract order (createdAt DESC, id DESC): the live message precedes the
-    // older confirmed message in the DOM.
+    // Chat order (oldest to newest): the live message follows the older
+    // confirmed message in the DOM.
     const older = screen.getByText('Primer mensaje del aula');
     expect(
-      liveMessage.compareDocumentPosition(older) &
+      older.compareDocumentPosition(liveMessage) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(store.getCounts().list).toBeGreaterThan(listCountBefore);

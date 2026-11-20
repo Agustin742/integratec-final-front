@@ -25,7 +25,6 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { toast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
 import { useSessionService } from '@/session/provider';
 import { classroomMessages as messages } from '../messages';
@@ -34,6 +33,7 @@ import {
   type ClassroomRole,
 } from '../use-classroom-capabilities';
 import { chatMessages } from './chat-messages';
+import { useChatScroll } from './chat-scroll-context';
 import { chatMentionDirectoryQueryKey } from '@/api/query-keys';
 import {
   CHAT_MESSAGE_BODY_MAX_LENGTH,
@@ -135,6 +135,7 @@ function ChatComposerForm({
   const queryClient = useQueryClient();
   const listboxId = useId();
   const mutedTextareaId = useId();
+  const { scrollToLatest } = useChatScroll();
 
   const form = useZodForm<ChatComposerInput, { body: string }>({
     schema: chatComposerSchema,
@@ -252,8 +253,11 @@ function ChatComposerForm({
         // message becomes visible by reconciling the history query (S6/S9).
         form.reset({ body: '' });
         setActiveMention(null);
+        // One confirmation channel (the live region, no toast), then follow
+        // the conversation and keep typing without reaching for the mouse.
         setAnnouncement(chat.composer.sentToast);
-        toast.success(chat.composer.sentToast);
+        scrollToLatest();
+        textareaRef.current?.focus();
         reconcileChat();
       } catch (error) {
         if (isAbortError(error) || !isMountedRef.current) {
@@ -333,9 +337,7 @@ function ChatComposerForm({
     >
       <LiveRegion message={announcement} visuallyHidden />
 
-      <h4 className="text-sm font-semibold text-foreground">
-        {chat.composer.heading}
-      </h4>
+      <h4 className="sr-only">{chat.composer.heading}</h4>
 
       {uncertainNotice ? (
         <Alert role="status">
@@ -344,12 +346,6 @@ function ChatComposerForm({
       ) : (
         <FormRootError form={form} headingLevel="h5" />
       )}
-
-      {isSubmitting ? (
-        <Alert role="status">
-          <AlertDescription>{chat.composer.pendingNotice}</AlertDescription>
-        </Alert>
-      ) : null}
 
       <FormField
         control={form.control}
@@ -365,6 +361,18 @@ function ChatComposerForm({
             event: KeyboardEvent<HTMLTextAreaElement>,
           ): void => {
             if (!isMentionOpen) {
+              // Enter sends, Shift+Enter keeps the native newline. Enter that
+              // confirms an IME composition must never send.
+              if (
+                event.key === 'Enter' &&
+                !event.shiftKey &&
+                !event.nativeEvent.isComposing
+              ) {
+                event.preventDefault();
+                if (!isSubmitting) {
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }
               return;
             }
             if (event.key === 'ArrowDown') {
@@ -382,10 +390,13 @@ function ChatComposerForm({
             <div className="space-y-2">
               <textarea
                 {...field}
-                rows={3}
+                rows={2}
                 maxLength={CHAT_MESSAGE_BODY_MAX_LENGTH}
                 placeholder={chat.composer.bodyPlaceholder}
-                disabled={isSubmitting}
+                // Read-only (not disabled) while sending: a disabled control
+                // drops focus, and the author keeps typing the next message.
+                readOnly={isSubmitting}
+                aria-busy={isSubmitting}
                 ref={(element) => {
                   field.ref(element);
                   textareaRef.current = element;
@@ -402,9 +413,10 @@ function ChatComposerForm({
                 }}
                 onKeyDown={handleKeyDown}
                 className={cn(
-                  'w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors',
+                  'w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs transition-colors',
                   'placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   'disabled:cursor-not-allowed disabled:opacity-50',
+                  isSubmitting && 'opacity-70',
                   field['aria-invalid'] && 'border-destructive',
                 )}
               />
@@ -464,6 +476,10 @@ function ChatComposerForm({
                   ))}
                 </ul>
               ) : null}
+
+              <p className="text-xs text-muted-foreground">
+                {chat.composer.sendHint}
+              </p>
 
               {/* Screen-reader notice: suggestions exist and are reachable. */}
               <LiveRegion

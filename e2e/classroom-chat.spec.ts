@@ -339,22 +339,23 @@ test('student reads paginated history, mentions a classmate, sends a server-conf
     }),
   ).toBeVisible();
   await expect(
-    dialog.getByText(
-      'Conversación de «Aula sintética del chat» con el historial confirmado por el servidor.',
-      { exact: true },
-    ),
+    dialog.getByText('Charlá con tu aula, «Aula sintética del chat».', {
+      exact: true,
+    }),
   ).toBeVisible();
 
   const historyList = dialog.getByRole('list', {
     name: 'Historial de mensajes del chat',
   });
   await expect(historyList).toBeVisible();
-  await expect(
-    dialog.getByText('Mostrando 20 de 25 mensajes.', { exact: true }),
-  ).toBeVisible();
+  // Real chat: the newest message is anchored at the bottom and there is no
+  // pager; the composer stays visible without scrolling the page.
   await expect(
     historyList.getByText('Mensaje del aula 25', { exact: true }),
   ).toBeVisible();
+  await expect(
+    dialog.getByRole('button', { name: /Página (siguiente|anterior)/ }),
+  ).toHaveCount(0);
   // Directory-backed author labels: teacher badge for staff rows and the
   // self marker on the signed-in student's own rows.
   await expect(
@@ -394,10 +395,8 @@ test('student reads paginated history, mentions a classmate, sends a server-conf
       exact: true,
     }),
   ).toBeVisible();
-  await expect(
-    dialog.getByText('Mostrando 20 de 26 mensajes.', { exact: true }),
-  ).toBeVisible();
   await expect(composer).toHaveValue('');
+  await expect(composer).toBeFocused();
 
   expect(
     await page.evaluate(
@@ -425,24 +424,18 @@ test('student reads paginated history, mentions a classmate, sends a server-conf
     'Segundo mensaje enviado demasiado rápido',
   );
 
-  // Contract pagination: page 2 keeps the oldest messages after the send.
+  // Infinite history: scrolling to the top loads page 2 (the oldest
+  // messages) automatically, with no pager.
+  await expect(
+    historyList.getByText('Mensaje del aula 1', { exact: true }),
+  ).toHaveCount(0);
   await dialog
-    .getByRole('button', { name: 'Página siguiente', exact: true })
-    .click();
+    .getByRole('region', { name: 'Conversación del chat' })
+    .evaluate((element) => {
+      element.scrollTop = 0;
+    });
   await expect(
-    dialog.getByText('Mostrando 6 de 26 mensajes.', { exact: true }),
-  ).toBeVisible();
-  await expect(
-    dialog.getByText('Página 2 de 2', { exact: true }),
-  ).toBeVisible();
-  await expect(
-    dialog.getByText('Mensaje del aula 1', { exact: true }),
-  ).toBeVisible();
-  await dialog
-    .getByRole('button', { name: 'Página anterior', exact: true })
-    .click();
-  await expect(
-    dialog.getByText('Mostrando 20 de 26 mensajes.', { exact: true }),
+    historyList.getByText('Mensaje del aula 1', { exact: true }),
   ).toBeVisible();
 
   // Typing inside the composer never triggers world shortcuts: Alt+M while

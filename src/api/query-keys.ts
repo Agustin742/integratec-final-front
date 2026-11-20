@@ -1497,23 +1497,30 @@ export interface ChatHistoryQueryParams {
   readonly pageSize?: number;
 }
 
+/**
+ * The chat history is one infinite query: the page is the query's page param
+ * (older messages = higher page numbers), so only `pageSize` identifies it.
+ */
+export interface ChatHistoryInfiniteQueryParams {
+  readonly pageSize?: number;
+}
+
 export interface NormalizedChatHistoryQueryParams {
-  readonly page: number;
   readonly pageSize: number;
 }
 
 /**
- * Key of `GET /classrooms/{id}/messages`: paginated classroom chat history
+ * Key of the `useInfiniteQuery` over `GET /classrooms/{id}/messages`
  * (`ChatController_list`) scoped by `userId` and `classroomId`, so switching
  * either one reads an isolated cache entry (`rules/state-management.md`).
+ * Its cached data is `InfiniteData<PaginatedChatHistoryDto>`.
  */
 export function classroomChatHistoryQueryKey(
   userId: string,
   classroomId: string,
-  params: ChatHistoryQueryParams = {},
+  params: ChatHistoryInfiniteQueryParams = {},
 ): ScopedQueryKey<NormalizedChatHistoryQueryParams> {
   const normalizedParams = Object.freeze({
-    page: clampListParam(params.page, 1, 1, 10_000),
     pageSize: clampListParam(params.pageSize, 20, 1, 100),
   });
   return createScopedQueryKey(

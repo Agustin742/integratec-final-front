@@ -251,8 +251,14 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
     typeDraft('Mensaje nuevo del estudiante');
     await submitDraft();
 
-    // Pending: visible feedback, no confirmed row, draft not cleared yet.
-    expect(screen.getByText('Enviando el mensaje…')).toBeVisible();
+    // Pending: the button itself shows the progress (no redundant alert), the
+    // textarea stays focusable (read-only, never disabled) and nothing is
+    // confirmed yet.
+    expect(screen.getByRole('button', { name: 'Enviando…' })).toBeDisabled();
+    expect(screen.queryByText('Enviando el mensaje…')).not.toBeInTheDocument();
+    expect(getDraftTextarea()).not.toBeDisabled();
+    expect(getDraftTextarea()).toHaveAttribute('readonly');
+    expect(getDraftTextarea()).toHaveAttribute('aria-busy', 'true');
     expect(
       queryHistoryRow('Mensaje nuevo del estudiante'),
     ).not.toBeInTheDocument();
@@ -262,13 +268,64 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
     // through the revalidated history, never from a local optimistic row.
     await waitFor(() => expect(getDraftTextarea()).toHaveValue(''));
     expect(await findHistoryRow('Mensaje nuevo del estudiante')).toBeVisible();
-    expect(screen.queryByText('Enviando el mensaje…')).not.toBeInTheDocument();
+    // Sent is announced once (live region), not duplicated by a toast.
+    expect(screen.getAllByText('Mensaje enviado.')).toHaveLength(1);
     expect(store.getCounts().send).toBe(1);
     expect(store.getMessages().at(-1)?.body).toBe(
       'Mensaje nuevo del estudiante',
     );
 
     await expectAccessible(view.container);
+  });
+
+  it('sends with Enter, inserts a newline with Shift+Enter and ignores Enter while composing', async () => {
+    const store = createClassroomChatStore({
+      classroomId: CLASSROOM_ID,
+      currentUserId: STUDENT_ID,
+      role: 'STUDENT',
+      members: makeMembers(),
+    });
+    mswServer.use(...store.handlers);
+
+    renderComposerRoute({ role: 'STUDENT', userId: STUDENT_ID });
+    const textarea = await screen.findByRole('textbox', {
+      name: 'Mensaje del chat',
+    });
+    expect(
+      screen.getByText('Enter envía, Shift+Enter agrega una línea.'),
+    ).toBeVisible();
+
+    typeDraft('Hola con Enter');
+    // Shift+Enter is a newline, never a send; IME composition is ignored.
+    fireEvent.keyDown(textarea, { key: 'Enter', shiftKey: true });
+    fireEvent.keyDown(textarea, { key: 'Enter', isComposing: true });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(store.getCounts().send).toBe(0);
+
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+    expect(await findHistoryRow('Hola con Enter')).toBeVisible();
+    expect(store.getCounts().send).toBe(1);
+    expect(getDraftTextarea()).toHaveValue('');
+  });
+
+  it('keeps focus in the textarea after a confirmed send', async () => {
+    const store = createClassroomChatStore({
+      classroomId: CLASSROOM_ID,
+      currentUserId: STUDENT_ID,
+      role: 'STUDENT',
+      members: makeMembers(),
+    });
+    mswServer.use(...store.handlers);
+
+    renderComposerRoute({ role: 'STUDENT', userId: STUDENT_ID });
+    await screen.findByRole('textbox', { name: 'Mensaje del chat' });
+    getDraftTextarea().focus();
+    typeDraft('Mensaje con foco');
+    fireEvent.keyDown(getDraftTextarea(), { key: 'Enter' });
+
+    expect(await findHistoryRow('Mensaje con foco')).toBeVisible();
+    await waitFor(() => expect(getDraftTextarea()).toHaveValue(''));
+    expect(getDraftTextarea()).toHaveFocus();
   });
 
   it('rejects an empty draft client-side without issuing any send request', async () => {
