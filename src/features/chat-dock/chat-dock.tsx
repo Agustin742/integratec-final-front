@@ -1,5 +1,6 @@
 import { useCallback, useContext, useEffect, useId, useRef } from 'react';
 import { QueryClientContext } from '@tanstack/react-query';
+import { useLocation } from 'react-router';
 import { cn } from '@/lib/utils';
 import { useSessionSnapshot } from '@/session/provider';
 import { useChatInbox } from '../chat-inbox/use-chat-inbox';
@@ -25,7 +26,10 @@ interface FocusRequest {
 export function ChatDock() {
   const queryClient = useContext(QueryClientContext);
   const snapshot = useSessionSnapshot();
-  if (!queryClient || snapshot.status !== 'authenticated') {
+  const { pathname } = useLocation();
+  // The all-chats page IS the conversation surface: no second window there.
+  const onChatsPage = pathname === '/chats' || pathname.startsWith('/chats/');
+  if (!queryClient || snapshot.status !== 'authenticated' || onChatsPage) {
     return null;
   }
   return <ChatDockContent key={snapshot.user.id} userId={snapshot.user.id} />;

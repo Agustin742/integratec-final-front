@@ -234,6 +234,52 @@ returns no chats for them) and users without chats.
 - **Layers.** The dock sits at `z-40`, below modal dialogs and sheets (`z-50`)
   so those still cover it; toasts moved from the bottom-right to the
   bottom-left so they never cover a conversation or its composer.
+- **Hidden on the chats page.** On `/chats` and `/chats/:classroomId` the dock
+  renders nothing: that page already is the conversation surface, so there is
+  never a second window (or a second room join) for the same chat elsewhere on
+  the screen. Everywhere else it behaves as above.
+
+## All-chats page and navbar entry
+
+`src/features/chat-page/` (page body, navbar link, copy) and
+`src/app/pages/chats-page.tsx` (route component). The user's chats of EVERY
+classroom live on one page, LinkedIn "Messaging" style, reached from the navbar.
+
+- **Navbar button.** `ChatsNavLink` sits next to the notification bell in the
+  `AppShell` banner: an outline icon link (same size and styling as the bell)
+  to `/chats` with the total unread badge from `useChatInbox()` (visible count
+  capped at `99+`; the accessible name keeps the real number, for example
+  `Mensajes, 120 mensajes sin leer`). It follows the dock's visibility rule:
+  nothing for signed-out visitors, parents, users without chats, and while the
+  inbox has not loaded.
+- **Route.** `/chats` and `/chats/:classroomId` (one lazy route,
+  `chats/:classroomId?`) inside the protected branch. The page title is
+  `Mensajes · IntegrarTec`, or `Chat de {aula} · IntegrarTec` with a chat open.
+- **Desktop (`md` and up).** Two panes: on the left a `nav` (`Chats de tus
+aulas`) with one link per classroom chat, latest activity first (server
+  order): name, `Author: preview`, time and the unread badge, with
+  `aria-current="page"` on the open one; on the right the open conversation
+  (the shared `ChatConversationWithComposer`, `variant="dock"`) under its
+  classroom heading, filling the pane height with the composer pinned at the
+  bottom and only the messages scrolling. `/chats` shows an `Elegí un chat`
+  prompt on the right.
+- **Small screens (< `md`).** One pane at a time: `/chats` shows only the list,
+  `/chats/:classroomId` only the conversation with a `Volver a los chats` link.
+  Both panes stay in the DOM and CSS picks the visible one, so exactly one
+  conversation is ever mounted.
+- **States.** Loading, a retryable error when the inbox fails, `Todavía no
+tenés chats` when there are none, and `No encontramos ese chat` (with a link
+  back) for an id that is not among the user's chats; the copy never says
+  whether the classroom exists.
+- **Realtime and read markers.** Identical to the dock because it is the same
+  conversation component: the classroom room is joined only while a chat is
+  shown (leaving or switching releases it; the ref-counted manager never opens a
+  second connection) and the newest visible message sends the read marker, which
+  clears the unread badge in the list and the navbar.
+- **Focus and headings.** The page title is the `h2`; after a navigation the app
+  focuses it (`RouterRoot`), and the open chat's name is an `h3`. On small
+  screens, while a chat is open, the page `h2` is visually hidden (still the
+  focus target) and the chat title with the back link takes its place.
 
 ## Muted chat
 

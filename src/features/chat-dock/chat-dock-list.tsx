@@ -7,7 +7,7 @@ import { CloseIcon } from './chat-dock-icons';
 import { chatDockMessages as messages } from './messages';
 
 /** Time of day for today's messages, `Ayer` or the date for older ones. */
-function formatListTime(isoInstant: string): string {
+export function formatListTime(isoInstant: string): string {
   try {
     const now = new Date();
     return getSchoolDayKey(isoInstant) === getSchoolDayKey(now.toISOString())

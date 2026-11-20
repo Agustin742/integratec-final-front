@@ -5,6 +5,7 @@ import { BaseLayout } from '@/components/layout/base-layout';
 import { Button } from '@/components/ui/button';
 import { Toast, toast } from '@/components/ui/toast';
 import { ChatDock } from '@/features/chat-dock/chat-dock';
+import { ChatsNavLink } from '@/features/chat-page/chats-nav-link';
 import { resetClassroomModeStore } from '@/features/classrooms/classroom-mode-store';
 import { DailyReviewDialog } from '@/features/daily-review/daily-review-dialog';
 import { NotificationCenter } from '@/features/notifications/notification-center';
@@ -89,6 +90,7 @@ export function AppShell() {
                 >
                   {messages.shell.profileLink}
                 </NavLink>
+                <ChatsNavLink />
                 <NotificationCenter />
                 <DailyReviewDialog />
                 <Button
