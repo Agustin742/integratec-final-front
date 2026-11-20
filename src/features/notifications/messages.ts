@@ -44,6 +44,6 @@ export const notificationMessages = {
     announcement: 'Nuevo anuncio en el tablón',
     mention: 'Te mencionaron en el aula',
     activity_forum_reply: 'Nueva respuesta en el foro',
-    badge_awarded: 'Nueva insignia desbloqueada',
+    badge_awarded: 'Obtuviste una nueva insignia',
   } satisfies Record<NotificationKind, string>,
 } as const;

@@ -541,8 +541,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Submit files to an activity
-         * @description Student only. Uploads 1-5 files (PDF, PNG, JPEG or DOCX, up to 10 MB each, type detected from the bytes) to a published FILE activity of the student's classroom. One submission per student and activity. The server clock decides the window: before `opensAt` or after `dueAt` with `allowLate = false` is rejected (409); after `dueAt` with `allowLate = true` is stored with `isLate = true`. Retrying with the same `Idempotency-Key` returns the stored submission (200) without storing anything new; a different key after a submission exists is 409. Unknown, malformed, draft or deactivated activities and non-members answer 404, so an unpublished activity never leaks its existence; staff and linked parents answer 403 on published activities only.
+         * Submit files or multiple-choice answers to an activity
+         * @description Student only. For a published FILE activity of the student's classroom, uploads 1-5 files (PDF, PNG, JPEG or DOCX, up to 10 MB each, type detected from the bytes). For a published MULTIPLE_CHOICE activity, sends the `answers` field instead: a JSON-encoded array of `{ questionId, optionId }` pairs, at least one, each belonging to the activity; the server grades them and stores the `autoScore` with the submission, and correct answers are never returned. One submission per student and activity. The server clock decides the window: before `opensAt` or after `dueAt` with `allowLate = false` is rejected (409); after `dueAt` with `allowLate = true` is stored with `isLate = true`. Retrying with the same `Idempotency-Key` returns the stored submission (200) without storing anything new and without re-scoring; a different key after a submission exists is 409. Sending files to a MULTIPLE_CHOICE activity, or answers to a FILE activity, is 409. Unknown, malformed, draft or deactivated activities and non-members answer 404, so an unpublished activity never leaks its existence; staff and linked parents answer 403 on published activities only.
          */
         post: operations["SubmissionsController_create"];
         delete?: never;
@@ -863,6 +863,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/classrooms/{id}/bot/materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List materials allowed for the bot with their indexing state
+         * @description Teacher-level staff only; every other actor receives 404. Offset pagination; sort is createdAt or -createdAt (default), with ID in the same direction as tiebreaker. Soft-removed materials are excluded.
+         */
+        get: operations["BotMaterialsController_list"];
+        put?: never;
+        /**
+         * Allow one study material for the study guide bot
+         * @description Teacher-level staff only; every other actor receives 404. The material must belong to this classroom and not be soft-removed. It is indexed under the classroom partition; a duplicate enable re-indexes from scratch without reusing earlier chunks. Indexing failure is returned as `failed` with a visible reason and leaves the material usable for its normal purposes.
+         */
+        post: operations["BotMaterialsController_enable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/bot/materials/{materialId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Disallow one study material for the bot
+         * @description Teacher-level staff only; every other actor receives 404. The material is excluded from bot retrieval immediately and its indexed chunks are removed; re-enabling indexes from scratch. Repeated disable returns 404.
+         */
+        delete: operations["BotMaterialsController_disable"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/classrooms/{id}/roster": {
         parameters: {
             query?: never;
@@ -949,7 +993,7 @@ export interface paths {
         };
         /**
          * List activities
-         * @description Staff see drafts and published (filter with `state`); students see published only (their `state` filter is ignored). Linked parents are not part of the activity matrix (403). Deactivated activities are never listed. Sortable by `dueAt` (default, ascending) or `createdAt`; `id` is the tiebreaker. Student list items add own work `status` (graded > submitted > overdue > pending) and `canSubmit` (FILE only). `status` filters before pagination/count for students; staff receive 400 for this query. Overdue means no submission and server time strictly after dueAt, regardless of allowLate.
+         * @description Staff see drafts and published (filter with `state`); students see published only (their `state` filter is ignored). Linked parents are not part of the activity matrix (403). Deactivated activities are never listed. Sortable by `dueAt` (default, ascending) or `createdAt`; `id` is the tiebreaker. Student list items add own work `status` (graded > submitted > overdue > pending) and `canSubmit` (either format). `status` filters before pagination/count for students; staff receive 400 for this query. Overdue means no submission and server time strictly after dueAt, regardless of allowLate.
          */
         get: operations["ActivitiesController_list"];
         put?: never;
@@ -987,7 +1031,7 @@ export interface paths {
         head?: never;
         /**
          * Update an activity
-         * @description Teacher-level staff only. Partial update; `type` and `format` are immutable. `questions` replaces all questions and stays editable only until the first submission exists (409 afterwards); title, description and dates remain editable.
+         * @description Teacher-level staff only. Partial update; `type` and `format` are immutable. `questions` replaces all questions and stays editable only until the first submission exists (409 afterwards). On a multiple-choice activity `maxScore` is frozen the same way: a different value is refused (409) once a submission exists. Title, description and dates remain editable.
          */
         patch: operations["ActivitiesController_update"];
         trace?: never;
@@ -1994,8 +2038,10 @@ export interface components {
             createdAt: string;
         };
         CreateSubmissionBodyDto: {
-            /** @description 1-5 files of at most 10 MB each. Allowed content (detected from the bytes): PDF, PNG, JPEG, DOCX. */
+            /** @description 1-5 files of at most 10 MB each. Allowed content (detected from the bytes): PDF, PNG, JPEG, DOCX. Required for FILE activities; rejected for MULTIPLE_CHOICE activities. */
             files: string[];
+            /** @description MULTIPLE_CHOICE answers: a JSON-encoded array of { questionId, optionId } pairs, at least one. Required for MULTIPLE_CHOICE activities; rejected for FILE activities. The server grades the answers and returns the score; correct answers are never sent back. */
+            answers?: string;
         };
         SubmissionFileResponseDto: {
             /** Format: uuid */
@@ -2011,6 +2057,14 @@ export interface components {
             /** @description Zero-based order in which the files were sent. */
             position: number;
         };
+        SubmissionAnswerResponseDto: {
+            /** Format: uuid */
+            questionId: string;
+            /** Format: uuid */
+            optionId: string;
+            /** @description Zero-based order in which the answers were sent. */
+            position: number;
+        };
         SubmissionResponseDto: {
             /** Format: uuid */
             id: string;
@@ -2023,12 +2077,16 @@ export interface components {
             submittedAt: string;
             /** @description True when submitted after `dueAt` on an activity with `allowLate`. */
             isLate: boolean;
+            /** @description Server-computed score of a MULTIPLE_CHOICE submission (0..maxScore), never supplied by the client; null for file submissions, which a teacher grades through the grade endpoint. */
+            autoScore: number | null;
             /**
              * @description Derived state of the work.
              * @enum {string}
              */
             status: "submitted" | "graded";
             files: components["schemas"]["SubmissionFileResponseDto"][];
+            /** @description Chosen options of a MULTIPLE_CHOICE submission in the order they were sent; empty for file submissions. */
+            answers: components["schemas"]["SubmissionAnswerResponseDto"][];
         };
         SubmissionFileDownloadDto: {
             /** Format: uuid */
@@ -2063,11 +2121,15 @@ export interface components {
             submittedAt: string;
             /** @description True when submitted after `dueAt` on an activity with `allowLate`. */
             isLate: boolean;
+            /** @description Server-computed score of a MULTIPLE_CHOICE submission (0..maxScore), never supplied by the client; null for file submissions, which a teacher grades through the grade endpoint. */
+            autoScore: number | null;
             /**
              * @description Derived state of the work.
              * @enum {string}
              */
             status: "submitted" | "graded";
+            /** @description Chosen options of a MULTIPLE_CHOICE submission in the order they were sent; empty for file submissions. */
+            answers: components["schemas"]["SubmissionAnswerResponseDto"][];
             files: components["schemas"]["SubmissionFileDownloadDto"][];
         };
         /** @enum {string} */
@@ -2386,6 +2448,38 @@ export interface components {
             streak: components["schemas"]["StreakSummaryDto"];
             badges: components["schemas"]["EarnedBadgeDto"][];
         };
+        EnableBotMaterialDto: {
+            /**
+             * Format: uuid
+             * @description Study material that must belong to the same classroom.
+             */
+            materialId: string;
+        };
+        BotMaterialDto: {
+            /**
+             * Format: uuid
+             * @description Allowed-material record id.
+             */
+            id: string;
+            /** Format: uuid */
+            classroomId: string;
+            /** Format: uuid */
+            materialId: string;
+            /** @example lesson.pdf */
+            filename: string;
+            /** @enum {string} */
+            contentType: "application/pdf" | "image/png" | "image/jpeg";
+            sizeBytes: number;
+            /**
+             * @description Indexing state inside the classroom partition. `FAILED` leaves the material usable for its normal purposes and is visible to the teacher.
+             * @enum {string}
+             */
+            indexState: "PENDING" | "INDEXED" | "FAILED";
+            /** @description Present only while indexState is `failed`. */
+            failureReason?: Record<string, never> | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
         RosterGuardianDto: {
             /** Format: uuid */
             id: string;
@@ -2658,7 +2752,7 @@ export interface components {
              * @enum {string}
              */
             status: "pending" | "submitted" | "graded" | "overdue";
-            /** @description Supported FILE submission, no prior submission, opensAt reached, and not past dueAt unless allowLate. Server-time snapshot, rechecked on submission. */
+            /** @description No prior submission, opensAt reached, and not past dueAt unless allowLate; both formats take a submission (files or multiple-choice answers), checked server-side at submit time. Server-time snapshot, rechecked on submission. */
             canSubmit: boolean;
         };
         StudentOptionDto: {
@@ -4547,7 +4641,7 @@ export interface operations {
                     "application/json": components["schemas"]["SubmissionResponseDto"];
                 };
             };
-            /** @description Missing or invalid `Idempotency-Key`, no files, disallowed or empty files (`VALIDATION_FAILED` with details), or too many files / unexpected field (`BAD_REQUEST`). */
+            /** @description Missing or invalid `Idempotency-Key`; no files, disallowed or empty files; missing, empty or malformed `answers` JSON; or answers that do not belong to the activity (`VALIDATION_FAILED` with details); or too many files / unexpected field (`BAD_REQUEST`). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -4583,7 +4677,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Already submitted with another key, window closed or not yet open, or not a file activity (`details` names the reason). */
+            /** @description Already submitted with another key, window closed or not yet open, a payload that does not match the activity format (files on a MULTIPLE_CHOICE activity, answers on a FILE activity), or a multiple-choice activity without questions (`details` names the reason). */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -5773,6 +5867,173 @@ export interface operations {
             };
         };
     };
+    BotMaterialsController_list: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+                /** @description Field to order by; prefix with "-" for descending. Allowed fields and the default order are listed per endpoint. */
+                sort?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Allowed materials with per-material indexing state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["BotMaterialDto"][];
+                        /** @example 1 */
+                        page: number;
+                        /** @example 20 */
+                        pageSize: number;
+                        /**
+                         * @description Item count across all pages.
+                         * @example 42
+                         */
+                        total: number;
+                    };
+                };
+            };
+            /** @description Invalid pagination or sort. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, absent, out-of-scope classroom, or a material outside it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    BotMaterialsController_enable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnableBotMaterialDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BotMaterialDto"];
+                };
+            };
+            /** @description Invalid body: materialId must be the only field and a UUID. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, absent, out-of-scope classroom, or a material outside it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    BotMaterialsController_disable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Material UUID */
+                materialId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, absent, out-of-scope classroom, or a material outside it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description The material is excluded but its index partition cleanup is pending. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
     ClassroomRosterController_list: {
         parameters: {
             query?: {
@@ -6344,7 +6605,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Questions can no longer change because a submission exists. */
+            /** @description Questions, or the `maxScore` of a multiple-choice activity, can no longer change because a submission exists. */
             409: {
                 headers: {
                     [name: string]: unknown;

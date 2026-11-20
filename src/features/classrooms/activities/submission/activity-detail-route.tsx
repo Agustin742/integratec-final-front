@@ -1,10 +1,15 @@
 import { ActivityDetailPage } from '../activity-detail-page';
+import { ExamAnsweringPanel } from '../exam/exam-answering-panel';
 import { ActivityForumPanel } from '../forum/activity-forum-panel';
 import { SubmissionPanel } from './submission-panel';
 import type { ActivityDetailDto } from '../activity-schema';
 
 function renderSubmissionTab(activity: ActivityDetailDto) {
-  return <SubmissionPanel activity={activity} />;
+  return activity.format === 'MULTIPLE_CHOICE' ? (
+    <ExamAnsweringPanel activity={activity} />
+  ) : (
+    <SubmissionPanel activity={activity} />
+  );
 }
 
 function renderForumTab(activity: ActivityDetailDto) {

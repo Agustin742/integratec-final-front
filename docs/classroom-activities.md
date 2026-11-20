@@ -153,7 +153,10 @@ teacher grading queue and form (`HU-ACT-004`, delivered separately in `#44` — 
 `Revisión docente` tab of `ActivityDetailPage`), the per-activity query forum tab
 (`HU-COM-003` MVP Core part, delivered in `#52` — see
 [classroom forum](./classroom-forum.md) — and wired via `renderForumTab` in
-`ActivityDetailRoute`), student submissions (`back#29`), and server-side answer
+`ActivityDetailRoute`), student multiple-choice answering (`HU-ACT-003` part
+2/2, delivered in `#43` — see [exam
+answering](./exam-answering.md) — and wired via the same `renderSubmissionTab`
+slot), student submissions (`back#29`), and server-side answer
 protection and notification fan-out (backend) are outside `#39`/`#41`.
 Whether a teacher may edit a published activity that already has submissions
 stays a server decision: the editor never claims an edit succeeded and surfaces

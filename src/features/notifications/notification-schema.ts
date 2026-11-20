@@ -4,17 +4,15 @@ import type { components } from '@/api/schema.generated';
 z.config({ jitless: true });
 
 /**
- * Narrow adaptation for `NotificationDto` (`schema.generated.ts` emits
- * `classroomId: Record<string, never> | null` from Swagger `nullable: true`;
- * the wire format is a UUID string or null for classroom-free notices such as
- * badge awards).
+ * The generated `classroomId` is typed `Record<string, never> | null` (the
+ * backend's OpenAPI emitter loses the `uuid` string type of its nullable
+ * field); the contract says it is a classroom id, `null` for classroom-free
+ * notices such as badge awards.
  */
 export type NotificationDto = Omit<
   components['schemas']['NotificationDto'],
   'classroomId'
-> & {
-  readonly classroomId: string | null;
-};
+> & { readonly classroomId: string | null };
 export type NotificationKind = NotificationDto['kind'];
 export type NotificationsReadResultDto =
   components['schemas']['NotificationsReadResultDto'];

@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-19 — Review and fixes on PR #109 (#43, student exam answering)
+
+- **Status:** completed (pending CI and merge of PR #109)
+- **Area / files:** `src/features/classrooms/activities/exam/`, `src/api/schema.generated.ts`, `src/features/notifications/`, `src/features/classrooms/activities/submission/submission-schema.ts`, `src/test/msw/handlers.ts`, `e2e/exam-answering.spec.ts`, `docs/exam-answering.md`
+- **Change:** Merged `develop` into the branch (tracker conflict, both entries kept). Fixed the reconcile flow (a failed verification read now reports "unverifiable" instead of "nothing stored") and kept a confirmed result visible when the background refresh fails. Improved form accessibility (prompt describes each radio group, option keys, focus on the result and on validation errors, inputs disabled when the window is blocked). Rewired the panel from the never-shipped provisional `/exam-answers` endpoints to the real back #47 contract (`POST /activities/{id}/submissions` with a JSON `answers` field, `GET .../submissions/me`, `autoScore`), synced contracts with back `develop` and adapted notifications to the synced schema (`badge_awarded`, nullable `classroomId`).
+- **Reason:** Review findings on PR #109; the visual check against the local backend returned 404 on every submission because back #47 shipped a different contract.
+- **Verification:** Per-task affected tests (exam suites 32/32, `--changed` 715 pass), lint, typecheck, build, `security:check`, `check_docs.py`, Playwright exam/submission/notification specs 16/16; live submission against the local backend stored `autoScore` 7/10. Native review approved on each task commit.
+- **Next step:** CI green and merge. MC auto-scores do not credit points until a teacher grades (back behavior, out of scope).
+
 ## 2026-11-18 — 3D avatar preview and shared avatar component (front #35)
 
 - **Status:** in-progress (branch `feat/35-avatar-3d-preview`, no PR yet)
