@@ -40,6 +40,7 @@ import { classroomMessages as messages } from '../messages';
 import { useClassroomContext } from '../use-classroom-capabilities';
 import { ChatModerationDialog } from './chat-moderation-dialog';
 import { ChatScrollContext } from './chat-scroll-context';
+import { useClassroomChatLive } from './use-classroom-chat-live';
 import type {
   ChatDirectoryMemberDto,
   ChatHistoryMessageDto,
@@ -68,10 +69,9 @@ export interface ChatPanelProps {
  * newest message, older pages loaded by scrolling up) as safe plain text, with
  * loading, empty, denied and stale states (`rules/error-handling-and-feedback.md`).
  *
- * Live updates: the committed contract has no per-message broadcast yet
- * (back #48), so new messages arrive by revalidating this panel's queries
- * through the workspace SSE `classroom.context-invalidated` seam
- * (`use-classroom-context-events.ts`). No realtime protocol is invented here.
+ * Live updates: `useClassroomChatLive` applies the Colyseus `chat:message`
+ * and `chat:message.hidden` events (back #48) to this history through the
+ * shared app-level connection, and revalidates it after a reconnect.
  *
  * Parents are denied up front without issuing any chat request (S5); a server
  * 403 on history (lost permission) is shown as its own denied state.
@@ -291,6 +291,8 @@ function ChatPanelConversation({
     return map;
   }, [membersQuery.data?.items]);
 
+  useClassroomChatLive(classroomId, { canModerate: canModerateChat });
+
   const historyQuery = useInfiniteQuery({
     queryKey: classroomChatHistoryQueryKey(userId, classroomId, {
       pageSize: CHAT_HISTORY_PAGE_SIZE,
@@ -308,10 +310,11 @@ function ChatPanelConversation({
     // vanished since the total was computed).
     getNextPageParam: (lastPage, allPages, lastPageParam) => {
       if (lastPage.items.length === 0) return undefined;
-      const loaded = allPages.reduce(
-        (count, page) => count + page.items.length,
-        0,
-      );
+      // Distinct ids: a live message pushes the last row of a page onto the
+      // next one, so the same row can arrive twice and must count once.
+      const loaded = new Set(
+        allPages.flatMap((page) => page.items.map((item) => item.id)),
+      ).size;
       return loaded < lastPage.total ? lastPageParam + 1 : undefined;
     },
     retry: false,

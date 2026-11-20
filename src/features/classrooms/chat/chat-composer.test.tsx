@@ -23,6 +23,7 @@ import {
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
 import { render } from '@/test/render';
+import { createLiveRealtimeHarness } from '@/test/realtime/live-realtime-harness';
 import { useClassroomContextEvents } from '../use-classroom-context-events';
 import { ChatComposer } from './chat-composer';
 import { ChatPanel } from './chat-panel';
@@ -168,10 +169,13 @@ function renderComposerRoute(
     { initialEntries: [`/classrooms/${CLASSROOM_ID}/panels/chat`] },
   );
 
+  const { sdk, LiveRealtimeProvider } = createLiveRealtimeHarness(session);
   const view = render(
     <SessionProvider service={session.service}>
       <ApiQueryProvider client={queryClient}>
-        <RouterProvider router={router} />
+        <LiveRealtimeProvider>
+          <RouterProvider router={router} />
+        </LiveRealtimeProvider>
       </ApiQueryProvider>
     </SessionProvider>,
   );
@@ -190,6 +194,7 @@ function renderComposerRoute(
 
   return {
     ...view,
+    sdk,
     hint,
     setChatMuted: (muted: boolean) => {
       detail.chatMuted = muted;
@@ -276,6 +281,40 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
     );
 
     await expectAccessible(view.container);
+  });
+
+  it('does not duplicate the own message when the room echoes it after the REST send', async () => {
+    const store = createClassroomChatStore({
+      classroomId: CLASSROOM_ID,
+      currentUserId: STUDENT_ID,
+      role: 'STUDENT',
+      members: makeMembers(),
+    });
+    mswServer.use(...store.handlers);
+
+    const view = renderComposerRoute({ role: 'STUDENT', userId: STUDENT_ID });
+    await screen.findByRole('textbox', { name: 'Mensaje del chat' });
+
+    typeDraft('Mensaje propio con eco');
+    await submitDraft();
+    expect(await findHistoryRow('Mensaje propio con eco')).toBeVisible();
+
+    // The server broadcasts the persisted message to the whole room, sender included.
+    const persisted = store.getMessages().at(-1)!;
+    const { hiddenAt: _hiddenAt, hiddenById: _hiddenById, ...echo } = persisted;
+    void _hiddenAt;
+    void _hiddenById;
+    await waitFor(() => expect(view.sdk.roomFor(CLASSROOM_ID)).toBeDefined());
+    act(() =>
+      view.sdk
+        .roomFor(CLASSROOM_ID)!
+        .emitMessage('chat:message', { ...echo, classroomId: CLASSROOM_ID }),
+    );
+
+    const list = screen.getByRole('list', {
+      name: 'Historial de mensajes del chat',
+    });
+    expect(within(list).getAllByText('Mensaje propio con eco')).toHaveLength(1);
   });
 
   it('sends with Enter, inserts a newline with Shift+Enter and ignores Enter while composing', async () => {

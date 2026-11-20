@@ -29,6 +29,7 @@ import { profile } from '@/session/test-fixtures';
 import { expectAccessible } from '@/test/accessibility';
 import {
   createClassroomChatStore,
+  createClassroomContextEventsHandler,
   createClassroomDetailHandler,
   TEST_API_BASE_URL,
   type ChatStoreMessage,
@@ -38,6 +39,7 @@ import { render } from '@/test/render';
 import { ClassroomPanelRoute } from '../classroom-panel-route';
 import { ClassroomWorkspace } from '../classroom-workspace';
 import { resetClassroomModeStore } from '../classroom-mode-store';
+import { createLiveRealtimeHarness } from '@/test/realtime/live-realtime-harness';
 import { useClassroomContextEvents } from '../use-classroom-context-events';
 import { ChatPanel } from './chat-panel';
 
@@ -96,8 +98,8 @@ function makeMembers() {
 
 /**
  * Mirrors the real workspace owner: one SSE `classroom.context-invalidated`
- * subscription mounted next to the panel, so live chat revalidation is
- * exercised through the committed seam instead of a bespoke test protocol.
+ * subscription mounted next to the panel. Live chat messages do not ride it:
+ * they arrive through the Colyseus room of the realtime provider.
  */
 function ChatRouteHost({ composer }: { readonly composer?: ReactNode }) {
   const { classroomId } = useParams();
@@ -129,8 +131,6 @@ function renderChatRoute(
         ? ['participate_activities', 'chat_classmates', 'list_directory']
         : ['message_teacher']);
 
-  const streamControllers: ReadableStreamDefaultController<Uint8Array>[] = [];
-
   mswServer.use(
     createClassroomDetailHandler(CLASSROOM_ID, {
       name: CLASSROOM_NAME,
@@ -138,18 +138,7 @@ function renderChatRoute(
       capabilities: [...capabilities],
       chatMuted: false,
     }),
-    http.get(
-      `${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}/context-events`,
-      () =>
-        new HttpResponse(
-          new ReadableStream<Uint8Array>({
-            start(controller) {
-              streamControllers.push(controller);
-            },
-          }),
-          { headers: { 'Content-Type': 'text/event-stream' } },
-        ),
-    ),
+    createClassroomContextEventsHandler(CLASSROOM_ID),
   );
 
   const client = createApiClient({ baseUrl: TEST_API_BASE_URL });
@@ -175,27 +164,30 @@ function renderChatRoute(
     { initialEntries: [`/classrooms/${CLASSROOM_ID}/panels/chat`] },
   );
 
+  const { sdk, LiveRealtimeProvider } = createLiveRealtimeHarness(session);
   const view = render(
     <SessionProvider service={session.service}>
       <ApiQueryProvider client={queryClient}>
-        <RouterProvider router={router} />
+        <LiveRealtimeProvider>
+          <RouterProvider router={router} />
+        </LiveRealtimeProvider>
       </ApiQueryProvider>
     </SessionProvider>,
   );
 
-  const hint = async () => {
-    await act(async () => {
-      streamControllers
-        .at(-1)
-        ?.enqueue(
-          new TextEncoder().encode(
-            `event: classroom.context-invalidated\ndata: {"classroomId":"${CLASSROOM_ID}"}\n\n`,
-          ),
-        );
+  /** The Colyseus room the panel joined, once the connection is up. */
+  const liveRoom = async () => {
+    await waitFor(() => {
+      expect(sdk.roomFor(CLASSROOM_ID)).toBeDefined();
     });
+    return sdk.roomFor(CLASSROOM_ID)!;
+  };
+  const emitLive = async (type: string, payload: unknown) => {
+    const room = await liveRoom();
+    act(() => room.emitMessage(type, payload));
   };
 
-  return { ...view, queryClient, hint };
+  return { ...view, queryClient, sdk, liveRoom, emitLive };
 }
 
 /**
@@ -688,7 +680,9 @@ describe('ChatPanel (#51, read side)', () => {
         correlationId: 'req-chat-refresh-500',
       },
     });
-    await view.hint();
+    // A reconnect revalidates the history; that refresh fails.
+    const room = await view.liveRoom();
+    act(() => room.emitDrop());
 
     expect(
       await screen.findByText('Chat pendiente de sincronización'),
@@ -699,50 +693,177 @@ describe('ChatPanel (#51, read side)', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('revalidates on a context-invalidated SSE event so a new message appears once, at the bottom', async () => {
-    const store = createClassroomChatStore({
-      classroomId: CLASSROOM_ID,
-      currentUserId: STUDENT_ID,
-      role: 'STUDENT',
-      initialMessages: [
-        makeMessage({
-          body: 'Primer mensaje del aula',
-          createdAt: '2026-11-19T02:00:00.000Z',
-        }),
-      ],
-      members: makeMembers(),
+  describe('live messages through the classroom room', () => {
+    // The realtime contract requires UUID ids (the REST fixtures use slugs).
+    let liveSeq = 0;
+    const liveId = () => {
+      liveSeq += 1;
+      return `00000000-0000-4000-8000-${String(900 + liveSeq).padStart(12, '0')}`;
+    };
+
+    function liveMessage(
+      body: string,
+      overrides: Partial<ChatStoreMessage> = {},
+    ) {
+      const {
+        hiddenAt: _hiddenAt,
+        hiddenById: _hiddenById,
+        ...message
+      } = makeMessage({
+        id: liveId(),
+        body,
+        authorId: STUDENT_ID_2,
+        ...overrides,
+      });
+      void _hiddenAt;
+      void _hiddenById;
+      return { ...message, classroomId: CLASSROOM_ID };
+    }
+
+    function seedStore(role: 'STUDENT' | 'TEACHER' = 'STUDENT') {
+      const store = createClassroomChatStore({
+        classroomId: CLASSROOM_ID,
+        currentUserId: role === 'TEACHER' ? TEACHER_ID : STUDENT_ID,
+        role,
+        initialMessages: [
+          makeMessage({
+            id: liveId(),
+            body: 'Primer mensaje del aula',
+            createdAt: '2026-11-19T02:00:00.000Z',
+          }),
+        ],
+        members: makeMembers(),
+      });
+      mswServer.use(...store.handlers);
+      return store;
+    }
+
+    it('shows a received chat:message at the bottom without refetching the history', async () => {
+      const store = seedStore();
+      const view = renderChatRoute({ role: 'STUDENT', userId: STUDENT_ID });
+      expect(await screen.findByText('Primer mensaje del aula')).toBeVisible();
+      const listCountBefore = store.getCounts().list;
+
+      await view.emitLive('chat:message', liveMessage('Nuevo mensaje en vivo'));
+
+      const live = await screen.findByText('Nuevo mensaje en vivo');
+      expect(live).toBeVisible();
+      expect(
+        screen
+          .getByText('Primer mensaje del aula')
+          .compareDocumentPosition(live) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(store.getCounts().list).toBe(listCountBefore);
     });
-    mswServer.use(...store.handlers);
 
-    const view = renderChatRoute({ role: 'STUDENT', userId: STUDENT_ID });
-    expect(await screen.findByText('Primer mensaje del aula')).toBeVisible();
-    const listCountBefore = store.getCounts().list;
+    it('still reaches the oldest message after a live message shifted the pages', async () => {
+      const store = createClassroomChatStore({
+        classroomId: CLASSROOM_ID,
+        currentUserId: STUDENT_ID,
+        role: 'STUDENT',
+        initialMessages: makeNumberedHistory(40),
+        members: makeMembers(),
+      });
+      mswServer.use(...store.handlers);
+      const view = renderChatRoute({ role: 'STUDENT', userId: STUDENT_ID });
+      expect(await screen.findByText('Historial 40')).toBeVisible();
 
-    // A classmate's send lands on the server; no per-message broadcast
-    // exists yet, so the panel only learns through the SSE revalidation seam.
-    store.setCurrentUserId(STUDENT_ID_2);
-    await fetch(`${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}/messages`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ body: 'Nuevo mensaje en vivo' }),
+      store.setCurrentUserId(STUDENT_ID_2);
+      await fetch(`${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: 'Mensaje en vivo' }),
+      });
+      store.setCurrentUserId(STUDENT_ID);
+      const {
+        hiddenAt: _hiddenAt,
+        hiddenById: _hiddenById,
+        ...echo
+      } = store.getMessages().at(-1)!;
+      void _hiddenAt;
+      void _hiddenById;
+      await view.emitLive('chat:message', {
+        ...echo,
+        classroomId: CLASSROOM_ID,
+      });
+      expect(await screen.findByText('Mensaje en vivo')).toBeVisible();
+
+      await scrollToTopSentinel();
+      expect(await screen.findByText('Historial 20')).toBeVisible();
+      await scrollToTopSentinel();
+
+      expect(await screen.findByText('Historial 01')).toBeVisible();
     });
-    store.setCurrentUserId(STUDENT_ID);
-    expect(screen.queryByText('Nuevo mensaje en vivo')).not.toBeInTheDocument();
 
-    await view.hint();
+    it('renders a duplicated event once', async () => {
+      seedStore();
+      const view = renderChatRoute({ role: 'STUDENT', userId: STUDENT_ID });
+      await screen.findByText('Primer mensaje del aula');
+      const message = liveMessage('Mensaje repetido');
 
-    const liveMessage = await screen.findByText('Nuevo mensaje en vivo');
-    expect(liveMessage).toBeVisible();
-    // Deduplicated by id even if the revalidated page repeats it.
-    expect(screen.getAllByText('Nuevo mensaje en vivo')).toHaveLength(1);
-    // Chat order (oldest to newest): the live message follows the older
-    // confirmed message in the DOM.
-    const older = screen.getByText('Primer mensaje del aula');
-    expect(
-      older.compareDocumentPosition(liveMessage) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(store.getCounts().list).toBeGreaterThan(listCountBefore);
+      await view.emitLive('chat:message', message);
+      await view.emitLive('chat:message', message);
+
+      expect(await screen.findAllByText('Mensaje repetido')).toHaveLength(1);
+    });
+
+    it('removes a message hidden by a teacher from a student view', async () => {
+      const store = seedStore();
+      const [first] = store.getMessages();
+      const view = renderChatRoute({ role: 'STUDENT', userId: STUDENT_ID });
+      expect(await screen.findByText('Primer mensaje del aula')).toBeVisible();
+
+      await view.emitLive('chat:message.hidden', {
+        messageId: first.id,
+        hiddenAt: '2026-11-19T05:00:00.000Z',
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.queryByText('Primer mensaje del aula'),
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it('refetches for staff when a message is hidden, so the audit trail comes from the server', async () => {
+      const store = seedStore('TEACHER');
+      const [first] = store.getMessages();
+      const view = renderChatRoute({ role: 'TEACHER', userId: TEACHER_ID });
+      expect(await screen.findByText('Primer mensaje del aula')).toBeVisible();
+      const listCountBefore = store.getCounts().list;
+
+      await view.emitLive('chat:message.hidden', {
+        messageId: first.id,
+        hiddenAt: '2026-11-19T05:00:00.000Z',
+      });
+
+      await waitFor(() => {
+        expect(store.getCounts().list).toBeGreaterThan(listCountBefore);
+      });
+      expect(screen.getByText('Primer mensaje del aula')).toBeVisible();
+    });
+
+    it('revalidates the history after the live connection is recovered', async () => {
+      const store = seedStore();
+      const view = renderChatRoute({ role: 'STUDENT', userId: STUDENT_ID });
+      expect(await screen.findByText('Primer mensaje del aula')).toBeVisible();
+      const listCountBefore = store.getCounts().list;
+
+      // A message committed while the socket was down is never replayed.
+      store.setCurrentUserId(STUDENT_ID_2);
+      await fetch(`${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: 'Mensaje perdido durante el corte' }),
+      });
+      store.setCurrentUserId(STUDENT_ID);
+      act(() => view.sdk.roomFor(CLASSROOM_ID)!.emitDrop());
+
+      expect(
+        await screen.findByText('Mensaje perdido durante el corte'),
+      ).toBeVisible();
+      expect(store.getCounts().list).toBeGreaterThan(listCountBefore);
+    });
   });
 
   describe('typing arbitration (S4)', () => {

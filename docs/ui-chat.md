@@ -77,18 +77,39 @@ on the server-resolved `myRole`:
   revalidates the classroom context once so a lost permission does not keep
   serving a stale denied page.
 
-## Live seam
+## Live messages
 
-The committed contract has no per-message chat broadcast yet (backend
-[back #48](https://github.com/Agustin742/integratec-final-back/issues/48) is
-open). Live updates arrive through the existing workspace SSE
-`classroom.context-invalidated` revalidation seam
-([context invalidation B](./classroom-workspace.md#context-invalidation-b)):
-every observed invalidation hint cancels obsolete REST and revalidates all
-chat queries of that user and classroom (history and suggestion sources share
-the `chat` query domain). Confirmed sends and moderation hides reconcile the
-same way. No realtime protocol is invented here; when back #48 lands, the
-panel will keep REST as the rendering authority
+New messages and moderation hides arrive through the Colyseus classroom room
+([back #48](https://github.com/Agustin742/integratec-final-back/issues/48):
+`chat:message` carries the persisted message, `chat:message.hidden` carries
+`{ messageId, hiddenAt }`). The workspace SSE
+`classroom.context-invalidated` hint no longer carries chat.
+
+- **One shared connection.** `ClassroomRealtimeProvider` (mounted once in
+  `main.tsx`) owns a `ClassroomRealtimeManager`
+  (`src/realtime/classroom-realtime-manager.ts`): at most one Colyseus
+  connection per classroom, reference-counted by subscribers and capped at
+  `MAX_CONNECTIONS_PER_USER`. It closes shortly after the last subscriber
+  leaves and retries transient failures with backoff. Any chat UI (this panel
+  today, a floating chat later) calls `useClassroomChatLive(classroomId)`
+  and shares that connection.
+- **Cache first.** Every payload is validated against the generated contract
+  (`chatMessagePayloadSchema`, `chatMessageHiddenPayloadSchema`) and ignored
+  if invalid or from another classroom. `chat:message` is prepended to the
+  newest page of the cached history, deduplicated by id, so an echo of the
+  user's own message or a repeated event never shows twice and no refetch is
+  needed. A hidden message is removed from a student history; staff refetch
+  because the audit pair only comes from REST.
+- **Missed events.** After a connection loss, the history is revalidated once
+  the connection is back, because Colyseus does not replay messages. Without the
+  provider or while the room is unavailable the chat keeps working on REST
+  (confirmed sends and moderation hides still reconcile through the `chat`
+  query domain).
+- **Presence side effect.** Joining the classroom room registers the user's
+  avatar and connected time on the server for as long as the connection is
+  open, whether or not the 3D view is shown.
+
+REST stays the rendering authority
 ([communication and notifications](../rules/communication-and-notifications.md)).
 
 ## Composer

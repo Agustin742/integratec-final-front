@@ -2,10 +2,7 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { requestApi } from '@/api/client';
 import { ApiError } from '@/api/errors';
-import {
-  classroomDetailQueryKey,
-  createClassroomChatPredicate,
-} from '@/api/query-keys';
+import { classroomDetailQueryKey } from '@/api/query-keys';
 import { useSessionService, useSessionSnapshot } from '@/session/provider';
 import { readContextEvents } from './context-events';
 
@@ -28,27 +25,11 @@ export function useClassroomContextEvents(classroomId: string): void {
       // Reset cancels obsolete REST, removes private data for ALL observers,
       // then fetches the same authoritative query. No parallel context store.
       void queryClient.resetQueries({ queryKey, exact: true });
-      // Live chat seam (back #48): the committed contract has no per-message
-      // broadcast yet, so live classroom chat rides this revalidation. A
-      // context-invalidated hint revalidates every chat history query owned by
-      // this user+classroom: confirmed pages stay visible while the server
-      // reconfirms them, a failed refresh degrades to a stale notice, and a
-      // lost permission arrives as the panel's denied state. When back #48
-      // ships a per-message protocol, it replaces this call site instead of
-      // adding a second live path.
-      void queryClient.invalidateQueries({
-        predicate: createClassroomChatPredicate(userId, classroomId),
-      });
     };
     const reconcileContext = () => {
       if (stopped) return;
       // Routine reconnects keep confirmed panels mounted while verifying with the server.
       void queryClient.invalidateQueries({ queryKey, exact: true });
-      // A missed live chat hint is recovered from the server on every
-      // reconnect/EOF reconciliation (back #48 seam, same reasoning as above).
-      void queryClient.invalidateQueries({
-        predicate: createClassroomChatPredicate(userId, classroomId),
-      });
     };
     const stop = () => {
       stopped = true;
