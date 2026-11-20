@@ -34,11 +34,11 @@ Recorded by `e2e/performance-offer.spec.ts` (Chromium via Playwright, 1280 px de
 
 | Condition                                              | fps (rolling mean) | Draw calls | Triangles | GPU memory est. | Offer          |
 | ------------------------------------------------------ | ------------------ | ---------- | --------- | --------------- | -------------- |
-| Unthrottled, desktop, resize-driven frames (~10 s)     | 30.7               | 0 / 100    | 0 / 200000 | 0 B / 256 MB   | Not shown      |
-| CPU throttled 20x, desktop 1280 px                     | 6.5                | 0 / 100    | 0 / 200000 | 0 B / 256 MB   | Shown          |
-| CPU throttled 20x, mobile emulation 360 px             | 6.7                | 0 / 100    | 0 / 200000 | 0 B / 256 MB   | Shown          |
+| Unthrottled, desktop, resize-driven frames (~10 s)     | 33.4               | 0 / 100    | 0 / 200000 | 0 B / 256 MB   | Not shown      |
+| CPU throttled 20x, desktop 1280 px                     | 6.8                | 0 / 100    | 0 / 200000 | 0 B / 256 MB   | Shown          |
+| CPU throttled 20x, mobile emulation 360 px             | 4.3                | 0 / 100    | 0 / 200000 | 0 B / 256 MB   | Shown          |
 
-Readings vary between runs (a prior run read 30.4, 8.1 and 6.0 fps respectively); the values above are from the final recorded run.
+Readings vary between runs (earlier runs read 30.4 to 30.7 unthrottled, 6.5 to 8.1 throttled desktop and 6.0 to 6.7 throttled mobile); the values above are from the final recorded run.
 
 > [!NOTE]
 > The empty demand-loop stage renders no frames by itself. The e2e drives real rendered frames through the app's own re-frame-on-resize path (`CameraFraming` → `invalidate()`), so the unthrottled fps is a property of that resize cadence, not a device benchmark. The throttled rows show that a slow device crosses the threshold and the offer appears; they are not a claim about any specific school machine. Draw calls and triangles read `0` because the stage has no meshes yet.

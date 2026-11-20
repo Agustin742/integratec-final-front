@@ -91,6 +91,14 @@ test.beforeEach(async ({ page, baseURL }) => {
     if (url.origin === apiOrigin && url.pathname === '/users/me/daily-review') {
       return route.fulfill({ json: { status: 'not_due' } });
     }
+    // The shell's chat dock and nav link read the chat inbox (#51).
+    if (
+      url.origin === apiOrigin &&
+      url.pathname === '/chats' &&
+      request.method() === 'GET'
+    ) {
+      return route.fulfill({ json: { items: [] } });
+    }
     if (
       url.origin === apiOrigin &&
       url.pathname === '/notifications' &&
