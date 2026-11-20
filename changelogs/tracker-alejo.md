@@ -1,5 +1,13 @@
 # Tracker — Alejo
 
+## 2026-11-20 — Runtime performance monitor and 2D Classic Mode offer (#56)
+
+- **Status:** in-progress (branch `feat/56-performance-monitor` from `develop` @ `00326db`, worktree `../integratec-wt-56`; board item moved to In progress; dependencies #24 and #34 verified closed)
+- **Area / files:** planned `src/features/world/performance-monitor.ts` (+ probe + dev stats overlay), `src/features/classrooms/performance-offer-banner.tsx`, `classroom-workspace.tsx`, `messages.ts` files, tests, docs guide + `docs/assets/`
+- **Change:** Implementing [issue #56](https://github.com/Agustin742/integratec-final-front/issues/56) (FD8): canvas frame-rate sampler with a rolling window, dev-time stats overlay against the FD8 limits, and a non-blocking offer to switch to 2D Classic Mode (accept calls the HU-ESP-003 mode action; decline is remembered per session; never auto-switches).
+- **Reason:** Card #56 requests runtime detection of devices that cannot sustain the 3D budget, offering — never forcing — the 2D Classic Mode.
+- **Next step:** RED tests for the sampler, then the monitor module, probe, overlay, offer banner, measurements, screenshots and the full check ladder.
+
 ## 2026-11-19 — Student multiple-choice exam answering and result display (#43)
 
 - **Status:** in-progress ([PR #109](https://github.com/Agustin742/integratec-final-front/pull/109) open against `develop`; branch `feat/43-student-exam-answering` pushed with commits `757bb6e` (T1 contract/service/MSW store), `9b23223` (T2 exam panel), `ec13d44` (T3 e2e evidence + T4 docs); full local check ladder recorded below in Verification; awaiting review and CI)
