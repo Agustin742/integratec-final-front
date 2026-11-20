@@ -296,12 +296,11 @@ export const classroomMessages = {
       heading: 'Escribir en el chat',
       regionLabel: 'Redactar un mensaje del chat',
       bodyLabel: 'Mensaje del chat',
-      bodyPlaceholder:
-        'Escribí tu mensaje. Usá @ para mencionar a integrantes del aula.',
+      bodyPlaceholder: 'Escribí un mensaje…',
       charCounter: (used: number, max: number) => `${used}/${max} caracteres`,
       submit: 'Enviar',
       submitting: 'Enviando…',
-      sendHint: 'Enter envía, Shift+Enter agrega una línea.',
+      sendHint: 'Enter envía · Shift+Enter, nueva línea · @ para mencionar',
       sentToast: 'Mensaje enviado.',
       mentionListboxLabel: 'Integrantes sugeridos para mencionar',
       mentionAvailableNotice:

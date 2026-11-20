@@ -78,8 +78,8 @@ on the server-resolved `myRole`:
   `createClassroomChatPredicate` invalidations still refetch every loaded page.
 - Author labels come from the optional `GET /classrooms/{id}/members`
   directory lookup (`list_directory`-capable callers only): display names and
-  a `Docente` badge for staff rows, a `(Vos)` marker on the signed-in
-  member's own rows. Absent, denied or failed lookups degrade to neutral
+  a compact `Docente` badge for staff rows. Own rows show no author line
+  (alignment and tint say it) and keep a screen-reader-only `Vos`. Absent, denied or failed lookups degrade to neutral
   labels (`Integrante del aula`), never to guesses.
 - Message bodies are untrusted content rendered as plain text nodes (never
   `dangerouslySetInnerHTML`), preserving whitespace with `break-words`

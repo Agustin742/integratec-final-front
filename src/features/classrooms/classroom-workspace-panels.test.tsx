@@ -357,7 +357,9 @@ test('default catalog opens chat with the composer wired: typing never triggers 
   });
   expect(within(dialog).getByRole('button', { name: 'Enviar' })).toBeVisible();
   expect(
-    within(dialog).getByText('Enter envía, Shift+Enter agrega una línea.'),
+    within(dialog).getByText(
+      'Enter envía · Shift+Enter, nueva línea · @ para mencionar',
+    ),
   ).toBeVisible();
 
   // Typing in the composer is an editable target: the workspace mode

@@ -356,9 +356,11 @@ test('student reads paginated history, mentions a classmate, sends a server-conf
   await expect(
     dialog.getByText('Prof. Laura Gómez', { exact: true }).first(),
   ).toBeVisible();
+  // Own rows drop the visible author line (alignment says it) and keep a
+  // screen-reader-only marker.
   await expect(
-    dialog.getByText('Sofía Martínez (Vos)', { exact: true }).first(),
-  ).toBeVisible();
+    dialog.locator('[data-own="true"] .sr-only', { hasText: 'Vos' }).first(),
+  ).toBeAttached();
   await expect(
     dialog.getByText('Docente', { exact: true }).first(),
   ).toBeVisible();

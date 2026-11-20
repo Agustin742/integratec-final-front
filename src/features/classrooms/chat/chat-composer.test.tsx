@@ -342,7 +342,9 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
       name: 'Mensaje del chat',
     });
     expect(
-      screen.getByText('Enter envía, Shift+Enter agrega una línea.'),
+      screen.getByText(
+        'Enter envía · Shift+Enter, nueva línea · @ para mencionar',
+      ),
     ).toBeVisible();
 
     typeDraft('Hola con Enter');
@@ -416,8 +418,10 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
     });
     expect(textarea).toHaveAttribute('maxlength', '2000');
     expect(textarea).toHaveAttribute('rows', '1');
+    // Short placeholder so the resting height is exactly one line.
+    expect(textarea).toHaveAttribute('placeholder', 'Escribí un mensaje…');
     // One compact footer line: the hint always, the counter only near the limit.
-    const hint = 'Enter envía, Shift+Enter agrega una línea.';
+    const hint = 'Enter envía · Shift+Enter, nueva línea · @ para mencionar';
     expect(screen.getByText(hint)).toBeVisible();
     expect(screen.queryByText(/caracteres$/)).not.toBeInTheDocument();
     fireEvent.change(textarea, { target: { value: 'x'.repeat(1799) } });

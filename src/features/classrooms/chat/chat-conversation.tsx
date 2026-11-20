@@ -689,14 +689,24 @@ function ChatConversationView({
                       )}
                     >
                       <div className="flex min-w-0 items-center gap-2">
-                        <span className="min-w-0 truncate text-xs font-semibold">
-                          {author.label}
-                        </span>
-                        {author.roleLabel !== null ? (
-                          <Badge variant={author.roleVariant}>
-                            {author.roleLabel}
-                          </Badge>
-                        ) : null}
+                        {isOwn ? (
+                          // Alignment and tint already say it is you.
+                          <span className="sr-only">{chat.authorSelf}</span>
+                        ) : (
+                          <>
+                            <span className="min-w-0 truncate text-xs font-semibold">
+                              {author.label}
+                            </span>
+                            {author.roleLabel !== null ? (
+                              <Badge
+                                variant={author.roleVariant}
+                                className="px-2 py-0 text-[10px] shadow-none"
+                              >
+                                {author.roleLabel}
+                              </Badge>
+                            ) : null}
+                          </>
+                        )}
                         {isHidden ? (
                           <Badge variant="secondary">{chat.hiddenBadge}</Badge>
                         ) : null}

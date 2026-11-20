@@ -290,6 +290,30 @@ describe('ChatPanel (#51, read side)', () => {
     expect(screen.queryByText(/Charlá con tu aula/)).not.toBeInTheDocument();
   });
 
+  it('drops the author line on own bubbles (screen-reader marker kept) and keeps a compact Docente badge on others', async () => {
+    const store = createClassroomChatStore({
+      classroomId: CLASSROOM_ID,
+      currentUserId: STUDENT_ID,
+      role: 'STUDENT',
+      initialMessages: [
+        makeMessage({ authorId: TEACHER_ID, body: 'Del docente' }),
+        makeMessage({ authorId: STUDENT_ID, body: 'Mío' }),
+      ],
+      members: makeMembers(),
+    });
+    mswServer.use(...store.handlers);
+
+    renderChatRoute({ role: 'STUDENT', userId: STUDENT_ID });
+
+    await screen.findByText('Mío');
+    const own = screen.getByText('Mío').closest('li') as HTMLElement;
+    expect(within(own).queryByText(/Sofía Martínez/)).not.toBeInTheDocument();
+    expect(within(own).getByText('Vos')).toHaveClass('sr-only');
+    const other = screen.getByText('Del docente').closest('li') as HTMLElement;
+    expect(within(other).getByText('Prof. Ana García')).toBeVisible();
+    expect(within(other).getByText('Docente')).toHaveClass('text-[10px]');
+  });
+
   it('renders history oldest to newest as safe plain text, with no pager', async () => {
     const history = makeNumberedHistory(25);
     // Created last, so it is the newest message and renders at the bottom.
