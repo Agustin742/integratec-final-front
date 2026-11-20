@@ -67,10 +67,7 @@ export function DailyReviewDialog() {
       }}
     >
       {open && due !== null ? (
-        <DialogContent
-          onEscapeKeyDown={keepOpen}
-          onInteractOutside={keepOpen}
-        >
+        <DialogContent onEscapeKeyDown={keepOpen} onInteractOutside={keepOpen}>
           <DailyReviewContent review={due} answerState={answerState} />
         </DialogContent>
       ) : null}

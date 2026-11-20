@@ -477,22 +477,25 @@ describe('DailyReviewDialog (HU-BOT-003, #55)', () => {
       },
     ],
     ['network error', 'network' as const],
-  ])('stays closed when the daily review request fails (%s)', async (_label, error) => {
-    mswServer.use(
-      createDailyReviewHandler({ error }),
-      createOwnStreakAndBadgesHandler(),
-    );
-
-    const { queryClient } = renderDailyReviewDialog();
-    await waitFor(() => {
-      const state = queryClient.getQueryState(
-        ownDailyReviewQueryKey(profile.id),
+  ])(
+    'stays closed when the daily review request fails (%s)',
+    async (_label, error) => {
+      mswServer.use(
+        createDailyReviewHandler({ error }),
+        createOwnStreakAndBadgesHandler(),
       );
-      expect(state?.status).toBe('error');
-    });
 
-    expect(screen.queryByRole('dialog')).toBeNull();
-  });
+      const { queryClient } = renderDailyReviewDialog();
+      await waitFor(() => {
+        const state = queryClient.getQueryState(
+          ownDailyReviewQueryKey(profile.id),
+        );
+        expect(state?.status).toBe('error');
+      });
+
+      expect(screen.queryByRole('dialog')).toBeNull();
+    },
+  );
 
   it('renders the structured fallback without generated text or a question card', async () => {
     mswServer.use(
