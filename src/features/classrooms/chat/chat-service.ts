@@ -236,6 +236,7 @@ export async function listClassroomChatMembers(
           ...(params.pageSize !== undefined
             ? { pageSize: params.pageSize }
             : {}),
+          ...(params.q !== undefined ? { q: params.q } : {}),
         },
       },
       signal: options.signal,

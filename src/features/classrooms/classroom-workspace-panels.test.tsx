@@ -17,6 +17,7 @@ import { profile } from '@/session/test-fixtures';
 import { render } from '@/test/render';
 import { ClassroomWorkspace } from './classroom-workspace';
 import { ClassroomPanelRoute } from './classroom-panel-route';
+import { resetClassroomModeStore } from './classroom-mode-store';
 import { useClassroomPanels } from './panels/classroom-panels';
 
 function SyntheticGrades() {
@@ -340,6 +341,36 @@ test('default catalog opens chat by URL with the chat history panel and closes c
   expect(view.router.state.historyAction).toBe('REPLACE');
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(document.activeElement).toHaveTextContent('Classroom a');
+});
+
+test('default catalog opens chat with the composer wired: typing never triggers mode shortcuts', async () => {
+  resetClassroomModeStore();
+  const view = setup(['chat'], '/classrooms/a/panels/chat', true);
+  const dialog = await screen.findByRole('dialog', { name: 'Chat' });
+  expect(
+    await within(dialog).findByText('Bienvenidos al chat del aula'),
+  ).toBeVisible();
+
+  // The catalog injects the real composer into the ChatPanel slot (S2).
+  const draft = within(dialog).getByRole('textbox', {
+    name: 'Mensaje del chat',
+  });
+  expect(within(dialog).getByRole('button', { name: 'Enviar' })).toBeVisible();
+  expect(within(dialog).getByText('0/2000 caracteres')).toBeVisible();
+
+  // Typing in the composer is an editable target: the workspace mode
+  // shortcut (Alt+M) must never fire from the chat draft (S4).
+  fireEvent.change(draft, { target: { value: 'escribiendo @an' } });
+  fireEvent.keyDown(draft, { key: 'm', code: 'KeyM', altKey: true });
+  fireEvent.keyDown(draft, { key: 'Escape', code: 'Escape' });
+  expect(
+    screen.queryByRole('heading', { name: 'Modo 2D Clásico' }),
+  ).not.toBeInTheDocument();
+
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Cerrar' }));
+  await screen.findByRole('button', { name: 'Open grades' });
+  expect(view.router.state.location.pathname).toBe('/classrooms/a');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
 
 test('default catalog opens material by URL with MaterialPanel and closes cleanly', async () => {

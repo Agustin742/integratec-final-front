@@ -1493,6 +1493,39 @@ export function classroomChatHistoryQueryKey(
 }
 
 /**
+ * Key of the chat mention-directory lookup (`GET /classrooms/{id}/members`
+ * with the `q` case-insensitive display-name prefix filter, backend decision
+ * D12) scoped by `userId` and `classroomId`.
+ *
+ * It deliberately shares the `chat` query domain of the history keys, so the
+ * workspace `createClassroomChatPredicate` revalidations (SSE
+ * `classroom.context-invalidated` seam, confirmed sends, uncertain-write
+ * reconciliation) cover the suggestion source together with the history.
+ */
+export interface ChatMentionDirectoryQueryParams {
+  readonly q: string;
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+export function chatMentionDirectoryQueryKey(
+  userId: string,
+  classroomId: string,
+  params: ChatMentionDirectoryQueryParams,
+): ScopedQueryKey<ChatMentionDirectoryQueryParams> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'chat',
+    'mention-directory',
+    Object.freeze({
+      q: params.q.trim().slice(0, 100),
+      page: params.page,
+      pageSize: params.pageSize,
+    }),
+  );
+}
+
+/**
  * Predicate matching every classroom chat query entry owned by `userId` and
  * `classroomId`, so confirmed sends, moderation hides and the classroom
  * context revalidation seam reconcile all affected chat views at once.

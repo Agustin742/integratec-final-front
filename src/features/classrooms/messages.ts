@@ -299,6 +299,24 @@ export const classroomMessages = {
       parentDeniedDescription:
         'El chat es para estudiantes y personal del aula. Las familias no participan de esta conversación.',
     },
+    composer: {
+      heading: 'Escribir en el chat',
+      regionLabel: 'Redactar un mensaje del chat',
+      bodyLabel: 'Mensaje del chat',
+      bodyPlaceholder:
+        'Escribí tu mensaje. Usá @ para mencionar a integrantes del aula.',
+      charCounter: (used: number, max: number) => `${used}/${max} caracteres`,
+      submit: 'Enviar',
+      submitting: 'Enviando…',
+      pendingNotice: 'Enviando el mensaje…',
+      sentToast: 'Mensaje enviado.',
+      mentionListboxLabel: 'Integrantes sugeridos para mencionar',
+      mentionAvailableNotice:
+        'Hay sugerencias de mención disponibles abajo. Usá las flechas para recorrerlas y Enter para elegir.',
+      mutedTitle: 'El chat está silenciado',
+      mutedDescription:
+        'El personal del aula silenció el chat por ahora. No podés enviar mensajes, pero el historial sigue visible.',
+    },
   },
   invitations: {
     forbiddenTitle: 'Sin permisos para gestionar invitaciones',

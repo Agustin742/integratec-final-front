@@ -6643,6 +6643,43 @@ export function createClassroomChatStore(
     return { ok: true, mentionedUserIds: mentioned };
   };
 
+  /**
+   * Mirrors `ClassroomDirectoryController_list`: only `page`/`pageSize`/`q`
+   * are accepted (`q` is the backend D12 case-insensitive display-name
+   * prefix filter used by the composer's @mention suggestions).
+   */
+  const parseChatMemberDirectoryQuery = (
+    url: URL,
+  ): { ok: true; page: number; pageSize: number } | { ok: false } => {
+    for (const key of url.searchParams.keys()) {
+      if (key !== 'page' && key !== 'pageSize' && key !== 'q') {
+        return { ok: false };
+      }
+    }
+
+    const rawPage = url.searchParams.get('page');
+    let page = 1;
+    if (rawPage !== null) {
+      const parsed = Number(rawPage);
+      if (!Number.isInteger(parsed) || parsed < 1) {
+        return { ok: false };
+      }
+      page = parsed;
+    }
+
+    const rawPageSize = url.searchParams.get('pageSize');
+    let pageSize = 20;
+    if (rawPageSize !== null) {
+      const parsed = Number(rawPageSize);
+      if (!Number.isInteger(parsed) || parsed < 1) {
+        return { ok: false };
+      }
+      pageSize = Math.min(parsed, 100);
+    }
+
+    return { ok: true, page, pageSize };
+  };
+
   return {
     getMessages: () => [...messages],
     setRole: (role) => {
@@ -6659,7 +6696,7 @@ export function createClassroomChatStore(
     },
     getCounts: () => ({ ...counts }),
     handlers: [
-      http.get(`${baseUrl}/classrooms/:id/members`, ({ params }) => {
+      http.get(`${baseUrl}/classrooms/:id/members`, ({ params, request }) => {
         if (String(params.id ?? '') !== options.classroomId) {
           return createErrorEnvelopeResponse(404, {
             code: 'NOT_FOUND',
@@ -6674,11 +6711,32 @@ export function createClassroomChatStore(
             correlationId: 'req-chat-members-403',
           });
         }
+
+        const url = new URL(request.url);
+        const pagination = parseChatMemberDirectoryQuery(url);
+        if (!pagination.ok) {
+          return createErrorEnvelopeResponse(400, {
+            code: 'VALIDATION_FAILED',
+            message: 'Invalid pagination or unsupported query.',
+            correlationId: 'req-chat-members-400',
+          });
+        }
+
+        // Optional `q`: case-insensitive display-name prefix filter.
+        const prefix = (url.searchParams.get('q') ?? '').toLowerCase();
+        const filtered =
+          prefix === ''
+            ? [...members]
+            : members.filter((member) =>
+                member.displayName.toLowerCase().startsWith(prefix),
+              );
+
+        const start = (pagination.page - 1) * pagination.pageSize;
         return HttpResponse.json({
-          items: [...members],
-          page: 1,
-          pageSize: 100,
-          total: members.length,
+          items: filtered.slice(start, start + pagination.pageSize),
+          page: pagination.page,
+          pageSize: pagination.pageSize,
+          total: filtered.length,
         });
       }),
       http.get(`${baseUrl}/classrooms/:id/messages`, ({ params, request }) => {

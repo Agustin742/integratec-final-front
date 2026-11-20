@@ -129,6 +129,12 @@ export type PaginatedChatDirectoryDto = z.infer<
 export interface ChatDirectoryQueryParams {
   readonly page?: number;
   readonly pageSize?: number;
+  /**
+   * Case-insensitive display-name prefix filter (backend decision D12,
+   * `ClassroomDirectoryController_list`): used by the composer's @mention
+   * suggestions, never to enumerate data the server would not return.
+   */
+  readonly q?: string;
 }
 
 /**
