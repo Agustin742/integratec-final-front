@@ -45,6 +45,12 @@ export const classroomMessages = {
     mode2dEmptyDescription:
       'El servidor todavía no habilitó paneles para tu cuenta en esta aula. Si cambia tu disponibilidad, los vas a ver acá al instante.',
   },
+  performanceOffer: {
+    title: 'La vista 3D está lenta en este dispositivo',
+    body: 'Podés pasar al Modo 2D Clásico para seguir con más fluidez. Las herramientas y tu contexto no cambian, y volvés a la vista 3D cuando quieras.',
+    accept: 'Pasar al Modo 2D Clásico',
+    decline: 'Seguir en la vista 3D',
+  },
   list: {
     subtitle:
       'Entrá a tus aulas virtuales o creá y configurá una nueva según tu rol.',
