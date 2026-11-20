@@ -5818,6 +5818,10 @@ export const defaultHandlers: readonly HttpHandler[] = [
   http.get(`${TEST_API_BASE_URL}/notifications`, () =>
     HttpResponse.json({ items: [], page: 1, pageSize: 20, total: 0 }),
   ),
+  // The chat dock polls the inbox from the app shell: quiet by default.
+  http.get(`${TEST_API_BASE_URL}/chats`, () =>
+    HttpResponse.json({ items: [] }),
+  ),
 ];
 
 export type ReportCardItemPayload = components['schemas']['ReportCardItemDto'];
@@ -7551,4 +7555,214 @@ export function createDailyQuestionAnswerHandler(
       );
     },
   );
+}
+
+export type ChatInboxPayload = components['schemas']['ChatInboxDto'];
+export type ChatInboxItemPayload = components['schemas']['ChatInboxItemDto'];
+
+export interface ChatInboxStoreMessage {
+  readonly id: string;
+  readonly authorId: string;
+  readonly authorDisplayName: string;
+  readonly body: string;
+  readonly createdAt: string;
+  readonly hidden?: boolean;
+}
+
+export interface ChatInboxStoreClassroom {
+  readonly classroomId: string;
+  readonly classroomName: string;
+  readonly messages: readonly ChatInboxStoreMessage[];
+  /** Message id already read by the caller, when a marker exists. */
+  readonly readMarkerMessageId?: string | null;
+}
+
+export type ChatInboxStoreOp = 'list' | 'markRead';
+
+export interface ChatInboxStoreOptions {
+  readonly baseUrl?: string;
+  readonly currentUserId: string;
+  readonly classrooms: readonly ChatInboxStoreClassroom[];
+  /** Parents get no items and cannot move markers (403). */
+  readonly parent?: boolean;
+}
+
+export interface ChatInboxStore {
+  readonly handlers: readonly HttpHandler[];
+  getMarker: (classroomId: string) => string | null;
+  /** Adds a message as another user would, so unread counts move. */
+  appendMessage: (classroomId: string, message: ChatInboxStoreMessage) => void;
+  failNext: (op: ChatInboxStoreOp, failure: MswErrorResponseSpec) => void;
+  getCounts: () => Record<ChatInboxStoreOp, number>;
+  getMarkRequests: () => readonly {
+    readonly classroomId: string;
+    readonly messageId: string;
+  }[];
+}
+
+const CHAT_INBOX_PREVIEW_MAX = 120;
+
+function toChatInboxPreview(body: string): string {
+  const collapsed = body.replace(/\s+/g, ' ').trim();
+  return collapsed.length <= CHAT_INBOX_PREVIEW_MAX
+    ? collapsed
+    : `${collapsed.slice(0, CHAT_INBOX_PREVIEW_MAX - 1)}…`;
+}
+
+/**
+ * Contract-faithful in-memory server for `GET /chats` (`ChatInboxController_list`)
+ * and `PUT /classrooms/{id}/messages/read-marker` (`ChatInboxController_markRead`):
+ * latest-activity-first items, last VISIBLE message with a collapsed preview,
+ * unread = visible messages from others after a forward-only marker (all of
+ * them without a marker), `204` on a valid marker, `404` for an unknown,
+ * foreign or hidden message, `403` for parents.
+ */
+export function createChatInboxStore(
+  options: ChatInboxStoreOptions,
+): ChatInboxStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classrooms = new Map<
+    string,
+    { name: string; messages: ChatInboxStoreMessage[]; marker: string | null }
+  >(
+    options.classrooms.map((c) => [
+      c.classroomId,
+      {
+        name: c.classroomName,
+        messages: [...c.messages],
+        marker: c.readMarkerMessageId ?? null,
+      },
+    ]),
+  );
+  const pending: Partial<Record<ChatInboxStoreOp, MswErrorResponseSpec>> = {};
+  const counts: Record<ChatInboxStoreOp, number> = { list: 0, markRead: 0 };
+  const markRequests: { classroomId: string; messageId: string }[] = [];
+
+  const ordered = (messages: readonly ChatInboxStoreMessage[]) =>
+    [...messages].sort((a, b) => {
+      const diff = Date.parse(a.createdAt) - Date.parse(b.createdAt);
+      return diff !== 0 ? diff : a.id.localeCompare(b.id);
+    });
+  const consume = (op: ChatInboxStoreOp) => {
+    const failure = pending[op];
+    pending[op] = undefined;
+    return failure;
+  };
+
+  const buildItem = (
+    classroomId: string,
+    entry: {
+      name: string;
+      messages: ChatInboxStoreMessage[];
+      marker: string | null;
+    },
+  ): ChatInboxItemPayload => {
+    const visible = ordered(entry.messages).filter((m) => m.hidden !== true);
+    const last = visible.at(-1);
+    const markerIndex =
+      entry.marker === null
+        ? -1
+        : visible.findIndex((m) => m.id === entry.marker);
+    const unreadCount = visible
+      .slice(markerIndex + 1)
+      .filter((m) => m.authorId !== options.currentUserId).length;
+    return {
+      classroomId,
+      classroomName: entry.name,
+      lastMessage:
+        last === undefined
+          ? null
+          : {
+              id: last.id,
+              authorId: last.authorId,
+              authorDisplayName: last.authorDisplayName,
+              bodyPreview: toChatInboxPreview(last.body),
+              createdAt: last.createdAt,
+            },
+      unreadCount,
+    };
+  };
+
+  return {
+    handlers: [
+      http.get(`${baseUrl}/chats`, () => {
+        counts.list += 1;
+        const failure = consume('list');
+        if (failure !== undefined) {
+          return createErrorEnvelopeResponse(failure.status, failure.body);
+        }
+        if (options.parent === true) {
+          return HttpResponse.json({ items: [] } satisfies ChatInboxPayload);
+        }
+        const items = [...classrooms.entries()]
+          .map(([id, entry]) => buildItem(id, entry))
+          .sort((a, b) =>
+            (b.lastMessage?.createdAt ?? '').localeCompare(
+              a.lastMessage?.createdAt ?? '',
+            ),
+          );
+        return HttpResponse.json({ items } satisfies ChatInboxPayload);
+      }),
+      http.put(
+        `${baseUrl}/classrooms/:id/messages/read-marker`,
+        async ({ params, request }) => {
+          counts.markRead += 1;
+          const failure = consume('markRead');
+          if (failure !== undefined) {
+            return createErrorEnvelopeResponse(failure.status, failure.body);
+          }
+          if (options.parent === true) {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Parents have no classroom chat.',
+              correlationId: 'req-chat-marker-403',
+            });
+          }
+          const classroomId = String(params.id ?? '');
+          const body = (await request.json()) as { messageId?: unknown };
+          if (typeof body.messageId !== 'string' || body.messageId === '') {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'messageId is required.',
+              correlationId: 'req-chat-marker-400',
+            });
+          }
+          markRequests.push({ classroomId, messageId: body.messageId });
+          const entry = classrooms.get(classroomId);
+          const target = entry?.messages.find((m) => m.id === body.messageId);
+          if (
+            entry === undefined ||
+            target === undefined ||
+            target.hidden === true
+          ) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Message not found.',
+              correlationId: 'req-chat-marker-404',
+            });
+          }
+          const visible = ordered(entry.messages).filter(
+            (m) => m.hidden !== true,
+          );
+          const current =
+            entry.marker === null
+              ? -1
+              : visible.findIndex((m) => m.id === entry.marker);
+          if (visible.findIndex((m) => m.id === target.id) > current) {
+            entry.marker = target.id;
+          }
+          return new HttpResponse(null, { status: 204 });
+        },
+      ),
+    ],
+    getMarker: (classroomId) => classrooms.get(classroomId)?.marker ?? null,
+    appendMessage: (classroomId, message) => {
+      classrooms.get(classroomId)?.messages.push(message);
+    },
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    getCounts: () => ({ ...counts }),
+    getMarkRequests: () => [...markRequests],
+  };
 }

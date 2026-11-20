@@ -35,7 +35,7 @@ export function hasDisallowedChatControlChar(value: string): boolean {
   return false;
 }
 
-const isoInstantWithOffsetSchema = z
+export const isoInstantWithOffsetSchema = z
   .string()
   .trim()
   .min(1)

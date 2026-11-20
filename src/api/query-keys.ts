@@ -1565,6 +1565,16 @@ export function chatMentionDirectoryQueryKey(
 }
 
 /**
+ * Key of the chat inbox (`GET /chats`, `ChatInboxController_list`): the chats
+ * of ALL the user's classrooms with their last message and unread count,
+ * scoped by user only. It lives in its own `chat-inbox` domain so the
+ * per-classroom `createClassroomChatPredicate` sweeps never refetch it.
+ */
+export function chatInboxQueryKey(userId: string): ScopedQueryKey {
+  return createScopedQueryKey({ userId }, 'chat-inbox', 'list');
+}
+
+/**
  * Predicate matching every classroom chat query entry owned by `userId` and
  * `classroomId`, so confirmed sends, moderation hides and the classroom
  * context revalidation seam reconcile all affected chat views at once.
