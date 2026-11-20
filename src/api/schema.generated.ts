@@ -502,7 +502,7 @@ export interface paths {
         put?: never;
         /**
          * Send a classroom chat message
-         * @description Current students and teaching staff only; parents denied. Muted classrooms reject students but allow staff. Message, resolved mentions and notification requests commit atomically before any future broadcast (#48). At most 5 sends per rolling 10 seconds per user/classroom, including staff and hidden messages. Only body is accepted; author and time are server-assigned.
+         * @description Current students and teaching staff only; parents denied. Muted classrooms reject students but allow staff. Message, resolved mentions, notification requests and the realtime outbox event commit atomically; Colyseus broadcasts asynchronously after commit. At most 5 sends per rolling 10 seconds per user/classroom, including staff and hidden messages. Only body is accepted; author and time are server-assigned.
          */
         post: operations["ChatController_send"];
         delete?: never;
@@ -523,9 +523,49 @@ export interface paths {
         post?: never;
         /**
          * Hide a classroom chat message (teacher moderation)
-         * @description Current classroom staff only (Owner, Admin or Teacher); students and parents denied. Logical moderation: the server sets the hiddenAt/hiddenById audit pair atomically and the row is never deleted. Repeating moderation returns 204 without overwriting the original actor/time. Independent of the send rate limit. No unhide operation exists.
+         * @description Current classroom staff only (Owner, Admin or Teacher); students and parents denied. Logical moderation: the server sets the hiddenAt/hiddenById audit pair and a minimal realtime outbox event in one transaction; Colyseus broadcasts after commit and the row is never deleted. Repeating moderation returns 204 without overwriting the original actor/time or recording another event. Independent of the send rate limit. No unhide operation exists.
          */
         delete: operations["ChatController_hide"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/chats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the caller chat inbox
+         * @description One summary per classroom where the caller is a current student or staff member (parents and removed members get none), at most 100 classrooms. Each item has the latest VISIBLE message (hidden ones are skipped for every role) with a trimmed preview, or null, and the unread count: visible messages from other users after the caller read marker (all of them when there is no marker). Ordered by latest message createdAt DESC (id DESC on ties); classrooms without messages last, by name. Not paginated.
+         */
+        get: operations["ChatInboxController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/messages/read-marker": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Advance the caller chat read marker
+         * @description Same access as chat history: current students and staff; parents denied. The message must be a visible message of this classroom. The marker only moves forward by (createdAt, id); an older or equal message leaves it unchanged, so the call is idempotent. Only messageId is accepted.
+         */
+        put: operations["ChatInboxController_markRead"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2036,6 +2076,37 @@ export interface components {
              * @description Server-assigned UTC creation instant.
              */
             createdAt: string;
+        };
+        ChatInboxLastMessageDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            authorId: string;
+            /** @description Current display name of the author. */
+            authorDisplayName: string;
+            /** @description Message text with whitespace collapsed, cut to 120 characters (the last one is an ellipsis when cut). Plain text, never HTML. */
+            bodyPreview: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ChatInboxItemDto: {
+            /** Format: uuid */
+            classroomId: string;
+            classroomName: string;
+            /** @description Latest VISIBLE message (hidden ones are skipped), or null when there is none. */
+            lastMessage: components["schemas"]["ChatInboxLastMessageDto"] | null;
+            /** @description Visible messages from other users after the caller read marker; every visible message from others when no marker exists. Never counts own or hidden messages. */
+            unreadCount: number;
+        };
+        ChatInboxDto: {
+            items: components["schemas"]["ChatInboxItemDto"][];
+        };
+        MarkChatReadDto: {
+            /**
+             * Format: uuid
+             * @description Newest visible message of this classroom the caller has seen. The marker only moves forward; an older or equal message keeps the current marker.
+             */
+            messageId: string;
         };
         CreateSubmissionBodyDto: {
             /** @description 1-5 files of at most 10 MB each. Allowed content (detected from the bytes): PDF, PNG, JPEG, DOCX. Required for FILE activities; rejected for MULTIPLE_CHOICE activities. */
@@ -4594,6 +4665,95 @@ export interface operations {
                 };
             };
             /** @description Invalid, nonexistent or inaccessible classroom, or unknown/foreign/invalid message UUID in it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ChatInboxController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatInboxDto"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ChatInboxController_markRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkChatReadDto"];
+            };
+        };
+        responses: {
+            /** @description Marker advanced, or already at or beyond that message. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or malformed messageId, or unknown fields. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Parent role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, nonexistent or inaccessible classroom, or unknown/foreign/hidden message in it. */
             404: {
                 headers: {
                     [name: string]: unknown;

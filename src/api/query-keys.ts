@@ -1491,3 +1491,130 @@ export function classroomDirectoryMembersQueryKey(
     normalizedParams,
   );
 }
+
+export interface ChatHistoryQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+}
+
+/**
+ * The chat history is one infinite query: the page is the query's page param
+ * (older messages = higher page numbers), so only `pageSize` identifies it.
+ */
+export interface ChatHistoryInfiniteQueryParams {
+  readonly pageSize?: number;
+}
+
+export interface NormalizedChatHistoryQueryParams {
+  readonly pageSize: number;
+}
+
+/**
+ * Key of the `useInfiniteQuery` over `GET /classrooms/{id}/messages`
+ * (`ChatController_list`) scoped by `userId` and `classroomId`, so switching
+ * either one reads an isolated cache entry (`rules/state-management.md`).
+ * Its cached data is `InfiniteData<PaginatedChatHistoryDto>`.
+ */
+export function classroomChatHistoryQueryKey(
+  userId: string,
+  classroomId: string,
+  params: ChatHistoryInfiniteQueryParams = {},
+): ScopedQueryKey<NormalizedChatHistoryQueryParams> {
+  const normalizedParams = Object.freeze({
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+  });
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'chat',
+    'history',
+    normalizedParams,
+  );
+}
+
+/**
+ * Key of the chat mention-directory lookup (`GET /classrooms/{id}/members`
+ * with the `q` case-insensitive display-name prefix filter, backend decision
+ * D12) scoped by `userId` and `classroomId`.
+ *
+ * It deliberately lives OUTSIDE the `chat` query domain of the history keys:
+ * the `createClassroomChatPredicate` revalidations (confirmed sends, hides,
+ * live reconnects, SSE context hints) must reconcile the conversation, not
+ * refetch the member directory the mention picker reads on demand.
+ */
+export interface ChatMentionDirectoryQueryParams {
+  readonly q: string;
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+export function chatMentionDirectoryQueryKey(
+  userId: string,
+  classroomId: string,
+  params: ChatMentionDirectoryQueryParams,
+): ScopedQueryKey<ChatMentionDirectoryQueryParams> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'chat-mentions',
+    'directory',
+    Object.freeze({
+      q: params.q.trim().slice(0, 100),
+      page: params.page,
+      pageSize: params.pageSize,
+    }),
+  );
+}
+
+/**
+ * Key of the chat inbox (`GET /chats`, `ChatInboxController_list`): the chats
+ * of ALL the user's classrooms with their last message and unread count,
+ * scoped by user only. It lives in its own `chat-inbox` domain so the
+ * per-classroom `createClassroomChatPredicate` sweeps never refetch it.
+ */
+export function chatInboxQueryKey(userId: string): ScopedQueryKey {
+  return createScopedQueryKey({ userId }, 'chat-inbox', 'list');
+}
+
+/**
+ * Predicate matching every classroom chat query entry owned by `userId` and
+ * `classroomId`, so confirmed sends, moderation hides and the classroom
+ * context revalidation seam reconcile all affected chat views at once.
+ */
+export function createClassroomChatPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'chat'
+    );
+  };
+}
+
+/**
+ * Predicate matching only the infinite history entries (any page size) of one
+ * user + classroom, the cache the live delivery and the composer read.
+ */
+export function createClassroomChatHistoryPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const isClassroomChat = createClassroomChatPredicate(userId, classroomId);
+  return (query) =>
+    isClassroomChat(query) &&
+    (query.queryKey[0] as { resource?: unknown }).resource === 'history';
+}

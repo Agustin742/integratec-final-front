@@ -148,3 +148,68 @@ export function formatDateOnly(
     year: 'numeric',
   }).format(utcDate);
 }
+
+export interface FormatTimeOfDayOptions {
+  readonly locale?: string;
+  readonly timeZone?: string;
+}
+
+/**
+ * Formats only the time of day (`HH:mm`, 24h) of an unambiguous ISO 8601
+ * instant in the school's time zone, for dense surfaces such as chat rows that
+ * already group messages under a day label.
+ */
+export function formatTimeOfDay(
+  isoInstant: string,
+  options: FormatTimeOfDayOptions = {},
+): string {
+  return new Intl.DateTimeFormat(options.locale ?? DEFAULT_LOCALE, {
+    timeZone: options.timeZone ?? DEFAULT_SCHOOL_TIME_ZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(parseValidatedInstant(isoInstant));
+}
+
+/**
+ * Stable `YYYY-MM-DD` calendar-day key of an instant in the school's time
+ * zone, so day grouping never depends on the browser time zone.
+ */
+export function getSchoolDayKey(
+  isoInstant: string,
+  timeZone: string = DEFAULT_SCHOOL_TIME_ZONE,
+): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(parseValidatedInstant(isoInstant));
+}
+
+/**
+ * Friendly day label for grouping separators: `Hoy`, `Ayer` or a long date,
+ * all resolved in the school's time zone relative to `now`. The reference
+ * instant only drives a presentation label, never a deadline decision.
+ */
+export function formatDayLabel(
+  isoInstant: string,
+  now: Date = new Date(),
+  options: FormatTimeOfDayOptions = {},
+): string {
+  const timeZone = options.timeZone ?? DEFAULT_SCHOOL_TIME_ZONE;
+  const locale = options.locale ?? DEFAULT_LOCALE;
+  const dayKey = getSchoolDayKey(isoInstant, timeZone);
+  const nowIso = now.toISOString();
+  if (dayKey === getSchoolDayKey(nowIso, timeZone)) {
+    return 'Hoy';
+  }
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  if (dayKey === getSchoolDayKey(yesterday.toISOString(), timeZone)) {
+    return 'Ayer';
+  }
+  return new Intl.DateTimeFormat(locale, {
+    timeZone,
+    dateStyle: 'long',
+  }).format(parseValidatedInstant(isoInstant));
+}

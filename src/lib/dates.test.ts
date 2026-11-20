@@ -4,7 +4,10 @@ import {
   DEFAULT_SCHOOL_TIME_ZONE,
   formatDateOnly,
   formatDeadline,
+  formatDayLabel,
   formatInstant,
+  formatTimeOfDay,
+  getSchoolDayKey,
 } from './dates';
 
 describe('dates formatting helpers', () => {
@@ -109,6 +112,30 @@ describe('dates formatting helpers', () => {
       expect(() => formatDateOnly('2026-02-29')).toThrow(/date-only/i);
       expect(() => formatDateOnly('2026-13-01')).toThrow(/date-only/i);
       expect(() => formatDateOnly('05/11/2026')).toThrow(/date-only/i);
+    });
+  });
+
+  describe('chat time helpers', () => {
+    // 2026-11-19T10:23:00Z is 07:23 on 2026-11-19 in Buenos Aires (UTC-3).
+    const instant = '2026-11-19T10:23:00.000Z';
+
+    it('formats the time of day in the school time zone', () => {
+      expect(formatTimeOfDay(instant)).toBe('07:23');
+      expect(formatTimeOfDay('2026-11-19T02:05:00.000Z')).toBe('23:05');
+    });
+
+    it('derives the school calendar day key across the UTC boundary', () => {
+      expect(getSchoolDayKey(instant)).toBe('2026-11-19');
+      expect(getSchoolDayKey('2026-11-20T01:00:00.000Z')).toBe('2026-11-19');
+    });
+
+    it('labels days as Hoy, Ayer or a long date relative to a reference instant', () => {
+      const now = new Date('2026-11-19T15:00:00.000Z');
+      expect(formatDayLabel(instant, now)).toBe('Hoy');
+      expect(formatDayLabel('2026-11-18T12:00:00.000Z', now)).toBe('Ayer');
+      const older = formatDayLabel('2026-11-10T12:00:00.000Z', now);
+      expect(older.toLowerCase()).toContain('noviembre');
+      expect(older).toContain('10');
     });
   });
 });

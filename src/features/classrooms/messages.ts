@@ -266,6 +266,76 @@ export const classroomMessages = {
     rosterTab: 'Nómina',
     invitationsTab: 'Invitaciones y código',
   },
+  chat: {
+    heading: 'Chat del aula',
+    loading: 'Cargando el chat del aula…',
+    listRegionLabel: 'Historial de mensajes del chat',
+    scrollRegionLabel: 'Conversación del chat',
+    loadingOlder: 'Cargando mensajes anteriores…',
+    startOfConversation: 'Inicio de la conversación',
+    authorFallback: 'Integrante del aula',
+    authorSelf: 'Vos',
+    roleTeacherBadge: 'Docente',
+    hiddenBadge: 'Ocultado',
+    hiddenAudit: (moderator: string, formattedDate: string) =>
+      `Ocultado por ${moderator} el ${formattedDate}`,
+    hiddenModeratorFallback: 'personal del aula',
+    states: {
+      emptyTitle: 'Todavía no hay mensajes en el chat',
+      emptyDescription:
+        'Cuando alguien del aula escriba, vas a ver el mensaje acá.',
+      loadErrorTitle: 'No pudimos cargar el chat',
+      loadErrorDescription: 'Revisá tu conexión e intentá actualizar el chat.',
+      forbiddenTitle: 'Sin acceso al chat del aula',
+      forbiddenDescription: 'No tenés permiso para leer el chat de este aula.',
+      notFoundTitle: 'No encontramos el chat del aula',
+      notFoundDescription:
+        'El aula ya no está disponible o perdiste el acceso.',
+      staleTitle: 'Chat pendiente de sincronización',
+      staleDescription:
+        'Mostrando los últimos mensajes confirmados. Falló la actualización en segundo plano.',
+      parentDeniedTitle: 'El chat del aula no está disponible para tu rol',
+      parentDeniedDescription:
+        'El chat es para estudiantes y personal del aula. Las familias no participan de esta conversación.',
+    },
+    composer: {
+      heading: 'Escribir en el chat',
+      regionLabel: 'Redactar un mensaje del chat',
+      bodyLabel: 'Mensaje del chat',
+      bodyPlaceholder: 'Escribí un mensaje…',
+      charCounter: (used: number, max: number) => `${used}/${max} caracteres`,
+      submit: 'Enviar',
+      submitting: 'Enviando…',
+      sendHint: 'Enter envía · Shift+Enter, nueva línea · @ para mencionar',
+      sentToast: 'Mensaje enviado.',
+      mentionListboxLabel: 'Integrantes sugeridos para mencionar',
+      mentionAvailableNotice:
+        'Hay sugerencias de mención disponibles abajo. Usá las flechas para recorrerlas y Enter para elegir.',
+      mutedTitle: 'El chat está silenciado',
+      mutedDescription:
+        'El personal del aula silenció el chat por ahora. No podés enviar mensajes, pero el historial sigue visible.',
+    },
+    moderation: {
+      hideAction: 'Ocultar',
+      hideAriaLabel: (author: string, sentAt: string) =>
+        `Ocultar el mensaje de ${author} del ${sentAt}`,
+      dialogTitle: 'Ocultar mensaje del chat',
+      dialogDescription:
+        'El mensaje deja de verse para el alumnado y queda registrado como oculto. Vos seguís viéndolo con la información de quién lo ocultó y cuándo.',
+      messageLabel: 'Mensaje que vas a ocultar',
+      confirmAction: 'Ocultar mensaje',
+      confirmingAction: 'Ocultando…',
+      cancelAction: 'Cancelar',
+      pendingNotice: 'Ocultando el mensaje…',
+      confirmedToast: 'Mensaje ocultado: el alumnado deja de verlo.',
+      deniedToastTitle: 'No pudimos ocultar el mensaje',
+      uncertainTitle: 'No pudimos confirmar la ocultación',
+      uncertainBody:
+        'No sabemos si el mensaje quedó oculto en el servidor. Verificamos el chat: si el mensaje sigue visible, podés volver a intentarlo.',
+      uncertainReconciledToast:
+        'Confirmamos con el servidor que el mensaje ya está oculto.',
+    },
+  },
   invitations: {
     forbiddenTitle: 'Sin permisos para gestionar invitaciones',
     forbiddenDescription:

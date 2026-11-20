@@ -19,12 +19,14 @@ import {
   test,
   vi,
 } from 'vitest';
+import { createApiClient } from '@/api/client';
 import { createSession, type SessionSnapshot } from '@/session/controller';
 import { SessionProvider } from '@/session/provider';
 import { profile, storageKey, tokens } from '@/session/test-fixtures';
 import { expectAccessible } from '@/test/accessibility';
 import {
   TEST_API_BASE_URL,
+  createChatInboxStore,
   createLogoutHandler,
   createOwnProfileHandler,
 } from '@/test/msw/handlers';
@@ -80,6 +82,52 @@ test('does not steal focus on the first render', async () => {
   await heading(messages.pages.invitationAccept.title);
 
   expect(document.body).toHaveFocus();
+});
+
+test('mounts the floating chat dock for signed-in users with chats only', async () => {
+  mswServer.listen();
+  const classroomId = '00000000-0000-4000-8000-000000000051';
+  mswServer.use(
+    ...createChatInboxStore({
+      currentUserId: profile.id,
+      classrooms: [
+        {
+          classroomId,
+          classroomName: 'Matemática',
+          messages: [
+            {
+              id: '00000000-0000-4000-8000-600000000001',
+              authorId: '00000000-0000-4000-8000-000000007002',
+              authorDisplayName: 'Sofía Martínez',
+              body: 'Hola',
+              createdAt: '2026-11-19T03:00:00.000Z',
+            },
+          ],
+        },
+      ],
+    }).handlers,
+  );
+  const session = fakeSession(
+    { status: 'authenticated', user: profile },
+    createApiClient({ baseUrl: TEST_API_BASE_URL }),
+  );
+  renderAt('/', { session });
+  try {
+    expect(
+      await screen.findByRole('button', {
+        name: 'Mensajes, 1 mensaje sin leer',
+      }),
+    ).toBeVisible();
+  } finally {
+    mswServer.resetHandlers();
+    mswServer.close();
+  }
+});
+
+test('shows no chat dock to signed-out visitors', async () => {
+  renderAt('/login', { signedIn: false });
+  await heading(messages.pages.login.title);
+  expect(screen.queryByRole('button', { name: /^Mensajes/ })).toBeNull();
 });
 
 test('does not steal focus when the first load is redirected to login', async () => {
