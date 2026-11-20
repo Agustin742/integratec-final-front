@@ -14,8 +14,8 @@ const question2WrongOptionId = '20000000-0000-4000-8000-000000007522';
 const question2CorrectOptionId = '20000000-0000-4000-8000-000000007523';
 const attemptId = '00000000-0000-4000-8000-000000007601';
 
-const ownAttemptUrl = `${apiOrigin}/activities/${activityId}/exam-answers/me`;
-const submitUrl = `${apiOrigin}/activities/${activityId}/exam-answers`;
+const ownAttemptUrl = `${apiOrigin}/activities/${activityId}/submissions/me`;
+const submitUrl = `${apiOrigin}/activities/${activityId}/submissions`;
 
 const profile: components['schemas']['OwnProfileDto'] = {
   id: userId,
@@ -103,49 +103,38 @@ const correctOptionIdsByQuestion: Readonly<Record<string, readonly string[]>> =
   };
 
 /**
- * PROVISIONAL response shape for `HU-ACT-003` part 2/2 until
- * `Agustin742/integratec-final-back#47` lands in `src/api/schema.generated.ts`;
- * see `docs/exam-answering.md`. Same payloads the MSW store
- * (`createExamAnswersStore`) serves in unit tests: answers in, server-computed
- * score out, no correct answers in any response.
+ * Same payloads the MSW store (`createExamSubmissionsStore`) serves in unit
+ * tests and the real backend returns (back #47): `answers` in as a JSON
+ * multipart field, server-computed `autoScore` out, no correct answers in any
+ * response.
  */
-interface ExamAnswerInputPayload {
-  readonly questionId: string;
-  readonly selectedOptionIds: readonly string[];
-}
-
-interface ExamAnswerSubmissionPayload {
-  readonly id: string;
-  readonly activityId: string;
-  readonly submittedAt: string;
-  readonly isLate: boolean;
-  readonly status: 'graded';
-  readonly score: number;
-  readonly maxScore: number;
-}
-
-interface OwnExamAttemptPayload extends ExamAnswerSubmissionPayload {
-  readonly answers: readonly ExamAnswerInputPayload[];
-}
+type ExamAnswerInputPayload = Pick<
+  components['schemas']['SubmissionAnswerResponseDto'],
+  'questionId' | 'optionId'
+>;
 
 /**
- * Provisional server-side scoring, mirroring the MSW store's all-or-nothing
- * rule per question: the browser sends answers only, the server computes the
- * score (`RN-06`).
+ * Server-side scoring mirroring the backend evaluator,
+ * `round(correct / questions * maxScore)`: the browser sends answers only, the
+ * server computes the score (`RN-06`).
  */
 function scoreAnswers(answers: readonly ExamAnswerInputPayload[]): number {
-  const correctQuestions = answers.filter((answer) => {
-    const correctIds = correctOptionIdsByQuestion[answer.questionId] ?? [];
-    return answer.selectedOptionIds.every((optionId) =>
-      correctIds.includes(optionId),
-    );
-  }).length;
-  const totalQuestions = Math.max(answers.length, 1);
-  return (
-    Math.round(
-      (examActivity.maxScore * correctQuestions * 100) / totalQuestions,
-    ) / 100
+  const correctQuestions = answers.filter((answer) =>
+    (correctOptionIdsByQuestion[answer.questionId] ?? []).includes(
+      answer.optionId,
+    ),
+  ).length;
+  return Math.round(
+    (correctQuestions / examActivity.questionCount) * examActivity.maxScore,
   );
+}
+
+/** Reads the JSON `answers` field out of the multipart request body. */
+function readAnswersField(
+  postData: string | null,
+): readonly ExamAnswerInputPayload[] {
+  const match = /name="answers"\r\n\r\n([\s\S]*?)\r\n--/.exec(postData ?? '');
+  return match ? (JSON.parse(match[1]!) as ExamAnswerInputPayload[]) : [];
 }
 
 async function setupAuthSession(page: Page) {
@@ -262,38 +251,39 @@ test('student answers a multiple-choice exam and the server-confirmed result sho
   const { cspViolations, pageErrors } = await setupAuthSession(page);
 
   // The read-own endpoint answers 404 until the POST has been observed, then
-  // returns the stored attempt with the retained answers and the
-  // server-computed score, like the MSW store serves in unit tests.
-  let stored: OwnExamAttemptPayload | null = null;
+  // returns the stored submission with the retained answers and the
+  // server-computed `autoScore`, like the MSW store serves in unit tests.
+  let stored: components['schemas']['SubmissionDownloadResponseDto'] | null =
+    null;
   await page.route(ownAttemptUrl, (route) =>
     stored !== null
       ? route.fulfill({ json: stored })
       : route.fulfill({
           status: 404,
-          json: errorEnvelope('NOT_FOUND', 'Exam attempt not found.'),
+          json: errorEnvelope(
+            'NOT_FOUND',
+            'The requested resource was not found.',
+          ),
         }),
   );
 
-  const createRequests: { key: string; body: unknown }[] = [];
+  const createRequests: { key: string; answers: string }[] = [];
   await page.route(submitUrl, (route) => {
-    const answers = (
-      route.request().postDataJSON() as {
-        answers: readonly ExamAnswerInputPayload[];
-      }
-    ).answers;
-    const submission: ExamAnswerSubmissionPayload = {
+    const answers = readAnswersField(route.request().postData());
+    const submission = {
       id: attemptId,
       activityId,
       submittedAt: new Date().toISOString(),
       isLate: false,
-      status: 'graded',
-      score: scoreAnswers(answers),
-      maxScore: examActivity.maxScore,
-    };
-    stored = { ...submission, answers };
+      autoScore: scoreAnswers(answers),
+      status: 'submitted',
+      files: [],
+      answers: answers.map((answer, position) => ({ ...answer, position })),
+    } satisfies components['schemas']['SubmissionDownloadResponseDto'];
+    stored = submission;
     createRequests.push({
       key: route.request().headers()['idempotency-key'] ?? '',
-      body: route.request().postDataJSON(),
+      answers: JSON.stringify(answers),
     });
     return route.fulfill({ status: 201, json: submission });
   });
@@ -327,7 +317,7 @@ test('student answers a multiple-choice exam and the server-confirmed result sho
     page.getByRole('heading', { name: examMessages.panel.heading }),
   ).toBeVisible();
   await expect(
-    page.getByText(examMessages.panel.statusLabels.graded, { exact: true }),
+    page.getByText(examMessages.panel.statusLabels.submitted, { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByText(
@@ -339,13 +329,14 @@ test('student answers a multiple-choice exam and the server-confirmed result sho
     ),
   ).toBeVisible();
 
-  // The send carried a client-generated idempotency key and answers only.
+  // The send carried a client-generated idempotency key and answers only
+  // (multipart `answers` field, no files).
   expect(createRequests).toHaveLength(1);
   expect(createRequests[0]!.key).toMatch(
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
   );
-  expect(JSON.stringify(createRequests[0]!.body)).toContain(question1Id);
-  expect(JSON.stringify(createRequests[0]!.body)).not.toContain('"score"');
+  expect(createRequests[0]!.answers).toContain(question1Id);
+  expect(createRequests[0]!.answers).not.toContain('score');
 
   expect(
     await page.evaluate(
@@ -369,7 +360,7 @@ test('unanswered questions block the submission, explain and keep the selection'
   await page.route(ownAttemptUrl, (route) =>
     route.fulfill({
       status: 404,
-      json: errorEnvelope('NOT_FOUND', 'Exam attempt not found.'),
+      json: errorEnvelope('NOT_FOUND', 'The requested resource was not found.'),
     }),
   );
   const createRequests: string[] = [];

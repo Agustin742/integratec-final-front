@@ -30,54 +30,74 @@ rendered come from the student detail response
 - **`RN-05` (activity lifecycle and deadlines):** the answering window is
   server authority. The panel shows a display-only pre-check (not open yet /
   closed without late allowance) that disables the send with the reason, while
-  the server still rejects out-of-window attempts with `409` (`opensAt`,
-  `dueAt` field details) and the UI shows that outcome — never an assumed one.
+  the server still rejects out-of-window attempts with `409` and the UI shows
+  that outcome — never an assumed one.
   A late-accepted attempt shows the `Entrega tardía` badge from the server's
   `isLate`.
 - **`RN-06` (grading and answer privacy):** the client sends answers only
-  (`{ questionId, selectedOptionIds }`); the server grades the attempt and the
-  response carries the score. The result view shows the aggregate
+  (`{ questionId, optionId }`); the server grades the attempt and the response
+  carries `autoScore`. The result view shows the aggregate
   server-computed score only — no per-question correctness, no correct
   options, no client-side score — and the question list is gone once graded.
 
-## PROVISIONAL contract (`back#47`)
+## Backend contract (`back#47`, shipped)
 
-Like the streak feature for [back
-#33](./streak-and-badges.md), this feature consumes a **provisional**
-contract until
 [Agustin742/integratec-final-back#47](https://github.com/Agustin742/integratec-final-back/issues/47)
-lands in `src/api/schema.generated.ts` (FD9, mock-first): the published
-contract only types the multipart file submission, so the JSON
-exam-answering operations are modeled locally with jitless Zod schemas
-(`exam-schema.ts`) and a typed service (`exam-service.ts`):
+shipped in `back/develop`: multiple-choice answers reuse the file submission
+endpoints, and the generated types in `src/api/schema.generated.ts` cover
+them. The typed service (`exam-service.ts`) and the jitless Zod schema
+(`exam-schema.ts`) sit on those generated types:
 
-- `POST /activities/{activityId}/exam-answers` with a client-generated
-  `Idempotency-Key` header (one key per answered attempt, rotated when the
-  selection changes, reused across retries so the server reconciles instead
-  of duplicating the attempt), body
-  `{ answers: [{ questionId, selectedOptionIds }] }`.
-- `GET /activities/{activityId}/exam-answers/me` for reconciliation and
-  answer retention; it returns the stored attempt with its retained answers or
-  `404` when no attempt exists. The response is not cacheable
+- `POST /activities/{activityId}/submissions` is `multipart/form-data` with a
+  client-generated `Idempotency-Key` header (one key per answered attempt,
+  rotated when the selection changes, reused across retries so the server
+  reconciles instead of duplicating the attempt). A multiple-choice activity
+  sends only the `answers` field: a JSON-encoded array of
+  `{ questionId, optionId }`, one pair per question (at least one). The body is
+  a `FormData` returned as-is by the `bodySerializer`, so the browser sets the
+  multipart boundary. Responses: `200` idempotent replay (the stored
+  submission, never re-scored), `201`, `400`, `401`, `403`, `404`, `409`,
+  `413`.
+- `GET /activities/{activityId}/submissions/me` returns the stored submission
+  (`id`, `activityId`, `submittedAt`, `isLate`, `autoScore`, `status`,
+  `answers: [{ questionId, optionId, position }]`) and is not cacheable
   (`staleTime 0`, `gcTime 0`, user+classroom+activity-scoped
-  `classroomExamAttemptQueryKey`).
+  `classroomExamAttemptQueryKey`). The key is kept apart from the file
+  submission key because a missing submission reads as `null` here and throws
+  in the file read.
 
-Both responses carry `{ id, activityId, submittedAt, isLate, status:
-'graded', score, maxScore }`; the read-own response adds the retained
-`answers`. Contract `400`/`403`/`404`/`409` failures translate to feature
-copy by machine-readable code and field details, never by server message
-text. The stateful MSW store `createExamAnswersStore`
-(`src/test/msw/handlers.ts`) serves both endpoints with
-idempotent replay, window checks, per-question validation, and **provisional
-all-or-nothing scoring** (`score = maxScore × correctQuestions /
-totalQuestions`): correct answers live only inside the store and are never
-part of any response. A passing mock is not integration proof. When
-`pnpm api:sync` regenerates the schema, `exam-service.ts` is the only place
-to adjust.
+The server grades the answers (`autoScore = round(correct / questions ×
+maxScore)`, `0..maxScore`) and never returns the correct options. The
+submission has no `maxScore`: the panel renders `autoScore` against the
+activity detail's `maxScore`. `status` is derived from a teacher grade, so an
+auto-scored submission reads `submitted` until a teacher grades it; the badge
+shows `Entregado` or `Calificado` from that value.
+
+Error handling branches on status, code and detail field, never on server
+message text:
+
+- `409` covers four reasons (window not open, window closed without late
+  allowance, a submission already stored under another key, wrong format) with
+  the same `activity` detail field, so the reason is not machine-readable. The
+  panel reads the own submission after a `409`: a stored submission is shown as
+  confirmed, otherwise the generic conflict copy names the possible causes.
+- `400` (`answers` or `Idempotency-Key` detail), `403` (staff and parents),
+  `404` (unknown, draft or non-member activity) and `413` map to feature copy.
+- `GET .../me` answers one generic `404` envelope for "Submission not found"
+  and "Activity not found" (same code and message, no details), so a `404`
+  reads as "nothing submitted yet"; the activity detail query that mounts the
+  panel owns activity existence. `403` and every other failure stay errors.
+
+The stateful MSW store `createExamSubmissionsStore`
+(`src/test/msw/handlers.ts`) serves both endpoints with the same status
+codes, idempotent replay, window checks, answer validation and the server
+scoring formula: correct answers live only inside the store and are never part
+of any response. A passing mock is not integration proof; the contract was
+also checked against a running backend.
 
 ## User-visible states
 
-- **Loading:** the panel consults `GET .../exam-answers/me` before rendering
+- **Loading:** the panel consults `GET .../submissions/me` before rendering
   the form (`Consultando tu examen`).
 - **Empty:** no published questions renders an honest empty state (nothing to
   answer, consult the teacher); no attempt yet renders the answering form
@@ -91,9 +111,10 @@ to adjust.
   and selections, and a failed verification offers only "verify again" —
   never a blind resubmission. Definite server rejections keep the selected
   answers and explain the refusal.
-- **Result:** the graded attempt shows the `Calificada` badge, the late badge
-  when the server says so, the submit instant in the school time zone, and
-  the score as `X de Y puntos` — all from the server response.
+- **Result:** the submitted attempt shows the `Entregado` badge (`Calificado`
+  once a teacher grades it), the late badge when the server says so, the
+  submit instant in the school time zone, and the automatic score as `X de Y
+puntos` (`autoScore` of the activity `maxScore`) — all from the server.
 
 ## Accessibility
 

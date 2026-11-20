@@ -4,8 +4,8 @@ import { createApiClient } from '@/api/client';
 import { ApiError } from '@/api/errors';
 import {
   TEST_API_BASE_URL,
-  createExamAnswersStore,
-  type ExamAnswersStore,
+  createExamSubmissionsStore,
+  type ExamSubmissionsStore,
 } from '@/test/msw/handlers';
 import { examMessages } from './exam-messages';
 import {
@@ -63,29 +63,29 @@ const examActivity = {
 const correctAnswers = [
   {
     questionId: '11111111-1111-4111-8111-111111111111',
-    selectedOptionIds: ['21111111-1111-4111-8111-211111111111'],
+    optionId: '21111111-1111-4111-8111-211111111111',
   },
   {
     questionId: '11111111-1111-4111-8111-333333333333',
-    selectedOptionIds: ['21111111-1111-4111-8111-555555555555'],
+    optionId: '21111111-1111-4111-8111-555555555555',
   },
 ];
 
 const partiallyCorrectAnswers = [
   {
     questionId: '11111111-1111-4111-8111-111111111111',
-    selectedOptionIds: ['21111111-1111-4111-8111-211111111111'],
+    optionId: '21111111-1111-4111-8111-211111111111',
   },
   {
     questionId: '11111111-1111-4111-8111-333333333333',
-    selectedOptionIds: ['21111111-1111-4111-8111-444444444444'],
+    optionId: '21111111-1111-4111-8111-444444444444',
   },
 ];
 
 function useStore(
-  overrides: Partial<Parameters<typeof createExamAnswersStore>[0]> = {},
-): ExamAnswersStore {
-  const store = createExamAnswersStore({
+  overrides: Partial<Parameters<typeof createExamSubmissionsStore>[0]> = {},
+): ExamSubmissionsStore {
+  const store = createExamSubmissionsStore({
     activity: examActivity,
     ...overrides,
   });
@@ -102,15 +102,16 @@ describe('exam-answer-service', () => {
       idempotencyKey: 'key-1',
     });
 
-    expect(result.status).toBe('graded');
-    expect(result.score).toBe(10);
-    expect(result.maxScore).toBe(10);
+    expect(result.status).toBe('submitted');
+    expect(result.autoScore).toBe(10);
     expect(result.activityId).toBe(activityId);
     expect(store.getItems()).toHaveLength(1);
     expect(store.getLastCreateRequest()?.idempotencyKey).toBe('key-1');
-    expect(store.getLastCreateRequest()?.answers).toEqual({
-      answers: correctAnswers,
-    });
+    // Multipart with only the JSON-encoded `answers` field (no files).
+    expect(store.getLastCreateRequest()?.fieldNames).toEqual(['answers']);
+    expect(JSON.parse(store.getLastCreateRequest()?.answers ?? 'null')).toEqual(
+      correctAnswers,
+    );
   });
 
   it('computes partial scores server-side; the browser never sends a score', async () => {
@@ -124,12 +125,9 @@ describe('exam-answer-service', () => {
       { idempotencyKey: 'key-1' },
     );
 
-    expect(result.score).toBe(5);
-    expect(result.maxScore).toBe(10);
-    const sent = store.getLastCreateRequest()?.answers as {
-      answers: { selectedOptionIds: string[] }[];
-    };
-    expect(JSON.stringify(sent).includes('"score"')).toBe(false);
+    expect(result.autoScore).toBe(5);
+    const sent = store.getLastCreateRequest()?.answers ?? '';
+    expect(sent.includes('score')).toBe(false);
   });
 
   it('replays idempotently when the same key is reused', async () => {
@@ -179,12 +177,17 @@ describe('exam-answer-service', () => {
 
     const attempt = await readOwnExamAttempt(client, activityId);
     expect(attempt).not.toBeNull();
-    expect(attempt?.answers).toEqual(correctAnswers);
-    expect(attempt?.score).toBe(10);
-    expect(attempt?.status).toBe('graded');
+    expect(
+      attempt?.answers.map(({ questionId, optionId }) => ({
+        questionId,
+        optionId,
+      })),
+    ).toEqual(correctAnswers);
+    expect(attempt?.autoScore).toBe(10);
+    expect(attempt?.status).toBe('submitted');
   });
 
-  it('translates a closed answering window into feature copy', async () => {
+  it('translates a closed answering window (409) into feature copy', async () => {
     useStore({
       activity: {
         ...examActivity,
@@ -201,7 +204,7 @@ describe('exam-answer-service', () => {
 
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).userMessage).toBe(
-      examMessages.serverErrors.windowClosed,
+      examMessages.serverErrors.conflict,
     );
   });
 
@@ -217,6 +220,101 @@ describe('exam-answer-service', () => {
     expect((error as ApiError).userMessage).toBe(
       examMessages.serverErrors.forbidden,
     );
+  });
+
+  it('translates a duplicate submission with another key (409) into the conflict copy', async () => {
+    const store = useStore();
+    const client = createApiClient({ baseUrl: TEST_API_BASE_URL });
+    await submitExamAnswers(client, activityId, correctAnswers, {
+      idempotencyKey: 'key-1',
+    });
+
+    const error = await submitExamAnswers(client, activityId, correctAnswers, {
+      idempotencyKey: 'key-2',
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(409);
+    expect((error as ApiError).userMessage).toBe(
+      examMessages.serverErrors.conflict,
+    );
+    expect(store.getItems()).toHaveLength(1);
+  });
+
+  it('translates an answer that does not belong to the activity (400)', async () => {
+    useStore();
+    const client = createApiClient({ baseUrl: TEST_API_BASE_URL });
+
+    const error = await submitExamAnswers(
+      client,
+      activityId,
+      [
+        {
+          questionId: correctAnswers[0]!.questionId,
+          optionId: '21111111-1111-4111-8111-555555555555',
+        },
+      ],
+      { idempotencyKey: 'key-1' },
+    ).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(400);
+    expect((error as ApiError).userMessage).toBe(
+      examMessages.validation.answers,
+    );
+  });
+
+  it('translates an unknown or draft activity (404) into the not-found copy', async () => {
+    useStore({ activity: { ...examActivity, state: 'DRAFT' } });
+    const client = createApiClient({ baseUrl: TEST_API_BASE_URL });
+
+    const error = await submitExamAnswers(client, activityId, correctAnswers, {
+      idempotencyKey: 'key-1',
+    }).catch((caught: unknown) => caught);
+
+    expect((error as ApiError).userMessage).toBe(
+      examMessages.serverErrors.notFound,
+    );
+  });
+
+  it('translates a payload that is too large (413)', async () => {
+    const store = useStore();
+    store.failNext('create', {
+      status: 413,
+      body: {
+        code: 'VALIDATION_FAILED',
+        message: 'Too large.',
+        correlationId: 'req-exam-submissions-create-413',
+      },
+    });
+    const client = createApiClient({ baseUrl: TEST_API_BASE_URL });
+
+    const error = await submitExamAnswers(client, activityId, correctAnswers, {
+      idempotencyKey: 'key-1',
+    }).catch((caught: unknown) => caught);
+
+    expect((error as ApiError).userMessage).toBe(
+      examMessages.serverErrors.tooLarge,
+    );
+  });
+
+  it('reads null for a missing submission (generic 404)', async () => {
+    useStore();
+    const client = createApiClient({ baseUrl: TEST_API_BASE_URL });
+
+    await expect(readOwnExamAttempt(client, activityId)).resolves.toBeNull();
+  });
+
+  it('surfaces a forbidden read-own as an error, never as "no attempt"', async () => {
+    useStore({ role: 'TEACHER' });
+    const client = createApiClient({ baseUrl: TEST_API_BASE_URL });
+
+    const error = await readOwnExamAttempt(client, activityId).catch(
+      (caught: unknown) => caught,
+    );
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(403);
   });
 
   it('validates the payload client-side before any request leaves', async () => {
@@ -237,7 +335,7 @@ describe('exam-answer-service', () => {
           correctAnswers[0]!,
           {
             questionId: correctAnswers[0]!.questionId,
-            selectedOptionIds: ['21111111-1111-4111-8111-211111111111'],
+            optionId: '21111111-1111-4111-8111-211111111111',
           },
         ],
         { idempotencyKey: 'key-1' },

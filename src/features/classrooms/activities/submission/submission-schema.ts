@@ -20,13 +20,24 @@ const submissionFileSchema = z.object({
   position: z.number().int().nonnegative(),
 });
 
+const submissionAnswerSchema = z.object({
+  questionId: z.string().uuid(),
+  optionId: z.string().uuid(),
+  /** Zero-based order in which the answers were sent. */
+  position: z.number().int().nonnegative(),
+});
+
 const submissionBaseFields = {
   id: z.string().uuid(),
   activityId: z.string().uuid(),
   /** Server clock, ISO 8601 UTC. */
   submittedAt: z.string().datetime({ offset: true }),
   isLate: z.boolean(),
+  /** Server-computed multiple-choice score; `null` for file submissions. */
+  autoScore: z.number().int().nonnegative().nullable(),
   status: z.enum(['submitted', 'graded']),
+  /** Chosen options of a multiple-choice submission; empty for files. */
+  answers: z.array(submissionAnswerSchema),
 };
 
 export const submissionResponseDtoSchema: z.ZodType<SubmissionResponseDto> =

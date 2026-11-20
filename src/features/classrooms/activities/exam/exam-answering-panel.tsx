@@ -26,7 +26,7 @@ import {
   readOwnExamAttempt,
   submitExamAnswers,
 } from './exam-service';
-import type { ExamAnswerSubmissionResponseDto } from './exam-schema';
+import type { ExamSubmissionDto } from './exam-schema';
 
 export interface ExamAnsweringPanelProps {
   /** The exam activity the student is viewing, as confirmed by the detail query. */
@@ -114,8 +114,7 @@ export function ExamAnsweringPanel({ activity }: ExamAnsweringPanelProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   /** Server-confirmed result from the POST response, before read-own lands. */
-  const [confirmed, setConfirmed] =
-    useState<ExamAnswerSubmissionResponseDto | null>(null);
+  const [confirmed, setConfirmed] = useState<ExamSubmissionDto | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
   const submitInFlightRef = useRef(false);
@@ -191,6 +190,30 @@ export function ExamAnsweringPanel({ activity }: ExamAnsweringPanelProps) {
     setPhase({ kind: 'idle' });
   }
 
+  /** Shows the stored submission the server confirmed instead of the form. */
+  function showReconciledAttempt(): void {
+    focusResultRef.current = true;
+    setConfirmed(null);
+    setNotice(copy.reconciledNotice);
+    setPhase({ kind: 'idle' });
+  }
+
+  /**
+   * A `409` is ambiguous (window not open, window closed, a submission
+   * already stored under another key, wrong format) and carries no
+   * machine-readable reason, so check the server: a stored submission is
+   * shown as confirmed; otherwise the conflict copy explains the rejection.
+   */
+  async function reconcileAfterConflict(message: string): Promise<void> {
+    const result = await ownAttempt.refetch();
+    if (!result.isError && result.data) {
+      showReconciledAttempt();
+      return;
+    }
+    setPhase({ kind: 'idle' });
+    setFormError(message);
+  }
+
   /** Reconciles an uncertain outcome with the server before any resubmission. */
   async function reconcileUncertainOutcome(): Promise<void> {
     setPhase({ kind: 'reconciling' });
@@ -204,10 +227,7 @@ export function ExamAnsweringPanel({ activity }: ExamAnsweringPanelProps) {
     }
     if (result.data) {
       // The server says the attempt exists: show it as confirmed.
-      focusResultRef.current = true;
-      setConfirmed(null);
-      setNotice(copy.reconciledNotice);
-      setPhase({ kind: 'idle' });
+      showReconciledAttempt();
       return;
     }
     if (result.data === null) {
@@ -253,7 +273,7 @@ export function ExamAnsweringPanel({ activity }: ExamAnsweringPanelProps) {
     const answers = questions.flatMap((question) => {
       const optionId = selectedAnswers[question.id];
       return optionId !== undefined
-        ? [{ questionId: question.id, selectedOptionIds: [optionId] }]
+        ? [{ questionId: question.id, optionId }]
         : [];
     });
 
@@ -262,7 +282,7 @@ export function ExamAnsweringPanel({ activity }: ExamAnsweringPanelProps) {
         idempotencyKey,
         signal: controller.signal,
       });
-      // 200/201: the server confirmed the stored, auto-graded attempt.
+      // 200/201: the server confirmed the stored, auto-scored submission.
       focusResultRef.current = true;
       setConfirmed(result);
       setPhase({ kind: 'idle' });
@@ -284,6 +304,10 @@ export function ExamAnsweringPanel({ activity }: ExamAnsweringPanelProps) {
         cause instanceof ApiError
           ? cause.userMessage
           : examMessages.serverErrors.unexpected;
+      if (cause instanceof ApiError && cause.status === 409) {
+        await reconcileAfterConflict(message);
+        return;
+      }
       setPhase({ kind: 'idle' });
       setFormError(message);
       return;
@@ -351,7 +375,7 @@ export function ExamAnsweringPanel({ activity }: ExamAnsweringPanelProps) {
           >
             {copy.heading}
           </h3>
-          <Badge variant="info">{copy.statusLabels.graded}</Badge>
+          <Badge variant="info">{copy.statusLabels[attempt.status]}</Badge>
           {attempt.isLate ? (
             <Badge variant="warning">{copy.lateBadge}</Badge>
           ) : null}
@@ -376,9 +400,9 @@ export function ExamAnsweringPanel({ activity }: ExamAnsweringPanelProps) {
           </div>
           <div>
             <dt className="font-semibold text-foreground">{copy.scoreTerm}</dt>
-            {/* Server-computed result; the browser never calculates a score. */}
+            {/* Server-computed `autoScore`; the browser never calculates a score. */}
             <dd className="text-muted-foreground">
-              {copy.scoreValue(attempt.score, attempt.maxScore)}
+              {copy.scoreValue(attempt.autoScore, activity.maxScore)}
             </dd>
           </div>
         </dl>

@@ -14,10 +14,10 @@ import { createAppQueryClient } from '@/api/query-client';
 import { fakeSession } from '@/app/router/fake-session';
 import { expectAccessible } from '@/test/accessibility';
 import {
-  createExamAnswersStore,
+  createExamSubmissionsStore,
   TEST_API_BASE_URL,
-  type ExamAnswersStore,
-  type ExamAnswersStoreItem,
+  type ExamSubmissionsStore,
+  type ExamSubmissionsStoreItem,
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
 import { render } from '@/test/render';
@@ -105,9 +105,9 @@ function makeExamActivityDto(
 }
 
 function makeStore(
-  overrides: Partial<Parameters<typeof createExamAnswersStore>[0]> = {},
-): ExamAnswersStore {
-  return createExamAnswersStore({
+  overrides: Partial<Parameters<typeof createExamSubmissionsStore>[0]> = {},
+): ExamSubmissionsStore {
+  return createExamSubmissionsStore({
     baseUrl: TEST_API_BASE_URL,
     role: 'STUDENT',
     activity: {
@@ -140,8 +140,8 @@ function makeStore(
 }
 
 function makeStoredAttempt(
-  overrides: Partial<ExamAnswersStoreItem> = {},
-): ExamAnswersStoreItem {
+  overrides: Partial<ExamSubmissionsStoreItem> = {},
+): ExamSubmissionsStoreItem {
   return {
     id: '99999999-9999-4999-8999-999999999999',
     activityId: ACTIVITY_ID,
@@ -149,17 +149,10 @@ function makeStoredAttempt(
     isLate: false,
     idempotencyKey: '11111111-2222-4333-8444-555555555555',
     answers: [
-      {
-        questionId: QUESTION_1_ID,
-        selectedOptionIds: [QUESTION_1_CORRECT],
-      },
-      {
-        questionId: QUESTION_2_ID,
-        selectedOptionIds: [QUESTION_2_CORRECT],
-      },
+      { questionId: QUESTION_1_ID, optionId: QUESTION_1_CORRECT, position: 0 },
+      { questionId: QUESTION_2_ID, optionId: QUESTION_2_CORRECT, position: 1 },
     ],
-    score: 10,
-    maxScore: 10,
+    autoScore: 10,
     ...overrides,
   };
 }
@@ -199,7 +192,7 @@ async function confirmSubmission() {
 
 /**
  * The panel renders the answering form only after the own-attempt query
- * (`GET .../exam-answers/me`, `404` while no attempt exists) settles, so
+ * (`GET .../submissions/me`, `404` while nothing was submitted) settles, so
  * every form interaction first waits for the question radios to appear.
  */
 async function waitForAnswerForm() {
@@ -210,7 +203,7 @@ async function waitForAnswerForm() {
 function trackCreateRequests() {
   const requests: string[] = [];
   const listener = ({ request }: { request: Request }) => {
-    if (request.method === 'POST' && request.url.endsWith('/exam-answers')) {
+    if (request.method === 'POST' && request.url.endsWith('/submissions')) {
       requests.push(request.headers.get('Idempotency-Key') ?? '');
     }
   };
@@ -249,7 +242,7 @@ describe('ExamAnsweringPanel', () => {
     await waitFor(() => {
       expect(screen.getByText('10 de 10 puntos')).toBeVisible();
     });
-    expect(screen.getByText(COPY.statusLabels.graded)).toBeVisible();
+    expect(screen.getByText(COPY.statusLabels.submitted)).toBeVisible();
     expect(store.getItems()).toHaveLength(1);
     await expectAccessible(container);
   });
@@ -268,8 +261,9 @@ describe('ExamAnsweringPanel', () => {
     });
 
     // The browser sends answers only: no score field in the request body.
-    const sent = JSON.stringify(store.getLastCreateRequest()?.answers);
-    expect(sent).not.toContain('"score"');
+    const sent = store.getLastCreateRequest()?.answers ?? '';
+    expect(store.getLastCreateRequest()?.fieldNames).toEqual(['answers']);
+    expect(sent).not.toContain('score');
     expect(sent).toContain(QUESTION_1_CORRECT);
 
     // The result view shows the aggregate score only, not which options were
@@ -285,9 +279,16 @@ describe('ExamAnsweringPanel', () => {
       status: 409,
       body: {
         code: 'CONFLICT',
-        message: 'Answering window closed.',
-        details: [{ field: 'dueAt', messages: ['Answering window closed.'] }],
-        correlationId: 'req-exam-answers-create-409-closed',
+        message: 'Request conflicts with the current state',
+        details: [
+          {
+            field: 'activity',
+            messages: [
+              'The deadline has passed and this activity does not accept late submissions',
+            ],
+          },
+        ],
+        correlationId: 'req-exam-submissions-create-409-closed',
       },
     });
     mswServer.use(...store.handlers);
@@ -300,7 +301,7 @@ describe('ExamAnsweringPanel', () => {
     // Definite rejection is explained and the selections are preserved.
     await waitFor(() => {
       expect(
-        screen.getByText(examMessages.serverErrors.windowClosed),
+        screen.getByText(examMessages.serverErrors.conflict),
       ).toBeVisible();
     });
     expect(
@@ -317,6 +318,36 @@ describe('ExamAnsweringPanel', () => {
       expect(screen.getByText('10 de 10 puntos')).toBeVisible();
     });
     expect(store.getItems()).toHaveLength(1);
+  });
+
+  test('shows the stored result when a 409 means the exam was already submitted with another key', async () => {
+    const store = makeStore({ initialItems: [makeStoredAttempt()] });
+    mswServer.use(...store.handlers);
+    renderPanel(makeExamActivityDto());
+    // The stored submission exists, but the first read-own answers `404` as
+    // if it were stale (another tab submitted since the page loaded).
+    store.failNext('readOwn', {
+      status: 404,
+      body: {
+        code: 'NOT_FOUND',
+        message: 'The requested resource was not found.',
+        correlationId: 'req-exam-submissions-me-404-stale',
+      },
+    });
+    await waitForAnswerForm();
+
+    selectCorrectAnswers();
+    await confirmSubmission();
+
+    // The server confirms the earlier submission: it replaces the form and
+    // the conflict copy is not shown as an error.
+    await waitFor(() => {
+      expect(screen.getByText(COPY.reconciledNotice)).toBeVisible();
+    });
+    expect(screen.getByText('10 de 10 puntos')).toBeVisible();
+    expect(
+      screen.queryByText(examMessages.serverErrors.conflict),
+    ).not.toBeInTheDocument();
   });
 
   test('sends only one request when the confirm action is activated twice', async () => {
@@ -506,7 +537,7 @@ describe('ExamAnsweringPanel', () => {
     await waitFor(() => {
       expect(screen.getByText('10 de 10 puntos')).toBeVisible();
     });
-    expect(screen.getByText(COPY.statusLabels.graded)).toBeVisible();
+    expect(screen.getByText(COPY.statusLabels.submitted)).toBeVisible();
     // No answering form is offered once the attempt exists.
     expect(screen.queryByRole('radio', { name: '4' })).not.toBeInTheDocument();
   });

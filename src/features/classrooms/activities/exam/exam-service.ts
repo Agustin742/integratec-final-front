@@ -1,63 +1,15 @@
-import type { Client } from 'openapi-fetch';
 import { requestApi, type TypedApiClient } from '@/api/client';
 import { ApiError } from '@/api/errors';
 import { examMessages } from './exam-messages';
 import {
-  examAnswerSubmissionResponseSchema,
-  ownExamAttemptSchema,
+  examSubmissionSchema,
   type ExamAnswerInputDto,
-  type ExamAnswerSubmissionRequestDto,
-  type ExamAnswerSubmissionResponseDto,
-  type OwnExamAttemptDto,
+  type ExamSubmissionDto,
 } from './exam-schema';
 
 const IDEMPOTENCY_KEY_MAX_LENGTH = 255;
-
-/**
- * Provisional OpenAPI path shapes for `HU-ACT-003` part 2/2 until
- * `Agustin742/integratec-final-back#47` lands in `src/api/schema.generated.ts`
- * (same pattern as the streak service for `HU-GAM-002`); see
- * `docs/exam-answering.md`.
- */
-interface ExamAnswerPaths {
-  '/activities/{activityId}/exam-answers': {
-    post: {
-      parameters: {
-        path: { activityId: string };
-      };
-      requestBody: {
-        content: {
-          'application/json': ExamAnswerSubmissionRequestDto;
-        };
-      };
-      responses: {
-        201: {
-          content: {
-            'application/json': ExamAnswerSubmissionResponseDto;
-          };
-        };
-      };
-    };
-  };
-  '/activities/{activityId}/exam-answers/me': {
-    get: {
-      parameters: {
-        path: { activityId: string };
-      };
-      responses: {
-        200: {
-          content: {
-            'application/json': OwnExamAttemptDto;
-          };
-        };
-      };
-    };
-  };
-}
-
-function asExamClient(client: TypedApiClient): Client<ExamAnswerPaths> {
-  return client as unknown as Client<ExamAnswerPaths>;
-}
+/** Backend error detail names (`SubmissionsService`). */
+const IDEMPOTENCY_KEY_FIELD = 'Idempotency-Key';
 
 export interface SubmitExamAnswersOptions {
   /**
@@ -124,7 +76,7 @@ function validateExamAnswersInput(
       throw validationFailure(examMessages.validation.duplicateQuestion);
     }
     seenQuestionIds.add(answer.questionId);
-    if (answer.selectedOptionIds.length < 1) {
+    if (answer.optionId.length < 1) {
       throw validationFailure(examMessages.validation.answerShape);
     }
   }
@@ -143,13 +95,20 @@ function withUserMessage(base: ApiError, userMessage: string): ApiError {
 }
 
 /**
- * Translates contract `409`/`400`/`403`/`404` exam-answering failures into
- * feature copy. Branches on the machine-readable code and the detail field,
- * never on the server message text.
+ * Translates contract `400`/`403`/`404`/`409`/`413` submission failures into
+ * exam copy. Branches on the status, the machine-readable code and the detail
+ * field, never on the server message text. Every `409` carries the single
+ * `activity` detail field (window not open, window closed, duplicate with
+ * another key, wrong format), so the reason is not machine-readable and the
+ * copy names the possible causes; the panel reconciles with the server to
+ * tell a duplicate apart.
  */
 function translateExamAnswerError(base: ApiError): ApiError {
   const fields = base.details.map((detail) => detail.field);
 
+  if (base.status === 413) {
+    return withUserMessage(base, examMessages.serverErrors.tooLarge);
+  }
   if (base.status === 403) {
     return withUserMessage(base, examMessages.serverErrors.forbidden);
   }
@@ -157,19 +116,10 @@ function translateExamAnswerError(base: ApiError): ApiError {
     return withUserMessage(base, examMessages.serverErrors.notFound);
   }
   if (base.status === 409) {
-    if (fields.includes('idempotencyKey')) {
-      return withUserMessage(base, examMessages.serverErrors.duplicate);
-    }
-    if (fields.includes('opensAt')) {
-      return withUserMessage(base, examMessages.serverErrors.windowNotOpen);
-    }
-    if (fields.includes('format')) {
-      return withUserMessage(base, examMessages.serverErrors.notExamActivity);
-    }
-    return withUserMessage(base, examMessages.serverErrors.windowClosed);
+    return withUserMessage(base, examMessages.serverErrors.conflict);
   }
   if (base.status === 400 || base.code === 'BAD_REQUEST') {
-    if (fields.includes('idempotencyKey')) {
+    if (fields.includes(IDEMPOTENCY_KEY_FIELD)) {
       return withUserMessage(base, examMessages.validation.idempotencyKey);
     }
     return withUserMessage(base, examMessages.validation.answers);
@@ -182,33 +132,43 @@ function translateExamAnswerError(base: ApiError): ApiError {
 
 /**
  * Submits the student's multiple-choice answers
- * (`POST /activities/{activityId}/exam-answers`, provisional path documented
- * in `docs/exam-answering.md`) with one idempotency key per attempt. The
- * browser never sends a computed score; the server grades the attempt and the
- * response carries the server-confirmed result
- * (`rules/activities-and-grading.md`).
+ * (`POST /activities/{activityId}/submissions`, multipart with one JSON
+ * `answers` field) with one idempotency key per attempt. The browser never
+ * sends a computed score; the server grades the attempt and the response
+ * carries the server-confirmed `autoScore` (`rules/activities-and-grading.md`).
  */
 export async function submitExamAnswers(
   client: TypedApiClient,
   activityId: string,
   answers: readonly ExamAnswerInputDto[],
   options: SubmitExamAnswersOptions,
-): Promise<ExamAnswerSubmissionResponseDto> {
+): Promise<ExamSubmissionDto> {
   validateExamAnswersInput(answers, options.idempotencyKey);
   if (options.signal?.aborted) {
     throw new DOMException('Exam answer submission aborted', 'AbortError');
   }
-  const examClient = asExamClient(client);
+  const formData = new FormData();
+  formData.append(
+    'answers',
+    JSON.stringify(
+      answers.map(({ questionId, optionId }) => ({ questionId, optionId })),
+    ),
+  );
   try {
     const raw: unknown = await requestApi(() =>
-      examClient.POST('/activities/{activityId}/exam-answers', {
-        params: { path: { activityId } },
-        body: { answers: [...answers] },
-        headers: { 'Idempotency-Key': options.idempotencyKey.trim() },
+      client.POST('/activities/{activityId}/submissions', {
+        params: {
+          path: { activityId },
+          header: { 'Idempotency-Key': options.idempotencyKey.trim() },
+        },
+        // openapi-fetch leaves `Content-Type` unset for `FormData` so the
+        // browser adds the multipart boundary.
+        body: formData as unknown as { files: string[]; answers?: string },
+        bodySerializer: (body) => body as unknown as FormData,
         signal: options.signal,
       }),
     );
-    const parsed = examAnswerSubmissionResponseSchema.safeParse(raw);
+    const parsed = examSubmissionSchema.safeParse(raw);
     if (!parsed.success) {
       throw unexpectedFailure(201);
     }
@@ -222,36 +182,38 @@ export async function submitExamAnswers(
 }
 
 /**
- * Reads the calling student's own exam attempt with the retained answers and
- * the server-computed result
- * (`GET /activities/{activityId}/exam-answers/me`, provisional path). Used
- * to reconcile an uncertain submission outcome and to restore selected
- * answers after a recoverable failure. Returns `null` when no attempt exists
- * yet; the response is not cacheable per the contract.
+ * Reads the calling student's own exam submission with the retained answers
+ * and the server-computed `autoScore`
+ * (`GET /activities/{activityId}/submissions/me`). Used to reconcile an
+ * uncertain submission outcome and to show the stored result. Returns `null`
+ * when nothing was submitted yet; the response is not cacheable per the
+ * contract.
  */
 export async function readOwnExamAttempt(
   client: TypedApiClient,
   activityId: string,
   options: ReadOwnExamAttemptOptions = {},
-): Promise<OwnExamAttemptDto | null> {
-  const examClient = asExamClient(client);
+): Promise<ExamSubmissionDto | null> {
   let raw: unknown;
   try {
     raw = await requestApi(() =>
-      examClient.GET('/activities/{activityId}/exam-answers/me', {
+      client.GET('/activities/{activityId}/submissions/me', {
         params: { path: { activityId } },
         signal: options.signal,
       }),
     );
   } catch (error) {
-    // No attempt yet is a normal state, not a failure; the activity detail
-    // query owns activity existence, so any `404` maps to "no attempt".
+    // "Submission not found" and "Activity not found" share one generic
+    // `404` envelope (same code, same message, no details), so they cannot be
+    // told apart here. The activity detail query that mounts the panel owns
+    // activity existence, so a `404` means "no submission yet". `403` and
+    // every other failure stay errors.
     if (error instanceof ApiError && error.status === 404) {
       return null;
     }
     throw error;
   }
-  const parsed = ownExamAttemptSchema.safeParse(raw);
+  const parsed = examSubmissionSchema.safeParse(raw);
   if (!parsed.success) {
     throw unexpectedFailure(200);
   }

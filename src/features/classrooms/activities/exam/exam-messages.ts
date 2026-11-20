@@ -1,7 +1,7 @@
 export const examMessages = {
   validation: {
     answers: 'Respondé todas las preguntas antes de enviar el examen.',
-    answerShape: 'Cada pregunta necesita al menos una opción seleccionada.',
+    answerShape: 'Cada pregunta necesita una opción seleccionada.',
     duplicateQuestion: 'Cada pregunta admite una única respuesta.',
     idempotencyKey:
       'No se pudo identificar el envío. Reintentá en unos segundos.',
@@ -9,13 +9,9 @@ export const examMessages = {
   serverErrors: {
     forbidden: 'El examen está disponible únicamente para alumnos del aula.',
     notFound: 'No encontramos la actividad del examen.',
-    windowClosed:
-      'La fecha límite del examen ya pasó y la actividad no admite entregas tardías.',
-    windowNotOpen:
-      'El examen todavía no abrió. Podés responder desde la fecha de apertura.',
-    notExamActivity: 'Esta actividad no se responde con opciones múltiples.',
-    duplicate:
-      'Tu examen ya está registrado con otro envío. Estás viendo la confirmación.',
+    conflict:
+      'No pudimos registrar tu envío: el examen todavía no abrió, ya cerró sin admitir entregas tardías o ya tenés un envío registrado.',
+    tooLarge: 'El envío es demasiado grande para el servidor.',
     uncertain:
       'No pudimos confirmar tu envío. Estamos verificando el resultado con el servidor.',
     unexpected:
@@ -26,16 +22,17 @@ export const examMessages = {
     loadingLabel: 'Consultando tu examen',
     errorTitle: 'No pudimos cargar tu examen',
     notAttemptedDescription:
-      'Todavía no enviaste tus respuestas. Elegí una opción por pregunta y confirmá el envío; después vas a ver acá la calificación confirmada por el servidor.',
+      'Todavía no enviaste tus respuestas. Elegí una opción por pregunta y confirmá el envío; después vas a ver acá la calificación automática confirmada por el servidor.',
     noQuestionsTitle: 'El examen no tiene preguntas publicadas',
     noQuestionsDescription:
       'No hay preguntas para responder en esta actividad. Consultá con tu docente.',
     statusLabels: {
-      graded: 'Calificada',
-    } satisfies Record<'graded', string>,
+      submitted: 'Entregado',
+      graded: 'Calificado',
+    } satisfies Record<'submitted' | 'graded', string>,
     lateBadge: 'Entrega tardía',
     submittedAtTerm: 'Fecha de envío',
-    scoreTerm: 'Calificación',
+    scoreTerm: 'Calificación automática',
     scoreValue: (score: number, maxScore: number) =>
       `${score} de ${maxScore} puntos`,
     questionLegend: (position: number, total: number) =>

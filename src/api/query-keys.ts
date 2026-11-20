@@ -642,11 +642,13 @@ export function classroomActivitySubmissionQueryKey(
 }
 
 /**
- * Key of the provisional `GET /activities/{activityId}/exam-answers/me`
- * (`HU-ACT-003` part 2/2, see `docs/exam-answering.md`): the calling
- * student's own exam attempt for one activity. The response is not cacheable
- * per the contract, so consumers keep it fresh rather than relying on cached
- * reads.
+ * Key of `GET /activities/{activityId}/submissions/me` read for a
+ * multiple-choice exam (`HU-ACT-003` part 2/2, see `docs/exam-answering.md`):
+ * the calling student's own exam submission, where a missing submission reads
+ * as `null`. Kept apart from `classroomActivitySubmissionQueryKey` because
+ * that entry caches the file read, which throws on `404`. The response is not
+ * cacheable per the contract, so consumers keep it fresh rather than relying
+ * on cached reads.
  */
 export function classroomExamAttemptQueryKey(
   userId: string,
