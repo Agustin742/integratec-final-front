@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-19 — Review and fixes on PR #110 (#55, daily review modal)
+
+- **Status:** completed (pending CI and merge of PR #110)
+- **Area / files:** `src/features/daily-review/daily-review-dialog.tsx`, `src/features/daily-review/messages.ts`, `src/features/daily-review/daily-review-dialog.test.tsx`
+- **Change:** Merged `develop` into the branch (no conflicts). Daily question flow: a `409 already_answered` now locks the card, a failed submit has its own message, a synchronous guard prevents double submits, and while the question is unanswered Escape and outside clicks no longer dismiss the dialog (only the close button does; owner decision, since the server already recorded the delivery). Accessibility and content: the dialog description is linked again, item keys are stable, the radio group is named once by the prompt, headings follow the dialog title (h3/h4), focus moves to the answer result with a persistent live region, and empty sections use per-section copy.
+- **Reason:** Review findings on PR #110. The provisional contract stays (back #42 open, proposal back #119); against the local backend the endpoint answers 404 and the dialog stays closed without blocking the app.
+- **Verification:** Per-task affected tests (daily-review 30/30; `--changed` with only the known flaky `classroom-invitations-panel` timeout, which passes in isolation), lint, typecheck, build, `security:check`. Native review approved on each task commit.
+- **Next step:** CI green and merge.
+
 ## 2026-11-19 — Review and fixes on PR #109 (#43, student exam answering)
 
 - **Status:** completed (pending CI and merge of PR #109)
