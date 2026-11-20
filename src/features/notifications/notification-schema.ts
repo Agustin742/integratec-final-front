@@ -3,7 +3,16 @@ import type { components } from '@/api/schema.generated';
 
 z.config({ jitless: true });
 
-export type NotificationDto = components['schemas']['NotificationDto'];
+/**
+ * The generated `classroomId` is typed `Record<string, never> | null` (the
+ * backend's OpenAPI emitter loses the `uuid` string type of its nullable
+ * field); the contract says it is a classroom id, `null` for classroom-free
+ * notices such as badge awards.
+ */
+export type NotificationDto = Omit<
+  components['schemas']['NotificationDto'],
+  'classroomId'
+> & { readonly classroomId: string | null };
 export type NotificationKind = NotificationDto['kind'];
 export type NotificationsReadResultDto =
   components['schemas']['NotificationsReadResultDto'];
@@ -14,6 +23,7 @@ export const NOTIFICATION_KINDS = [
   'announcement',
   'mention',
   'activity_forum_reply',
+  'badge_awarded',
 ] as const satisfies readonly NotificationKind[];
 
 export const notificationKindSchema = z.enum(NOTIFICATION_KINDS);
@@ -22,7 +32,7 @@ export const notificationDtoSchema: z.ZodType<NotificationDto> = z.object({
   id: z.string().uuid(),
   kind: notificationKindSchema,
   resourceId: z.string().uuid(),
-  classroomId: z.string().uuid(),
+  classroomId: z.string().uuid().nullable(),
   studentId: z.string().uuid().nullable(),
   readAt: z.string().datetime({ offset: true }).nullable(),
   createdAt: z.string().datetime({ offset: true }),

@@ -1,4 +1,4 @@
-import { HttpResponse, http, type HttpHandler } from 'msw';
+import { delay, HttpResponse, http, type HttpHandler } from 'msw';
 import type { components, operations } from '../../api/schema.generated';
 
 export type HealthStatusPayload = components['schemas']['HealthStatus'];
@@ -3405,6 +3405,13 @@ export function createClassroomSubmissionsStore(
   const respondError = (status: number, body: ErrorBodyPayload): Response =>
     withCors(createErrorEnvelopeResponse(status, body));
 
+  /** File submissions carry no auto score and no multiple-choice answers. */
+  const withFileResultFields = (item: SubmissionStoreItem) => ({
+    ...item,
+    autoScore: null,
+    answers: [],
+  });
+
   const fail = (failure: SubmissionStoreFailure): Response =>
     failure === 'network' || failure === 'drop-response'
       ? HttpResponse.error()
@@ -3497,7 +3504,7 @@ export function createClassroomSubmissionsStore(
           if (existing) {
             if (existing.idempotencyKey === key) {
               // Idempotent replay: the stored submission, nothing new stored.
-              return respondJson(existing, 200);
+              return respondJson(withFileResultFields(existing), 200);
             }
             return respondError(409, {
               code: 'CONFLICT',
@@ -3618,7 +3625,7 @@ export function createClassroomSubmissionsStore(
             // The server stored the submission but the response was lost.
             return HttpResponse.error();
           }
-          return respondJson(stored, 201);
+          return respondJson(withFileResultFields(stored), 201);
         },
       ),
       http.get(
@@ -3673,6 +3680,8 @@ export function createClassroomSubmissionsStore(
               submittedAt: found.submittedAt,
               isLate: found.isLate,
               status: found.status,
+              autoScore: null,
+              answers: [],
               files: found.files.map((file) => ({
                 ...file,
                 downloadUrl: `https://storage.example.invalid/signed/${file.id}`,
@@ -3681,6 +3690,426 @@ export function createClassroomSubmissionsStore(
             },
             200,
           );
+        },
+      ),
+    ],
+  };
+}
+
+/**
+ * Stateful contract-faithful MSW store for student multiple-choice exam
+ * answering (`SubmissionsController_create` and
+ * `SubmissionsController_readOwn` for a `MULTIPLE_CHOICE` activity, back #47):
+ * `POST /activities/{activityId}/submissions` (multipart, `answers` is a
+ * JSON-encoded array of `{ questionId, optionId }`) and
+ * `GET /activities/{activityId}/submissions/me`.
+ *
+ * Correct answers live only inside this store and are never part of any
+ * response (`RN-06`): the stored submission exposes the chosen options and the
+ * server-computed `autoScore` only. Scoring mirrors the server evaluator,
+ * `round(correct / questions * maxScore)`; the browser never computes a score.
+ * Every `409` carries the single `activity` detail field like the real API, so
+ * the reason is not machine-readable.
+ */
+export interface ExamSubmissionsStoreOption {
+  readonly id: string;
+  /** Store-internal only; never included in any response (`RN-06`). */
+  readonly isCorrect: boolean;
+}
+
+export interface ExamSubmissionsStoreQuestion {
+  readonly id: string;
+  readonly options: readonly ExamSubmissionsStoreOption[];
+}
+
+export interface ExamSubmissionsStoreActivity {
+  readonly id: string;
+  readonly state: 'DRAFT' | 'PUBLISHED';
+  readonly format: 'FILE' | 'MULTIPLE_CHOICE';
+  readonly opensAt: string | null;
+  readonly dueAt: string;
+  readonly allowLate: boolean;
+  readonly maxScore: number;
+  readonly questions: readonly ExamSubmissionsStoreQuestion[];
+}
+
+export interface ExamSubmissionsStoreItem {
+  readonly id: string;
+  readonly activityId: string;
+  readonly submittedAt: string;
+  readonly isLate: boolean;
+  readonly idempotencyKey: string;
+  readonly answers: readonly {
+    readonly questionId: string;
+    readonly optionId: string;
+    readonly position: number;
+  }[];
+  readonly autoScore: number;
+}
+
+export type ExamSubmissionsStoreOp = 'create' | 'readOwn';
+export type ExamSubmissionsStoreFailure =
+  MswErrorResponseSpec | 'network' | 'drop-response';
+
+export interface ExamSubmissionsStoreOptions {
+  readonly baseUrl?: string;
+  readonly role?: 'TEACHER' | 'SCHOOL_OWNER' | 'STUDENT' | 'PARENT';
+  /** Published `MULTIPLE_CHOICE` activity the store accepts answers for. */
+  readonly activity?: ExamSubmissionsStoreActivity;
+  /** Server-clock instant used to decide the answering window. */
+  readonly now?: string;
+  readonly initialItems?: readonly ExamSubmissionsStoreItem[];
+  /**
+   * Artificial latency for every `GET .../submissions/me` response, so tests
+   * can observe the panel's transient "verifying with the server" phase: MSW
+   * resolves in microtasks, which lets the whole uncertain-failure
+   * reconciliation finish before React ever commits the intermediate state.
+   */
+  readonly readOwnDelayMs?: number;
+}
+
+export interface ExamSubmissionCreateRequestRecord {
+  readonly idempotencyKey: string | null;
+  readonly authorization: string | null;
+  readonly accessTokenUsed: string | null;
+  /** Names of the multipart fields received (`answers`, `files`, ...). */
+  readonly fieldNames: readonly string[];
+  /** Raw `answers` multipart field, exactly as the browser sent it. */
+  readonly answers: string | null;
+}
+
+export interface ExamSubmissionsStore {
+  readonly handlers: readonly HttpHandler[];
+  getItems: () => readonly ExamSubmissionsStoreItem[];
+  getLastCreateRequest: () => ExamSubmissionCreateRequestRecord | null;
+  failNext: (
+    op: ExamSubmissionsStoreOp,
+    failure: ExamSubmissionsStoreFailure,
+  ) => void;
+}
+
+export function createExamSubmissionsStore(
+  options: ExamSubmissionsStoreOptions = {},
+): ExamSubmissionsStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const role = options.role ?? 'STUDENT';
+  const activity = options.activity;
+  const now = options.now ?? '2026-11-19T12:00:00.000Z';
+  const readOwnDelayMs = options.readOwnDelayMs ?? 0;
+  const items: ExamSubmissionsStoreItem[] = [...(options.initialItems ?? [])];
+  const pending: Partial<
+    Record<ExamSubmissionsStoreOp, ExamSubmissionsStoreFailure>
+  > = {};
+  let lastCreateRequest: ExamSubmissionCreateRequestRecord | null = null;
+
+  // jsdom enforces CORS, so every store response carries the header a real
+  // API gateway would add; `HttpResponse.error()` stays unwrapped.
+  const withCors = (response: Response): Response => {
+    const headers = new Headers(response.headers);
+    headers.set('access-control-allow-origin', '*');
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  };
+  const respondJson = (body: unknown, status: number): Response =>
+    withCors(
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+  const respondError = (status: number, body: ErrorBodyPayload): Response =>
+    withCors(createErrorEnvelopeResponse(status, body));
+  const respondConflict = (message: string, correlationId: string): Response =>
+    respondError(409, {
+      code: 'CONFLICT',
+      message: 'Request conflicts with the current state',
+      details: [{ field: 'activity', messages: [message] }],
+      correlationId,
+    });
+  const respondAnswersInvalid = (
+    message: string,
+    correlationId: string,
+  ): Response =>
+    respondError(400, {
+      code: 'VALIDATION_FAILED',
+      message: 'The request is invalid. Check the details and try again.',
+      details: [{ field: 'answers', messages: [message] }],
+      correlationId,
+    });
+
+  const fail = (failure: ExamSubmissionsStoreFailure): Response =>
+    failure === 'network' || failure === 'drop-response'
+      ? HttpResponse.error()
+      : respondError(failure.status, failure.body);
+
+  /** The submission payload; never includes correctness (`RN-06`). */
+  const toResponse = (item: ExamSubmissionsStoreItem) => ({
+    id: item.id,
+    activityId: item.activityId,
+    submittedAt: item.submittedAt,
+    isLate: item.isLate,
+    autoScore: item.autoScore,
+    // The server derives `graded` from a teacher grade; an auto-scored
+    // multiple-choice submission stays `submitted`.
+    status: 'submitted' as const,
+    files: [] as never[],
+    answers: item.answers,
+  });
+
+  return {
+    getItems: () => items,
+    getLastCreateRequest: () => lastCreateRequest,
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    handlers: [
+      // jsdom sends a CORS preflight for the POST's custom headers
+      // (`Authorization`, `Idempotency-Key`); answer it like the real API.
+      http.options(
+        `${baseUrl}/activities/:activityId/submissions`,
+        () =>
+          new HttpResponse(null, {
+            status: 204,
+            headers: {
+              'access-control-allow-origin': '*',
+              'access-control-allow-methods': 'POST, GET, OPTIONS',
+              'access-control-allow-headers':
+                'authorization, idempotency-key, accept, content-type',
+            },
+          }),
+      ),
+      http.options(
+        `${baseUrl}/activities/:activityId/submissions/me`,
+        () =>
+          new HttpResponse(null, {
+            status: 204,
+            headers: {
+              'access-control-allow-origin': '*',
+              'access-control-allow-methods': 'GET, OPTIONS',
+              'access-control-allow-headers': 'authorization, accept',
+            },
+          }),
+      ),
+      http.post(
+        `${baseUrl}/activities/:activityId/submissions`,
+        async ({ params, request }) => {
+          const failure = pending.create;
+          pending.create = undefined;
+          if (failure === 'network') {
+            return HttpResponse.error();
+          }
+          if (failure !== undefined && failure !== 'drop-response') {
+            return respondError(failure.status, failure.body);
+          }
+
+          const idempotencyKey = request.headers.get('Idempotency-Key');
+          const authorization = request.headers.get('Authorization');
+          const form = await request.formData().catch(() => null);
+          const answersField = form?.get('answers');
+          lastCreateRequest = {
+            idempotencyKey,
+            authorization,
+            accessTokenUsed:
+              authorization?.startsWith('Bearer ') && authorization.length > 7
+                ? authorization.slice(7)
+                : null,
+            fieldNames: form ? [...new Set(form.keys())] : [],
+            answers: typeof answersField === 'string' ? answersField : null,
+          };
+
+          if (
+            !activity ||
+            params.activityId !== activity.id ||
+            activity.state !== 'PUBLISHED'
+          ) {
+            return respondError(404, {
+              code: 'NOT_FOUND',
+              message: 'The requested resource was not found.',
+              correlationId: 'req-exam-submissions-create-404',
+            });
+          }
+          if (role !== 'STUDENT') {
+            return respondError(403, {
+              code: 'FORBIDDEN',
+              message: 'You are not allowed to perform this action.',
+              correlationId: 'req-exam-submissions-create-403',
+            });
+          }
+
+          const key = idempotencyKey?.trim() ?? '';
+          if (key.length < 1 || key.length > 255) {
+            return respondError(400, {
+              code: 'VALIDATION_FAILED',
+              message:
+                'The request is invalid. Check the details and try again.',
+              details: [
+                {
+                  field: 'Idempotency-Key',
+                  messages: ['Idempotency-Key header is required.'],
+                },
+              ],
+              correlationId: 'req-exam-submissions-create-400-key',
+            });
+          }
+
+          const existing = items.find(
+            (item) => item.activityId === activity.id,
+          );
+          if (existing) {
+            if (existing.idempotencyKey === key) {
+              // Idempotent replay: the stored submission, never re-scored.
+              return respondJson(toResponse(existing), 200);
+            }
+            return respondConflict(
+              'You already submitted to this activity',
+              'req-exam-submissions-create-409-key',
+            );
+          }
+
+          if (activity.format !== 'MULTIPLE_CHOICE' || form?.has('files')) {
+            return respondConflict(
+              'This activity does not accept file submissions',
+              'req-exam-submissions-create-409-format',
+            );
+          }
+
+          let parsed: unknown = null;
+          try {
+            parsed =
+              typeof answersField === 'string'
+                ? (JSON.parse(answersField) as unknown)
+                : null;
+          } catch {
+            parsed = null;
+          }
+          if (!Array.isArray(parsed) || parsed.length === 0) {
+            return respondAnswersInvalid(
+              'answers must be a non-empty JSON array of question/option pairs',
+              'req-exam-submissions-create-400-shape',
+            );
+          }
+
+          if (activity.opensAt && now < activity.opensAt) {
+            return respondConflict(
+              'This activity is not open yet',
+              'req-exam-submissions-create-409-window',
+            );
+          }
+          const isLate = now > activity.dueAt;
+          if (isLate && !activity.allowLate) {
+            return respondConflict(
+              'The deadline has passed and this activity does not accept late submissions',
+              'req-exam-submissions-create-409-closed',
+            );
+          }
+
+          const seenQuestionIds = new Set<string>();
+          const rows: {
+            questionId: string;
+            optionId: string;
+            position: number;
+          }[] = [];
+          let correct = 0;
+          for (const [position, entry] of (parsed as unknown[]).entries()) {
+            const { questionId, optionId } = (entry ?? {}) as Record<
+              string,
+              unknown
+            >;
+            if (
+              typeof questionId !== 'string' ||
+              typeof optionId !== 'string' ||
+              seenQuestionIds.has(questionId)
+            ) {
+              return respondAnswersInvalid(
+                'each answer must be an object with uuid questionId and optionId',
+                'req-exam-submissions-create-400-pair',
+              );
+            }
+            seenQuestionIds.add(questionId);
+            const option = activity.questions
+              .find((question) => question.id === questionId)
+              ?.options.find((candidate) => candidate.id === optionId);
+            if (!option) {
+              return respondAnswersInvalid(
+                `answer ${optionId} does not belong to question ${questionId} of this activity`,
+                'req-exam-submissions-create-400-option',
+              );
+            }
+            if (option.isCorrect) {
+              correct += 1;
+            }
+            rows.push({ questionId, optionId, position });
+          }
+
+          const autoScore = Math.round(
+            (correct / Math.max(activity.questions.length, 1)) *
+              activity.maxScore,
+          );
+          const stored: ExamSubmissionsStoreItem = {
+            id: globalThis.crypto.randomUUID(),
+            activityId: activity.id,
+            submittedAt: now,
+            isLate,
+            idempotencyKey: key,
+            answers: rows,
+            autoScore,
+          };
+          items.push(stored);
+
+          if (failure === 'drop-response') {
+            // The server stored the submission but the response was lost.
+            return HttpResponse.error();
+          }
+          return respondJson(toResponse(stored), 201);
+        },
+      ),
+      http.get(
+        `${baseUrl}/activities/:activityId/submissions/me`,
+        async ({ params }) => {
+          if (readOwnDelayMs > 0) {
+            await delay(readOwnDelayMs);
+          }
+          const failure = pending.readOwn;
+          pending.readOwn = undefined;
+          if (failure !== undefined) {
+            return fail(failure);
+          }
+
+          // The real API answers the same generic `404` for an unknown
+          // activity, a draft, a non-member and a missing submission.
+          if (
+            !activity ||
+            params.activityId !== activity.id ||
+            activity.state !== 'PUBLISHED'
+          ) {
+            return respondError(404, {
+              code: 'NOT_FOUND',
+              message: 'The requested resource was not found.',
+              correlationId: 'req-exam-submissions-me-404-activity',
+            });
+          }
+          if (role !== 'STUDENT') {
+            return respondError(403, {
+              code: 'FORBIDDEN',
+              message: 'You are not allowed to perform this action.',
+              correlationId: 'req-exam-submissions-me-403',
+            });
+          }
+
+          const found = items.find(
+            (item) => item.activityId === params.activityId,
+          );
+          if (!found) {
+            return respondError(404, {
+              code: 'NOT_FOUND',
+              message: 'The requested resource was not found.',
+              correlationId: 'req-exam-submissions-me-404-submission',
+            });
+          }
+          return respondJson(toResponse(found), 200);
         },
       ),
     ],
