@@ -8,6 +8,7 @@ const nav = vi.hoisted(() => ({
   options: null as unknown,
   onFloorClick: vi.fn(),
   localAvatarProps: null as unknown,
+  remoteAvatars: [] as unknown[],
 }));
 
 vi.mock('./use-classroom-navigation', () => ({
@@ -26,6 +27,12 @@ vi.mock('./local-avatar', () => ({
     return <div data-testid="local-avatar" />;
   },
 }));
+vi.mock('./remote-avatar', () => ({
+  RemoteAvatar: (props: unknown) => {
+    nav.remoteAvatars.push(props);
+    return <div data-testid="remote-avatar" />;
+  },
+}));
 
 const avatar: Avatar = {
   bodyId: 'female',
@@ -37,6 +44,7 @@ const avatar: Avatar = {
 
 beforeEach(() => {
   nav.onFloorClick.mockClear();
+  nav.remoteAvatars.length = 0;
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -67,5 +75,44 @@ describe('ClassroomScene', () => {
     const { container } = render(<ClassroomScene scopeKey="room-1" />);
     fireEvent.click(container.querySelector('primitive')!);
     expect(nav.onFloorClick).toHaveBeenCalledTimes(1);
+  });
+
+  test('forwards server pose, connection key, freeze state, and renders remote avatars', () => {
+    const selfPose = { x: 1, z: 4, rotation: 0.5 };
+    render(
+      <ClassroomScene
+        avatar={avatar}
+        scopeKey="room-1"
+        selfPose={selfPose}
+        connectionKey="room-1:session-1"
+        frozen
+        remoteParticipants={[
+          {
+            userId: 'remote-1',
+            displayName: 'Profe Ana',
+            role: 'TEACHER',
+            status: 'online',
+            x: 0,
+            z: -3,
+            rotation: 0,
+            avatar,
+          },
+        ]}
+      />,
+    );
+    expect(nav.options).toMatchObject({
+      scopeKey: 'room-1',
+      serverPose: selfPose,
+      connectionKey: 'room-1:session-1',
+      frozen: true,
+    });
+    expect(screen.getAllByTestId('remote-avatar')).toHaveLength(1);
+    expect(nav.remoteAvatars[0]).toMatchObject({
+      userId: 'remote-1',
+      status: 'online',
+      targetPose: { x: 0, z: -3, rotation: 0 },
+      avatar,
+      scopeKey: 'room-1',
+    });
   });
 });

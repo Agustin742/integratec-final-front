@@ -4,6 +4,11 @@ export {
   ClassroomWorld,
   type ClassroomWorldProps,
 } from './classroom/classroom-world';
+export {
+  RemoteAvatar,
+  type RemoteAvatarProps,
+  type RemoteClassroomParticipant,
+} from './classroom/remote-avatar';
 export { WarmLighting } from './world-lighting';
 export { WorldReference } from './world-reference';
 export { GlbAsset, type GlbAssetProps } from './glb-asset';

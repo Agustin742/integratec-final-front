@@ -22,10 +22,23 @@ const click = (x: number, z: number, button = 0) => ({
   stopPropagation: vi.fn(),
 });
 
-function setup(props: { scopeKey?: string; onIntentChange?: () => void } = {}) {
+function setup(
+  props: {
+    scopeKey?: string;
+    serverPose?: { x: number; z: number; rotation: number };
+    connectionKey?: string;
+    frozen?: boolean;
+    onIntentChange?: () => void;
+  } = {},
+) {
   return renderHook(
-    (p: { scopeKey?: string; onIntentChange?: () => void }) =>
-      useClassroomNavigation(p),
+    (p: {
+      scopeKey?: string;
+      serverPose?: { x: number; z: number; rotation: number };
+      connectionKey?: string;
+      frozen?: boolean;
+      onIntentChange?: () => void;
+    }) => useClassroomNavigation(p),
     { initialProps: props },
   );
 }
@@ -131,5 +144,90 @@ describe('useClassroomNavigation', () => {
     });
     expect(three.invalidate).toHaveBeenCalled();
     expect(onIntentChange).toHaveBeenCalledTimes(1);
+  });
+
+  test('spawns and reconciles to serverPose on join and reconnect while clearing destinations', () => {
+    const { result, rerender } = setup({
+      scopeKey: 'room-1',
+      connectionKey: 'connecting',
+    });
+
+    act(() => result.current.onFloorClick(click(-4, 5)));
+    expect(result.current.controller.hasDestination()).toBe(true);
+
+    // Server join provides authoritative spawn and replaces local state.
+    rerender({
+      scopeKey: 'room-1',
+      connectionKey: 'room-a:session-1',
+      serverPose: { x: 2, z: 5, rotation: 0.4 },
+    });
+    expect(result.current.controller.poseRef.current).toEqual({
+      x: 2,
+      z: 5,
+      rotation: 0.4,
+    });
+    expect(result.current.controller.hasDestination()).toBe(false);
+    expect(result.current.marker.object.visible).toBe(false);
+
+    // Reconnect under a new session epoch reconciles pose and discards queued destination.
+    act(() => result.current.onFloorClick(click(0, 5)));
+    expect(result.current.controller.hasDestination()).toBe(true);
+
+    rerender({
+      scopeKey: 'room-1',
+      connectionKey: 'room-a:session-2',
+      serverPose: { x: 4, z: 5, rotation: Math.PI },
+    });
+    expect(result.current.controller.poseRef.current).toEqual({
+      x: 4,
+      z: 5,
+      rotation: Math.PI,
+    });
+    expect(result.current.controller.hasDestination()).toBe(false);
+  });
+
+  test('stops movement input and drops destinations when classroom is frozen', () => {
+    const onIntentChange = vi.fn();
+    const { result, rerender } = setup({
+      scopeKey: 'room-1',
+      connectionKey: 'room-a:session-1',
+      serverPose: { x: -4, z: 5, rotation: 0 },
+      frozen: false,
+      onIntentChange,
+    });
+
+    act(() => result.current.onFloorClick(click(-2, 5)));
+    expect(result.current.controller.hasDestination()).toBe(true);
+
+    onIntentChange.mockClear();
+    rerender({
+      scopeKey: 'room-1',
+      connectionKey: 'room-a:session-1',
+      serverPose: { x: -1.5, z: 0.4, rotation: Math.PI },
+      frozen: true,
+      onIntentChange,
+    });
+
+    expect(result.current.controller.hasDestination()).toBe(false);
+    expect(result.current.marker.object.visible).toBe(false);
+    expect(result.current.controller.poseRef.current).toEqual({
+      x: -1.5,
+      z: 0.4,
+      rotation: Math.PI,
+    });
+
+    // Floor clicks and WASD keys are ignored while frozen.
+    act(() => result.current.onFloorClick(click(0, 5)));
+    expect(result.current.controller.hasDestination()).toBe(false);
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          code: 'KeyW',
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+    expect(result.current.controller.getIntent()).toEqual({ x: 0, z: 0 });
   });
 });

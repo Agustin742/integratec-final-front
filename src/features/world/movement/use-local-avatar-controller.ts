@@ -30,6 +30,8 @@ export interface LocalAvatarApi {
   /** Returns false, changing nothing, when the point is unwalkable, unreachable or input is disabled. */
   setDestination: (point: Waypoint) => boolean;
   clearDestination: () => void;
+  /** Resets position and clears any held input or queued destination. */
+  reset: (spawn: Pose) => void;
   /** Advances one frame from `useFrame`; mutates refs only, never React state. */
   step: (dtSeconds: number) => StepResult;
 }
@@ -93,6 +95,10 @@ export function useLocalAvatarController({
     () => controller.clearDestination(),
     [controller],
   );
+  const reset = useCallback(
+    (nextSpawn: Pose) => controller.reset(nextSpawn),
+    [controller],
+  );
   const step = useCallback((dt: number) => controller.step(dt), [controller]);
 
   return {
@@ -102,6 +108,7 @@ export function useLocalAvatarController({
     hasDestination,
     setDestination,
     clearDestination,
+    reset,
     step,
   };
 }

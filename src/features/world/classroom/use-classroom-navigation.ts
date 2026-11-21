@@ -21,22 +21,34 @@ export const LOCAL_SPAWN: Pose = {
 export interface UseClassroomNavigationOptions {
   /** Classroom id: changing it respawns the avatar and drops all input. */
   scopeKey?: string | undefined;
+  /** Authoritative pose from the room for the local user (#37). */
+  serverPose?: Pose | undefined;
+  /** Connection epoch key that changes on join, reconnect, or drop (#37). */
+  connectionKey?: string | undefined;
+  /** True while the classroom is frozen or movement is locked (#37). */
+  frozen?: boolean | undefined;
   /** Movement intent for the realtime sender (#37); fired on change only. */
   onIntentChange?: ((intent: AvatarInput) => void) | undefined;
 }
+
+const SERVER_SNAP_DISTANCE = 1.5;
+const SERVER_IDLE_SETTLE_EPSILON = 0.05;
 
 /**
  * Everything the classroom needs to walk the local avatar: the controller
  * (keyboard + destination), the click handler for the floor, the destination
  * marker and Escape to stop. Input is ignored while the canvas is not
- * rendering (hidden tab, offscreen).
+ * rendering (hidden tab, offscreen) or while frozen.
  */
 export function useClassroomNavigation({
   scopeKey,
+  serverPose,
+  connectionKey,
+  frozen = false,
   onIntentChange,
 }: UseClassroomNavigationOptions) {
   const invalidate = useThree((state) => state.invalidate);
-  const enabled = useThree((state) => state.frameloop) !== 'never';
+  const enabled = useThree((state) => state.frameloop) !== 'never' && !frozen;
   // A key press from rest must wake the demand loop itself; nothing else
   // (placeholder body, reduced motion) is guaranteed to be requesting frames.
   const listener = useRef(onIntentChange);
@@ -52,7 +64,7 @@ export function useClassroomNavigation({
   );
   const controller = useLocalAvatarController({
     layout: CLASSROOM_LAYOUT,
-    spawn: LOCAL_SPAWN,
+    spawn: serverPose ?? LOCAL_SPAWN,
     enabled,
     resetKey: scopeKey ?? '',
     onIntentChange: wakeAndForward,
@@ -60,11 +72,101 @@ export function useClassroomNavigation({
   const marker = useMemo(() => createDestinationMarker(), []);
   useEffect(() => () => marker.dispose(), [marker]);
 
+  const appliedConnectionRef = useRef<string | null>(null);
+  const spawnedForConnectionRef = useRef(false);
+  const prevFrozenRef = useRef(false);
+  const {
+    reset: resetController,
+    clearDestination: clearControllerDestination,
+  } = controller;
+  const serverX = serverPose?.x;
+  const serverZ = serverPose?.z;
+  const serverRotation = serverPose?.rotation;
+
   // Declared after the controller so it runs after the respawn it triggers.
   useEffect(() => {
     marker.hide();
     invalidate();
   }, [marker, invalidate, scopeKey]);
+
+  useEffect(() => {
+    const resolvedPose: Pose | undefined =
+      serverX !== undefined &&
+      serverZ !== undefined &&
+      serverRotation !== undefined
+        ? { x: serverX, z: serverZ, rotation: serverRotation }
+        : undefined;
+    const effectiveKey =
+      connectionKey !== undefined ? `${scopeKey ?? ''}:${connectionKey}` : null;
+
+    if (
+      effectiveKey !== null &&
+      appliedConnectionRef.current !== effectiveKey
+    ) {
+      appliedConnectionRef.current = effectiveKey;
+      spawnedForConnectionRef.current = resolvedPose !== undefined;
+      resetController(resolvedPose ?? LOCAL_SPAWN);
+      marker.hide();
+      invalidate();
+      prevFrozenRef.current = frozen;
+      return;
+    }
+
+    if (
+      effectiveKey !== null &&
+      !spawnedForConnectionRef.current &&
+      resolvedPose !== undefined
+    ) {
+      spawnedForConnectionRef.current = true;
+      resetController(resolvedPose);
+      marker.hide();
+      invalidate();
+      prevFrozenRef.current = frozen;
+      return;
+    }
+
+    if (frozen && !prevFrozenRef.current) {
+      clearControllerDestination();
+      marker.hide();
+      invalidate();
+    }
+    prevFrozenRef.current = frozen;
+
+    if (resolvedPose === undefined) {
+      return;
+    }
+
+    const current = controller.poseRef.current;
+    const dist = Math.hypot(
+      current.x - resolvedPose.x,
+      current.z - resolvedPose.z,
+    );
+    const intent = controller.getIntent();
+    const isIdle = intent.x === 0 && intent.z === 0;
+    if (
+      dist > SERVER_SNAP_DISTANCE ||
+      (frozen && dist > SERVER_IDLE_SETTLE_EPSILON) ||
+      (!controller.hasDestination() &&
+        isIdle &&
+        dist > SERVER_IDLE_SETTLE_EPSILON)
+    ) {
+      resetController(resolvedPose);
+      marker.hide();
+      invalidate();
+    }
+  }, [
+    clearControllerDestination,
+    connectionKey,
+    controller,
+    frozen,
+    invalidate,
+    marker,
+    resetController,
+    scopeKey,
+    serverRotation,
+    serverX,
+    serverZ,
+  ]);
 
   useEscapeKey({
     enabled,

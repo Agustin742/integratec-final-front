@@ -78,3 +78,35 @@ test('renders the scene without an avatar while the profile is unavailable', () 
   expect(screen.getByTestId('classroom-scene')).toBeInTheDocument();
   expect(canvas.sceneProps.avatar).toBeUndefined();
 });
+
+test('forwards remote participants, server pose, connection key, and freeze flag to the scene', () => {
+  const remoteParticipants = [
+    {
+      userId: 'remote-1',
+      displayName: 'Lucía',
+      role: 'STUDENT',
+      status: 'online',
+      x: 2,
+      z: 3,
+      rotation: 0,
+    },
+  ];
+  const selfPose = { x: -2, z: 5, rotation: Math.PI };
+  render(
+    <ClassroomWorld
+      label="Escena"
+      scopeKey="aula-1"
+      selfPose={selfPose}
+      connectionKey="room-1:s-1"
+      frozen
+      remoteParticipants={remoteParticipants}
+    />,
+  );
+  expect(canvas.sceneProps).toMatchObject({
+    scopeKey: 'aula-1',
+    selfPose,
+    connectionKey: 'room-1:s-1',
+    frozen: true,
+    remoteParticipants,
+  });
+});
