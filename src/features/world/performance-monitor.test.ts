@@ -65,6 +65,39 @@ describe('FpsSampler (#56)', () => {
     expect(sampler.isSustainedBelowTarget()).toBe(true);
   });
 
+  test('a steady 2 fps stream (below the 3.75 fps frame-count floor) triggers the offer', () => {
+    // 500 ms between frames stays under the 1000 ms idle gap, but 8 s only
+    // holds ~16 frames: fewer than minDecisionFrames.
+    stream(sampler, 2, 10000);
+    expect(sampler.getMetrics().frames).toBeLessThan(
+      PERF_SAMPLER_CONFIG.minDecisionFrames,
+    );
+    expect(sampler.isSustainedBelowTarget()).toBe(true);
+  });
+
+  test('a steady 3 fps stream triggers the offer', () => {
+    stream(sampler, 3, 10000);
+    expect(sampler.getMetrics().frames).toBeLessThan(
+      PERF_SAMPLER_CONFIG.minDecisionFrames,
+    );
+    expect(sampler.isSustainedBelowTarget()).toBe(true);
+  });
+
+  test('a short burst of slow frames below the span threshold does not trigger', () => {
+    // 4 s at 2 fps: few frames and not enough elapsed time to decide.
+    stream(sampler, 2, 4000);
+    expect(sampler.getMetrics().windowMs).toBeLessThan(
+      PERF_SAMPLER_CONFIG.minDecisionSpanMs,
+    );
+    expect(sampler.isSustainedBelowTarget()).toBe(false);
+  });
+
+  test('two frames far apart within the idle gap never decide', () => {
+    sampler.recordFrame(0);
+    sampler.recordFrame(900);
+    expect(sampler.isSustainedBelowTarget()).toBe(false);
+  });
+
   test('reports the frame count and mean fps of the rolling window', () => {
     stream(sampler, 30, 8000);
     const metrics = sampler.getMetrics();

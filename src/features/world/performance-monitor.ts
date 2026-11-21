@@ -44,8 +44,17 @@ export const PERF_SAMPLER_CONFIG = {
   /** Frames required inside the window before any offer decision. */
   minDecisionFrames: 30,
   /**
+   * Alternative decision gate for very slow devices: below ~3.75 fps the
+   * 8 s window can never hold `minDecisionFrames`, so a window that spans at
+   * least this much time (with at least 2 frames) may decide too. Must stay
+   * below `windowMs`.
+   */
+  minDecisionSpanMs: 6000,
+  /**
    * A gap longer than this between frames resets the window: frames across
    * an idle pause (hidden tab, static scene) are not evidence of slowness.
+   * Consequently a device rendering below 1 fps is indistinguishable from an
+   * idle pause and never gets the offer; that floor is accepted.
    */
   idleGapResetMs: 1000,
   /** Hard cap on stored samples so fast devices cannot grow the array. */
@@ -99,12 +108,18 @@ export class FpsSampler {
   }
 
   /**
-   * True when the rolling window holds enough frames to decide and their
-   * mean rate sits below the offer threshold (issue #56: sustained low fps).
+   * True when the rolling window is meaningful (enough frames, or enough
+   * elapsed time for very slow devices) and the mean rate sits below the
+   * offer threshold (issue #56: sustained low fps).
    */
   isSustainedBelowTarget(): boolean {
     const metrics = this.getMetrics();
-    if (metrics.frames < PERF_SAMPLER_CONFIG.minDecisionFrames) {
+    const enoughFrames =
+      metrics.frames >= PERF_SAMPLER_CONFIG.minDecisionFrames;
+    const enoughSpan =
+      metrics.frames >= 2 &&
+      metrics.windowMs >= PERF_SAMPLER_CONFIG.minDecisionSpanMs;
+    if (!enoughFrames && !enoughSpan) {
       return false;
     }
     return (
