@@ -32,7 +32,10 @@ import { joinMessages } from './join-messages';
 import { readClassroomJoinOutcome } from './join-schema';
 import { classroomMessages as messages } from './messages';
 import { PerformanceOfferBanner } from './performance-offer-banner';
-import { beginPerformanceOffer } from './performance-offer-store';
+import {
+  beginPerformanceOffer,
+  usePerformanceOfferStore,
+} from './performance-offer-store';
 import { useClassroomContext } from './use-classroom-capabilities';
 import { useClassroomContextEvents } from './use-classroom-context-events';
 import { classroomPanelCatalog } from './panels/classroom-panel-catalog';
@@ -159,8 +162,13 @@ function WorkspaceContext({
 
   const handleModeToggle = useCallback(() => {
     pendingFocusSwitchRef.current = true;
+    // Switching to 2D by hand answers a visible 2D offer (no-op otherwise),
+    // so it does not reappear stale after returning to 3D.
+    if (mode === '3d') {
+      usePerformanceOfferStore.getState().accept();
+    }
     toggleMode();
-  }, [toggleMode]);
+  }, [mode, toggleMode]);
 
   useLayoutEffect(() => {
     if (
@@ -350,6 +358,7 @@ function WorkspaceContext({
                   pendingFocusSwitchRef.current = true;
                   setMode('2d');
                 }}
+                onDecline={() => activeViewHeadingRef.current?.focus()}
               />
               <Classroom3DStage
                 headingRef={activeViewHeadingRef}

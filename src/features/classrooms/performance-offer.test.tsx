@@ -1,4 +1,10 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { createMemoryRouter, useOutletContext } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { beforeEach, describe, expect, test } from 'vitest';
@@ -19,6 +25,7 @@ import { classroomMessages } from './messages';
 import {
   beginPerformanceOffer,
   resetPerformanceOfferStore,
+  usePerformanceOfferStore,
 } from './performance-offer-store';
 
 type Detail = components['schemas']['ClassroomContextResponseDto'];
@@ -93,6 +100,18 @@ function setupWorkspace() {
   );
 }
 
+/** The header toggle shares its label with the offer's accept button. */
+function headerToggle(name: string) {
+  const offer = screen.queryByTestId('performance-offer');
+  const match = screen
+    .getAllByRole('button', { name })
+    .find((button) => !offer?.contains(button));
+  if (!match) {
+    throw new Error(`Header toggle "${name}" not found`);
+  }
+  return match;
+}
+
 /**
  * Issue #56 S4/S5/S6/S7a/S7b: sustained low fps shows a non-blocking offer;
  * the app never switches by itself; decline is remembered for the session.
@@ -122,21 +141,26 @@ describe('ClassroomWorkspace performance offer (#56)', () => {
       beginPerformanceOffer();
     });
 
-    // Announced to assistive technology as a polite status.
+    // Announced to assistive technology through the Alert's default status
+    // role, without a redundant explicit role or aria-live.
     const offer = screen.getByTestId('performance-offer');
     expect(offer).toHaveAttribute('role', 'status');
-    expect(offer).toHaveAttribute('aria-live', 'polite');
+    expect(within(offer).queryAllByRole('status')).toHaveLength(0);
+    expect(offer).not.toHaveAttribute('aria-live');
+    expect(offer.textContent).toContain(
+      classroomMessages.performanceOffer.body,
+    );
+    expect(classroomMessages.performanceOffer.body).toContain('Alt+M');
+    expect(classroomMessages.performanceOffer.accept).toBe(
+      classroomMessages.viewMode.switchTo2d,
+    );
     expect(offer.textContent).toContain(
       classroomMessages.performanceOffer.title,
     );
 
     // No mode change occurs without the user's choice.
     expect(getClassroomMode(profile.id)).toBe('3d');
-    expect(
-      screen.getByRole('button', {
-        name: classroomMessages.viewMode.switchTo2d,
-      }),
-    ).toBeTruthy();
+    expect(headerToggle(classroomMessages.viewMode.switchTo2d)).toBeTruthy();
   });
 
   test('accepting switches to 2D Classic Mode through the HU-ESP-003 action', async () => {
@@ -149,7 +173,7 @@ describe('ClassroomWorkspace performance offer (#56)', () => {
       beginPerformanceOffer();
     });
     fireEvent.click(
-      screen.getByRole('button', {
+      within(screen.getByTestId('performance-offer')).getByRole('button', {
         name: classroomMessages.performanceOffer.accept,
       }),
     );
@@ -189,5 +213,77 @@ describe('ClassroomWorkspace performance offer (#56)', () => {
     });
     expect(screen.queryByTestId('performance-offer')).toBeNull();
     expect(getClassroomMode(profile.id)).toBe('3d');
+  });
+
+  test('declining moves focus to the 3D stage heading', async () => {
+    setupWorkspace();
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 3 })).toBeTruthy(),
+    );
+
+    act(() => {
+      beginPerformanceOffer();
+    });
+    const decline = screen.getByRole('button', {
+      name: classroomMessages.performanceOffer.decline,
+    });
+    decline.focus();
+    fireEvent.click(decline);
+
+    expect(screen.queryByTestId('performance-offer')).toBeNull();
+    expect(document.activeElement).toBe(
+      screen.getByRole('heading', {
+        name: classroomMessages.viewMode.stage3dHeading,
+      }),
+    );
+  });
+
+  test('switching to 2D with the header toggle resolves the offer', async () => {
+    setupWorkspace();
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 3 })).toBeTruthy(),
+    );
+
+    act(() => {
+      beginPerformanceOffer();
+    });
+    fireEvent.click(headerToggle(classroomMessages.viewMode.switchTo2d));
+    expect(usePerformanceOfferStore.getState().status).toBe('accepted');
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', {
+          name: classroomMessages.viewMode.mode2dHeading,
+        }),
+      ).toBeTruthy(),
+    );
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: classroomMessages.viewMode.switchTo3d,
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', {
+          name: classroomMessages.viewMode.stage3dHeading,
+        }),
+      ).toBeTruthy(),
+    );
+    expect(screen.queryByTestId('performance-offer')).toBeNull();
+  });
+
+  test('switching to 2D with Alt+M resolves the offer', async () => {
+    setupWorkspace();
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 3 })).toBeTruthy(),
+    );
+
+    act(() => {
+      beginPerformanceOffer();
+    });
+    fireEvent.keyDown(window, { key: 'm', code: 'KeyM', altKey: true });
+
+    await waitFor(() => expect(getClassroomMode(profile.id)).toBe('2d'));
+    expect(usePerformanceOfferStore.getState().status).toBe('accepted');
   });
 });

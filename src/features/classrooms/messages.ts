@@ -47,9 +47,9 @@ export const classroomMessages = {
   },
   performanceOffer: {
     title: 'La vista 3D está lenta en este dispositivo',
-    body: 'Podés pasar al Modo 2D Clásico para seguir con más fluidez. Las herramientas y tu contexto no cambian, y volvés a la vista 3D cuando quieras.',
-    accept: 'Pasar al Modo 2D Clásico',
-    decline: 'Seguir en la vista 3D',
+    body: 'El Modo 2D Clásico muestra los paneles del aula en una vista más liviana, sin 3D. Tus herramientas y tu contexto no cambian. Para volver a la vista 3D, usá el botón "Cambiar a Vista 3D" en la parte superior del aula o el atajo Alt+M.',
+    accept: 'Cambiar a Modo 2D Clásico',
+    decline: 'Seguir en la vista 3D y no volver a avisar en esta sesión',
   },
   list: {
     subtitle:
