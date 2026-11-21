@@ -1618,3 +1618,49 @@ export function createClassroomChatHistoryPredicate(
     isClassroomChat(query) &&
     (query.queryKey[0] as { resource?: unknown }).resource === 'history';
 }
+
+/**
+ * Key of `GET /classrooms/{id}/me/equipment`: the authenticated student's
+ * classroom-scoped equipment state. Scoped by `userId` and `classroomId` so
+ * switching either one reads an isolated cache entry
+ * (`rules/state-management.md`).
+ */
+export function classroomEquipmentQueryKey(
+  userId: string,
+  classroomId: string,
+): ScopedQueryKey {
+  return createScopedQueryKey({ userId, classroomId }, 'equipment', 'state');
+}
+
+/**
+ * Predicate matching the classroom equipment state query entry owned by
+ * `userId` and `classroomId`. Used on logout or account switch to evict the
+ * private cache entry (`rules/state-management.md`).
+ */
+export function createClassroomEquipmentPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'equipment' &&
+      segment.resource === 'state'
+    );
+  };
+}
