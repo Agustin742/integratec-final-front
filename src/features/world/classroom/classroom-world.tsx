@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { AvatarInput } from '@/realtime';
 import { useOwnProfile } from '@/features/profile/use-own-profile';
 import { worldMessages } from '../messages';
@@ -10,6 +11,8 @@ export interface ClassroomWorldProps extends Pick<
 > {
   /** Movement intent of the local avatar, for the realtime sender (#37). */
   onIntentChange?: (intent: AvatarInput) => void;
+  /** Extra in-canvas nodes, such as the performance probe (#56). */
+  children?: ReactNode;
 }
 
 /**
@@ -21,6 +24,7 @@ export function ClassroomWorld({
   label,
   scopeKey,
   onIntentChange,
+  children,
 }: ClassroomWorldProps) {
   const { query } = useOwnProfile();
   return (
@@ -35,6 +39,7 @@ export function ClassroomWorld({
         scopeKey={scopeKey}
         onIntentChange={onIntentChange}
       />
+      {children}
     </WorldCanvas>
   );
 }

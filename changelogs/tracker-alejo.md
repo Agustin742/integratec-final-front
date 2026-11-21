@@ -9,6 +9,15 @@
 - **Verification:** On the merged `feat/36-classroom-scene` tree: Prettier format check/write on touched Markdown files, `tsc --noEmit`, `eslint` on touched modules, `assets:check`, `git diff --check origin/develop`, and affected Vitest suites (`input-arbitration`, `world`, `classroom-3d-stage`, `use-classroom-context-events`, `classroom-workspace-panels`, `classroom-invitations-panel`, `chat-composer`).
 - **Next step:** Push merge commit, approve and merge PR #112 into `develop`.
 
+## 2026-11-20 — Runtime performance monitor and 2D Classic Mode offer (#56)
+
+- **Status:** in review on [PR #114](https://github.com/Agustin742/integratec-final-front/pull/114) against `develop`; review fixes applied on the branch `feat/56-performance-monitor`
+- **Area / files:** `src/features/world/performance-monitor.ts`, `performance-probe.tsx`, `performance-stats-overlay.tsx` (+ tests, `world-canvas`/stage wiring), `src/features/classrooms/performance-offer-store.ts`, `performance-offer-banner.tsx`, `classroom-workspace.tsx`, `messages.ts` (+ tests), `src/app/router/app-shell.tsx` (logout reset), `src/test/setup.ts`, `e2e/performance-offer.spec.ts`, `docs/3d-performance-monitor.md`, `docs/technical-justification.md` (FD8), `docs/ai-usage.md`, `docs/assets/classroom-workspace/performance-offer-{1280,360}.png`
+- **Change:** [Issue #56](https://github.com/Agustin742/integratec-final-front/issues/56) (FD8): a rolling-window fps sampler over rendered frames (`8000 ms` window, offer when mean `< 24 fps`), a dev-only stats overlay against the FD8 limits, and a non-blocking es-AR offer banner (`role="status"`) to switch to 2D Classic Mode. Accept calls the HU-ESP-003 mode action; decline is remembered for the session; the app never switches by itself.
+- **Reason:** Detect devices that cannot sustain the 3D budget and offer, never force, the 2D Classic Mode.
+- **Verification:** Node v24.15.0 with `npm_config_engine_strict=false`: lint (pre-existing `jsx-ast-utils` warning), typecheck, build, `security:check`, `format:check`, `check_docs.py` and `git diff --check` pass; full vitest 1341/1344 with 3 failures (pre-existing `materials` class, see the ai-usage entry); `e2e/performance-offer.spec.ts` 5/5 (1 skipped by design) with screenshots. Measured on the empty reference stage: 33.4 fps unthrottled (resize-driven), 6.8 fps (desktop) and 4.3 fps (mobile) at 20x CPU throttle with the offer shown; 0 draw calls / 0 triangles. Other Playwright specs fail locally on the unmocked `GET /chats` from the chat dock merged with #113 (not changed here, not re-verified on clean `develop`). The Python CI `unittest` suite was not run on this Windows workstation.
+- **Next step:** CI green on PR #114 and merge.
+
 ## 2026-11-19 — Implement real-time classroom chat panel (#51)
 
 - **Status:** in-progress (published on [PR #113](https://github.com/Agustin742/integratec-final-front/pull/113) against `develop`: contract layer, panel, composer, moderation, e2e/docs evidence and the full local ladder with every full-suite failure proven pre-existing by differential; awaiting team review and merge)

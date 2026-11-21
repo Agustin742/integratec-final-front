@@ -7,6 +7,7 @@ import { Toast, toast } from '@/components/ui/toast';
 import { ChatDock } from '@/features/chat-dock/chat-dock';
 import { ChatsNavLink } from '@/features/chat-page/chats-nav-link';
 import { resetClassroomModeStore } from '@/features/classrooms/classroom-mode-store';
+import { resetPerformanceOfferStore } from '@/features/classrooms/performance-offer-store';
 import { DailyReviewDialog } from '@/features/daily-review/daily-review-dialog';
 import { NotificationCenter } from '@/features/notifications/notification-center';
 import {
@@ -32,8 +33,10 @@ export function AppShell() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const isLoggingOutRef = useRef(false);
   // The shell outlives every protected route, so logout from any page clears
-  // the per-user classroom view preference (rules/state-management.md).
+  // the per-user classroom view preference and the session 2D offer decision
+  // (rules/state-management.md).
   useSessionCleanup(resetClassroomModeStore);
+  useSessionCleanup(resetPerformanceOfferStore);
 
   const handleLogout = async () => {
     if (isLoggingOutRef.current) {

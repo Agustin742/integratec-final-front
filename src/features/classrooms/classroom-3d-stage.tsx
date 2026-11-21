@@ -6,6 +6,8 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
+import { PerformanceProbeRuntime } from '../world/performance-monitor';
+import { PerformanceStatsOverlay } from '../world/performance-stats-overlay';
 import { worldMessages } from '../world/messages';
 import { WorldFallback } from '../world/world-fallback';
 import { classroomMessages } from './messages';
@@ -13,6 +15,8 @@ import { classroomMessages } from './messages';
 export interface Classroom3DStageProps {
   readonly headingRef?: RefObject<HTMLHeadingElement | null>;
   readonly scopeKey?: string;
+  /** Fired when the canvas measures sustained low fps (#56). */
+  readonly onSustainedLowFps?: () => void;
 }
 
 type ClearAssetCacheFn = (options?: {
@@ -27,6 +31,12 @@ const loadClassroomWorld = () =>
     loadedClearAssetCache = module.clearAssetCache;
     return { default: module.ClassroomWorld };
   });
+
+/** Same lazy chunk as the classroom world, so the probe never eagerly loads three. */
+const loadWorldProbe = () =>
+  import('../world').then((module) => ({
+    default: module.PerformanceProbe,
+  }));
 
 /**
  * Clears GLB assets/decoders only if the lazy `../world` chunk has been loaded,
@@ -66,9 +76,12 @@ class StageBoundary extends Component<
 export function Classroom3DStage({
   headingRef,
   scopeKey,
+  onSustainedLowFps,
 }: Classroom3DStageProps) {
   const [LazyClassroomWorld] = useState(() => lazy(loadClassroomWorld));
+  const [LazyWorldProbe] = useState(() => lazy(loadWorldProbe));
   const supportsBrowserObservers = typeof ResizeObserver !== 'undefined';
+  const [performanceRuntime] = useState(() => new PerformanceProbeRuntime());
 
   return (
     <section
@@ -95,7 +108,12 @@ export function Classroom3DStage({
             <LazyClassroomWorld
               label={classroomMessages.viewMode.canvasLabel}
               scopeKey={scopeKey}
-            />
+            >
+              <LazyWorldProbe
+                runtime={performanceRuntime}
+                onSustainedLowFps={onSustainedLowFps}
+              />
+            </LazyClassroomWorld>
           </Suspense>
         </StageBoundary>
       ) : (
@@ -107,6 +125,7 @@ export function Classroom3DStage({
           <canvas aria-hidden="true" className="block h-48 w-full rounded-lg" />
         </div>
       )}
+      <PerformanceStatsOverlay runtime={performanceRuntime} />
     </section>
   );
 }
