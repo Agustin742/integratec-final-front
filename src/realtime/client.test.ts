@@ -701,4 +701,64 @@ describe('createClassroomRealtimeClient (#23)', () => {
 
     client.dispose();
   });
+
+  it('extracts optional participant appearance and classroom control flags from room state', async () => {
+    const { auth } = createFakeAuth('valid-token');
+    const sdk = createFakeSdk();
+    const room = new FakeRoom({ classroomId: CLASSROOM_A });
+    room.setAvatar('user-with-look', {
+      displayName: 'Sofía',
+      role: 'STUDENT',
+      x: 2,
+      z: 4,
+      rotation: 1,
+      status: 'online',
+    });
+    const avatarWithLook = room.state.avatars.get(
+      'user-with-look',
+    ) as Avatar & {
+      appearance?: unknown;
+    };
+    avatarWithLook.appearance = {
+      bodyId: 'female',
+      hairId: 'original',
+      topId: 'tshirt',
+      hairColor: '#6C4D48',
+      clothingColor: '#75B7DA',
+    };
+    Object.assign(room.state, {
+      chatMuted: true,
+      collaborationLocked: true,
+      gamesDisabled: false,
+      frozen: true,
+    });
+    sdk.setJoinHandler(async () => room);
+
+    const client = createClassroomRealtimeClient({
+      auth,
+      realtimeUrl: 'wss://realtime.example.invalid',
+      createSdkClient: sdk.createSdkClient,
+    });
+
+    await client.connect(CLASSROOM_A);
+    const snapshot = client.getSnapshot();
+    expect(snapshot.controls).toEqual({
+      chatMuted: true,
+      collaborationLocked: true,
+      gamesDisabled: false,
+      frozen: true,
+    });
+    expect(snapshot.participants.get('user-with-look')?.avatar).toEqual({
+      bodyId: 'female',
+      hairId: 'original',
+      topId: 'tshirt',
+      hairColor: '#6C4D48',
+      clothingColor: '#75B7DA',
+    });
+
+    room.emitDrop(1006, 'drop');
+    expect(client.getSnapshot().controls).toEqual({ frozen: false });
+
+    client.dispose();
+  });
 });

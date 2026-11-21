@@ -4,6 +4,8 @@ export {
   type ClassroomRealtimeClient,
   type CreateClassroomRealtimeClientOptions,
   type RealtimeAuthPort,
+  type RealtimeAvatarAppearance,
+  type RealtimeClassroomControls,
   type RealtimeConnectionStatus,
   type RealtimeFailureReason,
   type RealtimeParticipant,

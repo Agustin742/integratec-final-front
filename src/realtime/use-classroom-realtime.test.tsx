@@ -7,6 +7,7 @@ import { fakeSession } from '@/app/router/fake-session';
 import { SessionProvider } from '@/session/provider';
 import { profile } from '@/session/test-fixtures';
 import { Avatar } from './avatar.generated';
+import { ClassroomRealtimeProvider } from './classroom-realtime-provider';
 import type { RealtimeRoomLike, RealtimeSdkClientLike } from './client';
 import { ClassroomState } from './room-state.generated';
 import { useClassroomRealtime } from './use-classroom-realtime';
@@ -280,6 +281,63 @@ describe('useClassroomRealtime (#23)', () => {
     expect(roomsByUser.get('user-1-token')?.leave).toHaveBeenCalledTimes(1);
     await vi.waitFor(() => {
       expect(result.current.status).toBe('connected');
+    });
+  });
+
+  it('shares the single managed lease when mounted inside ClassroomRealtimeProvider', async () => {
+    const joinCalls: string[] = [];
+    const rooms = new Map<string, ReturnType<typeof createHookTestRoom>>();
+    const createSdkClient = (): RealtimeSdkClientLike => ({
+      auth: { token: undefined },
+      joinOrCreate: async (_name, options) => {
+        const id = options?.classroomId ?? CLASSROOM_A;
+        joinCalls.push(id);
+        const created = createHookTestRoom(id);
+        rooms.set(id, created);
+        return created.room;
+      },
+      reconnect: async () => createHookTestRoom(CLASSROOM_A).room,
+    });
+
+    const session = fakeSession({ status: 'authenticated', user: profile });
+    session.service.controller.getAccessToken = () => 'shared-token';
+    session.service.controller.refreshAccessToken = async () => 'shared-token';
+    session.service.controller.registerCleanup = () => () => {};
+
+    const queryClient = createAppQueryClient();
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <ApiQueryProvider client={queryClient}>
+        <SessionProvider service={session.service}>
+          <ClassroomRealtimeProvider
+            realtimeUrl="wss://realtime.example.invalid"
+            createSdkClient={createSdkClient}
+            releaseGraceMs={0}
+          >
+            {children}
+          </ClassroomRealtimeProvider>
+        </SessionProvider>
+      </ApiQueryProvider>
+    );
+
+    const { result, unmount } = renderHook(
+      () => ({
+        first: useClassroomRealtime({ classroomId: CLASSROOM_A }),
+        second: useClassroomRealtime({ classroomId: CLASSROOM_A }),
+      }),
+      { wrapper },
+    );
+
+    await vi.waitFor(() => {
+      expect(result.current.first.status).toBe('connected');
+      expect(result.current.second.status).toBe('connected');
+    });
+
+    expect(joinCalls).toEqual([CLASSROOM_A]);
+    expect(result.current.first.roomId).toBe(result.current.second.roomId);
+
+    unmount();
+    await vi.waitFor(() => {
+      expect(rooms.get(CLASSROOM_A)?.leave).toHaveBeenCalledTimes(1);
     });
   });
 });

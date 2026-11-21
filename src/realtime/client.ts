@@ -48,6 +48,21 @@ export type RealtimeFailureReason =
   | 'invalid-classroom'
   | 'connection-error';
 
+export interface RealtimeAvatarAppearance {
+  readonly bodyId: string;
+  readonly hairId: string;
+  readonly topId: string;
+  readonly hairColor: string;
+  readonly clothingColor: string;
+}
+
+export interface RealtimeClassroomControls {
+  readonly chatMuted?: boolean | undefined;
+  readonly collaborationLocked?: boolean | undefined;
+  readonly gamesDisabled?: boolean | undefined;
+  readonly frozen: boolean;
+}
+
 export interface RealtimeParticipant {
   readonly userId: string;
   readonly displayName: string;
@@ -56,6 +71,7 @@ export interface RealtimeParticipant {
   readonly z: number;
   readonly rotation: number;
   readonly status: string;
+  readonly avatar?: RealtimeAvatarAppearance | undefined;
 }
 
 export interface RealtimeSnapshot {
@@ -67,6 +83,7 @@ export interface RealtimeSnapshot {
   readonly reason: RealtimeFailureReason | null;
   readonly message: string | null;
   readonly participants: ReadonlyMap<string, RealtimeParticipant>;
+  readonly controls: RealtimeClassroomControls;
 }
 
 export interface RealtimeAuthPort {
@@ -131,6 +148,9 @@ interface RegisteredMessageHandler {
 
 const MAX_SEEN_EVENT_IDS = 500;
 const EMPTY_PARTICIPANTS: ReadonlyMap<string, RealtimeParticipant> = new Map();
+const DEFAULT_CONTROLS: RealtimeClassroomControls = Object.freeze({
+  frozen: false,
+});
 
 function createDefaultSdkClient(endpoint: string): RealtimeSdkClientLike {
   const sdk = new Client(endpoint);
@@ -147,6 +167,41 @@ function createDefaultSdkClient(endpoint: string): RealtimeSdkClientLike {
   };
 }
 
+function readParticipantAppearance(
+  rawAvatar: unknown,
+): RealtimeAvatarAppearance | undefined {
+  if (typeof rawAvatar !== 'object' || rawAvatar === null) {
+    return undefined;
+  }
+  const appearance = (rawAvatar as { appearance?: unknown }).appearance;
+  if (typeof appearance !== 'object' || appearance === null) {
+    return undefined;
+  }
+  const candidate = appearance as Record<string, unknown>;
+  const { bodyId, hairId, topId, hairColor, clothingColor } = candidate;
+  if (
+    typeof bodyId === 'string' &&
+    bodyId !== '' &&
+    typeof hairId === 'string' &&
+    hairId !== '' &&
+    typeof topId === 'string' &&
+    topId !== '' &&
+    typeof hairColor === 'string' &&
+    hairColor !== '' &&
+    typeof clothingColor === 'string' &&
+    clothingColor !== ''
+  ) {
+    return Object.freeze({
+      bodyId,
+      hairId,
+      topId,
+      hairColor,
+      clothingColor,
+    });
+  }
+  return undefined;
+}
+
 function readParticipants(
   state: ClassroomState | undefined,
 ): ReadonlyMap<string, RealtimeParticipant> {
@@ -156,6 +211,7 @@ function readParticipants(
   const next = new Map<string, RealtimeParticipant>();
   state.avatars.forEach((avatar, key) => {
     const userId = avatar.userId || key;
+    const appearance = readParticipantAppearance(avatar);
     next.set(
       userId,
       Object.freeze({
@@ -166,10 +222,45 @@ function readParticipants(
         z: avatar.z,
         rotation: avatar.rotation,
         status: avatar.status,
+        ...(appearance ? { avatar: appearance } : {}),
       }),
     );
   });
   return next;
+}
+
+function readControls(
+  state: ClassroomState | undefined,
+): RealtimeClassroomControls {
+  if (!state || typeof state !== 'object') {
+    return DEFAULT_CONTROLS;
+  }
+  const record = state as unknown as Record<string, unknown>;
+  const chatMuted =
+    typeof record.chatMuted === 'boolean' ? record.chatMuted : undefined;
+  const collaborationLocked =
+    typeof record.collaborationLocked === 'boolean'
+      ? record.collaborationLocked
+      : undefined;
+  const gamesDisabled =
+    typeof record.gamesDisabled === 'boolean'
+      ? record.gamesDisabled
+      : undefined;
+  const frozen = typeof record.frozen === 'boolean' ? record.frozen : false;
+  if (
+    chatMuted === undefined &&
+    collaborationLocked === undefined &&
+    gamesDisabled === undefined &&
+    !frozen
+  ) {
+    return DEFAULT_CONTROLS;
+  }
+  return Object.freeze({
+    ...(chatMuted !== undefined ? { chatMuted } : {}),
+    ...(collaborationLocked !== undefined ? { collaborationLocked } : {}),
+    ...(gamesDisabled !== undefined ? { gamesDisabled } : {}),
+    frozen,
+  });
 }
 
 function extractErrorCode(error: unknown): number | undefined {
@@ -305,6 +396,7 @@ export function createClassroomRealtimeClient(
     reason: null,
     message: null,
     participants: EMPTY_PARTICIPANTS,
+    controls: DEFAULT_CONTROLS,
   });
 
   const listeners = new Set<() => void>();
@@ -428,6 +520,7 @@ export function createClassroomRealtimeClient(
       reason: null,
       message: null,
       participants: readParticipants(room.state),
+      controls: readControls(room.state),
     });
 
     room.onStateChange((state) => {
@@ -442,6 +535,7 @@ export function createClassroomRealtimeClient(
         reason: snapshot.reason,
         message: snapshot.message,
         participants: readParticipants(state),
+        controls: readControls(state),
       });
     });
 
@@ -482,6 +576,7 @@ export function createClassroomRealtimeClient(
         reason: null,
         message: realtimeMessages.reconnecting,
         participants: snapshot.participants,
+        controls: DEFAULT_CONTROLS,
       });
 
       if (!reconnectionToken) {
@@ -494,6 +589,7 @@ export function createClassroomRealtimeClient(
           reason: 'connection-error',
           message: realtimeMessages.connectionFailed,
           participants: EMPTY_PARTICIPANTS,
+          controls: DEFAULT_CONTROLS,
         });
         return;
       }
@@ -523,6 +619,7 @@ export function createClassroomRealtimeClient(
             reason: failure.reason,
             message: failure.message,
             participants: EMPTY_PARTICIPANTS,
+            controls: DEFAULT_CONTROLS,
           });
         },
       );
@@ -542,6 +639,7 @@ export function createClassroomRealtimeClient(
           reason: null,
           message: null,
           participants: EMPTY_PARTICIPANTS,
+          controls: DEFAULT_CONTROLS,
         });
         return;
       }
@@ -554,6 +652,7 @@ export function createClassroomRealtimeClient(
         reason: failure.reason,
         message: failure.message,
         participants: EMPTY_PARTICIPANTS,
+        controls: DEFAULT_CONTROLS,
       });
     });
 
@@ -572,6 +671,7 @@ export function createClassroomRealtimeClient(
           reason: failure.reason,
           message: failure.message,
           participants: EMPTY_PARTICIPANTS,
+          controls: DEFAULT_CONTROLS,
         });
       }
     });
@@ -592,6 +692,7 @@ export function createClassroomRealtimeClient(
       reason: null,
       message: null,
       participants: EMPTY_PARTICIPANTS,
+      controls: DEFAULT_CONTROLS,
     });
   }
 
@@ -609,6 +710,7 @@ export function createClassroomRealtimeClient(
         reason: 'invalid-classroom',
         message: realtimeMessages.connectionFailed,
         participants: EMPTY_PARTICIPANTS,
+        controls: DEFAULT_CONTROLS,
       });
       return false;
     }
@@ -640,6 +742,7 @@ export function createClassroomRealtimeClient(
       reason: null,
       message: realtimeMessages.connecting,
       participants: EMPTY_PARTICIPANTS,
+      controls: DEFAULT_CONTROLS,
     });
 
     const attemptConnect = async (): Promise<boolean> => {
@@ -654,6 +757,7 @@ export function createClassroomRealtimeClient(
             reason: 'unauthorized',
             message: realtimeMessages.unauthorized,
             participants: EMPTY_PARTICIPANTS,
+            controls: DEFAULT_CONTROLS,
           });
         }
         return false;
@@ -709,6 +813,7 @@ export function createClassroomRealtimeClient(
           reason: failure.reason,
           message: failure.message,
           participants: EMPTY_PARTICIPANTS,
+          controls: DEFAULT_CONTROLS,
         });
         return false;
       } finally {
