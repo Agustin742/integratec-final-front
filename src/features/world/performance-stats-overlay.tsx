@@ -13,9 +13,10 @@ export type { CanvasPerformanceStats } from './performance-monitor';
 /**
  * Dev-time stats overlay (issue #56 S3): reports fps, draw calls, triangles
  * and texture/GPU memory estimates against the FD8 budget. Developer-facing
- * diagnostics, so the copy is English and `aria-hidden` — it never ships in
- * production builds and never becomes a user-facing announcement
- * (`rules/observability-and-privacy.md`).
+ * diagnostics, so the copy is English and `aria-hidden` — it is runtime-gated
+ * by `appEnv !== 'production'` (rendered as `null` with no interval in
+ * production; the component stays in the bundle) and never becomes a
+ * user-facing announcement (`rules/observability-and-privacy.md`).
  */
 const OVERLAY_REFRESH_MS = 500;
 

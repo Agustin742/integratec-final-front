@@ -177,7 +177,7 @@ The backend repository records decisions D1-D12 in its `docs/technical-justifica
 - **Trade-offs:** Less visual richness and tighter asset authoring; the runtime measurement adds code and needs tuning.
 - **Affected contracts:** [3D world and camera](../rules/3d-world-and-camera.md), [Art direction](../rules/art-direction.md), [Classrooms, roles, and permissions](../rules/classrooms-and-roles.md) for the 2D mode.
 - **Runtime measurement (#56):** The offer trigger samples the rendered frame cadence of the demand-loop canvas over a rolling `8000 ms` window (at least `30` frames) and fires when the mean is below `24 fps` (80% of the `30 fps` conservative target); the `60 fps` mid-range figure is reported by the dev overlay but never triggers the offer. A decline is remembered per app session. Details and measured reference-scene numbers: [3D performance monitor](./3d-performance-monitor.md).
-- **Open:** The budget numbers are limits to verify; the reference scene is currently empty (0 draw calls, 0 triangles), so the measured numbers must be repeated when the classroom scene gains content.
+- **Open:** The budget numbers are limits to verify. Measured on 2026-11-21 on the populated classroom scene (headless Chromium, resize-driven frames): 56 draw calls (limit 100), 66206 triangles (limit 200000) and about 3 MB estimated GPU memory (limit 256 MB), so the geometry budget holds today. Still to verify: steady-state fps on real integrated-GPU school hardware (the recorded fps comes from a resize-driven headless harness), and a re-measurement whenever the scene gains content.
 - **Approval:** Approved by Agustin (decision owner) on 2026-11-02.
 
 ### FD9. Contract mocks

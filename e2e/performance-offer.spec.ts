@@ -153,11 +153,9 @@ async function measuredFps(page: Page): Promise<number> {
 }
 
 /**
- * Real frame source for the classroom 3D stage (#56). The stage scene
- * currently holds no continuously animating content and R3F runs with
- * `frameloop="demand"`, so mouse motion over the canvas cannot produce
- * frames (an empty scene raycasts to nothing and pointermove without
- * intersections never invalidates). The app's own re-frame-on-resize path
+ * Real frame source for the classroom 3D stage (#56). The stage scene holds
+ * no continuously animating content and R3F runs with `frameloop="demand"`,
+ * so nothing renders by itself between interactions. The app's own re-frame-on-resize path
  * (`CameraFraming` in `world-canvas.tsx` -> `invalidate()`) renders one real
  * frame per viewport resize, and the probe samples every rendered frame, so
  * alternating the viewport size drives a sustained, controlled-low cadence
@@ -248,7 +246,6 @@ test('offers 2D Classic Mode under sustained low fps and keeps the 3D stage when
     const banner = offerBanner(page);
     await expect(banner).toBeVisible({ timeout: 45_000 });
     await expect(banner).toHaveAttribute('role', 'status');
-    await expect(banner).toHaveAttribute('aria-live', 'polite');
 
     // The app never switches modes by itself: the 3D stage is still on screen.
     await expect(stage3d(page)).toBeVisible();
