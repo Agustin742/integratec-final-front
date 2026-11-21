@@ -145,6 +145,19 @@ test.beforeEach(async ({ page, baseURL }) => {
         json: { items: [], page: 1, pageSize: 20, total: 0 },
       });
     }
+    if (
+      url.origin === apiOrigin &&
+      url.pathname === '/chats' &&
+      request.method() === 'GET'
+    ) {
+      return route.fulfill({ json: { items: [] } });
+    }
+    if (
+      url.origin === 'https://realtime.example.invalid' ||
+      url.pathname.startsWith('/matchmake/')
+    ) {
+      return route.abort();
+    }
     if (request.url() === `${classroomURL}/context-events`) {
       expect(request.method()).toBe('GET');
       expect(request.headers().authorization).toBe('Bearer synthetic-access');
