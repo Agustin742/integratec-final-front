@@ -30,10 +30,39 @@ test('mounts the lazy classroom world with the stage label and scope', async () 
       disconnect() {}
     },
   );
-  render(<Classroom3DStage scopeKey="aula-7" />);
+  const onIntentChange = vi.fn();
+  const selfPose = { x: 0, z: 5, rotation: Math.PI };
+  const remoteParticipants = [
+    {
+      userId: 'remote-1',
+      displayName: 'Mateo',
+      role: 'STUDENT',
+      status: 'online',
+      x: 1,
+      z: 2,
+      rotation: 0,
+    },
+  ];
+  render(
+    <Classroom3DStage
+      scopeKey="aula-7"
+      selfPose={selfPose}
+      connectionKey="room-7:s-1"
+      frozen
+      remoteParticipants={remoteParticipants}
+      onIntentChange={onIntentChange}
+    />,
+  );
   const region = await screen.findByRole('region', {
     name: classroomMessages.viewMode.canvasLabel,
   });
   expect(within(region).getByTestId('scene-host')).toBeInTheDocument();
-  expect(world.props.scopeKey).toBe('aula-7');
+  expect(world.props).toMatchObject({
+    scopeKey: 'aula-7',
+    selfPose,
+    connectionKey: 'room-7:s-1',
+    frozen: true,
+    remoteParticipants,
+    onIntentChange,
+  });
 });

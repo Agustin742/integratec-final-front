@@ -6,6 +6,8 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
+import type { AvatarInput } from '@/realtime';
+import type { Pose, RemoteClassroomParticipant } from '../world';
 import { worldMessages } from '../world/messages';
 import { WorldFallback } from '../world/world-fallback';
 import { classroomMessages } from './messages';
@@ -13,6 +15,12 @@ import { classroomMessages } from './messages';
 export interface Classroom3DStageProps {
   readonly headingRef?: RefObject<HTMLHeadingElement | null>;
   readonly scopeKey?: string;
+  readonly selfPose?: Pose | undefined;
+  readonly connectionKey?: string | undefined;
+  readonly frozen?: boolean | undefined;
+  readonly remoteParticipants?:
+    readonly RemoteClassroomParticipant[] | undefined;
+  readonly onIntentChange?: ((intent: AvatarInput) => void) | undefined;
 }
 
 type ClearAssetCacheFn = (options?: {
@@ -66,6 +74,11 @@ class StageBoundary extends Component<
 export function Classroom3DStage({
   headingRef,
   scopeKey,
+  selfPose,
+  connectionKey,
+  frozen,
+  remoteParticipants,
+  onIntentChange,
 }: Classroom3DStageProps) {
   const [LazyClassroomWorld] = useState(() => lazy(loadClassroomWorld));
   const supportsBrowserObservers = typeof ResizeObserver !== 'undefined';
@@ -95,6 +108,11 @@ export function Classroom3DStage({
             <LazyClassroomWorld
               label={classroomMessages.viewMode.canvasLabel}
               scopeKey={scopeKey}
+              selfPose={selfPose}
+              connectionKey={connectionKey}
+              frozen={frozen}
+              remoteParticipants={remoteParticipants}
+              onIntentChange={onIntentChange}
             />
           </Suspense>
         </StageBoundary>

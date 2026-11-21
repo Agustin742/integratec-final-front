@@ -1,0 +1,702 @@
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { createMemoryRouter, useOutletContext } from 'react-router';
+import { RouterProvider } from 'react-router/dom';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { createApiClient } from '@/api/client';
+import { ApiQueryProvider, createAppQueryClient } from '@/api/query-client';
+import type { components } from '@/api/schema.generated';
+import { fakeSession } from '@/app/router/fake-session';
+import { createAppRoutes } from '@/app/router/routes';
+import {
+  AVATAR_INPUT_MESSAGE,
+  CLOSE_CODE_ACCESS_REVOKED,
+  CLOSE_CODE_TOO_MANY_CONNECTIONS,
+  CLOSE_REASON_ACCESS_REVOKED,
+  CLOSE_REASON_TOO_MANY_CONNECTIONS,
+  ClassroomRealtimeProvider,
+  realtimeMessages,
+  type AvatarInput,
+} from '@/realtime';
+import { SessionProvider } from '@/session/provider';
+import { profile } from '@/session/test-fixtures';
+import { expectAccessible } from '@/test/accessibility';
+import { createFakeRealtimeSdk } from '@/test/realtime/fake-realtime-sdk';
+import { render } from '@/test/render';
+import type { Classroom3DStageProps } from './classroom-3d-stage';
+import { ClassroomWorkspace } from './classroom-workspace';
+import { classroomMessages } from './messages';
+
+const stage = vi.hoisted(() => ({
+  props: null as Classroom3DStageProps | null,
+  clearLoadedWorldAssets: vi.fn(),
+  mountCount: 0,
+}));
+
+vi.mock('./classroom-3d-stage', () => ({
+  clearLoadedWorldAssets: stage.clearLoadedWorldAssets,
+  Classroom3DStage: (props: Classroom3DStageProps) => {
+    stage.props = props;
+    stage.mountCount += 1;
+    return (
+      <div
+        data-testid="mock-3d-stage"
+        data-scope={props.scopeKey}
+        data-connection-key={props.connectionKey}
+        data-frozen={String(Boolean(props.frozen))}
+        data-remote-count={String(props.remoteParticipants?.length ?? 0)}
+      />
+    );
+  },
+}));
+
+const CLASSROOM_A = '11111111-1111-4111-8111-111111111111';
+const CLASSROOM_B = '22222222-2222-4222-8222-222222222222';
+const REMOTE_TEACHER_ID = '00000000-0000-4000-8000-000000000099';
+const REMOTE_STUDENT_ID = '00000000-0000-4000-8000-000000000088';
+
+type Detail = components['schemas']['ClassroomContextResponseDto'];
+
+function buildDetail(id: string, overrides: Partial<Detail> = {}): Detail {
+  return {
+    id,
+    name: `Aula ${id.slice(0, 4)}`,
+    subject: null,
+    schoolId: null,
+    independentTeacherId: null,
+    adultMode: false,
+    chatMuted: false,
+    collaborationLocked: false,
+    gamesDisabled: false,
+    myRole: 'STUDENT',
+    capabilities: ['chat_classmates', 'list_directory'],
+    availablePanels: ['activities', 'chat', 'grades'],
+    deskCount: 12,
+    pet: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function ActivePanelProbe() {
+  const ctx = useOutletContext<Detail>();
+  return (
+    <output data-testid="workspace-controls-probe">
+      {JSON.stringify({
+        id: ctx.id,
+        chatMuted: ctx.chatMuted,
+        collaborationLocked: ctx.collaborationLocked,
+        gamesDisabled: ctx.gamesDisabled,
+      })}
+    </output>
+  );
+}
+
+function setupPresenceWorkspace(
+  options: {
+    readonly path?: string;
+    readonly detailOverrides?: (id: string) => Partial<Detail>;
+    readonly members?: readonly components['schemas']['ClassroomMemberDto'][];
+  } = {},
+) {
+  const sdk = createFakeRealtimeSdk();
+  let currentDetailOverrides = options.detailOverrides;
+
+  const session = fakeSession(
+    { status: 'authenticated', user: profile },
+    createApiClient({
+      baseUrl: 'https://api.example.invalid',
+      fetch: async (input) => {
+        const request = input as Request;
+        const url = new URL(request.url);
+        if (url.pathname.endsWith('/context-events')) {
+          return new Response(new ReadableStream(), {
+            headers: { 'content-type': 'text/event-stream' },
+          });
+        }
+        if (url.pathname === '/notifications') {
+          return Response.json({ items: [], page: 1, pageSize: 20, total: 0 });
+        }
+        if (url.pathname === '/chats') {
+          return Response.json({ items: [] });
+        }
+        if (url.pathname === '/users/me/daily-review') {
+          return Response.json({ status: 'not_due' });
+        }
+        if (url.pathname.endsWith('/points')) {
+          return Response.json({
+            classroomId: CLASSROOM_A,
+            studentId: profile.id,
+            balance: 50,
+            items: [],
+            page: 1,
+            pageSize: 20,
+            total: 0,
+          });
+        }
+        if (url.pathname.endsWith('/members')) {
+          const items = options.members ?? [
+            {
+              id: REMOTE_TEACHER_ID,
+              userId: REMOTE_TEACHER_ID,
+              displayName: 'Prof. Laura',
+              role: 'TEACHER',
+              avatar: {
+                bodyId: 'female',
+                hairId: 'original',
+                topId: 'tshirt',
+                hairColor: '#6C4D48',
+                clothingColor: '#5B4F96',
+              },
+            },
+          ];
+          return Response.json({
+            items,
+            page: 1,
+            pageSize: 100,
+            total: items.length,
+          });
+        }
+        const match = /^\/classrooms\/([^/]+)$/.exec(url.pathname);
+        if (match) {
+          const id = match[1];
+          return Response.json(
+            buildDetail(id, currentDetailOverrides?.(id) ?? {}),
+          );
+        }
+        return new Response(null, { status: 404 });
+      },
+    }),
+  );
+  session.service.controller.getAccessToken = () => 'presence-token';
+  session.service.controller.refreshAccessToken = async () => 'presence-token';
+
+  const queryClient = createAppQueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+
+  const router = createMemoryRouter(
+    createAppRoutes({
+      protectedRoutes: [
+        {
+          path: 'presence/:classroomId',
+          Component: ClassroomWorkspace,
+          children: [{ index: true, Component: ActivePanelProbe }],
+        },
+      ],
+    }),
+    { initialEntries: [options.path ?? `/presence/${CLASSROOM_A}`] },
+  );
+
+  const view = render(
+    <ApiQueryProvider client={queryClient}>
+      <SessionProvider service={session.service}>
+        <ClassroomRealtimeProvider
+          realtimeUrl="wss://realtime.example.invalid"
+          createSdkClient={sdk.createSdkClient}
+          releaseGraceMs={0}
+        >
+          <RouterProvider router={router} />
+        </ClassroomRealtimeProvider>
+      </SessionProvider>
+    </ApiQueryProvider>,
+  );
+
+  return {
+    ...view,
+    sdk,
+    session,
+    queryClient,
+    router,
+    setDetailOverrides(fn: (id: string) => Partial<Detail>) {
+      currentDetailOverrides = fn;
+    },
+  };
+}
+
+beforeEach(() => {
+  stage.props = null;
+  stage.mountCount = 0;
+  stage.clearLoadedWorldAssets.mockClear();
+});
+
+describe('Classroom real-time presence & remote avatars (#37)', () => {
+  test('connects two members, resolves remote avatars from directory & room appearance, and sends movement intents', async () => {
+    const { container, sdk } = setupPresenceWorkspace();
+
+    await waitFor(() => {
+      expect(sdk.roomFor(CLASSROOM_A)).toBeDefined();
+    });
+    const room = sdk.roomFor(CLASSROOM_A)!;
+
+    act(() => {
+      room.setAvatar({
+        userId: profile.id,
+        displayName: profile.displayName,
+        role: 'STUDENT',
+        x: -2,
+        z: 5,
+        rotation: Math.PI,
+      });
+      room.setAvatar({
+        userId: REMOTE_TEACHER_ID,
+        displayName: 'Prof. Laura',
+        role: 'TEACHER',
+        x: 0,
+        z: -3.5,
+        rotation: 0,
+      });
+      room.setAvatar({
+        userId: REMOTE_STUDENT_ID,
+        displayName: 'Mateo',
+        role: 'STUDENT',
+        x: 3,
+        z: 1,
+        rotation: 0.5,
+        appearance: {
+          bodyId: 'male',
+          hairId: 'dreads',
+          topId: 'hoodie',
+          hairColor: '#353849',
+          clothingColor: '#75B7DA',
+        },
+      });
+    });
+
+    const bar = await screen.findByTestId('classroom-presence-bar');
+    expect(bar).toHaveTextContent(classroomMessages.presence.liveBadge);
+    expect(bar).toHaveTextContent(`${profile.displayName}`);
+    expect(bar).toHaveTextContent(classroomMessages.presence.youSuffix);
+    expect(bar).toHaveTextContent('Prof. Laura');
+    expect(bar).toHaveTextContent('Mateo');
+
+    await waitFor(() => {
+      expect(stage.props?.remoteParticipants).toHaveLength(2);
+      const teacherRemote = stage.props?.remoteParticipants?.find(
+        (p) => p.userId === REMOTE_TEACHER_ID,
+      );
+      expect(teacherRemote?.avatar).toEqual({
+        bodyId: 'female',
+        hairId: 'original',
+        topId: 'tshirt',
+        hairColor: '#6C4D48',
+        clothingColor: '#5B4F96',
+      });
+    });
+
+    const studentRemote = stage.props?.remoteParticipants?.find(
+      (p) => p.userId === REMOTE_STUDENT_ID,
+    );
+    expect(studentRemote?.avatar).toEqual({
+      bodyId: 'male',
+      hairId: 'dreads',
+      topId: 'hoodie',
+      hairColor: '#353849',
+      clothingColor: '#75B7DA',
+    });
+    expect(stage.props?.selfPose).toEqual({ x: -2, z: 5, rotation: Math.PI });
+
+    const intent: AvatarInput = { x: 1, z: 0 };
+    act(() => {
+      stage.props?.onIntentChange?.(intent);
+    });
+    expect(room.send).toHaveBeenCalledWith(AVATAR_INPUT_MESSAGE, intent);
+
+    await expectAccessible(container);
+  });
+
+  test('handles duplicate updates without ghost avatars and removes departed participants immediately', async () => {
+    const { sdk } = setupPresenceWorkspace();
+    await waitFor(() => {
+      expect(sdk.roomFor(CLASSROOM_A)).toBeDefined();
+    });
+    const room = sdk.roomFor(CLASSROOM_A)!;
+
+    act(() => {
+      room.setAvatar({
+        userId: profile.id,
+        displayName: profile.displayName,
+        role: 'STUDENT',
+        x: 0,
+        z: 5,
+      });
+      room.setAvatar({
+        userId: REMOTE_STUDENT_ID,
+        displayName: 'Mateo',
+        role: 'STUDENT',
+        x: 1,
+        z: 2,
+      });
+      room.setAvatar({
+        userId: REMOTE_STUDENT_ID,
+        displayName: 'Mateo',
+        role: 'STUDENT',
+        x: 1.5,
+        z: 2.2,
+      });
+    });
+
+    await waitFor(() => {
+      expect(stage.props?.remoteParticipants).toHaveLength(1);
+    });
+    expect(stage.props?.remoteParticipants?.[0]).toMatchObject({
+      userId: REMOTE_STUDENT_ID,
+      x: 1.5,
+      z: 2.2,
+    });
+
+    act(() => {
+      room.removeAvatar(REMOTE_STUDENT_ID);
+    });
+
+    await waitFor(() => {
+      expect(stage.props?.remoteParticipants).toHaveLength(0);
+    });
+    expect(screen.getByTestId('classroom-presence-bar')).not.toHaveTextContent(
+      'Mateo',
+    );
+  });
+
+  test('shows uncertain presence on connection drop, reconciles persisted controls and freeze on reconnect', async () => {
+    const { sdk, setDetailOverrides } = setupPresenceWorkspace();
+    await waitFor(() => {
+      expect(sdk.roomFor(CLASSROOM_A)).toBeDefined();
+    });
+    const firstRoom = sdk.roomFor(CLASSROOM_A)!;
+
+    act(() => {
+      firstRoom.setAvatar({
+        userId: profile.id,
+        displayName: profile.displayName,
+        role: 'STUDENT',
+        x: -2,
+        z: 5,
+      });
+      firstRoom.setAvatar({
+        userId: REMOTE_TEACHER_ID,
+        displayName: 'Prof. Laura',
+        role: 'TEACHER',
+        x: 0,
+        z: -4,
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('classroom-presence-bar')).toHaveTextContent(
+        classroomMessages.presence.liveBadge,
+      );
+    });
+
+    // Server persisted controls changed while offline.
+    setDetailOverrides(() => ({
+      chatMuted: true,
+      collaborationLocked: true,
+      gamesDisabled: true,
+    }));
+
+    act(() => {
+      firstRoom.emitDrop(1006, 'network lost');
+    });
+
+    // Reconnection resolves asynchronously; check uncertainty and freeze reconciliation.
+    await waitFor(() => {
+      const reconnectedRoom = sdk.roomFor(CLASSROOM_A);
+      expect(reconnectedRoom).toBeDefined();
+      expect(reconnectedRoom).not.toBe(firstRoom);
+    });
+    const reconnectedRoom = sdk.roomFor(CLASSROOM_A)!;
+
+    act(() => {
+      reconnectedRoom.setControls({
+        chatMuted: true,
+        collaborationLocked: true,
+        gamesDisabled: true,
+        frozen: true,
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('classroom-presence-bar')).toHaveTextContent(
+        classroomMessages.presence.controls.frozen,
+      );
+    });
+    expect(screen.getByTestId('classroom-presence-bar')).toHaveTextContent(
+      classroomMessages.presence.controls.chatMuted,
+    );
+    expect(screen.getByTestId('classroom-presence-bar')).toHaveTextContent(
+      classroomMessages.presence.controls.collaborationLocked,
+    );
+    expect(screen.getByTestId('classroom-presence-bar')).toHaveTextContent(
+      classroomMessages.presence.controls.gamesDisabled,
+    );
+    expect(stage.props?.frozen).toBe(true);
+    expect(stage.props?.remoteParticipants).toHaveLength(1);
+    expect(screen.getByTestId('workspace-controls-probe')).toHaveTextContent(
+      '"chatMuted":true',
+    );
+
+    // Intents must not be sent while frozen.
+    reconnectedRoom.send.mockClear();
+    act(() => {
+      stage.props?.onIntentChange?.({ x: 1, z: 0 });
+    });
+    expect(reconnectedRoom.send).not.toHaveBeenCalled();
+  });
+
+  test('displays uncertain state while reconnection is pending', async () => {
+    const sdk = createFakeRealtimeSdk();
+    let releaseReconnect!: () => void;
+    const reconnectGate = new Promise<void>((resolve) => {
+      releaseReconnect = resolve;
+    });
+    const wrappedSdkFactory: typeof sdk.createSdkClient = () => {
+      const inner = sdk.createSdkClient();
+      return {
+        ...inner,
+        reconnect: async (token) => {
+          await reconnectGate;
+          return inner.reconnect(token);
+        },
+      };
+    };
+
+    const session = fakeSession(
+      { status: 'authenticated', user: profile },
+      createApiClient({
+        baseUrl: 'https://api.example.invalid',
+        fetch: async (input) => {
+          const url = new URL((input as Request).url);
+          if (url.pathname.endsWith('/context-events')) {
+            return new Response(new ReadableStream(), {
+              headers: { 'content-type': 'text/event-stream' },
+            });
+          }
+          if (url.pathname === '/notifications') {
+            return Response.json({
+              items: [],
+              page: 1,
+              pageSize: 20,
+              total: 0,
+            });
+          }
+          if (url.pathname === '/chats') {
+            return Response.json({ items: [] });
+          }
+          if (url.pathname === '/users/me/daily-review') {
+            return Response.json({ status: 'not_due' });
+          }
+          if (url.pathname.endsWith('/points')) {
+            return Response.json({
+              classroomId: CLASSROOM_A,
+              studentId: profile.id,
+              balance: 0,
+              items: [],
+              page: 1,
+              pageSize: 20,
+              total: 0,
+            });
+          }
+          return Response.json(buildDetail(CLASSROOM_A));
+        },
+      }),
+    );
+    session.service.controller.getAccessToken = () => 'tok';
+    session.service.controller.refreshAccessToken = async () => 'tok';
+
+    const queryClient = createAppQueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const router = createMemoryRouter(createAppRoutes(), {
+      initialEntries: [`/classrooms/${CLASSROOM_A}`],
+    });
+
+    render(
+      <ApiQueryProvider client={queryClient}>
+        <SessionProvider service={session.service}>
+          <ClassroomRealtimeProvider
+            realtimeUrl="wss://realtime.example.invalid"
+            createSdkClient={wrappedSdkFactory}
+            releaseGraceMs={0}
+          >
+            <RouterProvider router={router} />
+          </ClassroomRealtimeProvider>
+        </SessionProvider>
+      </ApiQueryProvider>,
+    );
+
+    await waitFor(() => {
+      expect(sdk.roomFor(CLASSROOM_A)).toBeDefined();
+    });
+    const firstRoom = sdk.roomFor(CLASSROOM_A)!;
+
+    act(() => {
+      firstRoom.setAvatar({
+        userId: profile.id,
+        displayName: profile.displayName,
+        role: 'STUDENT',
+        x: 0,
+        z: 5,
+      });
+    });
+
+    act(() => {
+      firstRoom.emitDrop(1006, 'drop');
+    });
+
+    const bar = await screen.findByTestId('classroom-presence-bar');
+    expect(bar).toHaveTextContent(classroomMessages.presence.reconnectingBadge);
+    expect(bar).toHaveTextContent(classroomMessages.presence.uncertainBadge);
+    expect(bar).toHaveTextContent(realtimeMessages.reconnecting);
+    expect(stage.props?.connectionKey).toBe('reconnecting');
+
+    releaseReconnect();
+    await waitFor(() => {
+      expect(screen.getByTestId('classroom-presence-bar')).toHaveTextContent(
+        classroomMessages.presence.liveBadge,
+      );
+    });
+  });
+
+  test('exits immediately on live access revocation (4001 access_revoked) and unmounts scene and panels', async () => {
+    const { sdk } = setupPresenceWorkspace();
+    await waitFor(() => {
+      expect(sdk.roomFor(CLASSROOM_A)).toBeDefined();
+    });
+    const room = sdk.roomFor(CLASSROOM_A)!;
+
+    act(() => {
+      room.setAvatar({
+        userId: profile.id,
+        displayName: profile.displayName,
+        role: 'STUDENT',
+      });
+    });
+    await screen.findByTestId('mock-3d-stage');
+
+    act(() => {
+      room.emitLeave(CLOSE_CODE_ACCESS_REVOKED, CLOSE_REASON_ACCESS_REVOKED);
+    });
+
+    const alert = await screen.findByTestId('classroom-lost-access');
+    expect(alert).toHaveTextContent(classroomMessages.presence.lostAccessTitle);
+    expect(alert).toHaveTextContent(realtimeMessages.lostAccess);
+    expect(screen.queryByTestId('mock-3d-stage')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('classroom-presence-bar'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('workspace-controls-probe'),
+    ).not.toBeInTheDocument();
+    expect(stage.clearLoadedWorldAssets).toHaveBeenCalledWith({
+      scopeKey: CLASSROOM_A,
+    });
+    expect(
+      screen.getByRole('link', { name: classroomMessages.backToList }),
+    ).toHaveAttribute('href', '/');
+  });
+
+  test('shows rejected alert with retry on 4002 too_many_connections', async () => {
+    const { sdk } = setupPresenceWorkspace();
+    sdk.failNextJoinWith(
+      Object.assign(new Error(CLOSE_REASON_TOO_MANY_CONNECTIONS), {
+        code: CLOSE_CODE_TOO_MANY_CONNECTIONS,
+      }),
+    );
+
+    const rejected = await screen.findByTestId('classroom-realtime-rejected');
+    expect(rejected).toHaveTextContent(
+      classroomMessages.presence.rejectedTitle,
+    );
+    expect(rejected).toHaveTextContent(realtimeMessages.tooManyConnections);
+    expect(stage.props?.remoteParticipants).toEqual([]);
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: classroomMessages.presence.retryAction,
+      }),
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('classroom-presence-bar')).toHaveTextContent(
+        classroomMessages.presence.liveBadge,
+      );
+    });
+  });
+
+  test('discards old room state and remote avatars on classroom and account switches', async () => {
+    const { sdk, router, session } = setupPresenceWorkspace();
+    await waitFor(() => {
+      expect(sdk.roomFor(CLASSROOM_A)).toBeDefined();
+    });
+    const roomA = sdk.roomFor(CLASSROOM_A)!;
+
+    act(() => {
+      roomA.setAvatar({
+        userId: REMOTE_STUDENT_ID,
+        displayName: 'Estudiante A',
+        role: 'STUDENT',
+        x: 2,
+        z: 2,
+      });
+    });
+    await waitFor(() => {
+      expect(stage.props?.remoteParticipants).toHaveLength(1);
+    });
+
+    await act(() => router.navigate(`/presence/${CLASSROOM_B}`));
+    await waitFor(() => {
+      expect(sdk.roomFor(CLASSROOM_B)).toBeDefined();
+    });
+    expect(roomA.leave).toHaveBeenCalledTimes(1);
+    expect(stage.props?.remoteParticipants).toEqual([]);
+
+    const roomB = sdk.roomFor(CLASSROOM_B)!;
+    act(() => {
+      roomB.setAvatar({
+        userId: REMOTE_TEACHER_ID,
+        displayName: 'Docente B',
+        role: 'TEACHER',
+        x: -1,
+        z: -4,
+      });
+    });
+    await waitFor(() => {
+      expect(stage.props?.remoteParticipants).toHaveLength(1);
+      expect(stage.props?.remoteParticipants?.[0].displayName).toBe(
+        'Docente B',
+      );
+    });
+
+    // Account switch drops user 1's room and starts fresh for user 2.
+    act(() => {
+      session.set({
+        status: 'authenticated',
+        user: { ...profile, id: 'user-2', displayName: 'Otro Usuario' },
+      });
+    });
+
+    await waitFor(() => {
+      expect(roomB.leave).toHaveBeenCalledTimes(1);
+      expect(sdk.rooms.length).toBeGreaterThanOrEqual(3);
+    });
+    expect(stage.props?.remoteParticipants).toEqual([]);
+  });
+
+  test('never opens a realtime room for PARENT accounts', async () => {
+    const { sdk } = setupPresenceWorkspace({
+      detailOverrides: () => ({
+        myRole: 'PARENT',
+        capabilities: ['message_teacher'],
+        availablePanels: ['grades', 'notices'],
+      }),
+    });
+
+    await screen.findByText(/Familiar/);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(sdk.joinedClassrooms).toEqual([]);
+    expect(
+      screen.queryByTestId('classroom-presence-bar'),
+    ).not.toBeInTheDocument();
+  });
+});
