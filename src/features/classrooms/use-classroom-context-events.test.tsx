@@ -20,7 +20,10 @@ import {
   useClassroomContext,
   useClassroomCapabilities,
 } from './use-classroom-capabilities';
-import { useClassroomContextEvents } from './use-classroom-context-events';
+import {
+  CONTEXT_RENEWAL_MS,
+  useClassroomContextEvents,
+} from './use-classroom-context-events';
 
 function DraftPanel() {
   return <input aria-label="draft" defaultValue="" />;
@@ -166,12 +169,18 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-test('initial and duplicate hints fence every public consumer; obsolete REST cannot regrant', async () => {
+test('the registration hint is reconciled, later hints fence every public consumer; obsolete REST cannot regrant', async () => {
   const view = setup();
   await ready();
   expect(view.streams).toHaveLength(1); // Capability consumer must not subscribe.
   view.hold();
-  await view.hint(); // Initial registration hint is not special/replayable.
+  await view.hint(); // Initial registration hint: covered by the post-connect reconcile.
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
+  expect(screen.getByLabelText('context')).toHaveTextContent('Confirmed');
+  expect(screen.getByLabelText('guard')).toHaveTextContent('private');
+  await view.hint(); // A later hint on the same connection is a real invalidation.
   await waitFor(() =>
     expect(screen.getByLabelText('guard')).toHaveTextContent('denied'),
   );
@@ -246,7 +255,7 @@ test('stream 401 uses existing one-refresh GET replay and subsequent renewal use
   );
   expect(view.streams[0].request.url).not.toContain('access');
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(60_000);
+    await vi.advanceTimersByTimeAsync(CONTEXT_RENEWAL_MS);
   });
   expect(view.streams[0].request.signal.aborted).toBe(true);
   await act(async () => {
@@ -312,7 +321,7 @@ test.each([404, 503])(
   },
 );
 
-test('open panel draft survives EOF and repeated 60s renewals with 1s backoff reset; real hints still reset', async () => {
+test('open panel draft survives EOF and repeated renewals with 1s backoff reset; real hints still reset', async () => {
   vi.useFakeTimers();
   const view = setup();
   await ready();
@@ -332,10 +341,10 @@ test('open panel draft survives EOF and repeated 60s renewals with 1s backoff re
   expect(view.streams).toHaveLength(2);
   expect(screen.getByLabelText('draft')).toHaveValue('borrador docente');
 
-  // Six consecutive 60s renewals keep the open dialog mounted and always reconnect in 1s.
+  // Six consecutive renewals keep the open dialog mounted and always reconnect in 1s.
   for (let i = 0; i < 6; i++) {
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(60_000);
+      await vi.advanceTimersByTimeAsync(CONTEXT_RENEWAL_MS);
     });
     expect(screen.getByLabelText('draft')).toHaveValue('borrador docente');
     await act(async () => {
@@ -345,8 +354,14 @@ test('open panel draft survives EOF and repeated 60s renewals with 1s backoff re
     expect(screen.getByLabelText('draft')).toHaveValue('borrador docente');
   }
 
-  // An explicit invalidation hint still resets confirmed context immediately.
+  // The registration hint of the current connection does not reset...
   view.hold();
+  await view.hint();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(50);
+  });
+  expect(screen.getByLabelText('draft')).toHaveValue('borrador docente');
+  // ...but an explicit invalidation hint still resets confirmed context immediately.
   await view.hint();
   await act(async () => {
     await vi.advanceTimersByTimeAsync(50);
@@ -373,12 +388,79 @@ test('backoff resets to 1s after recovering from transient 503 failures', async 
   expect(streamAttempt).toBe(3);
   expect(view.streams).toHaveLength(1);
 
-  // Healthy stream resets backoff back to 1s on its 60s renewal (not 4s).
+  // Healthy stream resets backoff back to 1s on its renewal (not 4s).
   await act(async () => {
-    await vi.advanceTimersByTimeAsync(60_000);
+    await vi.advanceTimersByTimeAsync(CONTEXT_RENEWAL_MS);
   });
   await act(async () => {
     await vi.advanceTimersByTimeAsync(1_000);
   });
   expect(view.streams).toHaveLength(2);
+});
+
+test('routine renewals never unmount the workspace: each connection first hint is only reconciled', async () => {
+  vi.useFakeTimers();
+  const view = setup();
+  await ready();
+  view.hold(); // A reset would leave the context pending; reconcile keeps data.
+  for (let i = 0; i < 3; i++) {
+    await view.hint(); // Server registration hint of the current connection.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    expect(screen.getByLabelText('context')).toHaveTextContent('Confirmed');
+    expect(screen.getByLabelText('guard')).toHaveTextContent('private');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(CONTEXT_RENEWAL_MS);
+    }); // Client renewal closes this connection.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(view.streams).toHaveLength(2 + i); // New connection, new first hint.
+  }
+});
+
+test('a second hint on the same connection resets; a reconnect makes the next first hint harmless again', async () => {
+  vi.useFakeTimers();
+  const view = setup();
+  await ready();
+  view.hold();
+  await view.hint(); // First hint: no reset.
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(50);
+  });
+  expect(screen.getByLabelText('guard')).toHaveTextContent('private');
+  await act(async () => {
+    view.streams[0].source.close();
+  });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1_000);
+  });
+  expect(view.streams).toHaveLength(2);
+  await view.hint(); // First hint of the NEW connection: still no reset.
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(50);
+  });
+  expect(screen.getByLabelText('guard')).toHaveTextContent('private');
+  await view.hint(); // Second hint of the same connection: reset.
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(50);
+  });
+  expect(screen.getByLabelText('guard')).toHaveTextContent('denied');
+});
+
+test('the client renews the stream before the backend 60s lifetime', async () => {
+  expect(CONTEXT_RENEWAL_MS).toBeLessThan(60_000);
+  vi.useFakeTimers();
+  const timers = vi.spyOn(globalThis, 'setTimeout');
+  const view = setup();
+  await ready();
+  const delays = timers.mock.calls.map((call) => call[1]);
+  timers.mockRestore();
+  expect(delays).toContain(CONTEXT_RENEWAL_MS);
+  expect(view.streams[0].request.signal.aborted).toBe(false);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(CONTEXT_RENEWAL_MS);
+  });
+  expect(view.streams[0].request.signal.aborted).toBe(true);
 });

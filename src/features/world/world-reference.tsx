@@ -74,7 +74,7 @@ export function WorldReference() {
         {copy.title}
       </h3>
       <p>{copy.description}</p>
-      <WorldCanvas label={copy.canvas}>
+      <WorldCanvas label={copy.canvas} framing="reference">
         <ReferenceGeometry onIntent={onIntent} />
       </WorldCanvas>
       <Button

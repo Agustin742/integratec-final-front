@@ -1,5 +1,14 @@
 # Tracker — Alejo
 
+## 2026-11-21 — Review, develop conflict resolution, and merge of PR #112 (#36)
+
+- **Status:** completed (merged `origin/develop` into `feat/36-classroom-scene`, verified on the merged tree, ready to approve and merge [PR #112](https://github.com/Agustin742/integratec-final-front/pull/112))
+- **Area / files:** `changelogs/tracker-agustin.md`, `changelogs/tracker-alejo.md`, `docs/classroom-workspace.md`, `src/features/classrooms/classroom-workspace-panels.test.tsx`, `src/features/world/`, `src/lib/input-arbitration.ts`, `src/features/classrooms/use-classroom-context-events.ts`
+- **Change:** Reviewed PR #112 (`#36`, 3D classroom scene and local avatar navigation) and merged `origin/develop` into `feat/36-classroom-scene` to resolve the two merge conflicts (`changelogs/tracker-agustin.md` preserving all develop entries above `#36`, and `docs/classroom-workspace.md` combining the `#51` chat panel status with `#37`/`#38` deferrals while keeping the SSE registration-hint reconciliation docs). Verified the scene visually in Chrome at `1280×800` and `360×640` (initial spawn, click-to-walk on the floor, zero horizontal overflow on mobile).
+- **Reason:** PR #112 was ready at the code level but blocked on `mergeable_state: "dirty"` against `develop` (`#108`, `#109`, `#110`, `#111`, `#113`); resolving and merging unblocks `#37` and `#38`.
+- **Verification:** On the merged `feat/36-classroom-scene` tree: Prettier format check/write on touched Markdown files, `tsc --noEmit`, `eslint` on touched modules, `assets:check`, `git diff --check origin/develop`, and affected Vitest suites (`input-arbitration`, `world`, `classroom-3d-stage`, `use-classroom-context-events`, `classroom-workspace-panels`, `classroom-invitations-panel`, `chat-composer`).
+- **Next step:** Push merge commit, approve and merge PR #112 into `develop`.
+
 ## 2026-11-19 — Implement real-time classroom chat panel (#51)
 
 - **Status:** in-progress (published on [PR #113](https://github.com/Agustin742/integratec-final-front/pull/113) against `develop`: contract layer, panel, composer, moderation, e2e/docs evidence and the full local ladder with every full-suite failure proven pre-existing by differential; awaiting team review and merge)

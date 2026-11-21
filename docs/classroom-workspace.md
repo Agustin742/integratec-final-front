@@ -32,15 +32,22 @@ Bearer authorization and bounded 401 refresh/GET replay; neither native
 bypass JSON buffering through an abortable, per-chunk session-epoch fence.
 Ordinary REST responses retain their previous buffering and authentication behavior.
 
-| Signal                                                                         | Client behavior                                                                                                                                                                              |
-| ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Connect/reconnect                                                              | Reset and reload the complete shared REST context after stream registration.                                                                                                                 |
-| `classroom.context-invalidated` with `{ classroomId }`, including initial hint | Cancel obsolete REST, discard private context/panels/capabilities, and reload. No revision, event ID, or replay semantics. Duplicates simply reconcile again.                                |
-| EOF, transport/framing failure, or renewal                                     | Reload REST; retry after exponential delays from 1 second, capped at 30 seconds. Setup 503 is retryable; 401/403/404 stop this subscription's retries. REST remains the rendering authority. |
-| Classroom/user change, session cleanup, unmount                                | Abort connection/reader and clear renewal/retry timers. Old reads cannot restore current context.                                                                                            |
+| Signal                                                                                         | Client behavior                                                                                                                                                                              |
+| ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Connect/reconnect                                                                              | Reconcile (refetch, keep mounted) the shared REST context after stream registration.                                                                                                         |
+| `classroom.context-invalidated` with `{ classroomId }`, after the first hint of the connection | Cancel obsolete REST, discard private context/panels/capabilities, and reload. No revision, event ID, or replay semantics. Duplicates simply reconcile again.                                |
+| EOF, transport/framing failure, or renewal                                                     | Reload REST; retry after exponential delays from 1 second, capped at 30 seconds. Setup 503 is retryable; 401/403/404 stop this subscription's retries. REST remains the rendering authority. |
+| Classroom/user change, session cleanup, unmount                                                | Abort connection/reader and clear renewal/retry timers. Old reads cannot restore current context.                                                                                            |
 
-Comments (backend heartbeat every 15 seconds) carry no context. The client renews
-a connection at 60 seconds, tolerates chunked LF/CRLF/CR frames, discards incomplete
+The first hint of every connection is the backend's registration hint: it carries
+no change and is already covered by the post-connect reconcile, so it only keeps the
+workspace mounted (no reset, no 3D stage unmount). Every later hint on the same
+connection is a real invalidation and resets. The client renews a connection after
+50 seconds (`CONTEXT_RENEWAL_MS`, below the backend 60 second lifetime) so the
+lifetime-expiry hint is not received in normal operation.
+
+Comments (backend heartbeat every 15 seconds) carry no context. The client
+tolerates chunked LF/CRLF/CR frames, discards incomplete
 EOF frames, and bounds an individual frame to 64 KiB. Malformed/foreign hints cause
 conservative REST reconciliation, not permission grants. Capability consumers only
 read the existing TanStack Query cache and do not create subscriptions.
@@ -61,12 +68,22 @@ necessary. A hint removes stale content as soon as the client observes it.
 - **Canvas disposal & server parity:** Switching to `2D Classic Mode` unmounts `Classroom3DStage` (zero `<canvas>` elements mounted) while preserving classroom context and `<Outlet>`. Panel buttons in `Classroom2DLayout` are named exactly by the panel title (`aria-label`; the visible "Abrir panel" cue is `aria-hidden`) and filter the [F16 catalog](./classroom-panels.md) strictly by `canOpenPanel(key)` (`availablePanels`), keeping the 2D layout empty when the server grants none.
 - **UI evidence (`#34`):** Captured at [1280px](./assets/classroom-workspace/mode-2d-1280.png) and [360px](./assets/classroom-workspace/mode-2d-360.png).
 
+## 3D classroom scene and local navigation (#36)
+
+- **Scene:** `ClassroomWorld` (`src/features/world/classroom/`) is what `Classroom3DStage` lazy-loads. `buildClassroomScene` builds a placeholder room from primitives in the art-direction palette: floor, far walls at full height and a low skirting on the camera side so walls never hide avatars, one desk per `CLASSROOM_LAYOUT` obstacle (obstacle 0 is the teacher desk; student desks are instanced), and separate named placeholders for the board, shelf, bulletin board, shop, pet and tutor bot (`userData.placeholder`, ready for `#38`). Final models replace the primitives later.
+- **Camera:** `frameCamera` takes optional bounds; the classroom framing uses `CLASSROOM_BOUNDS` (layout bounds plus wall height) with the same fixed isometric angles.
+- **Collisions match the server:** walkable space is `CLASSROOM_LAYOUT` from `src/realtime/contracts.generated.ts`, and `stepAvatar` / `isWalkable` (`src/features/world/movement/`) mirror the realtime server step (fixed 3 m/s, sub-stepped, sliding on obstacles). Desk visuals are derived from the same boxes, and placeholders sit inside the wall margin so nothing visible contradicts a collision.
+- **Controls:** W, A, S, D or the arrow keys move the avatar in screen directions. Clicking or tapping the floor walks there along a grid A* path (`findPath`); a target on a desk or out of reach is rejected, so there is no false arrival and no marker. Any movement key or `Escape` cancels the walk. The canvas carries a screen-reader description of these controls.
+- **Input arbitration:** `src/lib/input-arbitration.ts` is shared with the `Alt+M` shortcut. Typing in a text control, an open dialog, modifier chords and arrow keys inside focused tab, menu or slider widgets never move the avatar. Held keys and the destination are cleared on window blur, hidden tab, dialog open, classroom switch and unmount.
+- **Rendering:** per-frame movement mutates a three `Group` inside `useFrame`; React state changes only when the avatar starts or stops (Walk / Idle clips). The demand frame loop is invalidated while moving and on input.
+- **Scope boundary:** movement is local only. The avatar spawns at `spawnPoints[0]`, nothing is persisted, and the `{ x, z }` movement intent is exposed through `onIntentChange` for `#37`, which sends it to the room and renders remote avatars.
+
 ## Verification boundary
 
 Synthetic component tests cover loading, server name/parent metadata, exact Outlet control values, shared capability cache, delayed classroom/account switches, cancellation, logout, non-disclosing failures, refresh failures and retry, plus 3D ↔ 2D toggling, `Alt+M` input/dialog arbitration, per-account mode isolation, and parent exclusion. Router and capability regression checks remain required. Mock results are not live-backend authorization proof; desktop/mobile render, keyboard/focus/overflow checks and full configured checks must be recorded separately.
 
 ## Deferred
 
-Panel business content beyond the delivered `activities` inbox and teacher editor (`#41` + `#39`), study `material` manager (`#40`), `members` staff tabs (roster `#33` and `invite_members`-gated invitations/join-code `#32`), the classroom `chat` panel (`#51`), full in-scene 3D furniture/interactions, and parent tools are not delivered. Panel registration, nested URL opening, and accessible 2D Classic Mode navigation (`#34`) are provided; the remaining minimum entries explicitly identify their content as pending. B/SSE invalidation is consumed, but this slice promises no globally instantaneous propagation. Login return destinations remain restricted to `/`.
+Panel business content beyond the delivered `activities` inbox and teacher editor (`#41` + `#39`), study `material` manager (`#40`), `members` staff tabs (roster `#33` and `invite_members`-gated invitations/join-code `#32`), the classroom `chat` panel (`#51`), final 3D furniture models and in-scene interactions (`#38`), remote avatars and presence (`#37`), and parent tools are not delivered. Panel registration, nested URL opening, and accessible 2D Classic Mode navigation (`#34`) are provided; the remaining minimum entries explicitly identify their content as pending. B/SSE invalidation is consumed, but this slice promises no globally instantaneous propagation. Login return destinations remain restricted to `/`.
 
 See [routing](./routing.md), [state ownership](../rules/state-management.md), and [classroom authority](../rules/classrooms-and-roles.md).
