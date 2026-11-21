@@ -56,7 +56,7 @@ export function PerformanceProbe({
     const offerFired = runtime.recordFrame(performance.now(), {
       drawCalls: gl.info.render.calls,
       triangles: gl.info.render.triangles,
-      gpuMemory: estimateGpuMemory(collectGpuMemoryInput(scene)),
+      gpuMemory: () => estimateGpuMemory(collectGpuMemoryInput(scene)),
     });
     if (offerFired) {
       onSustainedLowFpsRef.current?.();

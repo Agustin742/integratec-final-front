@@ -229,7 +229,11 @@ export const STATS_REFRESH_MS = 500;
 export interface ProbeFrameSources {
   readonly drawCalls: number;
   readonly triangles: number;
-  readonly gpuMemory: GpuMemoryEstimate;
+  /**
+   * Lazy: evaluated only when a stats refresh is due, so the scene traversal
+   * behind it never runs on the per-frame path.
+   */
+  readonly gpuMemory: () => GpuMemoryEstimate;
 }
 
 /**
@@ -263,15 +267,16 @@ export class PerformanceProbeRuntime {
     if (nowMs - this.lastStatsWriteMs >= STATS_REFRESH_MS) {
       this.lastStatsWriteMs = nowMs;
       const metrics = this.sampler.getMetrics();
+      const gpuMemory = sources.gpuMemory();
       this.stats = {
         fps: Math.round(metrics.fps * 10) / 10,
         frames: metrics.frames,
         sustainedLowFps: this.sustainedLow,
         drawCalls: sources.drawCalls,
         triangles: sources.triangles,
-        gpuMemoryBytes: sources.gpuMemory.bytes,
-        gpuTextures: sources.gpuMemory.textures,
-        gpuGeometries: sources.gpuMemory.geometries,
+        gpuMemoryBytes: gpuMemory.bytes,
+        gpuTextures: gpuMemory.textures,
+        gpuGeometries: gpuMemory.geometries,
       };
     }
     return offerFired;

@@ -1,9 +1,11 @@
-import { beforeEach, describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import {
   FD8_BUDGET,
   PERF_SAMPLER_CONFIG,
   FpsSampler,
   estimateGpuMemory,
+  PerformanceProbeRuntime,
+  STATS_REFRESH_MS,
 } from './performance-monitor';
 
 /**
@@ -143,5 +145,34 @@ describe('estimateGpuMemory (#56)', () => {
     });
     expect(result.bytes).toBe(0);
     expect(result.textures).toBe(2);
+  });
+});
+
+describe('PerformanceProbeRuntime GPU memory sampling (#56)', () => {
+  test('evaluates the lazy GPU memory source only when a stats refresh is due', () => {
+    const runtime = new PerformanceProbeRuntime();
+    const gpuMemory = vi.fn(() => ({
+      bytes: 1024,
+      textures: 2,
+      geometries: 3,
+    }));
+    const sources = { drawCalls: 5, triangles: 10, gpuMemory };
+
+    // First frame after the refresh interval publishes once.
+    runtime.recordFrame(STATS_REFRESH_MS, sources);
+    expect(gpuMemory).toHaveBeenCalledTimes(1);
+
+    // Frames inside the refresh interval must not evaluate the source.
+    for (let i = 1; i <= 20; i += 1) {
+      runtime.recordFrame(STATS_REFRESH_MS + i * 16, sources);
+    }
+    expect(gpuMemory).toHaveBeenCalledTimes(1);
+
+    // The next due frame evaluates it again and publishes the result.
+    runtime.recordFrame(STATS_REFRESH_MS * 2 + 1, sources);
+    expect(gpuMemory).toHaveBeenCalledTimes(2);
+    expect(runtime.getStats().gpuMemoryBytes).toBe(1024);
+    expect(runtime.getStats().gpuTextures).toBe(2);
+    expect(runtime.getStats().gpuGeometries).toBe(3);
   });
 });

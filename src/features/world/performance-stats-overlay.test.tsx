@@ -96,6 +96,9 @@ function driveRuntime(
 ): void {
   const stepMs = 1000 / fps;
   for (let t = 0; t < durationMs; t += stepMs) {
-    runtime.recordFrame(t + stepMs, sources);
+    runtime.recordFrame(t + stepMs, {
+      ...sources,
+      gpuMemory: () => sources.gpuMemory,
+    });
   }
 }
