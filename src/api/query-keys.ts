@@ -276,6 +276,14 @@ export function ownStreakAndBadgesQueryKey(userId: string): ScopedQueryKey {
 }
 
 /**
+ * Key of `GET /users/me/daily-review`: server-decided daily review eligibility
+ * and content for the authenticated user (`HU-BOT-003`).
+ */
+export function ownDailyReviewQueryKey(userId: string): ScopedQueryKey {
+  return createScopedQueryKey({ userId }, 'bot', 'daily-review');
+}
+
+/**
  * Key of `GET /classrooms/{id}/bot/status`: Study Guide Bot availability and
  * server-decided exam lockout state scoped by `userId` and `classroomId`
  * (`rules/ai-bot-and-daily-briefing.md`, `HU-BOT-002`).
@@ -635,6 +643,30 @@ export function classroomActivitySubmissionQueryKey(
     { userId, classroomId },
     'activities',
     'submission',
+    Object.freeze({
+      activityId: normalizeRequiredText(activityId, 'activityId'),
+    }),
+  );
+}
+
+/**
+ * Key of `GET /activities/{activityId}/submissions/me` read for a
+ * multiple-choice exam (`HU-ACT-003` part 2/2, see `docs/exam-answering.md`):
+ * the calling student's own exam submission, where a missing submission reads
+ * as `null`. Kept apart from `classroomActivitySubmissionQueryKey` because
+ * that entry caches the file read, which throws on `404`. The response is not
+ * cacheable per the contract, so consumers keep it fresh rather than relying
+ * on cached reads.
+ */
+export function classroomExamAttemptQueryKey(
+  userId: string,
+  classroomId: string,
+  activityId: string,
+): ScopedQueryKey<{ readonly activityId: string }> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'activities',
+    'exam-attempt',
     Object.freeze({
       activityId: normalizeRequiredText(activityId, 'activityId'),
     }),
@@ -1307,4 +1339,282 @@ export function createClassroomShopPredicate(
       (segment.resource === 'items' || segment.resource === 'purchases')
     );
   };
+}
+
+export type ForumSortOrder = 'createdAt' | '-createdAt';
+
+export interface ForumListQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+  readonly sort?: ForumSortOrder;
+}
+
+export interface NormalizedForumThreadsQueryParams {
+  readonly activityId: string;
+  readonly page: number;
+  readonly pageSize: number;
+  readonly sort: ForumSortOrder;
+}
+
+export interface NormalizedForumPostsQueryParams {
+  readonly activityId: string;
+  readonly threadId: string;
+  readonly page: number;
+  readonly pageSize: number;
+  readonly sort: ForumSortOrder;
+}
+
+export interface ClassroomDirectoryQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+}
+
+export interface NormalizedClassroomDirectoryQueryParams {
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+function normalizeForumSort(
+  value: ForumSortOrder | undefined,
+  fallback: ForumSortOrder,
+): ForumSortOrder {
+  if (value === 'createdAt' || value === '-createdAt') {
+    return value;
+  }
+  return fallback;
+}
+
+/**
+ * Key of `GET /classrooms/{id}/activities/{activityId}/forum/threads` scoped
+ * by `userId` and `classroomId` (`rules/state-management.md`).
+ */
+export function activityForumThreadsQueryKey(
+  userId: string,
+  classroomId: string,
+  activityId: string,
+  params: ForumListQueryParams = {},
+): ScopedQueryKey<NormalizedForumThreadsQueryParams> {
+  const normalizedParams = Object.freeze({
+    activityId: normalizeRequiredText(activityId, 'activityId'),
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 10, 1, 100),
+    sort: normalizeForumSort(params.sort, '-createdAt'),
+  });
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'activities',
+    'forum-threads',
+    normalizedParams,
+  );
+}
+
+/**
+ * Key of `GET /classrooms/{id}/activities/{activityId}/forum/threads/{threadId}/posts`
+ * scoped by `userId` and `classroomId`.
+ */
+export function activityForumPostsQueryKey(
+  userId: string,
+  classroomId: string,
+  activityId: string,
+  threadId: string,
+  params: ForumListQueryParams = {},
+): ScopedQueryKey<NormalizedForumPostsQueryParams> {
+  const normalizedParams = Object.freeze({
+    activityId: normalizeRequiredText(activityId, 'activityId'),
+    threadId: normalizeRequiredText(threadId, 'threadId'),
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+    sort: normalizeForumSort(params.sort, 'createdAt'),
+  });
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'activities',
+    'forum-posts',
+    normalizedParams,
+  );
+}
+
+/**
+ * Predicate matching all forum thread/post query entries for one activity owned
+ * by `userId` and `classroomId`.
+ */
+export function createActivityForumPredicate(
+  userId: string,
+  classroomId: string,
+  activityId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  const normalizedActivityId = normalizeRequiredText(activityId, 'activityId');
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+      params?: { activityId?: unknown };
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'activities' &&
+      (segment.resource === 'forum-threads' ||
+        segment.resource === 'forum-posts') &&
+      segment.params?.activityId === normalizedActivityId
+    );
+  };
+}
+
+/**
+ * Key of `GET /classrooms/{id}/members` directory lookup scoped by `userId`
+ * and `classroomId`.
+ */
+export function classroomDirectoryMembersQueryKey(
+  userId: string,
+  classroomId: string,
+  params: ClassroomDirectoryQueryParams = {},
+): ScopedQueryKey<NormalizedClassroomDirectoryQueryParams> {
+  const normalizedParams = Object.freeze({
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 100, 1, 100),
+  });
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'classrooms',
+    'members-directory',
+    normalizedParams,
+  );
+}
+
+export interface ChatHistoryQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+}
+
+/**
+ * The chat history is one infinite query: the page is the query's page param
+ * (older messages = higher page numbers), so only `pageSize` identifies it.
+ */
+export interface ChatHistoryInfiniteQueryParams {
+  readonly pageSize?: number;
+}
+
+export interface NormalizedChatHistoryQueryParams {
+  readonly pageSize: number;
+}
+
+/**
+ * Key of the `useInfiniteQuery` over `GET /classrooms/{id}/messages`
+ * (`ChatController_list`) scoped by `userId` and `classroomId`, so switching
+ * either one reads an isolated cache entry (`rules/state-management.md`).
+ * Its cached data is `InfiniteData<PaginatedChatHistoryDto>`.
+ */
+export function classroomChatHistoryQueryKey(
+  userId: string,
+  classroomId: string,
+  params: ChatHistoryInfiniteQueryParams = {},
+): ScopedQueryKey<NormalizedChatHistoryQueryParams> {
+  const normalizedParams = Object.freeze({
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+  });
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'chat',
+    'history',
+    normalizedParams,
+  );
+}
+
+/**
+ * Key of the chat mention-directory lookup (`GET /classrooms/{id}/members`
+ * with the `q` case-insensitive display-name prefix filter, backend decision
+ * D12) scoped by `userId` and `classroomId`.
+ *
+ * It deliberately lives OUTSIDE the `chat` query domain of the history keys:
+ * the `createClassroomChatPredicate` revalidations (confirmed sends, hides,
+ * live reconnects, SSE context hints) must reconcile the conversation, not
+ * refetch the member directory the mention picker reads on demand.
+ */
+export interface ChatMentionDirectoryQueryParams {
+  readonly q: string;
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+export function chatMentionDirectoryQueryKey(
+  userId: string,
+  classroomId: string,
+  params: ChatMentionDirectoryQueryParams,
+): ScopedQueryKey<ChatMentionDirectoryQueryParams> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'chat-mentions',
+    'directory',
+    Object.freeze({
+      q: params.q.trim().slice(0, 100),
+      page: params.page,
+      pageSize: params.pageSize,
+    }),
+  );
+}
+
+/**
+ * Key of the chat inbox (`GET /chats`, `ChatInboxController_list`): the chats
+ * of ALL the user's classrooms with their last message and unread count,
+ * scoped by user only. It lives in its own `chat-inbox` domain so the
+ * per-classroom `createClassroomChatPredicate` sweeps never refetch it.
+ */
+export function chatInboxQueryKey(userId: string): ScopedQueryKey {
+  return createScopedQueryKey({ userId }, 'chat-inbox', 'list');
+}
+
+/**
+ * Predicate matching every classroom chat query entry owned by `userId` and
+ * `classroomId`, so confirmed sends, moderation hides and the classroom
+ * context revalidation seam reconcile all affected chat views at once.
+ */
+export function createClassroomChatPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'chat'
+    );
+  };
+}
+
+/**
+ * Predicate matching only the infinite history entries (any page size) of one
+ * user + classroom, the cache the live delivery and the composer read.
+ */
+export function createClassroomChatHistoryPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const isClassroomChat = createClassroomChatPredicate(userId, classroomId);
+  return (query) =>
+    isClassroomChat(query) &&
+    (query.queryKey[0] as { resource?: unknown }).resource === 'history';
 }

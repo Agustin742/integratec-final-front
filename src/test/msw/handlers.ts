@@ -1,4 +1,4 @@
-import { HttpResponse, http, type HttpHandler } from 'msw';
+import { delay, HttpResponse, http, type HttpHandler } from 'msw';
 import type { components, operations } from '../../api/schema.generated';
 
 export type HealthStatusPayload = components['schemas']['HealthStatus'];
@@ -3405,6 +3405,13 @@ export function createClassroomSubmissionsStore(
   const respondError = (status: number, body: ErrorBodyPayload): Response =>
     withCors(createErrorEnvelopeResponse(status, body));
 
+  /** File submissions carry no auto score and no multiple-choice answers. */
+  const withFileResultFields = (item: SubmissionStoreItem) => ({
+    ...item,
+    autoScore: null,
+    answers: [],
+  });
+
   const fail = (failure: SubmissionStoreFailure): Response =>
     failure === 'network' || failure === 'drop-response'
       ? HttpResponse.error()
@@ -3497,7 +3504,7 @@ export function createClassroomSubmissionsStore(
           if (existing) {
             if (existing.idempotencyKey === key) {
               // Idempotent replay: the stored submission, nothing new stored.
-              return respondJson(existing, 200);
+              return respondJson(withFileResultFields(existing), 200);
             }
             return respondError(409, {
               code: 'CONFLICT',
@@ -3618,7 +3625,7 @@ export function createClassroomSubmissionsStore(
             // The server stored the submission but the response was lost.
             return HttpResponse.error();
           }
-          return respondJson(stored, 201);
+          return respondJson(withFileResultFields(stored), 201);
         },
       ),
       http.get(
@@ -3673,6 +3680,8 @@ export function createClassroomSubmissionsStore(
               submittedAt: found.submittedAt,
               isLate: found.isLate,
               status: found.status,
+              autoScore: null,
+              answers: [],
               files: found.files.map((file) => ({
                 ...file,
                 downloadUrl: `https://storage.example.invalid/signed/${file.id}`,
@@ -3681,6 +3690,426 @@ export function createClassroomSubmissionsStore(
             },
             200,
           );
+        },
+      ),
+    ],
+  };
+}
+
+/**
+ * Stateful contract-faithful MSW store for student multiple-choice exam
+ * answering (`SubmissionsController_create` and
+ * `SubmissionsController_readOwn` for a `MULTIPLE_CHOICE` activity, back #47):
+ * `POST /activities/{activityId}/submissions` (multipart, `answers` is a
+ * JSON-encoded array of `{ questionId, optionId }`) and
+ * `GET /activities/{activityId}/submissions/me`.
+ *
+ * Correct answers live only inside this store and are never part of any
+ * response (`RN-06`): the stored submission exposes the chosen options and the
+ * server-computed `autoScore` only. Scoring mirrors the server evaluator,
+ * `round(correct / questions * maxScore)`; the browser never computes a score.
+ * Every `409` carries the single `activity` detail field like the real API, so
+ * the reason is not machine-readable.
+ */
+export interface ExamSubmissionsStoreOption {
+  readonly id: string;
+  /** Store-internal only; never included in any response (`RN-06`). */
+  readonly isCorrect: boolean;
+}
+
+export interface ExamSubmissionsStoreQuestion {
+  readonly id: string;
+  readonly options: readonly ExamSubmissionsStoreOption[];
+}
+
+export interface ExamSubmissionsStoreActivity {
+  readonly id: string;
+  readonly state: 'DRAFT' | 'PUBLISHED';
+  readonly format: 'FILE' | 'MULTIPLE_CHOICE';
+  readonly opensAt: string | null;
+  readonly dueAt: string;
+  readonly allowLate: boolean;
+  readonly maxScore: number;
+  readonly questions: readonly ExamSubmissionsStoreQuestion[];
+}
+
+export interface ExamSubmissionsStoreItem {
+  readonly id: string;
+  readonly activityId: string;
+  readonly submittedAt: string;
+  readonly isLate: boolean;
+  readonly idempotencyKey: string;
+  readonly answers: readonly {
+    readonly questionId: string;
+    readonly optionId: string;
+    readonly position: number;
+  }[];
+  readonly autoScore: number;
+}
+
+export type ExamSubmissionsStoreOp = 'create' | 'readOwn';
+export type ExamSubmissionsStoreFailure =
+  MswErrorResponseSpec | 'network' | 'drop-response';
+
+export interface ExamSubmissionsStoreOptions {
+  readonly baseUrl?: string;
+  readonly role?: 'TEACHER' | 'SCHOOL_OWNER' | 'STUDENT' | 'PARENT';
+  /** Published `MULTIPLE_CHOICE` activity the store accepts answers for. */
+  readonly activity?: ExamSubmissionsStoreActivity;
+  /** Server-clock instant used to decide the answering window. */
+  readonly now?: string;
+  readonly initialItems?: readonly ExamSubmissionsStoreItem[];
+  /**
+   * Artificial latency for every `GET .../submissions/me` response, so tests
+   * can observe the panel's transient "verifying with the server" phase: MSW
+   * resolves in microtasks, which lets the whole uncertain-failure
+   * reconciliation finish before React ever commits the intermediate state.
+   */
+  readonly readOwnDelayMs?: number;
+}
+
+export interface ExamSubmissionCreateRequestRecord {
+  readonly idempotencyKey: string | null;
+  readonly authorization: string | null;
+  readonly accessTokenUsed: string | null;
+  /** Names of the multipart fields received (`answers`, `files`, ...). */
+  readonly fieldNames: readonly string[];
+  /** Raw `answers` multipart field, exactly as the browser sent it. */
+  readonly answers: string | null;
+}
+
+export interface ExamSubmissionsStore {
+  readonly handlers: readonly HttpHandler[];
+  getItems: () => readonly ExamSubmissionsStoreItem[];
+  getLastCreateRequest: () => ExamSubmissionCreateRequestRecord | null;
+  failNext: (
+    op: ExamSubmissionsStoreOp,
+    failure: ExamSubmissionsStoreFailure,
+  ) => void;
+}
+
+export function createExamSubmissionsStore(
+  options: ExamSubmissionsStoreOptions = {},
+): ExamSubmissionsStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const role = options.role ?? 'STUDENT';
+  const activity = options.activity;
+  const now = options.now ?? '2026-11-19T12:00:00.000Z';
+  const readOwnDelayMs = options.readOwnDelayMs ?? 0;
+  const items: ExamSubmissionsStoreItem[] = [...(options.initialItems ?? [])];
+  const pending: Partial<
+    Record<ExamSubmissionsStoreOp, ExamSubmissionsStoreFailure>
+  > = {};
+  let lastCreateRequest: ExamSubmissionCreateRequestRecord | null = null;
+
+  // jsdom enforces CORS, so every store response carries the header a real
+  // API gateway would add; `HttpResponse.error()` stays unwrapped.
+  const withCors = (response: Response): Response => {
+    const headers = new Headers(response.headers);
+    headers.set('access-control-allow-origin', '*');
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  };
+  const respondJson = (body: unknown, status: number): Response =>
+    withCors(
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+  const respondError = (status: number, body: ErrorBodyPayload): Response =>
+    withCors(createErrorEnvelopeResponse(status, body));
+  const respondConflict = (message: string, correlationId: string): Response =>
+    respondError(409, {
+      code: 'CONFLICT',
+      message: 'Request conflicts with the current state',
+      details: [{ field: 'activity', messages: [message] }],
+      correlationId,
+    });
+  const respondAnswersInvalid = (
+    message: string,
+    correlationId: string,
+  ): Response =>
+    respondError(400, {
+      code: 'VALIDATION_FAILED',
+      message: 'The request is invalid. Check the details and try again.',
+      details: [{ field: 'answers', messages: [message] }],
+      correlationId,
+    });
+
+  const fail = (failure: ExamSubmissionsStoreFailure): Response =>
+    failure === 'network' || failure === 'drop-response'
+      ? HttpResponse.error()
+      : respondError(failure.status, failure.body);
+
+  /** The submission payload; never includes correctness (`RN-06`). */
+  const toResponse = (item: ExamSubmissionsStoreItem) => ({
+    id: item.id,
+    activityId: item.activityId,
+    submittedAt: item.submittedAt,
+    isLate: item.isLate,
+    autoScore: item.autoScore,
+    // The server derives `graded` from a teacher grade; an auto-scored
+    // multiple-choice submission stays `submitted`.
+    status: 'submitted' as const,
+    files: [] as never[],
+    answers: item.answers,
+  });
+
+  return {
+    getItems: () => items,
+    getLastCreateRequest: () => lastCreateRequest,
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    handlers: [
+      // jsdom sends a CORS preflight for the POST's custom headers
+      // (`Authorization`, `Idempotency-Key`); answer it like the real API.
+      http.options(
+        `${baseUrl}/activities/:activityId/submissions`,
+        () =>
+          new HttpResponse(null, {
+            status: 204,
+            headers: {
+              'access-control-allow-origin': '*',
+              'access-control-allow-methods': 'POST, GET, OPTIONS',
+              'access-control-allow-headers':
+                'authorization, idempotency-key, accept, content-type',
+            },
+          }),
+      ),
+      http.options(
+        `${baseUrl}/activities/:activityId/submissions/me`,
+        () =>
+          new HttpResponse(null, {
+            status: 204,
+            headers: {
+              'access-control-allow-origin': '*',
+              'access-control-allow-methods': 'GET, OPTIONS',
+              'access-control-allow-headers': 'authorization, accept',
+            },
+          }),
+      ),
+      http.post(
+        `${baseUrl}/activities/:activityId/submissions`,
+        async ({ params, request }) => {
+          const failure = pending.create;
+          pending.create = undefined;
+          if (failure === 'network') {
+            return HttpResponse.error();
+          }
+          if (failure !== undefined && failure !== 'drop-response') {
+            return respondError(failure.status, failure.body);
+          }
+
+          const idempotencyKey = request.headers.get('Idempotency-Key');
+          const authorization = request.headers.get('Authorization');
+          const form = await request.formData().catch(() => null);
+          const answersField = form?.get('answers');
+          lastCreateRequest = {
+            idempotencyKey,
+            authorization,
+            accessTokenUsed:
+              authorization?.startsWith('Bearer ') && authorization.length > 7
+                ? authorization.slice(7)
+                : null,
+            fieldNames: form ? [...new Set(form.keys())] : [],
+            answers: typeof answersField === 'string' ? answersField : null,
+          };
+
+          if (
+            !activity ||
+            params.activityId !== activity.id ||
+            activity.state !== 'PUBLISHED'
+          ) {
+            return respondError(404, {
+              code: 'NOT_FOUND',
+              message: 'The requested resource was not found.',
+              correlationId: 'req-exam-submissions-create-404',
+            });
+          }
+          if (role !== 'STUDENT') {
+            return respondError(403, {
+              code: 'FORBIDDEN',
+              message: 'You are not allowed to perform this action.',
+              correlationId: 'req-exam-submissions-create-403',
+            });
+          }
+
+          const key = idempotencyKey?.trim() ?? '';
+          if (key.length < 1 || key.length > 255) {
+            return respondError(400, {
+              code: 'VALIDATION_FAILED',
+              message:
+                'The request is invalid. Check the details and try again.',
+              details: [
+                {
+                  field: 'Idempotency-Key',
+                  messages: ['Idempotency-Key header is required.'],
+                },
+              ],
+              correlationId: 'req-exam-submissions-create-400-key',
+            });
+          }
+
+          const existing = items.find(
+            (item) => item.activityId === activity.id,
+          );
+          if (existing) {
+            if (existing.idempotencyKey === key) {
+              // Idempotent replay: the stored submission, never re-scored.
+              return respondJson(toResponse(existing), 200);
+            }
+            return respondConflict(
+              'You already submitted to this activity',
+              'req-exam-submissions-create-409-key',
+            );
+          }
+
+          if (activity.format !== 'MULTIPLE_CHOICE' || form?.has('files')) {
+            return respondConflict(
+              'This activity does not accept file submissions',
+              'req-exam-submissions-create-409-format',
+            );
+          }
+
+          let parsed: unknown = null;
+          try {
+            parsed =
+              typeof answersField === 'string'
+                ? (JSON.parse(answersField) as unknown)
+                : null;
+          } catch {
+            parsed = null;
+          }
+          if (!Array.isArray(parsed) || parsed.length === 0) {
+            return respondAnswersInvalid(
+              'answers must be a non-empty JSON array of question/option pairs',
+              'req-exam-submissions-create-400-shape',
+            );
+          }
+
+          if (activity.opensAt && now < activity.opensAt) {
+            return respondConflict(
+              'This activity is not open yet',
+              'req-exam-submissions-create-409-window',
+            );
+          }
+          const isLate = now > activity.dueAt;
+          if (isLate && !activity.allowLate) {
+            return respondConflict(
+              'The deadline has passed and this activity does not accept late submissions',
+              'req-exam-submissions-create-409-closed',
+            );
+          }
+
+          const seenQuestionIds = new Set<string>();
+          const rows: {
+            questionId: string;
+            optionId: string;
+            position: number;
+          }[] = [];
+          let correct = 0;
+          for (const [position, entry] of (parsed as unknown[]).entries()) {
+            const { questionId, optionId } = (entry ?? {}) as Record<
+              string,
+              unknown
+            >;
+            if (
+              typeof questionId !== 'string' ||
+              typeof optionId !== 'string' ||
+              seenQuestionIds.has(questionId)
+            ) {
+              return respondAnswersInvalid(
+                'each answer must be an object with uuid questionId and optionId',
+                'req-exam-submissions-create-400-pair',
+              );
+            }
+            seenQuestionIds.add(questionId);
+            const option = activity.questions
+              .find((question) => question.id === questionId)
+              ?.options.find((candidate) => candidate.id === optionId);
+            if (!option) {
+              return respondAnswersInvalid(
+                `answer ${optionId} does not belong to question ${questionId} of this activity`,
+                'req-exam-submissions-create-400-option',
+              );
+            }
+            if (option.isCorrect) {
+              correct += 1;
+            }
+            rows.push({ questionId, optionId, position });
+          }
+
+          const autoScore = Math.round(
+            (correct / Math.max(activity.questions.length, 1)) *
+              activity.maxScore,
+          );
+          const stored: ExamSubmissionsStoreItem = {
+            id: globalThis.crypto.randomUUID(),
+            activityId: activity.id,
+            submittedAt: now,
+            isLate,
+            idempotencyKey: key,
+            answers: rows,
+            autoScore,
+          };
+          items.push(stored);
+
+          if (failure === 'drop-response') {
+            // The server stored the submission but the response was lost.
+            return HttpResponse.error();
+          }
+          return respondJson(toResponse(stored), 201);
+        },
+      ),
+      http.get(
+        `${baseUrl}/activities/:activityId/submissions/me`,
+        async ({ params }) => {
+          if (readOwnDelayMs > 0) {
+            await delay(readOwnDelayMs);
+          }
+          const failure = pending.readOwn;
+          pending.readOwn = undefined;
+          if (failure !== undefined) {
+            return fail(failure);
+          }
+
+          // The real API answers the same generic `404` for an unknown
+          // activity, a draft, a non-member and a missing submission.
+          if (
+            !activity ||
+            params.activityId !== activity.id ||
+            activity.state !== 'PUBLISHED'
+          ) {
+            return respondError(404, {
+              code: 'NOT_FOUND',
+              message: 'The requested resource was not found.',
+              correlationId: 'req-exam-submissions-me-404-activity',
+            });
+          }
+          if (role !== 'STUDENT') {
+            return respondError(403, {
+              code: 'FORBIDDEN',
+              message: 'You are not allowed to perform this action.',
+              correlationId: 'req-exam-submissions-me-403',
+            });
+          }
+
+          const found = items.find(
+            (item) => item.activityId === params.activityId,
+          );
+          if (!found) {
+            return respondError(404, {
+              code: 'NOT_FOUND',
+              message: 'The requested resource was not found.',
+              correlationId: 'req-exam-submissions-me-404-submission',
+            });
+          }
+          return respondJson(toResponse(found), 200);
         },
       ),
     ],
@@ -4117,9 +4546,10 @@ export interface NotificationStoreItem {
     | 'grade_posted'
     | 'announcement'
     | 'mention'
-    | 'activity_forum_reply';
+    | 'activity_forum_reply'
+    | 'badge_awarded';
   readonly resourceId: string;
-  readonly classroomId: string;
+  readonly classroomId: string | null;
   readonly studentId: string | null;
   readonly readAt: string | null;
   readonly createdAt: string;
@@ -5388,6 +5818,10 @@ export const defaultHandlers: readonly HttpHandler[] = [
   http.get(`${TEST_API_BASE_URL}/notifications`, () =>
     HttpResponse.json({ items: [], page: 1, pageSize: 20, total: 0 }),
   ),
+  // The chat dock polls the inbox from the app shell: quiet by default.
+  http.get(`${TEST_API_BASE_URL}/chats`, () =>
+    HttpResponse.json({ items: [] }),
+  ),
 ];
 
 export type ReportCardItemPayload = components['schemas']['ReportCardItemDto'];
@@ -5869,5 +6303,1466 @@ export function createClassroomBotStore(
         },
       ),
     ],
+  };
+}
+
+export interface ForumStorePost {
+  readonly id: string;
+  readonly threadId: string;
+  readonly authorId: string;
+  readonly body: string;
+  readonly createdAt: string;
+}
+
+export interface ForumStoreThread {
+  readonly id: string;
+  readonly classroomId: string;
+  readonly activityId: string;
+  readonly authorId: string;
+  readonly createdAt: string;
+  readonly posts: readonly ForumStorePost[];
+}
+
+export interface ForumStoreMember {
+  readonly id: string;
+  readonly userId: string;
+  readonly displayName: string;
+  readonly role: 'TEACHER' | 'STUDENT';
+}
+
+export type ForumStoreOp =
+  'listThreads' | 'createThread' | 'listPosts' | 'createPost' | 'members';
+
+export type ForumStoreFailure =
+  MswErrorResponseSpec | 'network' | 'drop-response' | 'malformed-2xx';
+
+export interface ActivityForumStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId: string;
+  readonly activityId: string;
+  readonly currentUserId?: string;
+  readonly role?: 'TEACHER' | 'STUDENT' | 'PARENT';
+  readonly adultMode?: boolean;
+  readonly members?: readonly ForumStoreMember[];
+  readonly initialThreads?: readonly ForumStoreThread[];
+  readonly writeDelayMs?: number;
+}
+
+export interface ActivityForumStore {
+  readonly handlers: readonly HttpHandler[];
+  getThreads: () => readonly ForumStoreThread[];
+  setRole: (role: 'TEACHER' | 'STUDENT' | 'PARENT') => void;
+  setCurrentUserId: (userId: string) => void;
+  failNext: (op: ForumStoreOp, failure: ForumStoreFailure) => void;
+  getCounts: () => Record<ForumStoreOp, number>;
+}
+
+/**
+ * Stateful contract-faithful MSW store for per-activity query forum
+ * (`HU-COM-003`, backend `#39`) plus directory lookup (`GET /members`).
+ */
+export function createActivityForumStore(
+  options: ActivityForumStoreOptions,
+): ActivityForumStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  let currentUserId =
+    options.currentUserId ?? '00000000-0000-4000-8000-000000007001';
+  let currentRole = options.role ?? 'STUDENT';
+  const adultMode = options.adultMode ?? false;
+  let threads: ForumStoreThread[] = [...(options.initialThreads ?? [])];
+  const members: ForumStoreMember[] = [...(options.members ?? [])];
+  let seq = 100;
+
+  const pending: Partial<Record<ForumStoreOp, ForumStoreFailure>> = {};
+  const counts: Record<ForumStoreOp, number> = {
+    listThreads: 0,
+    createThread: 0,
+    listPosts: 0,
+    createPost: 0,
+    members: 0,
+  };
+
+  const consumeFailure = (op: ForumStoreOp): ForumStoreFailure | undefined => {
+    const failure = pending[op];
+    pending[op] = undefined;
+    return failure;
+  };
+
+  const respondFailure = (failure: ForumStoreFailure): Response => {
+    if (failure === 'network' || failure === 'drop-response') {
+      return HttpResponse.error();
+    }
+    if (failure === 'malformed-2xx') {
+      return HttpResponse.json({ broken: true }, { status: 200 });
+    }
+    return createErrorEnvelopeResponse(failure.status, failure.body);
+  };
+
+  const checkAccess = (
+    classroomId: string,
+    activityId: string,
+  ): Response | null => {
+    if (
+      classroomId !== options.classroomId ||
+      activityId !== options.activityId
+    ) {
+      return createErrorEnvelopeResponse(404, {
+        code: 'NOT_FOUND',
+        message: 'Activity not found.',
+        correlationId: 'req-forum-404',
+      });
+    }
+    if (currentRole === 'PARENT') {
+      if (adultMode) {
+        return createErrorEnvelopeResponse(404, {
+          code: 'NOT_FOUND',
+          message: 'Activity not found.',
+          correlationId: 'req-forum-parent-404',
+        });
+      }
+      return createErrorEnvelopeResponse(403, {
+        code: 'FORBIDDEN',
+        message: 'Parents cannot access the activity forum.',
+        correlationId: 'req-forum-parent-403',
+      });
+    }
+    return null;
+  };
+
+  const validateForumBody = (
+    raw: unknown,
+  ): { ok: true; body: string } | { ok: false; response: Response } => {
+    if (typeof raw !== 'string') {
+      return {
+        ok: false,
+        response: createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Invalid body.',
+          details: [{ field: 'body', messages: ['Body must be a string'] }],
+          correlationId: 'req-forum-400',
+        }),
+      };
+    }
+    if (
+      [...raw].some((char) => {
+        const code = char.charCodeAt(0);
+        return (
+          (code <= 0x1f && code !== 0x09 && code !== 0x0a && code !== 0x0d) ||
+          (code >= 0x7f && code <= 0x9f)
+        );
+      })
+    ) {
+      return {
+        ok: false,
+        response: createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Invalid control characters.',
+          details: [
+            { field: 'body', messages: ['Disallowed control characters'] },
+          ],
+          correlationId: 'req-forum-400-ctrl',
+        }),
+      };
+    }
+    const trimmed = raw.trim();
+    if (trimmed.length < 1 || trimmed.length > 2000) {
+      return {
+        ok: false,
+        response: createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Invalid length.',
+          details: [
+            { field: 'body', messages: ['Length must be between 1 and 2000'] },
+          ],
+          correlationId: 'req-forum-400-len',
+        }),
+      };
+    }
+    return { ok: true, body: trimmed };
+  };
+
+  return {
+    getThreads: () => threads,
+    setRole: (role) => {
+      currentRole = role;
+    },
+    setCurrentUserId: (userId) => {
+      currentUserId = userId;
+    },
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    getCounts: () => ({ ...counts }),
+    handlers: [
+      http.get(`${baseUrl}/classrooms/:id/members`, ({ params }) => {
+        counts.members += 1;
+        const failure = consumeFailure('members');
+        if (failure !== undefined) {
+          return respondFailure(failure);
+        }
+        if (String(params.id ?? '') !== options.classroomId) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Classroom not found.',
+            correlationId: 'req-forum-members-404',
+          });
+        }
+        if (currentRole === 'PARENT') {
+          return createErrorEnvelopeResponse(403, {
+            code: 'FORBIDDEN',
+            message: 'Forbidden.',
+            correlationId: 'req-forum-members-403',
+          });
+        }
+        return HttpResponse.json({
+          items: members,
+          page: 1,
+          pageSize: 100,
+          total: members.length,
+        });
+      }),
+      http.get(
+        `${baseUrl}/classrooms/:id/activities/:activityId/forum/threads`,
+        ({ params, request }) => {
+          counts.listThreads += 1;
+          const failure = consumeFailure('listThreads');
+          if (failure !== undefined) {
+            return respondFailure(failure);
+          }
+
+          const denied = checkAccess(
+            String(params.id ?? ''),
+            String(params.activityId ?? ''),
+          );
+          if (denied) return denied;
+
+          const url = new URL(request.url);
+          const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+          const pageSize = Math.min(
+            100,
+            Math.max(1, Number(url.searchParams.get('pageSize') ?? '20')),
+          );
+          const sort = url.searchParams.get('sort') ?? '-createdAt';
+
+          const sorted = [...threads].sort((a, b) => {
+            const diff =
+              sort === 'createdAt'
+                ? Date.parse(a.createdAt) - Date.parse(b.createdAt)
+                : Date.parse(b.createdAt) - Date.parse(a.createdAt);
+            return diff !== 0 ? diff : a.id.localeCompare(b.id);
+          });
+
+          const start = (page - 1) * pageSize;
+          const items = sorted.slice(start, start + pageSize).map((t) => ({
+            id: t.id,
+            activityId: t.activityId,
+            authorId: t.authorId,
+            firstPostBody: t.posts[0]?.body ?? '',
+            replyCount: Math.max(0, t.posts.length - 1),
+            createdAt: t.createdAt,
+          }));
+
+          return HttpResponse.json({
+            items,
+            page,
+            pageSize,
+            total: sorted.length,
+          });
+        },
+      ),
+      http.post(
+        `${baseUrl}/classrooms/:id/activities/:activityId/forum/threads`,
+        async ({ params, request }) => {
+          counts.createThread += 1;
+          if (options.writeDelayMs) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, options.writeDelayMs),
+            );
+          }
+          const failure = consumeFailure('createThread');
+          if (
+            failure !== undefined &&
+            failure !== 'drop-response' &&
+            failure !== 'malformed-2xx'
+          ) {
+            return respondFailure(failure);
+          }
+
+          const denied = checkAccess(
+            String(params.id ?? ''),
+            String(params.activityId ?? ''),
+          );
+          if (denied) return denied;
+
+          const payload = (await request.json()) as { body?: unknown };
+          const validated = validateForumBody(payload.body);
+          if (!validated.ok) return validated.response;
+
+          seq += 1;
+          const now = new Date(
+            Date.parse('2026-11-19T03:00:00.000Z') + seq * 1000,
+          ).toISOString();
+          const threadId = `00000000-0000-4000-8000-40000000${String(seq).padStart(4, '0')}`;
+          const postId = `00000000-0000-4000-8000-50000000${String(seq).padStart(4, '0')}`;
+          const post: ForumStorePost = {
+            id: postId,
+            threadId,
+            authorId: currentUserId,
+            body: validated.body,
+            createdAt: now,
+          };
+          const created: ForumStoreThread = {
+            id: threadId,
+            classroomId: options.classroomId,
+            activityId: options.activityId,
+            authorId: currentUserId,
+            createdAt: now,
+            posts: [post],
+          };
+          threads = [created, ...threads];
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+          if (failure === 'malformed-2xx') {
+            return HttpResponse.json({ broken: true }, { status: 201 });
+          }
+
+          return HttpResponse.json(
+            {
+              id: created.id,
+              activityId: created.activityId,
+              authorId: created.authorId,
+              posts: created.posts,
+              createdAt: created.createdAt,
+            },
+            { status: 201 },
+          );
+        },
+      ),
+      http.get(
+        `${baseUrl}/classrooms/:id/activities/:activityId/forum/threads/:threadId/posts`,
+        ({ params, request }) => {
+          counts.listPosts += 1;
+          const failure = consumeFailure('listPosts');
+          if (failure !== undefined) {
+            return respondFailure(failure);
+          }
+
+          const denied = checkAccess(
+            String(params.id ?? ''),
+            String(params.activityId ?? ''),
+          );
+          if (denied) return denied;
+
+          const thread = threads.find((t) => t.id === params.threadId);
+          if (!thread) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Thread not found.',
+              correlationId: 'req-forum-thread-404',
+            });
+          }
+
+          const url = new URL(request.url);
+          const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
+          const pageSize = Math.min(
+            100,
+            Math.max(1, Number(url.searchParams.get('pageSize') ?? '20')),
+          );
+          const sort = url.searchParams.get('sort') ?? 'createdAt';
+
+          const sorted = [...thread.posts].sort((a, b) => {
+            const diff =
+              sort === '-createdAt'
+                ? Date.parse(b.createdAt) - Date.parse(a.createdAt)
+                : Date.parse(a.createdAt) - Date.parse(b.createdAt);
+            return diff !== 0 ? diff : a.id.localeCompare(b.id);
+          });
+
+          const start = (page - 1) * pageSize;
+          return HttpResponse.json({
+            items: sorted.slice(start, start + pageSize),
+            page,
+            pageSize,
+            total: sorted.length,
+          });
+        },
+      ),
+      http.post(
+        `${baseUrl}/classrooms/:id/activities/:activityId/forum/threads/:threadId/posts`,
+        async ({ params, request }) => {
+          counts.createPost += 1;
+          if (options.writeDelayMs) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, options.writeDelayMs),
+            );
+          }
+          const failure = consumeFailure('createPost');
+          if (
+            failure !== undefined &&
+            failure !== 'drop-response' &&
+            failure !== 'malformed-2xx'
+          ) {
+            return respondFailure(failure);
+          }
+
+          const denied = checkAccess(
+            String(params.id ?? ''),
+            String(params.activityId ?? ''),
+          );
+          if (denied) return denied;
+
+          const thread = threads.find((t) => t.id === params.threadId);
+          if (!thread) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Thread not found.',
+              correlationId: 'req-forum-thread-404',
+            });
+          }
+
+          const payload = (await request.json()) as { body?: unknown };
+          const validated = validateForumBody(payload.body);
+          if (!validated.ok) return validated.response;
+
+          seq += 1;
+          const now = new Date(
+            Date.parse('2026-11-19T03:00:00.000Z') + seq * 1000,
+          ).toISOString();
+          const post: ForumStorePost = {
+            id: `00000000-0000-4000-8000-50000000${String(seq).padStart(4, '0')}`,
+            threadId: thread.id,
+            authorId: currentUserId,
+            body: validated.body,
+            createdAt: now,
+          };
+          threads = threads.map((t) =>
+            t.id === thread.id ? { ...t, posts: [...t.posts, post] } : t,
+          );
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+          if (failure === 'malformed-2xx') {
+            return HttpResponse.json({ broken: true }, { status: 201 });
+          }
+
+          return HttpResponse.json(post, { status: 201 });
+        },
+      ),
+    ],
+  };
+}
+
+export type ChatMessagePayload = components['schemas']['ChatMessageDto'];
+export type ChatHistoryMessagePayload =
+  components['schemas']['ChatHistoryMessageDto'];
+export type SendMessageRequestPayload = components['schemas']['SendMessageDto'];
+export type PaginatedChatHistoryPayload =
+  operations['ChatController_list']['responses'][200]['content']['application/json'];
+
+export interface ChatStoreMessage {
+  readonly id: string;
+  readonly authorId: string;
+  readonly body: string;
+  readonly mentionedUserIds: readonly string[];
+  readonly createdAt: string;
+  readonly hiddenAt: string | null;
+  readonly hiddenById: string | null;
+}
+
+export type ChatStoreRole =
+  'OWNER' | 'ADMIN' | 'TEACHER' | 'STUDENT' | 'PARENT';
+
+/**
+ * One `GET /classrooms/{id}/members` row served by the chat store: the
+ * display-name directory used to label authors and moderation auditors.
+ */
+export interface ChatStoreMember {
+  readonly id: string;
+  readonly userId: string;
+  readonly displayName: string;
+  readonly role: 'TEACHER' | 'STUDENT';
+}
+
+export type ChatStoreOp = 'list' | 'send' | 'hide';
+
+export type ChatStoreFailure =
+  MswErrorResponseSpec | 'network' | 'drop-response' | 'malformed-2xx';
+
+export interface ClassroomChatStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId: string;
+  readonly currentUserId?: string;
+  readonly role?: ChatStoreRole;
+  readonly chatMuted?: boolean;
+  readonly initialMessages?: readonly ChatStoreMessage[];
+  /**
+   * Display-name to userId directory used to resolve `@Name` mentions on send,
+   * mirroring the server-side resolution of active classroom members.
+   */
+  readonly mentionDirectory?: Readonly<Record<string, string>>;
+  /**
+   * Member rows served by `GET /classrooms/{id}/messages`-adjacent
+   * `GET /classrooms/{id}/members`, so chat panel tests can label authors and
+   * moderation auditors with server-confirmed display names.
+   */
+  readonly members?: readonly ChatStoreMember[];
+  readonly writeDelayMs?: number;
+  /**
+   * Stamp sent messages with the wall clock instead of the fixed 2026-11-19
+   * timeline, for flows that compare `createdAt` with the real send instant.
+   */
+  readonly wallClockCreatedAt?: boolean;
+}
+
+export interface ClassroomChatStore {
+  readonly handlers: readonly HttpHandler[];
+  getMessages: () => readonly ChatStoreMessage[];
+  setRole: (role: ChatStoreRole) => void;
+  setCurrentUserId: (userId: string) => void;
+  failNext: (op: ChatStoreOp, failure: ChatStoreFailure) => void;
+  resetRateLimit: () => void;
+  getCounts: () => Record<ChatStoreOp, number>;
+}
+
+const CHAT_SEND_RATE_LIMIT_MAX = 5;
+const CHAT_SEND_RATE_LIMIT_WINDOW_MS = 10_000;
+const CHAT_MENTIONED_USERS_MAX = 20;
+const CHAT_MESSAGE_BODY_MAX_LENGTH = 2000;
+
+function isChatStaffRole(role: ChatStoreRole): boolean {
+  return role === 'OWNER' || role === 'ADMIN' || role === 'TEACHER';
+}
+
+/**
+ * Stateful contract-faithful MSW store for the classroom chat REST contract
+ * (`HU-COM-002`, backend `#38`): `GET`/`POST /classrooms/{id}/messages` and
+ * `DELETE /classrooms/{id}/messages/{messageId}`.
+ *
+ * Contract behavior mirrored from `src/api/schema.generated.ts`:
+ * - History is latest first (`createdAt DESC`, `id DESC`); students omit hidden
+ *   rows while staff retain them with the moderation audit; parents are denied.
+ * - Send rejects parents, muted students, invalid bodies, unknown fields and
+ *   more than 20 distinct mentions; it enforces 5 admitted sends per rolling
+ *   10 seconds per user/classroom with a `429`.
+ * - Hide is staff-only logical moderation: idempotent `204` that never
+ *   overwrites the original audit pair.
+ *
+ * `'network'` failures simulate the request never reaching the server;
+ * `'drop-response'`/`'malformed-2xx'` simulate a write that landed but whose
+ * confirmation was lost or unparseable (outcome-uncertain).
+ */
+export function createClassroomChatStore(
+  options: ClassroomChatStoreOptions,
+): ClassroomChatStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  let currentUserId =
+    options.currentUserId ?? '00000000-0000-4000-8000-000000007001';
+  let currentRole: ChatStoreRole = options.role ?? 'STUDENT';
+  const chatMuted = options.chatMuted ?? false;
+  const mentionDirectory: Readonly<Record<string, string>> =
+    options.mentionDirectory ?? {};
+  const members: readonly ChatStoreMember[] = [...(options.members ?? [])];
+  let messages: ChatStoreMessage[] = [...(options.initialMessages ?? [])];
+  let admittedSendAts: number[] = [];
+  let seq = 100;
+
+  const pending: Partial<Record<ChatStoreOp, ChatStoreFailure>> = {};
+  const counts: Record<ChatStoreOp, number> = {
+    list: 0,
+    send: 0,
+    hide: 0,
+  };
+
+  const consumeFailure = (op: ChatStoreOp): ChatStoreFailure | undefined => {
+    const failure = pending[op];
+    pending[op] = undefined;
+    return failure;
+  };
+
+  const respondFailure = (failure: ChatStoreFailure): Response => {
+    if (failure === 'network' || failure === 'drop-response') {
+      return HttpResponse.error();
+    }
+    if (failure === 'malformed-2xx') {
+      return HttpResponse.json({ broken: true }, { status: 200 });
+    }
+    return createErrorEnvelopeResponse(failure.status, failure.body);
+  };
+
+  const checkListAccess = (classroomId: string): Response | null => {
+    if (classroomId !== options.classroomId) {
+      return createErrorEnvelopeResponse(404, {
+        code: 'NOT_FOUND',
+        message: 'Classroom not found.',
+        correlationId: 'req-chat-list-404',
+      });
+    }
+    if (currentRole === 'PARENT') {
+      return createErrorEnvelopeResponse(403, {
+        code: 'FORBIDDEN',
+        message: 'Parents cannot access the classroom chat.',
+        correlationId: 'req-chat-parent-403',
+      });
+    }
+    return null;
+  };
+
+  /**
+   * Mirrors `ChatController_list`: only `page`/`pageSize` are accepted.
+   * Non-positive or non-integer values yield `400` ("Invalid pagination or
+   * unsupported query"); `pageSize` above 100 is clamped like every other
+   * paginated store because the contract documents no explicit maximum.
+   */
+  const parseChatPagination = (
+    url: URL,
+  ): { ok: true; page: number; pageSize: number } | { ok: false } => {
+    for (const key of url.searchParams.keys()) {
+      if (key !== 'page' && key !== 'pageSize') {
+        return { ok: false };
+      }
+    }
+
+    const rawPage = url.searchParams.get('page');
+    let page = 1;
+    if (rawPage !== null) {
+      const parsed = Number(rawPage);
+      if (!Number.isInteger(parsed) || parsed < 1) {
+        return { ok: false };
+      }
+      page = parsed;
+    }
+
+    const rawPageSize = url.searchParams.get('pageSize');
+    let pageSize = 20;
+    if (rawPageSize !== null) {
+      const parsed = Number(rawPageSize);
+      if (!Number.isInteger(parsed) || parsed < 1) {
+        return { ok: false };
+      }
+      pageSize = Math.min(parsed, 100);
+    }
+
+    return { ok: true, page, pageSize };
+  };
+
+  /**
+   * Mirrors `SendMessageDto`: plain text, 1-2000 characters after trimming,
+   * unsafe control characters rejected (multiline `\n`, `\r`, `\t` allowed),
+   * and only the `body` field accepted.
+   */
+  const validateChatBody = (
+    payload: unknown,
+  ): { ok: true; body: string } | { ok: false; response: Response } => {
+    if (
+      typeof payload !== 'object' ||
+      payload === null ||
+      Array.isArray(payload)
+    ) {
+      return {
+        ok: false,
+        response: createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Invalid body.',
+          correlationId: 'req-chat-send-400',
+        }),
+      };
+    }
+    const unknownFields = Object.keys(payload).filter((key) => key !== 'body');
+    if (unknownFields.length > 0) {
+      return {
+        ok: false,
+        response: createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Unknown fields are not accepted.',
+          details: [
+            {
+              field: unknownFields[0],
+              messages: ['Unexpected property'],
+            },
+          ],
+          correlationId: 'req-chat-send-400-unknown',
+        }),
+      };
+    }
+
+    const raw = (payload as { body?: unknown }).body;
+    if (typeof raw !== 'string') {
+      return {
+        ok: false,
+        response: createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Invalid body.',
+          details: [{ field: 'body', messages: ['Body must be a string'] }],
+          correlationId: 'req-chat-send-400-type',
+        }),
+      };
+    }
+    if (
+      [...raw].some((char) => {
+        const code = char.charCodeAt(0);
+        return (
+          (code <= 0x1f && code !== 0x09 && code !== 0x0a && code !== 0x0d) ||
+          (code >= 0x7f && code <= 0x9f)
+        );
+      })
+    ) {
+      return {
+        ok: false,
+        response: createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Invalid control characters.',
+          details: [
+            { field: 'body', messages: ['Disallowed control characters'] },
+          ],
+          correlationId: 'req-chat-send-400-ctrl',
+        }),
+      };
+    }
+    const trimmed = raw.trim();
+    if (trimmed.length < 1 || trimmed.length > CHAT_MESSAGE_BODY_MAX_LENGTH) {
+      return {
+        ok: false,
+        response: createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Invalid length.',
+          details: [
+            {
+              field: 'body',
+              messages: [
+                `Length must be between 1 and ${CHAT_MESSAGE_BODY_MAX_LENGTH}`,
+              ],
+            },
+          ],
+          correlationId: 'req-chat-send-400-len',
+        }),
+      };
+    }
+    return { ok: true, body: trimmed };
+  };
+
+  /**
+   * Resolves `@Name` tokens against the store directory, mirroring the
+   * server-side resolution into distinct active classroom member ids.
+   * More than 20 distinct users is a definite `400` rejection.
+   */
+  const resolveChatMentions = (
+    trimmedBody: string,
+  ):
+    | { ok: true; mentionedUserIds: string[] }
+    | { ok: false; response: Response } => {
+    const mentioned: string[] = [];
+    for (const [displayName, userId] of Object.entries(mentionDirectory)) {
+      if (
+        trimmedBody.includes(`@${displayName}`) &&
+        !mentioned.includes(userId)
+      ) {
+        mentioned.push(userId);
+      }
+    }
+    if (mentioned.length > CHAT_MENTIONED_USERS_MAX) {
+      return {
+        ok: false,
+        response: createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Too many mentions.',
+          details: [
+            {
+              field: 'body',
+              messages: [`At most ${CHAT_MENTIONED_USERS_MAX} distinct users`],
+            },
+          ],
+          correlationId: 'req-chat-send-400-mentions',
+        }),
+      };
+    }
+    return { ok: true, mentionedUserIds: mentioned };
+  };
+
+  /**
+   * Mirrors `ClassroomDirectoryController_list`: only `page`/`pageSize`/`q`
+   * are accepted (`q` is the backend D12 case-insensitive display-name
+   * prefix filter used by the composer's @mention suggestions).
+   */
+  const parseChatMemberDirectoryQuery = (
+    url: URL,
+  ): { ok: true; page: number; pageSize: number } | { ok: false } => {
+    for (const key of url.searchParams.keys()) {
+      if (key !== 'page' && key !== 'pageSize' && key !== 'q') {
+        return { ok: false };
+      }
+    }
+
+    const rawPage = url.searchParams.get('page');
+    let page = 1;
+    if (rawPage !== null) {
+      const parsed = Number(rawPage);
+      if (!Number.isInteger(parsed) || parsed < 1) {
+        return { ok: false };
+      }
+      page = parsed;
+    }
+
+    const rawPageSize = url.searchParams.get('pageSize');
+    let pageSize = 20;
+    if (rawPageSize !== null) {
+      const parsed = Number(rawPageSize);
+      if (!Number.isInteger(parsed) || parsed < 1) {
+        return { ok: false };
+      }
+      pageSize = Math.min(parsed, 100);
+    }
+
+    return { ok: true, page, pageSize };
+  };
+
+  return {
+    getMessages: () => [...messages],
+    setRole: (role) => {
+      currentRole = role;
+    },
+    setCurrentUserId: (userId) => {
+      currentUserId = userId;
+    },
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    resetRateLimit: () => {
+      admittedSendAts = [];
+    },
+    getCounts: () => ({ ...counts }),
+    handlers: [
+      http.get(`${baseUrl}/classrooms/:id/members`, ({ params, request }) => {
+        if (String(params.id ?? '') !== options.classroomId) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Classroom not found.',
+            correlationId: 'req-chat-members-404',
+          });
+        }
+        if (currentRole === 'PARENT') {
+          return createErrorEnvelopeResponse(403, {
+            code: 'FORBIDDEN',
+            message: 'Forbidden.',
+            correlationId: 'req-chat-members-403',
+          });
+        }
+
+        const url = new URL(request.url);
+        const pagination = parseChatMemberDirectoryQuery(url);
+        if (!pagination.ok) {
+          return createErrorEnvelopeResponse(400, {
+            code: 'VALIDATION_FAILED',
+            message: 'Invalid pagination or unsupported query.',
+            correlationId: 'req-chat-members-400',
+          });
+        }
+
+        // Optional `q`: case-insensitive display-name prefix filter.
+        const prefix = (url.searchParams.get('q') ?? '').toLowerCase();
+        const filtered =
+          prefix === ''
+            ? [...members]
+            : members.filter((member) =>
+                member.displayName.toLowerCase().startsWith(prefix),
+              );
+
+        const start = (pagination.page - 1) * pagination.pageSize;
+        return HttpResponse.json({
+          items: filtered.slice(start, start + pagination.pageSize),
+          page: pagination.page,
+          pageSize: pagination.pageSize,
+          total: filtered.length,
+        });
+      }),
+      http.get(`${baseUrl}/classrooms/:id/messages`, ({ params, request }) => {
+        counts.list += 1;
+        const failure = consumeFailure('list');
+        if (failure !== undefined) {
+          return respondFailure(failure);
+        }
+
+        const denied = checkListAccess(String(params.id ?? ''));
+        if (denied) return denied;
+
+        const pagination = parseChatPagination(new URL(request.url));
+        if (!pagination.ok) {
+          return createErrorEnvelopeResponse(400, {
+            code: 'VALIDATION_FAILED',
+            message: 'Invalid pagination or unsupported query.',
+            correlationId: 'req-chat-list-400',
+          });
+        }
+
+        // Students omit hidden rows entirely (count included); staff retain
+        // the full history with the moderation audit.
+        const visible =
+          currentRole === 'STUDENT'
+            ? messages.filter((m) => m.hiddenAt === null)
+            : messages;
+
+        const sorted = [...visible].sort((a, b) => {
+          const diff = Date.parse(b.createdAt) - Date.parse(a.createdAt);
+          return diff !== 0 ? diff : b.id.localeCompare(a.id);
+        });
+
+        const start = (pagination.page - 1) * pagination.pageSize;
+        const items: ChatHistoryMessagePayload[] = sorted
+          .slice(start, start + pagination.pageSize)
+          .map((m) => ({
+            id: m.id,
+            classroomId: options.classroomId,
+            authorId: m.authorId,
+            body: m.body,
+            mentionedUserIds: [...m.mentionedUserIds],
+            createdAt: m.createdAt,
+            hiddenAt: m.hiddenAt,
+            hiddenById: m.hiddenById,
+          }));
+
+        return HttpResponse.json({
+          items,
+          page: pagination.page,
+          pageSize: pagination.pageSize,
+          total: sorted.length,
+        });
+      }),
+      http.post(
+        `${baseUrl}/classrooms/:id/messages`,
+        async ({ params, request }) => {
+          counts.send += 1;
+          if (options.writeDelayMs) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, options.writeDelayMs),
+            );
+          }
+          const failure = consumeFailure('send');
+          if (
+            failure !== undefined &&
+            failure !== 'drop-response' &&
+            failure !== 'malformed-2xx'
+          ) {
+            return respondFailure(failure);
+          }
+
+          // Compute the server decision first: when the injected failure is a
+          // transport-level loss ('drop-response'/'malformed-2xx'), the caller
+          // must not observe the verdict, so the decision only decides whether
+          // the write landed in the store.
+          type ChatSendOutcome =
+            | { readonly kind: 'admitted'; readonly created: ChatStoreMessage }
+            | { readonly kind: 'rejected'; readonly response: Response };
+
+          let outcome: ChatSendOutcome;
+          if (String(params.id ?? '') !== options.classroomId) {
+            outcome = {
+              kind: 'rejected',
+              response: createErrorEnvelopeResponse(404, {
+                code: 'NOT_FOUND',
+                message: 'Classroom not found.',
+                correlationId: 'req-chat-send-404',
+              }),
+            };
+          } else if (currentRole === 'PARENT') {
+            outcome = {
+              kind: 'rejected',
+              response: createErrorEnvelopeResponse(403, {
+                code: 'FORBIDDEN',
+                message: 'Parents cannot access the classroom chat.',
+                correlationId: 'req-chat-parent-403',
+              }),
+            };
+          } else if (currentRole === 'STUDENT' && chatMuted) {
+            outcome = {
+              kind: 'rejected',
+              response: createErrorEnvelopeResponse(403, {
+                code: 'FORBIDDEN',
+                message: 'The classroom chat is muted for students.',
+                correlationId: 'req-chat-send-403-muted',
+              }),
+            };
+          } else {
+            const payload = await request.json().catch(() => null);
+            const validated = validateChatBody(payload);
+            if (!validated.ok) {
+              outcome = { kind: 'rejected', response: validated.response };
+            } else {
+              const mentions = resolveChatMentions(validated.body);
+              if (!mentions.ok) {
+                outcome = { kind: 'rejected', response: mentions.response };
+              } else {
+                const now = Date.now();
+                admittedSendAts = admittedSendAts.filter(
+                  (at) => now - at < CHAT_SEND_RATE_LIMIT_WINDOW_MS,
+                );
+                if (admittedSendAts.length >= CHAT_SEND_RATE_LIMIT_MAX) {
+                  outcome = {
+                    kind: 'rejected',
+                    response: createErrorEnvelopeResponse(429, {
+                      code: 'TOO_MANY_REQUESTS',
+                      message:
+                        'Five messages already admitted in the rolling ten-second window.',
+                      correlationId: 'req-chat-send-429',
+                    }),
+                  };
+                } else {
+                  seq += 1;
+                  const createdAt = options.wallClockCreatedAt
+                    ? new Date(now).toISOString()
+                    : new Date(
+                        Date.parse('2026-11-19T03:00:00.000Z') + seq * 1000,
+                      ).toISOString();
+                  const created: ChatStoreMessage = {
+                    id: `00000000-0000-4000-8000-60000000${String(seq).padStart(4, '0')}`,
+                    authorId: currentUserId,
+                    body: validated.body,
+                    mentionedUserIds: [...mentions.mentionedUserIds],
+                    createdAt,
+                    hiddenAt: null,
+                    hiddenById: null,
+                  };
+                  messages = [...messages, created];
+                  admittedSendAts = [...admittedSendAts, now];
+                  outcome = { kind: 'admitted', created };
+                }
+              }
+            }
+          }
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+          if (failure === 'malformed-2xx') {
+            return HttpResponse.json({ broken: true }, { status: 201 });
+          }
+          if (outcome.kind === 'rejected') {
+            return outcome.response;
+          }
+
+          const response: ChatMessagePayload = {
+            id: outcome.created.id,
+            classroomId: options.classroomId,
+            authorId: outcome.created.authorId,
+            body: outcome.created.body,
+            mentionedUserIds: [...outcome.created.mentionedUserIds],
+            createdAt: outcome.created.createdAt,
+          };
+          return HttpResponse.json(response, { status: 201 });
+        },
+      ),
+      http.delete(
+        `${baseUrl}/classrooms/:id/messages/:messageId`,
+        async ({ params }) => {
+          counts.hide += 1;
+          if (options.writeDelayMs) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, options.writeDelayMs),
+            );
+          }
+          const failure = consumeFailure('hide');
+          if (
+            failure !== undefined &&
+            failure !== 'drop-response' &&
+            failure !== 'malformed-2xx'
+          ) {
+            return respondFailure(failure);
+          }
+
+          // Compute the moderation decision first: when the injected failure is
+          // a transport-level loss, the caller must not observe the verdict;
+          // the decision only decides whether the hide landed in the store.
+          const classroomMismatch =
+            String(params.id ?? '') !== options.classroomId;
+          const denied = !isChatStaffRole(currentRole);
+          const message = classroomMismatch
+            ? undefined
+            : messages.find((m) => m.id === String(params.messageId ?? ''));
+
+          if (
+            !classroomMismatch &&
+            !denied &&
+            message !== undefined &&
+            message.hiddenAt === null
+          ) {
+            // Idempotent moderation: repeating it returns 204 without
+            // overwriting the original audit pair.
+            messages = messages.map((m) =>
+              m.id === message.id
+                ? {
+                    ...m,
+                    hiddenAt: '2026-11-19T04:00:00.000Z',
+                    hiddenById: currentUserId,
+                  }
+                : m,
+            );
+          }
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+          if (failure === 'malformed-2xx') {
+            // The contract promises `204 No Content`; a 2xx with a body is the
+            // unparseable-confirmation simulation for this endpoint.
+            return HttpResponse.json({ broken: true }, { status: 200 });
+          }
+
+          if (classroomMismatch) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-chat-hide-404',
+            });
+          }
+          if (denied) {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Only classroom staff can moderate the chat.',
+              correlationId: 'req-chat-hide-403',
+            });
+          }
+          if (message === undefined) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Message not found in this classroom.',
+              correlationId: 'req-chat-hide-404-message',
+            });
+          }
+
+          return new HttpResponse(null, { status: 204 });
+        },
+      ),
+    ],
+  };
+}
+
+export interface DailyReviewPayloadItem {
+  readonly kind:
+    'pending_activity' | 'recent_grade' | 'announcement' | 'teacher_review';
+  readonly title: string;
+  readonly detail: string | null;
+  readonly classroomName: string | null;
+  readonly dueAt: string | null;
+}
+
+export interface DailyReviewPayloadSection {
+  readonly kind: 'pending' | 'news';
+  readonly items: readonly DailyReviewPayloadItem[];
+}
+
+export interface DailyReviewPayloadQuestion {
+  readonly id: string;
+  readonly prompt: string;
+  readonly options: readonly string[];
+  readonly materialTitle: string | null;
+}
+
+export type DailyReviewPayload =
+  | { readonly status: 'not_due' }
+  | {
+      readonly status: 'due';
+      readonly audience: 'STUDENT' | 'TEACHER';
+      readonly contentKind: 'generated' | 'structured';
+      readonly summary: string | null;
+      readonly sections: readonly DailyReviewPayloadSection[];
+      readonly dailyQuestion: DailyReviewPayloadQuestion | null;
+    };
+
+export interface CreateDailyReviewHandlerOptions {
+  readonly baseUrl?: string;
+  readonly payload?: DailyReviewPayload;
+  /** Models the persistent once-per-day delivery record: first call delivers, later calls answer `not_due`. */
+  readonly deliverOnce?: boolean;
+  readonly error?: MswErrorResponseSpec | 'network';
+}
+
+/**
+ * Contract-faithful MSW handler for `GET /users/me/daily-review`
+ * (`HU-BOT-003`). Eligibility is decided here, as the server would: parents,
+ * reloads, and concurrent tabs receive `not_due` unless the payload says
+ * otherwise.
+ */
+export function createDailyReviewHandler(
+  options: CreateDailyReviewHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const payload = options.payload ?? { status: 'not_due' as const };
+  let delivered = false;
+  return http.get(`${baseUrl}/users/me/daily-review`, () => {
+    if (options.error === 'network') {
+      return HttpResponse.error();
+    }
+    if (options.error) {
+      return createErrorEnvelopeResponse(
+        options.error.status,
+        options.error.body,
+      );
+    }
+    if (options.deliverOnce === true && delivered) {
+      return HttpResponse.json({ status: 'not_due' });
+    }
+    delivered = true;
+    return HttpResponse.json(payload);
+  });
+}
+
+export interface DailyQuestionAnswerResultPayload {
+  readonly correct: boolean;
+  readonly feedback: string | null;
+  readonly streak: {
+    readonly currentStreak: number;
+    readonly bestStreak: number;
+    readonly lastQualifiedDate: string | null;
+  } | null;
+}
+
+export interface CreateDailyQuestionAnswerHandlerOptions {
+  readonly baseUrl?: string;
+  readonly result?: DailyQuestionAnswerResultPayload;
+  readonly onAnswer?: (body: { questionId: string; answer: string }) => void;
+  readonly error?: MswErrorResponseSpec | 'network';
+}
+
+/**
+ * Contract-faithful MSW handler for
+ * `POST /users/me/daily-review/daily-question` (`HU-BOT-003`). The result and
+ * the streak credit are decided here, as the server would.
+ */
+export function createDailyQuestionAnswerHandler(
+  options: CreateDailyQuestionAnswerHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  return http.post(
+    `${baseUrl}/users/me/daily-review/daily-question`,
+    async ({ request }) => {
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+      const body = (await request.json()) as {
+        questionId: string;
+        answer: string;
+      };
+      options.onAnswer?.(body);
+      return HttpResponse.json(
+        options.result ?? { correct: false, feedback: null, streak: null },
+      );
+    },
+  );
+}
+
+export type ChatInboxPayload = components['schemas']['ChatInboxDto'];
+export type ChatInboxItemPayload = components['schemas']['ChatInboxItemDto'];
+
+export interface ChatInboxStoreMessage {
+  readonly id: string;
+  readonly authorId: string;
+  readonly authorDisplayName: string;
+  readonly body: string;
+  readonly createdAt: string;
+  readonly hidden?: boolean;
+}
+
+export interface ChatInboxStoreClassroom {
+  readonly classroomId: string;
+  readonly classroomName: string;
+  readonly messages: readonly ChatInboxStoreMessage[];
+  /** Message id already read by the caller, when a marker exists. */
+  readonly readMarkerMessageId?: string | null;
+}
+
+export type ChatInboxStoreOp = 'list' | 'markRead';
+
+export interface ChatInboxStoreOptions {
+  readonly baseUrl?: string;
+  readonly currentUserId: string;
+  readonly classrooms: readonly ChatInboxStoreClassroom[];
+  /** Parents get no items and cannot move markers (403). */
+  readonly parent?: boolean;
+}
+
+export interface ChatInboxStore {
+  readonly handlers: readonly HttpHandler[];
+  getMarker: (classroomId: string) => string | null;
+  /** Adds a message as another user would, so unread counts move. */
+  appendMessage: (classroomId: string, message: ChatInboxStoreMessage) => void;
+  failNext: (op: ChatInboxStoreOp, failure: MswErrorResponseSpec) => void;
+  getCounts: () => Record<ChatInboxStoreOp, number>;
+  getMarkRequests: () => readonly {
+    readonly classroomId: string;
+    readonly messageId: string;
+  }[];
+}
+
+const CHAT_INBOX_PREVIEW_MAX = 120;
+
+function toChatInboxPreview(body: string): string {
+  const collapsed = body.replace(/\s+/g, ' ').trim();
+  return collapsed.length <= CHAT_INBOX_PREVIEW_MAX
+    ? collapsed
+    : `${collapsed.slice(0, CHAT_INBOX_PREVIEW_MAX - 1)}…`;
+}
+
+/**
+ * Contract-faithful in-memory server for `GET /chats` (`ChatInboxController_list`)
+ * and `PUT /classrooms/{id}/messages/read-marker` (`ChatInboxController_markRead`):
+ * latest-activity-first items, last VISIBLE message with a collapsed preview,
+ * unread = visible messages from others after a forward-only marker (all of
+ * them without a marker), `204` on a valid marker, `404` for an unknown,
+ * foreign or hidden message, `403` for parents.
+ */
+export function createChatInboxStore(
+  options: ChatInboxStoreOptions,
+): ChatInboxStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classrooms = new Map<
+    string,
+    { name: string; messages: ChatInboxStoreMessage[]; marker: string | null }
+  >(
+    options.classrooms.map((c) => [
+      c.classroomId,
+      {
+        name: c.classroomName,
+        messages: [...c.messages],
+        marker: c.readMarkerMessageId ?? null,
+      },
+    ]),
+  );
+  const pending: Partial<Record<ChatInboxStoreOp, MswErrorResponseSpec>> = {};
+  const counts: Record<ChatInboxStoreOp, number> = { list: 0, markRead: 0 };
+  const markRequests: { classroomId: string; messageId: string }[] = [];
+
+  const ordered = (messages: readonly ChatInboxStoreMessage[]) =>
+    [...messages].sort((a, b) => {
+      const diff = Date.parse(a.createdAt) - Date.parse(b.createdAt);
+      return diff !== 0 ? diff : a.id.localeCompare(b.id);
+    });
+  const consume = (op: ChatInboxStoreOp) => {
+    const failure = pending[op];
+    pending[op] = undefined;
+    return failure;
+  };
+
+  const buildItem = (
+    classroomId: string,
+    entry: {
+      name: string;
+      messages: ChatInboxStoreMessage[];
+      marker: string | null;
+    },
+  ): ChatInboxItemPayload => {
+    const visible = ordered(entry.messages).filter((m) => m.hidden !== true);
+    const last = visible.at(-1);
+    const markerIndex =
+      entry.marker === null
+        ? -1
+        : visible.findIndex((m) => m.id === entry.marker);
+    const unreadCount = visible
+      .slice(markerIndex + 1)
+      .filter((m) => m.authorId !== options.currentUserId).length;
+    return {
+      classroomId,
+      classroomName: entry.name,
+      lastMessage:
+        last === undefined
+          ? null
+          : {
+              id: last.id,
+              authorId: last.authorId,
+              authorDisplayName: last.authorDisplayName,
+              bodyPreview: toChatInboxPreview(last.body),
+              createdAt: last.createdAt,
+            },
+      unreadCount,
+    };
+  };
+
+  return {
+    handlers: [
+      http.get(`${baseUrl}/chats`, () => {
+        counts.list += 1;
+        const failure = consume('list');
+        if (failure !== undefined) {
+          return createErrorEnvelopeResponse(failure.status, failure.body);
+        }
+        if (options.parent === true) {
+          return HttpResponse.json({ items: [] } satisfies ChatInboxPayload);
+        }
+        const items = [...classrooms.entries()]
+          .map(([id, entry]) => buildItem(id, entry))
+          .sort((a, b) =>
+            (b.lastMessage?.createdAt ?? '').localeCompare(
+              a.lastMessage?.createdAt ?? '',
+            ),
+          );
+        return HttpResponse.json({ items } satisfies ChatInboxPayload);
+      }),
+      http.put(
+        `${baseUrl}/classrooms/:id/messages/read-marker`,
+        async ({ params, request }) => {
+          counts.markRead += 1;
+          const failure = consume('markRead');
+          if (failure !== undefined) {
+            return createErrorEnvelopeResponse(failure.status, failure.body);
+          }
+          if (options.parent === true) {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Parents have no classroom chat.',
+              correlationId: 'req-chat-marker-403',
+            });
+          }
+          const classroomId = String(params.id ?? '');
+          const body = (await request.json()) as { messageId?: unknown };
+          if (typeof body.messageId !== 'string' || body.messageId === '') {
+            return createErrorEnvelopeResponse(400, {
+              code: 'VALIDATION_FAILED',
+              message: 'messageId is required.',
+              correlationId: 'req-chat-marker-400',
+            });
+          }
+          markRequests.push({ classroomId, messageId: body.messageId });
+          const entry = classrooms.get(classroomId);
+          const target = entry?.messages.find((m) => m.id === body.messageId);
+          if (
+            entry === undefined ||
+            target === undefined ||
+            target.hidden === true
+          ) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Message not found.',
+              correlationId: 'req-chat-marker-404',
+            });
+          }
+          const visible = ordered(entry.messages).filter(
+            (m) => m.hidden !== true,
+          );
+          const current =
+            entry.marker === null
+              ? -1
+              : visible.findIndex((m) => m.id === entry.marker);
+          if (visible.findIndex((m) => m.id === target.id) > current) {
+            entry.marker = target.id;
+          }
+          return new HttpResponse(null, { status: 204 });
+        },
+      ),
+    ],
+    getMarker: (classroomId) => classrooms.get(classroomId)?.marker ?? null,
+    appendMessage: (classroomId, message) => {
+      classrooms.get(classroomId)?.messages.push(message);
+    },
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    getCounts: () => ({ ...counts }),
+    getMarkRequests: () => [...markRequests],
   };
 }

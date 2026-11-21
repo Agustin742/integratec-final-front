@@ -98,6 +98,7 @@ function ActivityDetailContent({
   const canParticipate =
     context.status === 'ready' &&
     context.classroom.capabilities.includes('participate_activities');
+  const canForum = isStaff || canParticipate;
 
   const query = useQuery({
     queryKey: classroomActivityDetailQueryKey(
@@ -270,6 +271,7 @@ function ActivityDetailContent({
 
   const effectiveTab: ActivityDetailTab =
     (activeTab === 'submission' && !canParticipate) ||
+    (activeTab === 'forum' && !canForum) ||
     (activeTab === 'review' && !isStaff)
       ? 'overview'
       : activeTab;
@@ -326,9 +328,11 @@ function ActivityDetailContent({
               {activityMessages.detail.tabs.submission}
             </TabsTrigger>
           ) : null}
-          <TabsTrigger value="forum" className="min-h-11">
-            {activityMessages.detail.tabs.forum}
-          </TabsTrigger>
+          {canForum ? (
+            <TabsTrigger value="forum" className="min-h-11">
+              {activityMessages.detail.tabs.forum}
+            </TabsTrigger>
+          ) : null}
           {isStaff ? (
             <TabsTrigger value="review" className="min-h-11">
               {activityMessages.detail.tabs.review}
@@ -454,17 +458,19 @@ function ActivityDetailContent({
           </TabsContent>
         ) : null}
 
-        <TabsContent value="forum">
-          {renderForumTab ? (
-            renderForumTab(activity)
-          ) : (
-            <EmptyState
-              headingLevel="h3"
-              title={activityMessages.detail.pendingTabTitle}
-              description={activityMessages.detail.forumPendingDescription}
-            />
-          )}
-        </TabsContent>
+        {canForum ? (
+          <TabsContent value="forum">
+            {renderForumTab ? (
+              renderForumTab(activity)
+            ) : (
+              <EmptyState
+                headingLevel="h3"
+                title={activityMessages.detail.pendingTabTitle}
+                description={activityMessages.detail.forumPendingDescription}
+              />
+            )}
+          </TabsContent>
+        ) : null}
 
         {isStaff ? (
           <TabsContent value="review">

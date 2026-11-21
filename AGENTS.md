@@ -40,7 +40,7 @@ The root `odd/` directory contains local agent work plans (`odd/tasks/`), offlin
 - Branch naming: `<feat|fix|chore|docs|test>/<issue>-<slug>`
 - Rule index: `rules/index.md`
 - Local checks (run in order): `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm security:check`, `pnpm format:check`, `pnpm e2e`, `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/ci -p 'test_*.py' -v`, `python3 scripts/ci/check_docs.py`, `git diff --check origin/develop..HEAD --`
-- Tracker: `changelogs/tracker-mati.md`
+- Tracker: the acting participant's `changelogs/tracker-<name>.md` ([changelog guide](changelogs/README.md))
 - Board: `rules/github-projects.md`
 - UI design rules: `rules/art-direction.md`, `rules/ui-and-accessibility.md`
 - UI evidence: `screenshots at 1280px and 360px under docs/assets/, linked in the relevant docs/ guide and embedded in the PR`

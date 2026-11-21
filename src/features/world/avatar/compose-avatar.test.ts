@@ -2,6 +2,7 @@ import {
   Bone,
   BufferGeometry,
   Group,
+  Mesh,
   MeshStandardMaterial,
   Skeleton,
   SkinnedMesh,
@@ -171,6 +172,76 @@ describe('composeAvatar', () => {
     const body = makeRig(BONES, 'skin', 'Body');
     const avatar = composeAvatar({ body: body.scene, hairColor: '#FF0000' });
     expect(skinnedMeshes(avatar.root)[0].material).toBe(body.material);
+  });
+
+  it('carries a static mesh of a part with its authored placement', () => {
+    const body = makeRig(BONES, 'skin', 'Body');
+    const hair = makeRig(BONES, 'AvatarHairTint', 'Hair');
+    const band = new Mesh(
+      new BufferGeometry(),
+      new MeshStandardMaterial({ name: 'AvatarHairTint' }),
+    );
+    band.position.set(0, 3, 0);
+    hair.scene.add(band);
+    hair.scene.updateMatrixWorld(true);
+
+    const avatar = composeAvatar({
+      body: body.scene,
+      hair: hair.scene,
+      hairColor: '#FF0000',
+    });
+    const statics: Mesh[] = [];
+    avatar.root.traverse((node) => {
+      if (node instanceof Mesh && !(node instanceof SkinnedMesh))
+        statics.push(node);
+    });
+
+    expect(avatar.skippedParts).toEqual([]);
+    expect(statics).toHaveLength(1);
+    expect(statics[0].parent).toBe(avatar.root);
+    expect(statics[0].position.y).toBeCloseTo(3);
+    expect(colorOf(statics[0].material)).toBe('#FF0000');
+  });
+
+  it('keeps a nested part mesh at its authored world placement', () => {
+    const body = makeRig(BONES, 'skin', 'Body');
+    const hair = makeRig(BONES, 'AvatarHairTint', 'Hair');
+    const wrapper = new Group();
+    wrapper.position.set(2, 1, 0);
+    hair.scene.add(wrapper);
+    hair.mesh.position.set(3, 0, 0);
+    wrapper.add(hair.mesh);
+    hair.scene.updateMatrixWorld(true);
+
+    const avatar = composeAvatar({ body: body.scene, hair: hair.scene });
+    const hairMesh = skinnedMeshes(avatar.root)[1];
+
+    expect(hairMesh.parent).toBe(avatar.root);
+    avatar.root.updateMatrixWorld(true);
+    expect(hairMesh.matrixWorld.elements[12]).toBeCloseTo(5);
+    expect(hairMesh.matrixWorld.elements[13]).toBeCloseTo(1);
+  });
+
+  it('carries a part that has only static meshes', () => {
+    const body = makeRig(BONES, 'skin', 'Body');
+    const scene = new Group();
+    const hat = new Mesh(
+      new BufferGeometry(),
+      new MeshStandardMaterial({ name: 'AvatarHairTint' }),
+    );
+    scene.add(hat);
+    scene.updateMatrixWorld(true);
+
+    const avatar = composeAvatar({ body: body.scene, hair: scene });
+    const statics: Mesh[] = [];
+    avatar.root.traverse((node) => {
+      if (node instanceof Mesh && !(node instanceof SkinnedMesh))
+        statics.push(node);
+    });
+
+    expect(avatar.skippedParts).toEqual([]);
+    expect(statics).toHaveLength(1);
+    expect(statics[0].parent).toBe(avatar.root);
   });
 
   it('disposes only what the instance created', () => {

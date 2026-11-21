@@ -157,6 +157,7 @@ function submissionResponse(
     activityId,
     submittedAt: '2026-11-18T12:30:00.000Z',
     isLate,
+    autoScore: null,
     status: 'submitted',
     files: [
       {
@@ -167,6 +168,7 @@ function submissionResponse(
         position: 0,
       },
     ],
+    answers: [],
   };
 }
 

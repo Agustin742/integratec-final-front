@@ -1,4 +1,6 @@
 import {
+  Matrix4,
+  Mesh,
   Skeleton,
   SkinnedMesh,
   type Bone,
@@ -44,6 +46,16 @@ function skinnedMeshesOf(root: Object3D): SkinnedMesh[] {
   return meshes;
 }
 
+/** Meshes without skin weights, such as rigid hair bands or glasses. */
+function staticMeshesOf(root: Object3D): Mesh[] {
+  const meshes: Mesh[] = [];
+  root.traverse((node) => {
+    if (node instanceof Mesh && !(node instanceof SkinnedMesh))
+      meshes.push(node);
+  });
+  return meshes;
+}
+
 function bonesByName(root: Object3D): Map<string, Bone> {
   const bones = new Map<string, Bone>();
   root.traverse((node) => {
@@ -74,7 +86,7 @@ function rebindSkeleton(
  * targets are cloned per instance before their color is written.
  */
 function tintMaterials(
-  mesh: SkinnedMesh,
+  mesh: Mesh,
   targetName: string,
   color: string,
   created: Material[],
@@ -95,8 +107,9 @@ function tintMaterials(
 
 /**
  * Composes a renderable avatar from already-loaded GLTF scenes: every part
- * skinned mesh is re-bound to the body clone's bones by name so a single
- * mixer on the body animates the whole avatar.
+ * mesh, skinned or static, is carried onto the body clone with its authored
+ * placement; skinned meshes are re-bound to the body's bones by name so a
+ * single mixer on the body animates the whole avatar.
  */
 export function composeAvatar({
   body,
@@ -106,6 +119,7 @@ export function composeAvatar({
   clothingColor,
 }: ComposeAvatarInput): ComposedAvatar {
   const root = cloneSkeleton(body);
+  root.updateMatrixWorld(true);
   const bodyBones = bonesByName(root);
   const createdMaterials: Material[] = [];
   const createdSkeletons: Skeleton[] = skinnedMeshesOf(root).map(
@@ -133,21 +147,38 @@ export function composeAvatar({
   for (const [kind, scene, materialName, color] of parts) {
     if (!scene) continue;
     const partClone = cloneSkeleton(scene);
-    const meshes = skinnedMeshesOf(partClone);
-    const skeletons = meshes.map((mesh) => rebindSkeleton(mesh, bodyBones));
-    if (meshes.length === 0 || skeletons.some((skeleton) => !skeleton)) {
+    const skinned = skinnedMeshesOf(partClone);
+    const statics = staticMeshesOf(partClone);
+    const skeletons = skinned.map((mesh) => rebindSkeleton(mesh, bodyBones));
+    if (
+      skinned.length + statics.length === 0 ||
+      skeletons.some((skeleton) => skeleton === null)
+    ) {
       skippedParts.push(kind);
-      skinnedMeshesOf(partClone).forEach((mesh) => mesh.skeleton.dispose());
+      skinned.forEach((mesh) => mesh.skeleton.dispose());
       continue;
     }
-    meshes.forEach((mesh, index) => {
+    // Bake each mesh's authored world placement before re-parenting: a mesh
+    // nested under a transform group keeps its place instead of collapsing
+    // onto the body root's frame.
+    partClone.updateMatrixWorld(true);
+    const intoRoot = new Matrix4().copy(root.matrixWorld).invert();
+    const placement = new Matrix4();
+    for (const mesh of [...skinned, ...statics]) {
+      placement.copy(intoRoot).multiply(mesh.matrixWorld);
+      placement.decompose(mesh.position, mesh.quaternion, mesh.scale);
+    }
+    skinned.forEach((mesh, index) => {
       const skeleton = skeletons[index] as Skeleton;
       mesh.skeleton.dispose();
       mesh.bind(skeleton, mesh.bindMatrix);
       tintMaterials(mesh, materialName, color, createdMaterials);
       createdSkeletons.push(skeleton);
-      root.add(mesh);
     });
+    statics.forEach((mesh) => {
+      tintMaterials(mesh, materialName, color, createdMaterials);
+    });
+    root.add(...skinned, ...statics);
   }
 
   return {

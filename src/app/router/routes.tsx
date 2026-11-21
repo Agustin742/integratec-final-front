@@ -134,6 +134,15 @@ export function createAppRoutes({
                           (await import('../pages/profile-page')).ProfilePage,
                       },
                     },
+                    {
+                      // One page for the list and a selected chat: the
+                      // optional segment is the selected classroom.
+                      path: 'chats/:classroomId?',
+                      lazy: {
+                        Component: async () =>
+                          (await import('../pages/chats-page')).ChatsPage,
+                      },
+                    },
                     ...protectedRoutes,
                     {
                       path: 'classrooms/:classroomId/activities/:activityId',

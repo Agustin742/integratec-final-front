@@ -1,5 +1,32 @@
 # Tracker — Agustin
 
+## 2026-11-20 — Review and fixes on PR #113 (#51, classroom chat)
+
+- **Status:** completed (pending CI and Agustin's visual check before merging PR #113)
+- **Area / files:** `src/features/classrooms/chat/`, `src/features/chat-dock/`, `src/features/chat-inbox/`, `src/features/chat-page/`, `src/app/pages/chats-page.tsx`, `src/app/router/`, `src/realtime/classroom-realtime-manager.ts`, `src/realtime/classroom-realtime-provider.tsx`, `src/api/query-keys.ts`, `src/api/schema.generated.ts`, `src/realtime/contracts.generated.ts`, `docs/ui-chat.md`
+- **Change:** Merged `develop` (MSW handlers conflict, both sides kept). The chat now reads like a messenger: oldest to newest with infinite scroll up, fixed composer, Enter sends. Messages arrive live through the classroom Colyseus room (one ref-counted connection per classroom). Composer hardening: uncertain sends reconcile instead of duplicating, debounced mention lookup in its own query domain, accessible mention listbox, 429 cooldown. New floating chat dock (bottom-right, unread counts, read markers) and an all-chats page `/chats` reached from a navbar button next to notifications. Toasts moved to the bottom-left so they don't cover the dock.
+- **Reason:** Review findings on PR #113 plus Agustin's product decision (2026-11-20) to turn the chat into LinkedIn/Facebook-style messaging with unread counts. Backend counterpart: back PR #125 (issue #124), merged.
+- **Verification:** Per-task strict TDD; `--changed origin/develop` up to 887/887 (only known load timeouts that pass in isolation on some runs); lint, typecheck, build, `security:check`, `check_docs.py`. Native review approved on each task commit. Browser smoke tests (desktop 1366x768 and mobile 375x740) of the dock and the `/chats` page against the local backend.
+- **Next step:** CI green, Agustin's visual check, merge.
+
+## 2026-11-19 — Review and fixes on PR #110 (#55, daily review modal)
+
+- **Status:** completed (pending CI and merge of PR #110)
+- **Area / files:** `src/features/daily-review/daily-review-dialog.tsx`, `src/features/daily-review/messages.ts`, `src/features/daily-review/daily-review-dialog.test.tsx`
+- **Change:** Merged `develop` into the branch (no conflicts). Daily question flow: a `409 already_answered` now locks the card, a failed submit has its own message, a synchronous guard prevents double submits, and while the question is unanswered Escape and outside clicks no longer dismiss the dialog (only the close button does; owner decision, since the server already recorded the delivery). Accessibility and content: the dialog description is linked again, item keys are stable, the radio group is named once by the prompt, headings follow the dialog title (h3/h4), focus moves to the answer result with a persistent live region, and empty sections use per-section copy.
+- **Reason:** Review findings on PR #110. The provisional contract stays (back #42 open, proposal back #119); against the local backend the endpoint answers 404 and the dialog stays closed without blocking the app.
+- **Verification:** Per-task affected tests (daily-review 30/30; `--changed` with only the known flaky `classroom-invitations-panel` timeout, which passes in isolation), lint, typecheck, build, `security:check`. Native review approved on each task commit.
+- **Next step:** CI green and merge.
+
+## 2026-11-19 — Review and fixes on PR #109 (#43, student exam answering)
+
+- **Status:** completed (pending CI and merge of PR #109)
+- **Area / files:** `src/features/classrooms/activities/exam/`, `src/api/schema.generated.ts`, `src/features/notifications/`, `src/features/classrooms/activities/submission/submission-schema.ts`, `src/test/msw/handlers.ts`, `e2e/exam-answering.spec.ts`, `docs/exam-answering.md`
+- **Change:** Merged `develop` into the branch (tracker conflict, both entries kept). Fixed the reconcile flow (a failed verification read now reports "unverifiable" instead of "nothing stored") and kept a confirmed result visible when the background refresh fails. Improved form accessibility (prompt describes each radio group, option keys, focus on the result and on validation errors, inputs disabled when the window is blocked). Rewired the panel from the never-shipped provisional `/exam-answers` endpoints to the real back #47 contract (`POST /activities/{id}/submissions` with a JSON `answers` field, `GET .../submissions/me`, `autoScore`), synced contracts with back `develop` and adapted notifications to the synced schema (`badge_awarded`, nullable `classroomId`).
+- **Reason:** Review findings on PR #109; the visual check against the local backend returned 404 on every submission because back #47 shipped a different contract.
+- **Verification:** Per-task affected tests (exam suites 32/32, `--changed` 715 pass), lint, typecheck, build, `security:check`, `check_docs.py`, Playwright exam/submission/notification specs 16/16; live submission against the local backend stored `autoScore` 7/10. Native review approved on each task commit.
+- **Next step:** CI green and merge. MC auto-scores do not credit points until a teacher grades (back behavior, out of scope).
+
 ## 2026-11-19 — 3D classroom scene and local avatar navigation (front #36)
 
 - **Status:** in-progress (branch `feat/36-classroom-scene`, cut from `feat/35-avatar-3d-preview` because the scene reuses `AvatarModel`; no PR yet)

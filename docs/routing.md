@@ -12,6 +12,7 @@ React Router (FD4) runs in data mode: `createBrowserRouter` with `RouterProvider
 | `/invitations/accept`                       | none (signed in or out) | `src/app/pages/invitation-accept-page`          |
 | `/`                                         | `RequireAuth`           | `src/app/pages/home-page`                       |
 | `/profile`                                  | `RequireAuth`           | `src/app/pages/profile-page`                    |
+| `/chats`, `/chats/:classroomId`             | `RequireAuth`           | `src/app/pages/chats-page`                      |
 | `/classrooms/:classroomId`                  | `RequireAuth`           | `src/features/classrooms/classroom-workspace`   |
 | `/classrooms/:classroomId/panels/:panelKey` | `RequireAuth`           | `src/features/classrooms/classroom-panel-route` |
 | `/dev/ui`                                   | none, dev/showcase only | `src/app/ui-foundations`                        |
@@ -24,7 +25,7 @@ Every page is a lazy route module (`lazy: { Component }`), so its chunk loads wh
 Two pathless layout routes sit under the root route. Both mount the single toast host and a `main` landmark with the same id, and focus after navigation is handled once above them (`RouterRoot`), so moving between layouts (for example login to home) is still announced.
 
 - `AuthLayout` (`/login`, `/register`, `/password-reset`, `/invitations/accept`): a split screen with no sidebar. The brand panel (the only `h1`, the product name, a one-line value statement and a text placeholder where the 3D classroom model will go) comes first in the DOM, so on phones it stacks above the content and on wide screens it sits on the right. The form column is `[data-auth-slot]`: feature screens render their form inside it and inherit its width and surface.
-- `AppShell` (everything else, including the `*` catch-all): `BaseLayout` (skip link, banner with the only `h1`, `main`) and `<Outlet />`. It has no sidebar: navigation arrives with the features that need it, and an empty aside is not rendered. When `snapshot.status === 'authenticated'`, the banner displays the signed-in user's `displayName`, the `Mi perfil` link to `/profile`, and the `Cerrar sesión` action; signed-out views (including `*` 404) never render signed-in controls. The showcase at `/dev/ui` is reached by URL only; nothing links to it.
+- `AppShell` (everything else, including the `*` catch-all): `BaseLayout` (skip link, banner with the only `h1`, `main`) and `<Outlet />`. It has no sidebar: navigation arrives with the features that need it, and an empty aside is not rendered. When `snapshot.status === 'authenticated'`, the banner displays the signed-in user's `displayName`, the `Mi perfil` link to `/profile`, the `Mensajes` link to `/chats` (only for users with chats, with the unread badge, see [classroom chat](./ui-chat.md#all-chats-page-and-navbar-entry)), the notification bell and the `Cerrar sesión` action; signed-out views (including `*` 404) never render signed-in controls. The showcase at `/dev/ui` is reached by URL only; nothing links to it.
 
 Pages use `h2` for their title. The not found, forbidden and error views share `StatusView` (a decorative scene from `src/components/illustrations/scenes.tsx`, title, explanation, actions) and take the width of whichever layout hosts them.
 
