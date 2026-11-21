@@ -7767,7 +7767,6 @@ export function createChatInboxStore(
   };
 }
 
-
 export type EquipmentSlotName = 'head' | 'face' | 'back' | 'desk_decor';
 
 export interface EquipmentStoreSlotEntry {
@@ -7781,9 +7780,7 @@ export interface EquipmentStoreSlotEntry {
 export type EquipmentStoreOp = 'getEquipment' | 'setSlot' | 'purchases';
 
 export type EquipmentStoreFailure =
-  | MswErrorResponseSpec
-  | 'network'
-  | 'malformed-2xx';
+  MswErrorResponseSpec | 'network' | 'malformed-2xx';
 
 export interface ClassroomEquipmentStoreOptions {
   readonly baseUrl?: string;
@@ -7838,8 +7835,7 @@ export function createClassroomEquipmentStore(
   options: ClassroomEquipmentStoreOptions,
 ): ClassroomEquipmentStore {
   const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
-  const studentId =
-    options.studentId ?? '00000000-0000-4000-8000-000000007001';
+  const studentId = options.studentId ?? '00000000-0000-4000-8000-000000007001';
   let currentRole = options.role ?? 'STUDENT';
   let purchases: ShopStorePurchase[] = [...(options.initialPurchases ?? [])];
 
@@ -7882,31 +7878,28 @@ export function createClassroomEquipmentStore(
   });
 
   const handlers: HttpHandler[] = [
-    http.get(
-      `${baseUrl}/classrooms/:id/me/equipment`,
-      async ({ params }) => {
-        counts.getEquipment += 1;
-        const failure = consumeFailure('getEquipment');
-        if (failure) {
-          return respondFailure(failure);
-        }
-        if (params.id !== options.classroomId) {
-          return createErrorEnvelopeResponse(404, {
-            code: 'NOT_FOUND',
-            message: 'Classroom not found.',
-            correlationId: 'req-equipment-get-404',
-          });
-        }
-        if (currentRole !== 'STUDENT') {
-          return createErrorEnvelopeResponse(403, {
-            code: 'FORBIDDEN',
-            message: 'Only active enrolled students have equipment.',
-            correlationId: 'req-equipment-get-403',
-          });
-        }
-        return HttpResponse.json(buildStateDto());
-      },
-    ),
+    http.get(`${baseUrl}/classrooms/:id/me/equipment`, async ({ params }) => {
+      counts.getEquipment += 1;
+      const failure = consumeFailure('getEquipment');
+      if (failure) {
+        return respondFailure(failure);
+      }
+      if (params.id !== options.classroomId) {
+        return createErrorEnvelopeResponse(404, {
+          code: 'NOT_FOUND',
+          message: 'Classroom not found.',
+          correlationId: 'req-equipment-get-404',
+        });
+      }
+      if (currentRole !== 'STUDENT') {
+        return createErrorEnvelopeResponse(403, {
+          code: 'FORBIDDEN',
+          message: 'Only active enrolled students have equipment.',
+          correlationId: 'req-equipment-get-403',
+        });
+      }
+      return HttpResponse.json(buildStateDto());
+    }),
     http.put(
       `${baseUrl}/classrooms/:id/me/equipment/:slot`,
       async ({ params, request }) => {

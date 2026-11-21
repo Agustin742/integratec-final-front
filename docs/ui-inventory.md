@@ -15,8 +15,8 @@ The 2D inventory selector lets enrolled students inspect their classroom-scoped 
 
 ## Visual evidence
 
-| Desktop (`1280px`) | Mobile (`360px`) |
-|---|---|
+| Desktop (`1280px`)                                        | Mobile (`360px`)                                        |
+| --------------------------------------------------------- | ------------------------------------------------------- |
 | ![Inventory desktop](assets/inventory/inventory-1280.png) | ![Inventory mobile](assets/inventory/inventory-360.png) |
 
 ## Out of scope (part 1/2)
