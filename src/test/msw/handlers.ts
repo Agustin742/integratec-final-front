@@ -7766,3 +7766,272 @@ export function createChatInboxStore(
     getMarkRequests: () => [...markRequests],
   };
 }
+
+export type EquipmentSlotName = 'head' | 'face' | 'back' | 'desk_decor';
+
+export interface EquipmentStoreSlotEntry {
+  readonly slot: EquipmentSlotName;
+  readonly shopItemId: string;
+  readonly shopItemCode: string;
+  readonly shopItemName: string;
+  readonly kind: ShopStoreItemKind;
+}
+
+export type EquipmentStoreOp = 'getEquipment' | 'setSlot' | 'purchases';
+
+export type EquipmentStoreFailure =
+  MswErrorResponseSpec | 'network' | 'malformed-2xx';
+
+export interface ClassroomEquipmentStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId: string;
+  readonly studentId?: string;
+  readonly role?: string;
+  readonly initialPurchases?: readonly ShopStorePurchase[];
+  readonly initialSlots?: Partial<
+    Record<EquipmentSlotName, EquipmentStoreSlotEntry | null>
+  >;
+  readonly setSlotDelayMs?: number;
+  readonly includePurchasesHandler?: boolean;
+}
+
+export interface ClassroomEquipmentStore {
+  readonly handlers: readonly HttpHandler[];
+  getSlots: () => Record<EquipmentSlotName, EquipmentStoreSlotEntry | null>;
+  setRole: (role: string) => void;
+  setPurchases: (purchases: readonly ShopStorePurchase[]) => void;
+  failNext: (op: EquipmentStoreOp, failure: EquipmentStoreFailure) => void;
+  getCounts: () => Record<EquipmentStoreOp, number>;
+}
+
+const KNOWN_EQUIPMENT_SLOTS: readonly EquipmentSlotName[] = [
+  'head',
+  'face',
+  'back',
+  'desk_decor',
+];
+
+function isValidEquipmentSlot(value: string): value is EquipmentSlotName {
+  return (KNOWN_EQUIPMENT_SLOTS as readonly string[]).includes(value);
+}
+
+function isKindCompatibleWithSlot(
+  kind: ShopStoreItemKind,
+  slot: EquipmentSlotName,
+): boolean {
+  if (slot === 'desk_decor') {
+    return kind === 'DESK_UPGRADE';
+  }
+  return kind === 'AVATAR_ACCESSORY';
+}
+
+/**
+ * Stateful contract-faithful MSW store for classroom-scoped student inventory
+ * equipment (`GET /classrooms/:id/me/equipment`,
+ * `PUT /classrooms/:id/me/equipment/:slot`, and optionally
+ * `GET /classrooms/:id/shop/purchases`).
+ */
+export function createClassroomEquipmentStore(
+  options: ClassroomEquipmentStoreOptions,
+): ClassroomEquipmentStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const studentId = options.studentId ?? '00000000-0000-4000-8000-000000007001';
+  let currentRole = options.role ?? 'STUDENT';
+  let purchases: ShopStorePurchase[] = [...(options.initialPurchases ?? [])];
+
+  const slots: Record<EquipmentSlotName, EquipmentStoreSlotEntry | null> = {
+    head: options.initialSlots?.head ?? null,
+    face: options.initialSlots?.face ?? null,
+    back: options.initialSlots?.back ?? null,
+    desk_decor: options.initialSlots?.desk_decor ?? null,
+  };
+
+  const pending: Partial<Record<EquipmentStoreOp, EquipmentStoreFailure>> = {};
+  const counts: Record<EquipmentStoreOp, number> = {
+    getEquipment: 0,
+    setSlot: 0,
+    purchases: 0,
+  };
+
+  const consumeFailure = (
+    op: EquipmentStoreOp,
+  ): EquipmentStoreFailure | undefined => {
+    const failure = pending[op];
+    pending[op] = undefined;
+    return failure;
+  };
+
+  const respondFailure = (failure: EquipmentStoreFailure): Response => {
+    if (failure === 'network') {
+      return HttpResponse.error();
+    }
+    if (failure === 'malformed-2xx') {
+      return HttpResponse.json({ broken: true }, { status: 200 });
+    }
+    return createErrorEnvelopeResponse(failure.status, failure.body);
+  };
+
+  const buildStateDto = () => ({
+    classroomId: options.classroomId,
+    studentId,
+    slots: { ...slots },
+  });
+
+  const handlers: HttpHandler[] = [
+    http.get(`${baseUrl}/classrooms/:id/me/equipment`, async ({ params }) => {
+      counts.getEquipment += 1;
+      const failure = consumeFailure('getEquipment');
+      if (failure) {
+        return respondFailure(failure);
+      }
+      if (params.id !== options.classroomId) {
+        return createErrorEnvelopeResponse(404, {
+          code: 'NOT_FOUND',
+          message: 'Classroom not found.',
+          correlationId: 'req-equipment-get-404',
+        });
+      }
+      if (currentRole !== 'STUDENT') {
+        return createErrorEnvelopeResponse(403, {
+          code: 'FORBIDDEN',
+          message: 'Only active enrolled students have equipment.',
+          correlationId: 'req-equipment-get-403',
+        });
+      }
+      return HttpResponse.json(buildStateDto());
+    }),
+    http.put(
+      `${baseUrl}/classrooms/:id/me/equipment/:slot`,
+      async ({ params, request }) => {
+        counts.setSlot += 1;
+        if (options.setSlotDelayMs && options.setSlotDelayMs > 0) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, options.setSlotDelayMs),
+          );
+        }
+        const failure = consumeFailure('setSlot');
+        if (failure) {
+          return respondFailure(failure);
+        }
+        if (params.id !== options.classroomId) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Classroom not found.',
+            correlationId: 'req-equipment-put-404',
+          });
+        }
+        const rawSlot = String(params.slot ?? '');
+        if (!isValidEquipmentSlot(rawSlot)) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Unknown equipment slot.',
+            correlationId: 'req-equipment-slot-404',
+          });
+        }
+        if (currentRole !== 'STUDENT') {
+          return createErrorEnvelopeResponse(403, {
+            code: 'FORBIDDEN',
+            message: 'Only active enrolled students can equip items.',
+            correlationId: 'req-equipment-put-role-403',
+          });
+        }
+
+        const body = (await request.json().catch(() => ({}))) as {
+          shopItemId?: string | null;
+        };
+        const shopItemId = body.shopItemId ?? null;
+
+        if (shopItemId === null) {
+          slots[rawSlot] = null;
+          return HttpResponse.json(buildStateDto());
+        }
+
+        if (typeof shopItemId !== 'string' || shopItemId.trim() === '') {
+          return createErrorEnvelopeResponse(400, {
+            code: 'VALIDATION_FAILED',
+            message: 'shopItemId must be a valid UUID or null.',
+            correlationId: 'req-equipment-put-400',
+          });
+        }
+
+        const owned = purchases.find((p) => p.shopItemId === shopItemId);
+        if (!owned) {
+          return createErrorEnvelopeResponse(403, {
+            code: 'FORBIDDEN',
+            message: 'You do not own this item in this classroom.',
+            correlationId: 'req-equipment-put-403',
+          });
+        }
+
+        if (!isKindCompatibleWithSlot(owned.shopItemKind, rawSlot)) {
+          return createErrorEnvelopeResponse(409, {
+            code: 'CONFLICT',
+            message: 'This item cannot be equipped in the selected slot.',
+            correlationId: 'req-equipment-put-409',
+          });
+        }
+
+        slots[rawSlot] = {
+          slot: rawSlot,
+          shopItemId: owned.shopItemId,
+          shopItemCode: owned.shopItemCode,
+          shopItemName: owned.shopItemName,
+          kind: owned.shopItemKind,
+        };
+
+        return HttpResponse.json(buildStateDto());
+      },
+    ),
+  ];
+
+  if (options.includePurchasesHandler !== false) {
+    handlers.push(
+      http.get(`${baseUrl}/classrooms/:id/shop/purchases`, ({ params }) => {
+        counts.purchases += 1;
+        const failure = consumeFailure('purchases');
+        if (failure) {
+          return respondFailure(failure);
+        }
+        if (params.id !== options.classroomId) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Classroom not found.',
+            correlationId: 'req-equipment-purchases-404',
+          });
+        }
+        if (currentRole !== 'STUDENT') {
+          return createErrorEnvelopeResponse(403, {
+            code: 'FORBIDDEN',
+            message: 'Only students can view purchases.',
+            correlationId: 'req-equipment-purchases-403',
+          });
+        }
+        return HttpResponse.json({
+          items: purchases.map((p) => ({
+            ...p,
+            classroomId: options.classroomId,
+            studentId,
+          })),
+          page: 1,
+          pageSize: 100,
+          total: purchases.length,
+        });
+      }),
+    );
+  }
+
+  return {
+    handlers,
+    getSlots: () => ({ ...slots }),
+    setRole: (role) => {
+      currentRole = role;
+    },
+    setPurchases: (next) => {
+      purchases = [...next];
+    },
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    getCounts: () => ({ ...counts }),
+  };
+}

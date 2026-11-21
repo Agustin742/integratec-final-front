@@ -1,5 +1,18 @@
 # Tracker — Alejo
 
+## 2026-11-20 — Inventory selector to equip purchased items on avatar and desk (#57)
+
+- **Status:** completed (ready for commit/PR on branch `feat/57-inventory-selector` in `odd/worktrees/57-inventory`)
+- **Area / files:** `src/api/query-keys.ts`, `src/features/inventory/` (`inventory-schema.ts`, `inventory-service.ts`, `inventory-messages.ts`, `inventory-panel.tsx`, `profile-inventory-section.tsx`, `inventory-service.test.ts`, `inventory-panel.test.tsx`), `src/features/shop/shop-panel.tsx` + `messages.ts`, `src/features/profile/profile-view.tsx` + `profile-page.test.tsx`, `src/test/msw/handlers.ts` (`createClassroomEquipmentStore`), `e2e/inventory.spec.ts`, `docs/ui-inventory.md`, `docs/classroom-panels.md`, `docs/assets/inventory/`, this tracker.
+- **Change:** Implemented [issue #57](https://github.com/Agustin742/integratec-final-front/issues/57) (`HU-ESP-004` part 1/2):
+  1. Added classroom- and user-scoped equipment query keys/predicates (`classroomEquipmentQueryKey`, `createClassroomEquipmentPredicate`), jitless Zod schemas (`equipmentStateDtoSchema` supporting `null` empty slots, `isEquipableInSlot` / `isEquipableKind` compatibility helpers), and typed REST service (`getEquipment`, `setEquipmentSlot`) with Spanish (`es-AR`) error translation (`400`, `401`, `403` unowned item, `404`, `409`, `429`, `5xx`/network/malformed `2xx` uncertain-write classification).
+  2. Built `InventoryPanel` with student-only gating and cache eviction for non-student roles, loading/empty/stale/error states, per-slot equip/unequip controls (`head`, `face`, `back`, `desk_decor`), pending/confirmed/rejected states, `403` rejection alert without mutating confirmed equipped state, and uncertain-write cache reconciliation.
+  3. Wired `InventoryPanel` into the workspace `shop` panel (`Mi inventario` tab in `ShopPanel`) and `/profile` (`ProfileInventorySection` with student classroom selector).
+  4. Added contract-faithful `createClassroomEquipmentStore` MSW handlers, unit/RTL/axe tests (10/10), Playwright E2E `e2e/inventory.spec.ts` (desktop 1280px and mobile 360px), `docs/ui-inventory.md` with screenshots, and `docs/classroom-panels.md` cross-link.
+- **Reason:** Deliver the 2D inventory selector per `rules/avatars-and-customization.md`, `rules/points-and-shop.md`, `rules/state-management.md`, `rules/forms-and-validation.md`, `rules/ui-and-accessibility.md`.
+- **Verification:** On Node `v24.15.0` (`npm_config_engine_strict=false`; CI pins `>=22.23.4 <23`): `pnpm lint` pass (0 errors); `pnpm typecheck` pass (0 errors); focused Vitest `src/features/inventory src/features/shop` 5 files, 24/24 passed (and earlier `src/features/inventory src/features/shop src/features/profile` 10 files, 68/68 passed); `pnpm build` pass (`VITE_APP_ENV=test`, `VITE_API_BASE_URL=https://api.example.invalid`); `pnpm security:check` pass; `pnpm build:e2e` pass; Playwright `e2e/inventory.spec.ts` 2/2 passed (desktop 1280px + mobile 360px, CSP/pageerror/overflow clean) against local preview on port 4175; `check_docs.py` passed (80 files); `git diff --check` clean. MSW/Playwright evidence is not live-backend proof (`Agustin742/integratec-final-back#35`).
+- **Next step:** Commit changes on `feat/57-inventory-selector`, push, and open PR against `develop`.
+
 ## 2026-11-19 — Implement real-time classroom chat panel (#51)
 
 - **Status:** in-progress (published on [PR #113](https://github.com/Agustin742/integratec-final-front/pull/113) against `develop`: contract layer, panel, composer, moderation, e2e/docs evidence and the full local ladder with every full-suite failure proven pre-existing by differential; awaiting team review and merge)
