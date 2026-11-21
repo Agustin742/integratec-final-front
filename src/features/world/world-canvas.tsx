@@ -2,6 +2,7 @@ import {
   Component,
   Suspense,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -14,7 +15,7 @@ import {
   SRGBColorSpace,
   WebGLRenderer,
 } from 'three';
-import { frameAvatarCamera, frameCamera } from './camera';
+import { CLASSROOM_BOUNDS, frameAvatarCamera, frameCamera } from './camera';
 import {
   DEFAULT_SCOPE,
   clearAssetCache,
@@ -23,17 +24,24 @@ import {
 import { worldMessages as copy } from './messages';
 import { WorldFallback } from './world-fallback';
 
+export type WorldFraming = 'classroom' | 'avatar' | 'reference';
+
 export interface WorldCanvasProps {
   children?: ReactNode;
   label: string;
   /** Changing `scopeKey` or unmounting disposes cached scene assets. */
   scopeKey?: string;
-  /** Camera framing: the isometric classroom (default) or one standing avatar. */
-  framing?: 'classroom' | 'avatar';
+  /**
+   * Camera framing: the whole isometric classroom (default), one standing
+   * avatar, or the small 6x4 m technical reference.
+   */
+  framing?: WorldFraming;
   /** Landmark role of the host; `img` suits a decorative preview. */
   role?: 'region' | 'img';
   /** Sizing classes for the canvas box; defaults to the classroom height. */
   canvasClassName?: string;
+  /** Visually hidden text that describes the canvas (for example its controls). */
+  description?: string;
   /** Replaces the loading announcement; `null` hides it. */
   loading?: ReactNode;
   /**
@@ -62,12 +70,15 @@ class SceneBoundary extends Component<
   }
 }
 
-function CameraFraming({ framing }: { framing: 'classroom' | 'avatar' }) {
+function CameraFraming({ framing }: { framing: WorldFraming }) {
   const { camera, size, invalidate } = useThree();
   useLayoutEffect(() => {
     if (camera instanceof OrthographicCamera) {
-      const frame = framing === 'avatar' ? frameAvatarCamera : frameCamera;
-      frame(camera, size.width, size.height);
+      if (framing === 'avatar')
+        frameAvatarCamera(camera, size.width, size.height);
+      else if (framing === 'reference')
+        frameCamera(camera, size.width, size.height);
+      else frameCamera(camera, size.width, size.height, CLASSROOM_BOUNDS);
       invalidate();
     }
   }, [camera, framing, size.width, size.height, invalidate]);
@@ -81,9 +92,11 @@ export function WorldCanvas({
   framing = 'classroom',
   role = 'region',
   canvasClassName,
+  description,
   loading,
   onUnavailable,
 }: WorldCanvasProps) {
+  const descriptionId = useId();
   const host = useRef<HTMLDivElement>(null);
   const creationErrors = useRef(new Set<unknown>());
   const [failed, setFailed] = useState(false);
@@ -195,9 +208,15 @@ export function WorldCanvas({
         ref={host}
         role={role}
         aria-label={label}
+        aria-describedby={description ? descriptionId : undefined}
         aria-busy={!failed && !canvas}
         className="min-w-0"
       >
+        {description && (
+          <p id={descriptionId} className="sr-only">
+            {description}
+          </p>
+        )}
         {failed ? (
           <WorldFallback />
         ) : (

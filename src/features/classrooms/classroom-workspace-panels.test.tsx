@@ -189,6 +189,16 @@ function setup(
     router,
     session,
     streamSignals,
+    // The server's registration hint (first of a connection) never resets.
+    registrationHint: async () => {
+      await act(async () => {
+        stream?.enqueue(
+          new TextEncoder().encode(
+            'event: classroom.context-invalidated\ndata: {"classroomId":"a"}\n\n',
+          ),
+        );
+      });
+    },
     hint: async (next: unknown = []) => {
       availability = next;
       holdRead = true;
@@ -453,6 +463,8 @@ test('SSE hint immediately removes private panel and guards until fresh REST con
   fireEvent.change(screen.getByRole('textbox'), {
     target: { value: 'restricted draft' },
   });
+  await view.registrationHint();
+  expect(screen.getByRole('textbox')).toHaveValue('restricted draft');
   await view.hint();
   await waitFor(() =>
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
@@ -501,6 +513,7 @@ test('invalidating a nested panel consumes the old URL intent and drops its draf
   fireEvent.change(screen.getByRole('textbox'), {
     target: { value: 'private' },
   });
+  await view.registrationHint();
   await view.hint(['grades']);
   await waitFor(() =>
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument(),

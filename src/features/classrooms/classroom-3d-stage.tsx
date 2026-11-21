@@ -26,13 +26,13 @@ type ClearAssetCacheFn = (options?: {
 
 let loadedClearAssetCache: ClearAssetCacheFn | null = null;
 
-const loadWorldCanvas = () =>
+const loadClassroomWorld = () =>
   import('../world').then((module) => {
     loadedClearAssetCache = module.clearAssetCache;
-    return { default: module.WorldCanvas };
+    return { default: module.ClassroomWorld };
   });
 
-/** Same lazy chunk as the canvas, so the probe never eagerly loads three. */
+/** Same lazy chunk as the classroom world, so the probe never eagerly loads three. */
 const loadWorldProbe = () =>
   import('../world').then((module) => ({
     default: module.PerformanceProbe,
@@ -78,7 +78,7 @@ export function Classroom3DStage({
   scopeKey,
   onSustainedLowFps,
 }: Classroom3DStageProps) {
-  const [LazyWorldCanvas] = useState(() => lazy(loadWorldCanvas));
+  const [LazyClassroomWorld] = useState(() => lazy(loadClassroomWorld));
   const [LazyWorldProbe] = useState(() => lazy(loadWorldProbe));
   const supportsBrowserObservers = typeof ResizeObserver !== 'undefined';
   const [performanceRuntime] = useState(() => new PerformanceProbeRuntime());
@@ -105,7 +105,7 @@ export function Classroom3DStage({
       {supportsBrowserObservers ? (
         <StageBoundary>
           <Suspense fallback={<p role="status">{worldMessages.loading}</p>}>
-            <LazyWorldCanvas
+            <LazyClassroomWorld
               label={classroomMessages.viewMode.canvasLabel}
               scopeKey={scopeKey}
             >
@@ -113,7 +113,7 @@ export function Classroom3DStage({
                 runtime={performanceRuntime}
                 onSustainedLowFps={onSustainedLowFps}
               />
-            </LazyWorldCanvas>
+            </LazyClassroomWorld>
           </Suspense>
         </StageBoundary>
       ) : (
