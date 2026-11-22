@@ -1,5 +1,23 @@
 # Tracker — Alejo
 
+## 2026-11-22 — Refine modular avatar reuse and body preservation (PR #119)
+
+- **Status:** completed
+- **Area / files:** `rules/modular-avatar-assets.md`, this tracker.
+- **Change:** Clarified mandatory master-garment reuse and fitted variants, unchanged female anatomy, coverage-safe skin hiding, canonical joint names/tolerance, pending weight/clip migrations, and current versus future runtime support. AI assisted the documentation correction; no models or runtime code changed.
+- **Reason:** Adapt existing wearables to each anatomy instead of rebuilding assets or reshaping the body to fit clothing; incorporate the technical review of PR #119.
+- **Verification:** `python scripts/ci/check_docs.py` passed (84 files); `git diff --check` clean; documentation diff inspected. No meaningful failing behavior test for passive documentation; application suites and full CI Python regression not run for this docs-only slice.
+- **Next step:** Merged `origin/develop` (`bead380c`, PR #118) to resolve the tracker conflict; awaiting team review/approval (`Agustin742`, `Calegaris`) and green CI before merging PR #119. Asset migrations and runtime extensions remain pending.
+
+## 2026-11-22 — Add modular 3D avatar asset authoring rule
+
+- **Status:** in review ([PR #119](https://github.com/Agustin742/integratec-final-front/pull/119) on `docs/modular-avatar-assets-rule` off `origin/develop` `30ec66c`, reviewers `Agustin742` and `Calegaris`)
+- **Area / files:** `rules/modular-avatar-assets.md`, `changelogs/tracker-alejo.md`
+- **Change:** Added a dedicated technical rule (`rules/modular-avatar-assets.md`) governing modular 3D avatar construction and Blender/MCP export aligned with `docs/art/asset-wishlist.md` (PR #117) and the verified baseline transforms, T-pose rest rig, and 34-bone core skeleton of `public/models/avatars/{male,female}/body.glb`, keeping `rules/index.md` and `rules/README.md` untouched per contributor scope.
+- **Reason:** Establish a single canonical 34-bone skeleton (preserving female mesh anatomy without female-only secondary bones), semantic split-body region naming (`Body_*`), rigid-accessory binding, material/slot conventions, incremental delivery scope, and Blender/MCP export guardrails before producing modular character assets.
+- **Verification:** `python3 scripts/ci/check_docs.py` passed across all 84 tracked Markdown files; `git diff --check origin/develop..HEAD --` clean; docs-only change (outside `format:check` paths). Disclosure: `unittest discover -s scripts/ci` hung locally on Windows (`test_public_checker_cases`) and runs in Ubuntu CI.
+- **Next step:** Team review and approval by `Agustin742` and `Calegaris`, then merge into `develop`.
+
 ## 2026-11-22 — Review fixes for PR #118 (#38)
 
 - **Status:** completed (all review fixes applied, verified locally with Vitest, lint, typecheck, format, builds, security/asset checks, and Playwright E2E on `feat/38-interactable-classroom-objects`; pushing for Ubuntu CI, approval, and merge)
