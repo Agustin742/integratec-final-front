@@ -1,5 +1,14 @@
 # Tracker — Alejo
 
+## 2026-11-22 — Refine modular avatar reuse and body preservation (PR #119)
+
+- **Status:** completed
+- **Area / files:** `rules/modular-avatar-assets.md`, this tracker.
+- **Change:** Clarified mandatory master-garment reuse and fitted variants, unchanged female anatomy, coverage-safe skin hiding, canonical joint names/tolerance, pending weight/clip migrations, and current versus future runtime support. AI assisted the documentation correction; no models or runtime code changed.
+- **Reason:** Adapt existing wearables to each anatomy instead of rebuilding assets or reshaping the body to fit clothing; incorporate the technical review of PR #119.
+- **Verification:** `python scripts/ci/check_docs.py` passed (84 files); `git diff --check` clean; documentation diff inspected. No meaningful failing behavior test for passive documentation; application suites and full CI Python regression not run for this docs-only slice.
+- **Next step:** Commit and push the verified corrections to PR #119 as requested, then team review; asset migrations and runtime extensions remain pending.
+
 ## 2026-11-22 — Add modular 3D avatar asset authoring rule
 
 - **Status:** in review ([PR #119](https://github.com/Agustin742/integratec-final-front/pull/119) on `docs/modular-avatar-assets-rule` off `origin/develop` `30ec66c`, reviewers `Agustin742` and `Calegaris`)

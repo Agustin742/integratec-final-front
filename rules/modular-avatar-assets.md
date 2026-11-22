@@ -27,7 +27,7 @@ Different body anatomies (male vs. female torso, bust, hips, and face) belong to
 
 ### Canonical 34-bone skeleton
 
-- **MUST:** All compatible character bases (male and female student bodies, and teacher bodies sharing the animation library) **MUST** share **one single canonical 34-bone skeleton** (`rig`) with identical bone names, parent hierarchy, rest positions, and rest orientations, matching the 34 core `DEF-*` joints already shared identically between the baseline male and female bodies:
+- **MUST:** All compatible character bases (male and female student bodies, and teacher bodies sharing the animation library) **MUST** use the male base's canonical 34-joint skeleton (`rig`), including `neutral_bone`, with identical joint names and parent hierarchy and matching rest transforms within floating-point export tolerance, not bitwise identity. The legacy female GLB has 41 joints: the shared 34-joint core plus 7 secondary joints; migration remains pending (see below).
 
 | Region | Canonical bones (`rig`) | Primary use and rigid accessory anchor |
 |---|---|---|
@@ -35,20 +35,22 @@ Different body anatomies (male vs. female torso, bust, hips, and face) belong to
 | Torso and chest | `DEF-spine.001`, `DEF-spine.002`, `DEF-spine.003` | Waist, female bust silhouette (`DEF-spine.002`), upper back/backpacks/capes (`DEF-spine.003`) |
 | Neck | `DEF-spine.004`, `DEF-spine.005` | Neck, scarves, necklaces, bow ties (`DEF-spine.004`) |
 | Head | `DEF-spine.006` | Head, face, hairstyles, caps, helmets, headphones, glasses, masks, earrings |
-| Arms and hands (`.L` / `.R`) | `DEF-shoulder`, `DEF-upper_arm`, `DEF-upper_arm.001`, `DEF-forearm`, `DEF-forearm.001`, `DEF-hand` | Sleeves and hands; rigid hand items bind to `DEF-hand.R` or `DEF-hand.L` |
-| Legs and feet (`.L` / `.R`) | `DEF-thigh`, `DEF-thigh.001`, `DEF-shin`, `DEF-shin.001`, `DEF-foot`, `DEF-toe` | Bottoms, socks, and shoes |
-| glTF neutral node | `neutral_bone` | Exporter neutral joint when present in the canonical rig |
+| Arms and hands | `DEF-shoulder.L` / `DEF-shoulder.R`, `DEF-upper_arm.L` / `DEF-upper_arm.R`, `DEF-upper_arm.L.001` / `DEF-upper_arm.R.001`, `DEF-forearm.L` / `DEF-forearm.R`, `DEF-forearm.L.001` / `DEF-forearm.R.001`, `DEF-hand.L` / `DEF-hand.R` | Sleeves and hands; rigid hand items bind to `DEF-hand.R` or `DEF-hand.L` |
+| Legs and feet | `DEF-thigh.L` / `DEF-thigh.R`, `DEF-thigh.L.001` / `DEF-thigh.R.001`, `DEF-shin.L` / `DEF-shin.R`, `DEF-shin.L.001` / `DEF-shin.R.001`, `DEF-foot.L` / `DEF-foot.R`, `DEF-toe.L` / `DEF-toe.R` | Bottoms, socks, and shoes |
+| glTF neutral node | `neutral_bone` | Exporter neutral joint included in the canonical 34 |
 
 - **MUST NOT:** Add body-specific secondary bones (such as `DEF-bust.L/R`, `DEF-glute.L/R`, or `DEF-hair_*`) to the canonical rig. Preserve the full female anatomy (bust, hips/glutes, waist, eyelashes) in the mesh geometry and weight it directly to `DEF-spine.002` / `DEF-spine.003` and `DEF-pelvis.L/R`.
-- **Rationale:** Keeping one 34-bone rig lets every animation clip and every unisex wearable (`hair`, `head`, `face`, `shoes`, `back`, `hand`, `neck`) work identically across all bodies without duplicating rigs or triggering silent part rejection when a wearable references a bone missing on another body. Any future decision to introduce optional secondary bones requires updating this rule and every base body together.
+- **MUST:** Preserve the female base's existing silhouette, anatomy, and proportions, including bust, waist, hips, and glutes. Never flatten, shrink, or reshape the body to reuse a garment; fit the clothing to the unchanged body instead.
+- **Rationale:** A shared rig enables animation and binding reuse without missing-joint rejection; it does not guarantee garment fit across anatomies. Any future decision to introduce optional secondary bones requires updating this rule and every base body together.
 
 ### Skinning, rigid accessories, and reuse
 
 - **MUST:** Limit every skinned mesh to at most **4 bone influences per vertex**, with normalized weights summing to `1.0` and zero unweighted vertices.
 - **MUST NOT:** Export rigid accessories (glasses, caps, helmets, headphones, earrings, backpacks, guitars, hand items) as unskinned static meshes parented to the scene root. In the current runtime composer, root-parented static meshes remain frozen at the origin while the body animates.
 - **MUST:** Until explicit bone-socket attachment is added to the runtime composer, export every rigid accessory as a `SkinnedMesh` weighted `100%` to its target canonical bone from the table above, using the exact same armature and rest pose.
-- **MUST (Reuse first):** Author and export unisex wearables (`hair`, `head`, `face`, `shoes`, `back`, `hand`, `neck`) **once** under `shared/`. Create separate per-body variants (`male/` and `female/`) only when anatomical silhouette differences require fitted geometry (primarily `top` and `bottom`).
-- **SHOULD:** When creating the second body variant of a fitted `top` or `bottom`, adapt the existing garment mesh over the same canonical rig rather than re-rigging from scratch.
+- **MUST (Reuse first):** Start from the existing editable master garment when one exists; do not rebuild the same asset from scratch for each base body. Derive fitted variants only where needed, retaining the shared canonical rig, materials, and design. This reduces duplicate authoring and AI token expenditure without promising a quantified reuse percentage.
+- **MUST:** Export an identical wearable once under `shared/` only after verifying its fit on both bodies. Otherwise derive the required `male/` and `female/` fitted exports from the master, including for accessories or footwear when necessary; a shared rig alone does not prove fit.
+- **MUST:** Adapt garment volume around bust and hips, align shoulders, seams, sleeves, and cuffs to each body, and maintain skin clearance throughout available animations without changing the base anatomy.
 
 ## Split base body and region hiding
 
@@ -63,14 +65,15 @@ To support interchangeable tops, bottoms, and footwear without skin poking throu
 | `Body_Mouth` | Mouth stroke/mesh | Never hidden |
 | `Body_Eyelashes` | Optional lashes (for example female base) | Never hidden |
 | `Body_Neck` | Neck | High collars or scarves when fully enclosed |
-| `Body_Torso` | Chest, abdomen, upper back | Full tops, hoodies, jackets, smocks |
-| `Body_UpperArms` | Shoulders to elbows | Short-sleeve and long-sleeve tops (kept visible for tank tops) |
-| `Body_Forearms` | Elbows to wrists | Long-sleeve tops (kept visible for t-shirts / short sleeves) |
+| `Body_Torso` | Chest, abdomen, upper back | Tops only when the entire region is occluded, including neckline and hem |
+| `Body_UpperArms` | Shoulders to elbows | Sleeves only when the entire region is occluded; short sleeves usually leave skin visible |
+| `Body_Forearms` | Elbows to wrists | Sleeves only when the entire region is occluded, including cuffs |
 | `Body_Hands` | Palms / mittens | Never hidden |
-| `Body_UpperLegs` | Pelvis and thighs to knees | Shorts, bermudas, skirts, trousers, joggers, leggings |
-| `Body_LowerLegs` | Knees to ankles | Long trousers, joggers, jeans, leggings (kept visible for shorts/skirts) |
-| `Body_Feet` | Ankles and feet | Closed sneakers, school shoes, boots (kept visible for flip-flops) |
+| `Body_UpperLegs` | Pelvis and thighs to knees | Bottoms only when the entire region is occluded; shorts and skirt hems usually expose skin |
+| `Body_LowerLegs` | Knees to ankles | Bottoms only when the entire region is occluded; preserve skin below cropped hems |
+| `Body_Feet` | Ankles and feet | Footwear only when the entire region is occluded; preserve exposed ankles, heels, or toes |
 
+- **MUST:** Hide a region only when clothing completely occludes it throughout the tested poses. Never hide whole arms for short sleeves, whole thighs for shorts/skirts, or whole feet for partial footwear if any skin remains exposed. Keep partially covered regions visible or split them into coverage-safe subregions with clean English names (for example `Body_UpperArms_Proximal`). Preserve complete skin geometry; do not delete skin to solve clipping. Check hems and boundaries for holes during motion.
 - **MUST NOT:** Ship meshes with Blender default names (`Cube.003`, `Roundcube`, `Sphere.001`) or non-English names (`cuerpo`, `pantalones`, `ojos`).
 - **SHOULD:** Keep clean tucked seam margins at region boundaries (neck, elbow, wrist, waist, knee, ankle) so exposing adjacent bare skin (such as t-shirt + shorts + flip-flops) never reveals hollow gaps during bending animations.
 - **SHOULD:** Respect a consistent inner-to-outer clearance order to prevent Z-fighting across stacked wearables:
@@ -82,7 +85,7 @@ To support interchangeable tops, bottoms, and footwear without skin poking throu
 
 ## Wearable slot conventions
 
-Wearable slots align with the categories in the [asset wishlist](../docs/art/asset-wishlist.md) and apply whenever an item in that slot is authored.
+Wearable slots align with the categories in the [asset wishlist](../docs/art/asset-wishlist.md) and apply whenever an item in that slot is authored. Folder scopes below are defaults subject to the reuse-first fit check: any slot may need fitted variants, and identical exports may be shared only after fit is verified on both bodies.
 
 | Slot | Filename pattern | Folder scope | Attachment | Key constraints |
 |---|---|---|---|---|
@@ -90,7 +93,7 @@ Wearable slots align with the categories in the [asset wishlist](../docs/art/ass
 | `hair` | `hair-<id>.glb` | `shared/` | Skinned to `DEF-spine.006` (+ `DEF-spine.003` if resting over shoulders) | Tintable via `AvatarHairTint`; must not obscure eyes. |
 | `top` | `top-<id>.glb` | `<bodyId>/` | Skinned across torso, shoulders, and arms | Primary color via `AvatarTopTint` when tintable. |
 | `bottom` | `bottom-<id>.glb` | `<bodyId>/` | Skinned across pelvis, thighs, and shins | Primary color via `AvatarBottomTint` when tintable. |
-| `shoes` | `shoes-<id>.glb` | `shared/` *(or `<bodyId>/` only if shape differs)* | Skinned to shins, feet, and toes | Closed shoes hide `Body_Feet`; flip-flops keep `Body_Feet` visible. |
+| `shoes` | `shoes-<id>.glb` | `shared/` *(or `<bodyId>/` only if shape differs)* | Skinned to shins, feet, and toes | Hide only fully occluded foot subregions; preserve visible skin with partial footwear. |
 | `head` | `head-<id>.glb` | `shared/` | 100% rigid-skinned to `DEF-spine.006` | Readable from elevated 40°/45° camera; must not cover eyes. |
 | `face` | `face-<id>.glb` | `shared/` | 100% rigid-skinned to `DEF-spine.006` | Clean forward clearance from face plane; zero Z-fighting. |
 | `back` | `back-<id>.glb` | `shared/` | 100% rigid-skinned to `DEF-spine.003` (or skinned for capes) | Straps must clear both male and female chest silhouettes. |
@@ -107,6 +110,7 @@ Wearable slots align with the categories in the [asset wishlist](../docs/art/ass
   - Movement and posture: `Idle`, `Walk`, `Run`, `Sit`, `SitWrite`
   - Shared gestures and reactions: `RaiseHand`, `Wave`, `Cheer`, `Clap`, `Think`, `Nod`, `ShakeHead`, `Sad`, `Dance`
   - Teacher actions: `TeacherExplain`, `TeacherPoint`
+- **MUST (Clip migration):** When migrating legacy `Yes`, `No`, and `Celebrate` names to proposed `Nod`, `ShakeHead`, and `Cheer`, explicitly record and verify the intended mappings (`Yes` → `Nod`, `No` → `ShakeHead`, `Celebrate` → `Cheer`) and update callers in the same migration. These are naming candidates, not proof that the animation contents are equivalent; inspect and adapt each clip before adopting its new name. Until then, preserve existing caller/clip compatibility.
 - **SHOULD:** Author facial expressions incrementally as named shape keys (morph targets) on the facial feature meshes (`Body_Eyes`, `Body_Mouth`, `Body_Eyelashes`) using canonical English names: `Blink`, `Happy`, `Surprised`, `Thoughtful`, `Sad`, `Wink`, `Focused`.
 - **MUST:** Preserve the simplified `:)` facial language in [Art direction](./art-direction.md), avoid complex facial bone rigs, and ensure no morph target sinks behind `Body_Head`.
 
@@ -143,6 +147,10 @@ Check every item that applies to the assets included in the pull request:
 - [ ] Uses the single canonical 34-bone skeleton and exact T-pose rest pose (no body-specific extra bones).
 - [ ] Rigid accessories are `100%` weighted to their target canonical bone (never root-parented static meshes).
 - [ ] Every skinned vertex has `<= 4` normalized weights and deforms cleanly across the available extreme poses (`Idle`, `Walk`, `Sit`, and `RaiseHand` when present).
+- [ ] Existing editable master reused; only necessary fitted variants derived, retaining rig, materials, and design.
+- [ ] Female base silhouette, anatomy, and proportions unchanged in rest and tested poses, including after any weight migration.
+- [ ] Shoulder/seam alignment, sleeves, cuffs, bust/hip clearance, and footwear fit verified across available poses; no clipping or holes at exposed skin, sleeves, or hems.
+- [ ] Only fully occluded body regions hidden; visible skin retained and complete skin geometry preserved.
 - [ ] `shared/` items visually verified on **both** `male` and `female` bodies.
 - [ ] New or refactored base bodies split into semantic English `Body_*` sub-meshes (no `Cube.003` or Spanish names).
 - [ ] Wearable `.glb` contains zero animation clips, zero lights/cameras, zero reference-body meshes, and no importer `Icosphere`.
@@ -153,4 +161,6 @@ Check every item that applies to the assets included in the pull request:
 ## Boundaries and migration notes
 
 - **Product and API contracts remain separate:** Adding a `.glb` under `public/models/avatars/` does not modify backend validation, `AvatarDto`, or shop/inventory contracts; those require explicit coordination under [Avatars and customization](./avatars-and-customization.md) and [API contracts](./api-contracts.md).
+- **Current runtime versus authoring contract:** The current composer supports hair/top composition and their two tint channels (`AvatarHairTint`, `AvatarTopTint`), with no `Body_*` region hiding. It does not yet provide a shared-folder resolver or all-slot tint support. The folder, expanded slot/material, and coverage conventions above are authoring targets, not delivered runtime features. A future runtime slice must explicitly resolve shared versus fitted assets, apply item-specific coverage-safe hiding, and support the corresponding slot/tint channels before those capabilities can be claimed; this documentation change implements none of them.
+- **Pending female rig migration:** Before deleting any of the 7 secondary joints from the legacy 41-joint female rig, reassign their vertex influences to appropriate canonical joints and normalize weights (at most 4 per vertex, none unweighted). Compare rest and animated appearance against the original female base, preserving anatomy and silhouette, then remove secondary joints and re-export/retest bindings and available extreme poses. Do not treat bone deletion alone as a migration or claim that this migration is complete.
 - **Legacy baseline assets:** The existing `public/models/avatars/{male,female}/body.glb` files (`34`/`41` Rigify joints, baked `Pants` and `boots`, over-budget exceptions tracked in `#91`, documented in [student uniforms](../docs/art/student-uniforms.md)) predate this rule. New or refactored base bodies and wearables **MUST** follow this rule and retire those `#91` exceptions as legacy files are replaced.
