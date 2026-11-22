@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { useSessionService, useSessionSnapshot } from '@/session/provider';
 import { useClassroomContext } from '../classrooms/use-classroom-capabilities';
 import type { StudentPurchaseDto } from '../shop/shop-schema';
-import { listShopItems, listShopPurchases } from '../shop/shop-service';
+import { listAllShopItems, listAllShopPurchases } from '../shop/shop-service';
 import { inventoryMessages } from './inventory-messages';
 import {
   getEquipment,
@@ -131,10 +131,10 @@ function InventoryPanelScoped({
       { pageSize: 100, sort: '-createdAt' },
     ),
     queryFn: ({ signal }) =>
-      listShopPurchases(
+      listAllShopPurchases(
         client,
         classroomId,
-        { pageSize: 100, sort: '-createdAt' },
+        { sort: '-createdAt' },
         { signal },
       ),
     enabled: Boolean(userId && classroomId) && isStudent,
@@ -150,7 +150,12 @@ function InventoryPanelScoped({
       CATALOG_PARAMS,
     ),
     queryFn: ({ signal }) =>
-      listShopItems(client, classroomId, CATALOG_PARAMS, { signal }),
+      listAllShopItems(
+        client,
+        classroomId,
+        { sort: CATALOG_PARAMS.sort },
+        { signal },
+      ),
     enabled: Boolean(userId && classroomId) && isStudent,
     retry: false,
   });
@@ -336,11 +341,28 @@ function InventoryPanelScoped({
               purchases={purchasesBySlot[slot]}
               classroomId={classroomId}
               onEquipmentConfirmed={(updated) => {
-                queryClient.setQueryData<EquipmentStateDto>(
-                  equipmentKey,
-                  updated,
-                );
-                void queryClient.invalidateQueries({ queryKey: equipmentKey });
+                void (async () => {
+                  // Drop any in-flight read, then merge ONLY the confirmed
+                  // slot: a response for another slot may land out of order
+                  // and its snapshot must not erase this slot's change.
+                  await queryClient.cancelQueries({ queryKey: equipmentKey });
+                  queryClient.setQueryData<EquipmentStateDto>(
+                    equipmentKey,
+                    (current) =>
+                      current
+                        ? {
+                            ...current,
+                            slots: {
+                              ...current.slots,
+                              [slot]: updated.slots[slot],
+                            },
+                          }
+                        : updated,
+                  );
+                  await queryClient.invalidateQueries({
+                    queryKey: equipmentKey,
+                  });
+                })();
               }}
               onReconcile={() => {
                 void queryClient.invalidateQueries({ queryKey: equipmentKey });

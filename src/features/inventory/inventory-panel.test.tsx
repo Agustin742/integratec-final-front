@@ -3,6 +3,7 @@ import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createApiClient } from '@/api/client';
+import { classroomEquipmentQueryKey } from '@/api/query-keys';
 import { ApiQueryProvider, createAppQueryClient } from '@/api/query-client';
 import { fakeSession } from '@/app/router/fake-session';
 import { SessionProvider } from '@/session/provider';
@@ -18,6 +19,7 @@ import { mswServer } from '@/test/msw/server';
 import { render } from '@/test/render';
 import { inventoryMessages } from './inventory-messages';
 import { InventoryPanel } from './inventory-panel';
+import type { EquipmentStateDto } from './inventory-schema';
 
 const CLASSROOM_ID = '00000000-0000-4000-8000-000000000057';
 const STUDENT_ID = '00000000-0000-4000-8000-000000007001';
@@ -305,6 +307,129 @@ describe('InventoryPanel', () => {
     expect(select.value).toBe('');
     await waitFor(() => {
       expect(store.getCounts().getEquipment).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe('concurrent equips and paging', () => {
+    function lampPurchase(overrides: Partial<ShopStorePurchase> = {}) {
+      return makePurchase({
+        id: '00000000-0000-4000-8000-000000002002',
+        shopItemId: LAMP_ID,
+        shopItemCode: 'desk-lamp',
+        shopItemName: 'Lámpara de escritorio',
+        shopItemKind: 'DESK_UPGRADE',
+        ...overrides,
+      });
+    }
+
+    function optionNames(group: HTMLElement): string[] {
+      return within(group)
+        .queryAllByRole('option')
+        .map((o) => o.textContent ?? '');
+    }
+
+    it('keeps both slots equipped when responses land out of order', async () => {
+      const store = createClassroomEquipmentStore({
+        classroomId: CLASSROOM_ID,
+        itemMetadata: { ...CAP_METADATA, [LAMP_ID]: { slot: 'desk_decor' } },
+        // The head response (stale snapshot without the lamp) lands last.
+        setSlotDelaysMs: { head: 120, desk_decor: 10 },
+        refetchDelayMs: 400,
+        initialPurchases: [makePurchase(), lampPurchase()],
+      });
+      mswServer.use(...store.handlers);
+
+      const { queryClient } = renderInventoryRoute();
+
+      const headGroup = await screen.findByRole('group', { name: 'Cabeza' });
+      const deskGroup = screen.getByRole('group', {
+        name: 'Decoración del escritorio',
+      });
+      fireEvent.change(within(headGroup).getByRole('combobox'), {
+        target: { value: CAP_ID },
+      });
+      fireEvent.change(within(deskGroup).getByRole('combobox'), {
+        target: { value: LAMP_ID },
+      });
+      fireEvent.click(
+        within(headGroup).getByRole('button', {
+          name: inventoryMessages.actions.equip,
+        }),
+      );
+      fireEvent.click(
+        within(deskGroup).getByRole('button', {
+          name: inventoryMessages.actions.equip,
+        }),
+      );
+
+      // Head confirmation is the last response to land.
+      await waitFor(() => {
+        expect(within(headGroup).getByRole('status')).toHaveTextContent(
+          inventoryMessages.states.confirmed,
+        );
+      });
+      expect(
+        within(deskGroup).getByText(
+          `${inventoryMessages.actions.equipped}: Lámpara de escritorio`,
+        ),
+      ).toBeInTheDocument();
+      expect(
+        within(headGroup).getByText(
+          `${inventoryMessages.actions.equipped}: Gorra azul`,
+        ),
+      ).toBeInTheDocument();
+      const cached = queryClient.getQueryData<EquipmentStateDto>(
+        classroomEquipmentQueryKey('student-user-1', CLASSROOM_ID),
+      );
+      expect(cached?.slots.head?.shopItemId).toBe(CAP_ID);
+      expect(cached?.slots.desk_decor?.shopItemId).toBe(LAMP_ID);
+    });
+
+    it('offers a purchase that lives on the second purchases page', async () => {
+      const filler = Array.from({ length: 100 }, (_, i) =>
+        makePurchase({
+          id: `00000000-0000-4000-8000-0000000${String(30000 + i)}`,
+          shopItemId: `00000000-0000-4000-8000-0000000${String(40000 + i)}`,
+          shopItemCode: `filler-${i}`,
+          shopItemName: `Relleno ${i}`,
+        }),
+      );
+      const store = createClassroomEquipmentStore({
+        classroomId: CLASSROOM_ID,
+        itemMetadata: { ...CAP_METADATA, [LAMP_ID]: { slot: 'desk_decor' } },
+        initialPurchases: [...filler, lampPurchase()],
+      });
+      mswServer.use(...store.handlers);
+
+      renderInventoryRoute();
+
+      const deskGroup = await screen.findByRole('group', {
+        name: 'Decoración del escritorio',
+      });
+      await waitFor(() => {
+        expect(optionNames(deskGroup)).toContain('Lámpara de escritorio');
+      });
+    });
+
+    it('resolves the slot of an item that lives on the second catalog page', async () => {
+      const store = createClassroomEquipmentStore({
+        classroomId: CLASSROOM_ID,
+        itemMetadata: { ...CAP_METADATA, [LAMP_ID]: { slot: 'desk_decor' } },
+        pageSizeCap: 1,
+        initialPurchases: [makePurchase(), lampPurchase()],
+      });
+      mswServer.use(...store.handlers);
+
+      renderInventoryRoute();
+
+      const deskGroup = await screen.findByRole('group', {
+        name: 'Decoración del escritorio',
+      });
+      const headGroup = screen.getByRole('group', { name: 'Cabeza' });
+      await waitFor(() => {
+        expect(optionNames(deskGroup)).toContain('Lámpara de escritorio');
+      });
+      expect(optionNames(headGroup)).toContain('Gorra azul');
     });
   });
 
