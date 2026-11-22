@@ -17,19 +17,17 @@ export const inventoryMessages = {
     staleDescription:
       'No pudimos actualizar tu equipamiento. Podés reintentar sin perder tu selección.',
   },
+  slotFallback: 'Otra ranura',
   slots: {
     head: 'Cabeza',
     face: 'Cara',
     back: 'Espalda',
     desk_decor: 'Decoración del escritorio',
-  } as Record<string, string>,
+  } as Readonly<Record<string, string>>,
   actions: {
-    equip: 'Equipar',
     unequip: 'Desequipar',
     equipped: 'Equipado',
     noItem: 'Ranura vacía',
-    selectItem: 'Elegí un artículo para equipar',
-    selectPlaceholder: '— Sin equipar —',
   },
   states: {
     pending: 'Guardando…',
@@ -37,6 +35,7 @@ export const inventoryMessages = {
     rejected: 'No se pudo guardar',
   },
   errors: {
+    loadTitle: 'No se pudo cargar el inventario',
     loadError:
       'No pudimos cargar tu inventario. Revisá tu conexión e intentá de nuevo.',
     loadForbidden:
@@ -56,6 +55,7 @@ export const inventoryMessages = {
       'El servidor devolvió una respuesta inválida. Intentá de nuevo en unos instantes.',
   },
   empty: {
+    slotHint: 'Todavía no tenés artículos para esta ranura',
     title: 'Todavía no tenés artículos comprados',
     description:
       'Cuando compres artículos en la tienda, vas a poder equiparlos acá para personalizar tu avatar y tu escritorio.',
@@ -80,3 +80,13 @@ export const inventoryMessages = {
       'Cuando te inscribas como estudiante en un aula, vas a poder gestionar tu inventario desde acá.',
   },
 } as const;
+
+/**
+ * Human label for a slot key. Falls back to a neutral label so a raw
+ * key (or an inherited object property) never reaches the UI.
+ */
+export function getSlotLabel(slot: string): string {
+  return Object.hasOwn(inventoryMessages.slots, slot)
+    ? inventoryMessages.slots[slot]
+    : inventoryMessages.slotFallback;
+}

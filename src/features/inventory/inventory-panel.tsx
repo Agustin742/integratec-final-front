@@ -1,4 +1,13 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import { ApiError } from '@/api/errors';
@@ -15,11 +24,12 @@ import {
   StaleDataNotice,
 } from '@/components/feedback/states';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { useSessionService, useSessionSnapshot } from '@/session/provider';
 import { useClassroomContext } from '../classrooms/use-classroom-capabilities';
 import type { StudentPurchaseDto } from '../shop/shop-schema';
 import { listAllShopItems, listAllShopPurchases } from '../shop/shop-service';
-import { inventoryMessages } from './inventory-messages';
+import { getSlotLabel, inventoryMessages } from './inventory-messages';
 import {
   getEquipment,
   isUncertainEquipmentError,
@@ -35,10 +45,18 @@ import {
 
 const msgs = inventoryMessages;
 
+/** How long the "Guardado" confirmation stays visible. */
+const CONFIRMATION_VISIBLE_MS = 4000;
+
 const CATALOG_PARAMS = { page: 1, pageSize: 100, sort: 'createdAt' } as const;
 
 export interface InventoryPanelProps {
   readonly classroomId?: string;
+  /**
+   * Moves focus to the heading on mount. Only meant for a standalone route;
+   * leave off when embedded (shop dialog tab, profile) so focus is not stolen.
+   */
+  readonly focusHeadingOnMount?: boolean;
 }
 
 type SlotMutationStatus = 'idle' | 'pending' | 'confirmed' | 'rejected';
@@ -64,6 +82,7 @@ function deduplicatePurchases(
 
 export function InventoryPanel({
   classroomId: explicitClassroomId,
+  focusHeadingOnMount = false,
 }: InventoryPanelProps = {}) {
   const { classroomId: routeClassroomId } = useParams();
   const classroomId = (explicitClassroomId ?? routeClassroomId ?? '').trim();
@@ -76,6 +95,7 @@ export function InventoryPanel({
       key={`${userId ?? 'anon'}:${classroomId || 'unknown'}`}
       classroomId={classroomId}
       userId={userId}
+      focusHeadingOnMount={focusHeadingOnMount}
     />
   );
 }
@@ -83,11 +103,13 @@ export function InventoryPanel({
 interface InventoryPanelScopedProps {
   readonly classroomId: string;
   readonly userId: string | null;
+  readonly focusHeadingOnMount: boolean;
 }
 
 function InventoryPanelScoped({
   classroomId,
   userId,
+  focusHeadingOnMount,
 }: InventoryPanelScopedProps) {
   const { client } = useSessionService();
   const queryClient = useQueryClient();
@@ -97,10 +119,11 @@ function InventoryPanelScoped({
   const isStudent =
     context.status === 'ready' && context.classroom.myRole === 'STUDENT';
 
-  // Focus heading on mount for accessibility
   useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
+    if (focusHeadingOnMount) {
+      headingRef.current?.focus();
+    }
+  }, [focusHeadingOnMount]);
 
   // Evict private equipment cache when student role is absent/revoked
   useEffect(() => {
@@ -193,41 +216,32 @@ function InventoryPanelScoped({
 
   if (context.status === 'pending') {
     return (
-      <div className="flex flex-col gap-4 p-4">
-        <h2 ref={headingRef} className="text-xl font-semibold" tabIndex={-1}>
-          {msgs.panel.heading}
-        </h2>
+      <PanelShell headingRef={headingRef}>
         <LoadingState label={msgs.panel.loading} />
-      </div>
+      </PanelShell>
     );
   }
 
   if (context.status === 'error') {
     return (
-      <div className="flex flex-col gap-4 p-4">
-        <h2 ref={headingRef} className="text-xl font-semibold" tabIndex={-1}>
-          {msgs.panel.heading}
-        </h2>
+      <PanelShell headingRef={headingRef}>
         <ErrorState
-          title={msgs.errors.loadError}
+          title={msgs.errors.loadTitle}
           description={msgs.errors.loadError}
           onRetry={() => context.retry()}
         />
-      </div>
+      </PanelShell>
     );
   }
 
   if (!isStudent) {
     return (
-      <div className="flex flex-col gap-4 p-4">
-        <h2 ref={headingRef} className="text-xl font-semibold" tabIndex={-1}>
-          {msgs.panel.heading}
-        </h2>
+      <PanelShell headingRef={headingRef}>
         <EmptyState
           title={msgs.panel.studentOnlyTitle}
           description={msgs.panel.studentOnlyDescription}
         />
-      </div>
+      </PanelShell>
     );
   }
 
@@ -237,12 +251,9 @@ function InventoryPanelScoped({
     (catalogQuery.isLoading && catalogQuery.data === undefined)
   ) {
     return (
-      <div className="flex flex-col gap-4 p-4">
-        <h2 ref={headingRef} className="text-xl font-semibold" tabIndex={-1}>
-          {msgs.panel.heading}
-        </h2>
+      <PanelShell headingRef={headingRef}>
         <LoadingState label={msgs.panel.loading} />
-      </div>
+      </PanelShell>
     );
   }
 
@@ -256,12 +267,9 @@ function InventoryPanelScoped({
     const userMessage =
       err instanceof ApiError ? err.userMessage : msgs.errors.loadError;
     return (
-      <div className="flex flex-col gap-4 p-4">
-        <h2 ref={headingRef} className="text-xl font-semibold" tabIndex={-1}>
-          {msgs.panel.heading}
-        </h2>
+      <PanelShell headingRef={headingRef}>
         <ErrorState
-          title={msgs.errors.loadError}
+          title={msgs.errors.loadTitle}
           description={userMessage}
           onRetry={() => {
             void equipmentQuery.refetch();
@@ -269,7 +277,7 @@ function InventoryPanelScoped({
             void catalogQuery.refetch();
           }}
         />
-      </div>
+      </PanelShell>
     );
   }
 
@@ -277,29 +285,23 @@ function InventoryPanelScoped({
 
   if (uniquePurchases.length === 0) {
     return (
-      <div className="flex flex-col gap-4 p-4">
-        <h2 ref={headingRef} className="text-xl font-semibold" tabIndex={-1}>
-          {msgs.panel.heading}
-        </h2>
+      <PanelShell headingRef={headingRef}>
         <EmptyState
           title={msgs.empty.title}
           description={msgs.empty.description}
         />
-      </div>
+      </PanelShell>
     );
   }
 
   if (!hasEquipablePurchases) {
     return (
-      <div className="flex flex-col gap-4 p-4">
-        <h2 ref={headingRef} className="text-xl font-semibold" tabIndex={-1}>
-          {msgs.panel.heading}
-        </h2>
+      <PanelShell headingRef={headingRef}>
         <EmptyState
           title={msgs.empty.noEquipableTitle}
           description={msgs.empty.noEquipableDescription}
         />
-      </div>
+      </PanelShell>
     );
   }
 
@@ -309,16 +311,7 @@ function InventoryPanelScoped({
     (catalogQuery.isError && catalogQuery.data !== undefined);
 
   return (
-    <div className="flex flex-col gap-6 p-4">
-      <div className="flex flex-col gap-1">
-        <h2 ref={headingRef} className="text-xl font-semibold" tabIndex={-1}>
-          {msgs.panel.heading}
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          {msgs.panel.description}
-        </p>
-      </div>
-
+    <PanelShell headingRef={headingRef} description={msgs.panel.description}>
       {hasStaleError ? (
         <StaleDataNotice
           title={msgs.panel.staleTitle}
@@ -371,6 +364,36 @@ function InventoryPanelScoped({
           );
         })}
       </div>
+    </PanelShell>
+  );
+}
+
+interface PanelShellProps {
+  readonly headingRef: RefObject<HTMLHeadingElement | null>;
+  readonly description?: string;
+  readonly children: ReactNode;
+}
+
+/**
+ * Single shell for every panel state, so the heading element survives
+ * loading -> ready transitions (focus and reading position are kept).
+ */
+function PanelShell({ headingRef, description, children }: PanelShellProps) {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <h2
+          ref={headingRef}
+          className="font-display text-xl font-semibold text-foreground"
+          tabIndex={-1}
+        >
+          {msgs.panel.heading}
+        </h2>
+        {description ? (
+          <p className="text-sm text-muted-foreground">{description}</p>
+        ) : null}
+      </div>
+      {children}
     </div>
   );
 }
@@ -384,6 +407,40 @@ interface SlotRowProps {
   readonly onReconcile: () => void;
 }
 
+function CheckIcon({ className }: { readonly className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+      className={cn(
+        'size-4 shrink-0 fill-none stroke-current stroke-[3]',
+        className,
+      )}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </svg>
+  );
+}
+
+function AlertIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+      className="size-4 shrink-0 fill-none stroke-current stroke-[2.5]"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7.5v5.5M12 16.5h.01" />
+    </svg>
+  );
+}
+
 function SlotRow({
   slot,
   equippedItem,
@@ -393,25 +450,16 @@ function SlotRow({
   onReconcile,
 }: SlotRowProps) {
   const { client } = useSessionService();
-  const selectId = useId();
-  const labelId = useId();
+  const headingId = useId();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tileRefs = useRef(new Map<string, HTMLButtonElement>());
 
   const [mutationState, setMutationState] = useState<SlotMutationState>({
     status: 'idle',
     errorMessage: null,
   });
-
-  const serverEquippedId = equippedItem?.shopItemId ?? '';
-  const [prevServerEquippedId, setPrevServerEquippedId] =
-    useState<string>(serverEquippedId);
-  const [selectedItemId, setSelectedItemId] =
-    useState<string>(serverEquippedId);
-
-  if (serverEquippedId !== prevServerEquippedId) {
-    setPrevServerEquippedId(serverEquippedId);
-    setSelectedItemId(serverEquippedId);
-  }
+  // Roving tabindex: the tile that currently owns the single tab stop.
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -429,7 +477,10 @@ function SlotRow({
         clearTimeout(timerRef.current);
         timerRef.current = null;
       }
-      setMutationState({ status: 'pending', errorMessage: null });
+      setMutationState({
+        status: 'pending',
+        errorMessage: null,
+      });
     },
     onSuccess: (updatedEquipment) => {
       setMutationState({ status: 'confirmed', errorMessage: null });
@@ -440,120 +491,197 @@ function SlotRow({
             ? { status: 'idle', errorMessage: null }
             : prev,
         );
-      }, 1500);
+      }, CONFIRMATION_VISIBLE_MS);
     },
     onError: (error) => {
+      // The equipped state never changes on error; the message stays until the
+      // next interaction with this slot.
       const userMessage =
         error instanceof ApiError ? error.userMessage : msgs.errors.uncertain;
-      setMutationState({ status: 'rejected', errorMessage: userMessage });
-      // Restore selection to the confirmed server state — equipped state never changes on error
-      setSelectedItemId(equippedItem?.shopItemId ?? '');
+      setMutationState({
+        status: 'rejected',
+        errorMessage: userMessage,
+      });
       if (isUncertainEquipmentError(error)) {
         onReconcile();
       }
     },
   });
 
-  const handleEquip = () => {
-    if (mutationState.status === 'pending' || !selectedItemId) return;
-    mutation.mutate(selectedItemId);
+  const slotLabel = getSlotLabel(slot);
+  const equippedId = equippedItem?.shopItemId ?? null;
+  const isPending = mutationState.status === 'pending';
+
+  const tabStopId =
+    purchases.find((p) => p.shopItemId === activeItemId)?.shopItemId ??
+    purchases.find((p) => p.shopItemId === equippedId)?.shopItemId ??
+    purchases[0]?.shopItemId ??
+    null;
+
+  const handleSelect = (shopItemId: string) => {
+    setActiveItemId(shopItemId);
+    if (isPending || shopItemId === equippedId) return;
+    mutation.mutate(shopItemId);
   };
 
   const handleUnequip = () => {
-    if (mutationState.status === 'pending') return;
+    if (isPending) return;
     mutation.mutate(null);
   };
 
-  const slotLabel = msgs.slots[slot] ?? slot;
-  const isPending = mutationState.status === 'pending';
-  const isRejected = mutationState.status === 'rejected';
-  const isUnchangedSelection =
-    !selectedItemId || selectedItemId === equippedItem?.shopItemId;
+  const handleKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) => {
+    const last = purchases.length - 1;
+    let next: number;
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        next = index === last ? 0 : index + 1;
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        next = index === 0 ? last : index - 1;
+        break;
+      case 'Home':
+        next = 0;
+        break;
+      case 'End':
+        next = last;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    const target = purchases[next];
+    if (!target) return;
+    // Arrow keys only move focus: selecting sends a request, so it stays an
+    // explicit action (Space, Enter or click).
+    setActiveItemId(target.shopItemId);
+    tileRefs.current.get(target.shopItemId)?.focus();
+  };
 
   return (
-    <div
-      className="flex flex-col gap-3 rounded-lg border border-border p-4"
-      role="group"
-      aria-labelledby={labelId}
+    <section
+      aria-labelledby={headingId}
+      className="flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-surface p-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span id={labelId} className="text-sm font-medium">
+        <h3
+          id={headingId}
+          className="font-display text-base font-semibold text-foreground"
+        >
           {slotLabel}
-        </span>
+        </h3>
         {equippedItem ? (
-          <span className="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
-            {msgs.actions.equipped}: {equippedItem.shopItemName}
-          </span>
-        ) : (
-          <span className="text-xs text-muted-foreground">
-            {msgs.actions.noItem}
-          </span>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
-        <div className="flex min-w-0 flex-1 basis-48 flex-col gap-1">
-          <label htmlFor={selectId} className="text-xs text-muted-foreground">
-            {msgs.actions.selectItem}
-          </label>
-          <select
-            id={selectId}
-            className="min-h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            value={selectedItemId}
-            onChange={(e) => setSelectedItemId(e.target.value)}
-            disabled={isPending || purchases.length === 0}
-            aria-label={`${slotLabel}: ${msgs.actions.selectItem}`}
-          >
-            <option value="">{msgs.actions.selectPlaceholder}</option>
-            {purchases.map((p) => (
-              <option key={p.shopItemId} value={p.shopItemId}>
-                {p.shopItemName}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex shrink-0 flex-wrap gap-2">
           <Button
             type="button"
-            onClick={handleEquip}
-            disabled={isPending || isUnchangedSelection}
-            className="min-h-11"
+            variant="outline"
+            size="sm"
+            onClick={handleUnequip}
+            disabled={isPending}
           >
-            {isPending ? msgs.states.pending : msgs.actions.equip}
+            {msgs.actions.unequip}
           </Button>
-          {equippedItem && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleUnequip}
-              disabled={isPending}
-              className="min-h-11"
-            >
-              {msgs.actions.unequip}
-            </Button>
-          )}
-        </div>
+        ) : purchases.length > 0 ? (
+          <span className="text-sm text-muted-foreground">
+            {msgs.actions.noItem}
+          </span>
+        ) : null}
       </div>
 
-      {mutationState.status === 'confirmed' && (
-        <p
-          role="status"
-          aria-live="polite"
-          className="text-xs text-green-600 dark:text-green-400"
+      {purchases.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{msgs.empty.slotHint}</p>
+      ) : (
+        <div
+          role="radiogroup"
+          aria-labelledby={headingId}
+          className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2"
         >
-          {msgs.states.confirmed}
-        </p>
+          {purchases.map((purchase, index) => {
+            const isChecked = purchase.shopItemId === equippedId;
+            return (
+              <button
+                key={purchase.shopItemId}
+                ref={(node) => {
+                  if (node) {
+                    tileRefs.current.set(purchase.shopItemId, node);
+                  } else {
+                    tileRefs.current.delete(purchase.shopItemId);
+                  }
+                }}
+                type="button"
+                role="radio"
+                aria-checked={isChecked}
+                aria-disabled={isPending ? true : undefined}
+                data-item-name={purchase.shopItemName}
+                tabIndex={purchase.shopItemId === tabStopId ? 0 : -1}
+                onClick={() => handleSelect(purchase.shopItemId)}
+                onKeyDown={(event) => handleKeyDown(event, index)}
+                className={cn(
+                  'flex min-h-24 min-w-0 flex-col justify-between gap-2 rounded-xl border-2 p-3 text-left transition-colors focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring aria-disabled:cursor-wait aria-disabled:opacity-70',
+                  isChecked
+                    ? 'border-success-foreground bg-success text-success-foreground'
+                    : 'border-edge bg-card text-card-foreground hover:bg-tray-hover',
+                )}
+              >
+                <span className="flex items-start justify-between gap-2">
+                  <span className="min-w-0 break-words text-sm font-semibold">
+                    {purchase.shopItemName}
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border-2',
+                      isChecked
+                        ? 'border-success-foreground bg-success-foreground text-success'
+                        : 'border-field-border bg-background',
+                    )}
+                  >
+                    {isChecked ? <CheckIcon className="size-3" /> : null}
+                  </span>
+                </span>
+                <span className="flex min-h-5 items-center gap-1 text-sm font-semibold">
+                  {isChecked ? (
+                    <>
+                      <CheckIcon />
+                      {msgs.actions.equipped}
+                    </>
+                  ) : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       )}
-      {isRejected && mutationState.errorMessage && (
-        <p
-          role="alert"
-          aria-live="assertive"
-          className="text-xs text-destructive"
-        >
-          {mutationState.errorMessage}
-        </p>
-      )}
-    </div>
+
+      {/* Always mounted so assistive tech registers it before its text changes. */}
+      <p
+        role="status"
+        className={cn(
+          'flex min-h-5 items-center gap-1.5 text-sm',
+          mutationState.status === 'rejected'
+            ? 'text-destructive'
+            : 'font-semibold text-success-foreground',
+        )}
+      >
+        {mutationState.status === 'pending' ? (
+          <span className="font-normal text-muted-foreground">
+            {msgs.states.pending}
+          </span>
+        ) : mutationState.status === 'confirmed' ? (
+          <>
+            <CheckIcon />
+            {msgs.states.confirmed}
+          </>
+        ) : mutationState.status === 'rejected' ? (
+          <>
+            <AlertIcon />
+            {mutationState.errorMessage}
+          </>
+        ) : null}
+      </p>
+    </section>
   );
 }

@@ -9,6 +9,10 @@ const userId = '00000000-0000-4000-8000-000000000001';
 const classroomId = '00000000-0000-4000-8000-000000000057';
 const capId = '00000000-0000-4000-8000-000000001001';
 const lampId = '00000000-0000-4000-8000-000000001002';
+const strawHatId = '00000000-0000-4000-8000-000000001003';
+const glassesId = '00000000-0000-4000-8000-000000001004';
+const backpackId = '00000000-0000-4000-8000-000000001005';
+const plantId = '00000000-0000-4000-8000-000000001006';
 const syntheticNow = '2026-11-20T12:00:00.000Z';
 
 type ClassroomContext = components['schemas']['ClassroomContextResponseDto'];
@@ -47,32 +51,95 @@ const classroomContext: ClassroomContext = {
   updatedAt: syntheticNow,
 };
 
-const purchases: StudentPurchase[] = [
+interface OwnedItem {
+  readonly id: string;
+  readonly code: string;
+  readonly name: string;
+  readonly kind: 'AVATAR_ACCESSORY' | 'DESK_UPGRADE';
+  readonly slot: 'head' | 'face' | 'back' | 'desk_decor';
+  readonly price: number;
+}
+
+const ownedItems: readonly OwnedItem[] = [
   {
-    id: '00000000-0000-4000-8000-000000002001',
-    classroomId,
-    studentId: userId,
-    shopItemId: capId,
-    shopItemCode: 'cap-blue',
-    shopItemName: 'Gorra escolar azul',
-    shopItemKind: 'AVATAR_ACCESSORY',
-    pointTransactionId: '00000000-0000-4000-8000-000000003001',
-    pricePaid: 100,
-    createdAt: syntheticNow,
+    id: capId,
+    code: 'cap-blue',
+    name: 'Gorra escolar azul',
+    kind: 'AVATAR_ACCESSORY',
+    slot: 'head',
+    price: 100,
   },
   {
-    id: '00000000-0000-4000-8000-000000002002',
-    classroomId,
-    studentId: userId,
-    shopItemId: lampId,
-    shopItemCode: 'desk-lamp',
-    shopItemName: 'Lámpara de escritorio',
-    shopItemKind: 'DESK_UPGRADE',
-    pointTransactionId: '00000000-0000-4000-8000-000000003002',
-    pricePaid: 140,
-    createdAt: syntheticNow,
+    id: strawHatId,
+    code: 'straw-hat',
+    name: 'Sombrero de paja',
+    kind: 'AVATAR_ACCESSORY',
+    slot: 'head',
+    price: 120,
+  },
+  {
+    id: glassesId,
+    code: 'round-glasses',
+    name: 'Lentes redondos',
+    kind: 'AVATAR_ACCESSORY',
+    slot: 'face',
+    price: 90,
+  },
+  {
+    id: backpackId,
+    code: 'green-backpack',
+    name: 'Mochila verde',
+    kind: 'AVATAR_ACCESSORY',
+    slot: 'back',
+    price: 150,
+  },
+  {
+    id: lampId,
+    code: 'desk-lamp',
+    name: 'Lámpara de escritorio',
+    kind: 'DESK_UPGRADE',
+    slot: 'desk_decor',
+    price: 140,
+  },
+  {
+    id: plantId,
+    code: 'desk-plant',
+    name: 'Planta de escritorio',
+    kind: 'DESK_UPGRADE',
+    slot: 'desk_decor',
+    price: 80,
   },
 ];
+
+const purchases: StudentPurchase[] = ownedItems.map((item, index) => ({
+  id: `00000000-0000-4000-8000-00000000200${String(index + 1)}`,
+  classroomId,
+  studentId: userId,
+  shopItemId: item.id,
+  shopItemCode: item.code,
+  shopItemName: item.name,
+  shopItemKind: item.kind,
+  pointTransactionId: `00000000-0000-4000-8000-00000000300${String(index + 1)}`,
+  pricePaid: item.price,
+  createdAt: syntheticNow,
+}));
+
+// The slot each item fits comes from the catalog metadata, like in the back.
+const catalogItems: components['schemas']['ShopCatalogItemDto'][] =
+  ownedItems.map((item) => ({
+    id: item.id,
+    code: item.code,
+    name: item.name,
+    description: '',
+    kind: item.kind,
+    price: item.price,
+    isImplemented: true,
+    isPurchasable: true,
+    ownedByStudent: true,
+    ownedByClassroom: false,
+    metadata: { slot: item.slot },
+    createdAt: syntheticNow,
+  }));
 
 async function attachRuntimeMonitors(page: Page) {
   const cspViolations: string[] = [];
@@ -206,10 +273,10 @@ async function mockAuthAndClassroom(
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          items: [],
+          items: catalogItems,
           page: 1,
-          pageSize: 12,
-          total: 0,
+          pageSize: 100,
+          total: catalogItems.length,
         }),
       });
       return;
@@ -304,16 +371,22 @@ async function captureEvidenceIfRequested(
   testInfo: TestInfo,
   name: string,
 ) {
-  if (testInfo.project.name.includes('desktop')) {
-    await page.screenshot({
-      path: `docs/assets/inventory/${name}-1280.png`,
-      fullPage: true,
-    });
-  } else if (testInfo.project.name.includes('mobile')) {
-    await page.screenshot({
-      path: `docs/assets/inventory/${name}-360.png`,
-      fullPage: true,
-    });
+  const suffix = testInfo.project.name.includes('desktop')
+    ? '1280'
+    : testInfo.project.name.includes('mobile')
+      ? '360'
+      : null;
+  if (suffix === null) return;
+  // The dialog scrolls internally; grow the viewport so the whole panel shows.
+  const original = page.viewportSize();
+  if (original) {
+    await page.setViewportSize({ width: original.width, height: 2400 });
+  }
+  await page.getByRole('dialog').screenshot({
+    path: `docs/assets/inventory/${name}-${suffix}.png`,
+  });
+  if (original) {
+    await page.setViewportSize(original);
   }
 }
 
@@ -345,48 +418,51 @@ test('student equips, unequips, and handles 403 rejection in workspace shop inve
   await expect(inventoryTab).toBeVisible();
   await inventoryTab.click();
 
-  const headGroup = page.getByRole('group', {
+  const headGroup = page.getByRole('radiogroup', {
     name: inventoryMessages.slots.head,
   });
   await expect(headGroup).toBeVisible();
 
   // Equip cap in head slot
-  await headGroup.getByRole('combobox').selectOption(capId);
-  await headGroup
-    .getByRole('button', { name: inventoryMessages.actions.equip })
-    .click();
+  const cap = headGroup.getByRole('radio', { name: /Gorra escolar azul/ });
+  await cap.click();
 
+  await expect(cap).toHaveAttribute('aria-checked', 'true');
+  await expect(cap).toContainText(inventoryMessages.actions.equipped);
   await expect(
-    headGroup.getByText(
-      `${inventoryMessages.actions.equipped}: Gorra escolar azul`,
-    ),
-  ).toBeVisible();
+    page.getByRole('region', { name: inventoryMessages.slots.head }),
+  ).toContainText(inventoryMessages.states.confirmed);
   await assertNoHorizontalOverflow(page);
   await captureEvidenceIfRequested(page, testInfo, 'inventory');
 
   // 403 rejection leaves equipped state unchanged
   state.rejectNextPutWith403 = true;
-  const deskGroup = page.getByRole('group', {
+  const deskSection = page.getByRole('region', {
     name: inventoryMessages.slots.desk_decor,
   });
-  await deskGroup.getByRole('combobox').selectOption(lampId);
-  await deskGroup
-    .getByRole('button', { name: inventoryMessages.actions.equip })
-    .click();
+  const lamp = deskSection.getByRole('radio', {
+    name: /Lámpara de escritorio/,
+  });
+  await lamp.click();
 
-  await expect(deskGroup.getByRole('alert')).toContainText(
+  await expect(deskSection.getByRole('status')).toContainText(
     inventoryMessages.errors.notOwned,
   );
+  await expect(lamp).toHaveAttribute('aria-checked', 'false');
   await expect(
-    deskGroup.getByText(inventoryMessages.actions.noItem),
+    deskSection.getByText(inventoryMessages.actions.noItem),
   ).toBeVisible();
 
   // Unequip cap
-  await headGroup
+  const headSection = page.getByRole('region', {
+    name: inventoryMessages.slots.head,
+  });
+  await headSection
     .getByRole('button', { name: inventoryMessages.actions.unequip })
     .click();
+  await expect(cap).toHaveAttribute('aria-checked', 'false');
   await expect(
-    headGroup.getByText(inventoryMessages.actions.noItem),
+    headSection.getByText(inventoryMessages.actions.noItem),
   ).toBeVisible();
 
   expect(cspViolations).toEqual([]);

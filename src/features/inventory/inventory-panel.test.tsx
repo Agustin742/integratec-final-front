@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
@@ -17,7 +18,7 @@ import {
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
 import { render } from '@/test/render';
-import { inventoryMessages } from './inventory-messages';
+import { getSlotLabel, inventoryMessages } from './inventory-messages';
 import { InventoryPanel } from './inventory-panel';
 import type { EquipmentStateDto } from './inventory-schema';
 
@@ -52,6 +53,7 @@ function makePurchase(
 function renderInventoryRoute(
   options: {
     readonly role?: 'STUDENT' | 'TEACHER' | 'PARENT';
+    readonly panelProps?: ComponentProps<typeof InventoryPanel>;
   } = {},
 ) {
   const role = options.role ?? 'STUDENT';
@@ -81,7 +83,7 @@ function renderInventoryRoute(
     [
       {
         path: '/classrooms/:classroomId',
-        element: <InventoryPanel />,
+        element: <InventoryPanel {...options.panelProps} />,
       },
     ],
     { initialEntries: [`/classrooms/${CLASSROOM_ID}`] },
@@ -143,191 +145,454 @@ describe('InventoryPanel', () => {
     await expectAccessible(view.container);
   });
 
-  it('equips and unequips a purchased item with pending and confirmed states', async () => {
-    const store = createClassroomEquipmentStore({
-      classroomId: CLASSROOM_ID,
-      itemMetadata: { ...CAP_METADATA, [LAMP_ID]: { slot: 'desk_decor' } },
-      setSlotDelayMs: 40,
-      initialPurchases: [
-        makePurchase(),
-        makePurchase({
-          id: '00000000-0000-4000-8000-000000002002',
-          shopItemId: LAMP_ID,
-          shopItemCode: 'desk-lamp',
-          shopItemName: 'Lámpara de escritorio',
-          shopItemKind: 'DESK_UPGRADE',
-        }),
-      ],
+  function tiles(group: HTMLElement): HTMLElement[] {
+    return within(group).queryAllByRole('radio');
+  }
+
+  function tileNames(group: HTMLElement): string[] {
+    return tiles(group).map((tile) => tile.dataset.itemName ?? '');
+  }
+
+  function tile(group: HTMLElement, name: string): HTMLElement {
+    const found = tiles(group).find((t) => t.dataset.itemName === name);
+    if (!found) {
+      throw new Error(`No tile named ${name}`);
+    }
+    return found;
+  }
+
+  function slotSection(group: HTMLElement): HTMLElement {
+    return group.closest('section') as HTMLElement;
+  }
+
+  function lampPurchase(overrides: Partial<ShopStorePurchase> = {}) {
+    return makePurchase({
+      id: '00000000-0000-4000-8000-000000002002',
+      shopItemId: LAMP_ID,
+      shopItemCode: 'desk-lamp',
+      shopItemName: 'Lámpara de escritorio',
+      shopItemKind: 'DESK_UPGRADE',
+      ...overrides,
     });
-    mswServer.use(...store.handlers);
+  }
 
-    const { view } = renderInventoryRoute();
-
-    const headGroup = await screen.findByRole('group', { name: 'Cabeza' });
-    const select = within(headGroup).getByRole('combobox');
-    fireEvent.change(select, { target: { value: CAP_ID } });
-
-    const equipButton = within(headGroup).getByRole('button', {
-      name: inventoryMessages.actions.equip,
+  function glassesPurchase() {
+    return makePurchase({
+      id: '00000000-0000-4000-8000-000000002003',
+      shopItemId: GLASSES_ID,
+      shopItemCode: 'glasses-star',
+      shopItemName: 'Lentes estrella',
     });
-    fireEvent.click(equipButton);
+  }
 
-    // Pending state shown while request is in flight
-    expect(
-      await within(headGroup).findByRole('button', {
-        name: inventoryMessages.states.pending,
-      }),
-    ).toBeDisabled();
+  const EQUIPPED_CAP = {
+    head: {
+      slot: 'head',
+      shopItemId: CAP_ID,
+      shopItemCode: 'cap-blue',
+      shopItemName: 'Gorra azul',
+      kind: 'AVATAR_ACCESSORY',
+    },
+  } as const;
 
-    // Confirmed state + equipped badge
-    expect(await within(headGroup).findByRole('status')).toHaveTextContent(
-      inventoryMessages.states.confirmed,
-    );
-    expect(
-      within(headGroup).getByText(
-        `${inventoryMessages.actions.equipped}: Gorra azul`,
-      ),
-    ).toBeInTheDocument();
-    expect(store.getSlots().head?.shopItemId).toBe(CAP_ID);
+  describe('grid selector', () => {
+    it('renders one named radiogroup per slot with the owned items as radio tiles', async () => {
+      const store = createClassroomEquipmentStore({
+        classroomId: CLASSROOM_ID,
+        itemMetadata: {
+          ...CAP_METADATA,
+          [GLASSES_ID]: { slot: 'head' },
+          [LAMP_ID]: { slot: 'desk_decor' },
+        },
+        initialPurchases: [makePurchase(), glassesPurchase(), lampPurchase()],
+      });
+      mswServer.use(...store.handlers);
 
-    // Unequip flow
-    const unequipButton = within(headGroup).getByRole('button', {
-      name: inventoryMessages.actions.unequip,
-    });
-    fireEvent.click(unequipButton);
+      const { view } = renderInventoryRoute();
 
-    await waitFor(() => {
+      const headGroup = await screen.findByRole('radiogroup', {
+        name: 'Cabeza',
+      });
+      expect(screen.getAllByRole('radiogroup')).toHaveLength(2);
       expect(
-        within(headGroup).getByText(inventoryMessages.actions.noItem),
+        screen.getByRole('radiogroup', { name: 'Decoración del escritorio' }),
+      ).toBeInTheDocument();
+      expect(tileNames(headGroup)).toEqual(['Gorra azul', 'Lentes estrella']);
+      expect(screen.queryByRole('combobox')).toBeNull();
+      expect(screen.queryByRole('option')).toBeNull();
+      await expectAccessible(view.container);
+    });
+
+    it('equips a tile on selection with a pending tile, then marks it checked with "Equipado"', async () => {
+      const store = createClassroomEquipmentStore({
+        classroomId: CLASSROOM_ID,
+        itemMetadata: CAP_METADATA,
+        setSlotDelayMs: 40,
+        initialPurchases: [makePurchase()],
+      });
+      mswServer.use(...store.handlers);
+
+      renderInventoryRoute();
+
+      const headGroup = await screen.findByRole('radiogroup', {
+        name: 'Cabeza',
+      });
+      const cap = tile(headGroup, 'Gorra azul');
+      expect(cap).toHaveAttribute('aria-checked', 'false');
+      expect(
+        within(headGroup).queryByText(inventoryMessages.actions.equipped),
+      ).toBeNull();
+
+      fireEvent.click(cap);
+
+      // One request per selection; further selections are ignored while pending
+      // but the tile stays focusable (aria-disabled, not disabled).
+      await waitFor(() => {
+        expect(cap).toHaveAttribute('aria-disabled', 'true');
+      });
+      expect(
+        within(slotSection(headGroup)).getByRole('status'),
+      ).toHaveTextContent(inventoryMessages.states.pending);
+      fireEvent.click(cap);
+
+      await waitFor(() => {
+        expect(cap).toHaveAttribute('aria-checked', 'true');
+      });
+      expect(cap).not.toHaveAttribute('aria-disabled', 'true');
+      expect(
+        within(cap).getByText(inventoryMessages.actions.equipped),
+      ).toBeInTheDocument();
+      expect(store.getSlots().head?.shopItemId).toBe(CAP_ID);
+      expect(store.getCounts().setSlot).toBe(1);
+    });
+
+    it('renders each tile as a native button so Space and Enter activate it', async () => {
+      const store = createClassroomEquipmentStore({
+        classroomId: CLASSROOM_ID,
+        itemMetadata: CAP_METADATA,
+        initialPurchases: [makePurchase()],
+      });
+      mswServer.use(...store.handlers);
+
+      renderInventoryRoute();
+
+      const headGroup = await screen.findByRole('radiogroup', {
+        name: 'Cabeza',
+      });
+      const cap = tile(headGroup, 'Gorra azul');
+      expect(cap.tagName).toBe('BUTTON');
+      expect(cap).toHaveAttribute('type', 'button');
+    });
+
+    it('uses a roving tabindex and moves focus with the arrow keys without equipping', async () => {
+      const store = createClassroomEquipmentStore({
+        classroomId: CLASSROOM_ID,
+        itemMetadata: { ...CAP_METADATA, [GLASSES_ID]: { slot: 'head' } },
+        initialPurchases: [makePurchase(), glassesPurchase()],
+        initialSlots: {
+          head: {
+            slot: 'head',
+            shopItemId: GLASSES_ID,
+            shopItemCode: 'glasses-star',
+            shopItemName: 'Lentes estrella',
+            kind: 'AVATAR_ACCESSORY',
+          },
+        },
+      });
+      mswServer.use(...store.handlers);
+
+      renderInventoryRoute();
+
+      const headGroup = await screen.findByRole('radiogroup', {
+        name: 'Cabeza',
+      });
+      const cap = tile(headGroup, 'Gorra azul');
+      const glasses = tile(headGroup, 'Lentes estrella');
+      // The equipped tile is the single tab stop.
+      expect(glasses).toHaveAttribute('tabindex', '0');
+      expect(cap).toHaveAttribute('tabindex', '-1');
+
+      glasses.focus();
+      fireEvent.keyDown(glasses, { key: 'ArrowRight' });
+      // Wraps around to the first tile.
+      expect(cap).toHaveFocus();
+      expect(cap).toHaveAttribute('tabindex', '0');
+      expect(glasses).toHaveAttribute('tabindex', '-1');
+      fireEvent.keyDown(cap, { key: 'ArrowLeft' });
+      expect(glasses).toHaveFocus();
+      fireEvent.keyDown(glasses, { key: 'Home' });
+      expect(cap).toHaveFocus();
+      fireEvent.keyDown(cap, { key: 'End' });
+      expect(glasses).toHaveFocus();
+
+      expect(store.getCounts().setSlot).toBe(0);
+      expect(store.getSlots().head?.shopItemId).toBe(GLASSES_ID);
+    });
+
+    it('unequips with the explicit "Desequipar" action, shown only when something is equipped', async () => {
+      const store = createClassroomEquipmentStore({
+        classroomId: CLASSROOM_ID,
+        itemMetadata: CAP_METADATA,
+        initialPurchases: [makePurchase()],
+        initialSlots: { ...EQUIPPED_CAP },
+      });
+      mswServer.use(...store.handlers);
+
+      renderInventoryRoute();
+
+      const headGroup = await screen.findByRole('radiogroup', {
+        name: 'Cabeza',
+      });
+      const headSection = slotSection(headGroup);
+      expect(tile(headGroup, 'Gorra azul')).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
+      expect(screen.getAllByRole('button')).toHaveLength(1);
+
+      fireEvent.click(
+        within(headSection).getByRole('button', {
+          name: inventoryMessages.actions.unequip,
+        }),
+      );
+
+      await waitFor(() => {
+        expect(tile(headGroup, 'Gorra azul')).toHaveAttribute(
+          'aria-checked',
+          'false',
+        );
+      });
+      expect(store.getSlots().head).toBeNull();
+      expect(
+        within(headSection).queryByRole('button', {
+          name: inventoryMessages.actions.unequip,
+        }),
+      ).toBeNull();
+      expect(
+        within(headSection).getByText(inventoryMessages.actions.noItem),
       ).toBeInTheDocument();
     });
-    expect(store.getSlots().head).toBeNull();
-    await expectAccessible(view.container);
-  });
 
-  it('shows 403 error for unowned item and leaves equipped state unchanged', async () => {
-    const store = createClassroomEquipmentStore({
-      classroomId: CLASSROOM_ID,
-      itemMetadata: { ...CAP_METADATA, [GLASSES_ID]: { slot: 'head' } },
-      initialPurchases: [
-        makePurchase(),
-        makePurchase({
-          id: '00000000-0000-4000-8000-000000002003',
-          shopItemId: GLASSES_ID,
-          shopItemCode: 'glasses-star',
-          shopItemName: 'Lentes estrella',
-          shopItemKind: 'AVATAR_ACCESSORY',
-        }),
-      ],
-      initialSlots: {
-        head: {
-          slot: 'head',
-          shopItemId: CAP_ID,
-          shopItemCode: 'cap-blue',
-          shopItemName: 'Gorra azul',
-          kind: 'AVATAR_ACCESSORY',
+    it('shows a hint instead of controls when a slot has no owned items', async () => {
+      const store = createClassroomEquipmentStore({
+        classroomId: CLASSROOM_ID,
+        itemMetadata: CAP_METADATA,
+        initialPurchases: [makePurchase()],
+      });
+      mswServer.use(...store.handlers);
+
+      renderInventoryRoute();
+
+      await screen.findByRole('radiogroup', { name: 'Cabeza' });
+      expect(screen.getAllByRole('radiogroup')).toHaveLength(1);
+      expect(
+        screen.getAllByText(inventoryMessages.empty.slotHint),
+      ).toHaveLength(3);
+      expect(screen.getByRole('heading', { name: 'Cara' })).toBeInTheDocument();
+    });
+
+    it('keeps the live region mounted and announces the confirmation, then clears it', async () => {
+      const store = createClassroomEquipmentStore({
+        classroomId: CLASSROOM_ID,
+        itemMetadata: CAP_METADATA,
+        initialPurchases: [makePurchase()],
+      });
+      mswServer.use(...store.handlers);
+
+      renderInventoryRoute();
+
+      const headGroup = await screen.findByRole('radiogroup', {
+        name: 'Cabeza',
+      });
+      const section = slotSection(headGroup);
+      const region = within(section).getByRole('status');
+      expect(region).toBeEmptyDOMElement();
+
+      fireEvent.click(tile(headGroup, 'Gorra azul'));
+
+      await waitFor(() => {
+        expect(region).toHaveTextContent(inventoryMessages.states.confirmed);
+      });
+      // The same node is updated, never unmounted.
+      expect(within(section).getByRole('status')).toBe(region);
+      expect(region).not.toHaveAttribute('aria-live');
+      expect(region).not.toHaveAttribute('aria-label');
+
+      await waitFor(
+        () => {
+          expect(region).toBeEmptyDOMElement();
         },
-      },
+        { timeout: 6000 },
+      );
+    }, 10000);
+
+    it('announces the rejection in the same live region and keeps it until the next interaction', async () => {
+      const store = createClassroomEquipmentStore({
+        classroomId: CLASSROOM_ID,
+        itemMetadata: { ...CAP_METADATA, [GLASSES_ID]: { slot: 'head' } },
+        initialPurchases: [makePurchase(), glassesPurchase()],
+        initialSlots: { ...EQUIPPED_CAP },
+      });
+      mswServer.use(...store.handlers);
+
+      renderInventoryRoute();
+
+      const headGroup = await screen.findByRole('radiogroup', {
+        name: 'Cabeza',
+      });
+      const section = slotSection(headGroup);
+      const region = within(section).getByRole('status');
+      store.failNext('setSlot', {
+        status: 403,
+        body: {
+          code: 'FORBIDDEN',
+          message: 'Item not owned',
+          correlationId: 'req-403-not-owned',
+        },
+      });
+
+      fireEvent.click(tile(headGroup, 'Lentes estrella'));
+
+      await waitFor(() => {
+        expect(region).toHaveTextContent(inventoryMessages.errors.notOwned);
+      });
+      expect(within(section).getByRole('status')).toBe(region);
+      expect(within(section).queryByRole('alert')).toBeNull();
+      // Equipped state is unchanged.
+      expect(tile(headGroup, 'Gorra azul')).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
+      expect(tile(headGroup, 'Lentes estrella')).toHaveAttribute(
+        'aria-checked',
+        'false',
+      );
+      expect(store.getSlots().head?.shopItemId).toBe(CAP_ID);
+
+      // Next interaction replaces the message.
+      fireEvent.click(tile(headGroup, 'Lentes estrella'));
+      await waitFor(() => {
+        expect(region).toHaveTextContent(inventoryMessages.states.confirmed);
+      });
+      expect(region).not.toHaveTextContent(inventoryMessages.errors.notOwned);
     });
-    mswServer.use(...store.handlers);
 
-    renderInventoryRoute();
+    it('handles an uncertain 500 without changing the equipped state and reconciles', async () => {
+      const store = createClassroomEquipmentStore({
+        classroomId: CLASSROOM_ID,
+        itemMetadata: CAP_METADATA,
+        initialPurchases: [makePurchase()],
+      });
+      mswServer.use(...store.handlers);
 
-    const headGroup = await screen.findByRole('group', { name: 'Cabeza' });
-    expect(
-      within(headGroup).getByText(
-        `${inventoryMessages.actions.equipped}: Gorra azul`,
-      ),
-    ).toBeInTheDocument();
+      renderInventoryRoute();
 
-    // Simulate server rejecting with 403 (e.g. item not owned)
-    store.failNext('setSlot', {
-      status: 403,
-      body: {
-        code: 'FORBIDDEN',
-        message: 'Item not owned',
-        correlationId: 'req-403-not-owned',
-      },
+      const headGroup = await screen.findByRole('radiogroup', {
+        name: 'Cabeza',
+      });
+      store.failNext('setSlot', {
+        status: 500,
+        body: {
+          code: 'INTERNAL_ERROR',
+          message: 'Server error',
+          correlationId: 'req-500',
+        },
+      });
+      fireEvent.click(tile(headGroup, 'Gorra azul'));
+
+      const section = slotSection(headGroup);
+      await waitFor(() => {
+        expect(within(section).getByRole('status')).toHaveTextContent(
+          inventoryMessages.errors.uncertain,
+        );
+      });
+      expect(tile(headGroup, 'Gorra azul')).toHaveAttribute(
+        'aria-checked',
+        'false',
+      );
+      expect(
+        within(section).getByText(inventoryMessages.actions.noItem),
+      ).toBeInTheDocument();
+      await waitFor(() => {
+        expect(store.getCounts().getEquipment).toBeGreaterThanOrEqual(2);
+      });
     });
 
-    const select = within(headGroup).getByRole('combobox') as HTMLSelectElement;
-    fireEvent.change(select, { target: { value: GLASSES_ID } });
-    fireEvent.click(
-      within(headGroup).getByRole('button', {
-        name: inventoryMessages.actions.equip,
-      }),
+    it.each([
+      [409, 'CONFLICT', inventoryMessages.errors.conflict],
+      [404, 'NOT_FOUND', inventoryMessages.errors.notFound],
+      [429, 'TOO_MANY_REQUESTS', inventoryMessages.errors.rateLimited],
+    ] as const)(
+      'shows the right message when the equip endpoint answers %i',
+      async (status, code, message) => {
+        const store = createClassroomEquipmentStore({
+          classroomId: CLASSROOM_ID,
+          itemMetadata: CAP_METADATA,
+          initialPurchases: [makePurchase()],
+        });
+        mswServer.use(...store.handlers);
+
+        renderInventoryRoute();
+
+        const headGroup = await screen.findByRole('radiogroup', {
+          name: 'Cabeza',
+        });
+        store.failNext('setSlot', {
+          status,
+          body: { code, message: 'rejected', correlationId: `req-${status}` },
+        });
+        fireEvent.click(tile(headGroup, 'Gorra azul'));
+
+        await waitFor(() => {
+          expect(
+            within(slotSection(headGroup)).getByRole('status'),
+          ).toHaveTextContent(message);
+        });
+        expect(store.getSlots().head).toBeNull();
+      },
     );
-
-    const alert = await within(headGroup).findByRole('alert');
-    expect(alert).toHaveTextContent(inventoryMessages.errors.notOwned);
-
-    // Equipped state remains Gorra azul and select reverts to confirmed CAP_ID
-    expect(
-      within(headGroup).getByText(
-        `${inventoryMessages.actions.equipped}: Gorra azul`,
-      ),
-    ).toBeInTheDocument();
-    expect(select.value).toBe(CAP_ID);
-    expect(store.getSlots().head?.shopItemId).toBe(CAP_ID);
   });
 
-  it('handles uncertain 500 error without changing equipped state and reconciles', async () => {
-    const store = createClassroomEquipmentStore({
-      classroomId: CLASSROOM_ID,
-      itemMetadata: CAP_METADATA,
-      initialPurchases: [makePurchase()],
-    });
-    mswServer.use(...store.handlers);
+  describe('focus', () => {
+    it('does not steal focus on mount when embedded (shop dialog tab)', async () => {
+      const store = createClassroomEquipmentStore({
+        classroomId: CLASSROOM_ID,
+        itemMetadata: CAP_METADATA,
+        initialPurchases: [makePurchase()],
+      });
+      mswServer.use(...store.handlers);
 
-    renderInventoryRoute();
+      renderInventoryRoute({ panelProps: { classroomId: CLASSROOM_ID } });
 
-    const headGroup = await screen.findByRole('group', { name: 'Cabeza' });
-    store.failNext('setSlot', {
-      status: 500,
-      body: {
-        code: 'INTERNAL_ERROR',
-        message: 'Server error',
-        correlationId: 'req-500',
-      },
+      await screen.findByRole('radiogroup', { name: 'Cabeza' });
+      expect(
+        screen.getByRole('heading', { name: inventoryMessages.panel.heading }),
+      ).not.toHaveFocus();
+      expect(document.body).toHaveFocus();
     });
 
-    const select = within(headGroup).getByRole('combobox') as HTMLSelectElement;
-    fireEvent.change(select, { target: { value: CAP_ID } });
-    fireEvent.click(
-      within(headGroup).getByRole('button', {
-        name: inventoryMessages.actions.equip,
-      }),
-    );
+    it('focuses the heading on mount only when asked to (standalone route)', async () => {
+      const store = createClassroomEquipmentStore({
+        classroomId: CLASSROOM_ID,
+        itemMetadata: CAP_METADATA,
+        initialPurchases: [makePurchase()],
+      });
+      mswServer.use(...store.handlers);
 
-    const alert = await within(headGroup).findByRole('alert');
-    expect(alert).toHaveTextContent(inventoryMessages.errors.uncertain);
-    expect(
-      within(headGroup).getByText(inventoryMessages.actions.noItem),
-    ).toBeInTheDocument();
-    expect(select.value).toBe('');
-    await waitFor(() => {
-      expect(store.getCounts().getEquipment).toBeGreaterThanOrEqual(2);
+      renderInventoryRoute({ panelProps: { focusHeadingOnMount: true } });
+
+      await screen.findByRole('radiogroup', { name: 'Cabeza' });
+      await waitFor(() => {
+        expect(
+          screen.getByRole('heading', {
+            name: inventoryMessages.panel.heading,
+          }),
+        ).toHaveFocus();
+      });
     });
   });
 
   describe('concurrent equips and paging', () => {
-    function lampPurchase(overrides: Partial<ShopStorePurchase> = {}) {
-      return makePurchase({
-        id: '00000000-0000-4000-8000-000000002002',
-        shopItemId: LAMP_ID,
-        shopItemCode: 'desk-lamp',
-        shopItemName: 'Lámpara de escritorio',
-        shopItemKind: 'DESK_UPGRADE',
-        ...overrides,
-      });
-    }
-
-    function optionNames(group: HTMLElement): string[] {
-      return within(group)
-        .queryAllByRole('option')
-        .map((o) => o.textContent ?? '');
-    }
-
     it('keeps both slots equipped when responses land out of order', async () => {
       const store = createClassroomEquipmentStore({
         classroomId: CLASSROOM_ID,
@@ -341,43 +606,29 @@ describe('InventoryPanel', () => {
 
       const { queryClient } = renderInventoryRoute();
 
-      const headGroup = await screen.findByRole('group', { name: 'Cabeza' });
-      const deskGroup = screen.getByRole('group', {
+      const headGroup = await screen.findByRole('radiogroup', {
+        name: 'Cabeza',
+      });
+      const deskGroup = screen.getByRole('radiogroup', {
         name: 'Decoración del escritorio',
       });
-      fireEvent.change(within(headGroup).getByRole('combobox'), {
-        target: { value: CAP_ID },
-      });
-      fireEvent.change(within(deskGroup).getByRole('combobox'), {
-        target: { value: LAMP_ID },
-      });
-      fireEvent.click(
-        within(headGroup).getByRole('button', {
-          name: inventoryMessages.actions.equip,
-        }),
-      );
-      fireEvent.click(
-        within(deskGroup).getByRole('button', {
-          name: inventoryMessages.actions.equip,
-        }),
-      );
+      fireEvent.click(tile(headGroup, 'Gorra azul'));
+      fireEvent.click(tile(deskGroup, 'Lámpara de escritorio'));
 
       // Head confirmation is the last response to land.
       await waitFor(() => {
-        expect(within(headGroup).getByRole('status')).toHaveTextContent(
-          inventoryMessages.states.confirmed,
-        );
+        expect(
+          within(slotSection(headGroup)).getByRole('status'),
+        ).toHaveTextContent(inventoryMessages.states.confirmed);
       });
-      expect(
-        within(deskGroup).getByText(
-          `${inventoryMessages.actions.equipped}: Lámpara de escritorio`,
-        ),
-      ).toBeInTheDocument();
-      expect(
-        within(headGroup).getByText(
-          `${inventoryMessages.actions.equipped}: Gorra azul`,
-        ),
-      ).toBeInTheDocument();
+      expect(tile(deskGroup, 'Lámpara de escritorio')).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
+      expect(tile(headGroup, 'Gorra azul')).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
       const cached = queryClient.getQueryData<EquipmentStateDto>(
         classroomEquipmentQueryKey('student-user-1', CLASSROOM_ID),
       );
@@ -403,11 +654,11 @@ describe('InventoryPanel', () => {
 
       renderInventoryRoute();
 
-      const deskGroup = await screen.findByRole('group', {
+      const deskGroup = await screen.findByRole('radiogroup', {
         name: 'Decoración del escritorio',
       });
       await waitFor(() => {
-        expect(optionNames(deskGroup)).toContain('Lámpara de escritorio');
+        expect(tileNames(deskGroup)).toContain('Lámpara de escritorio');
       });
     });
 
@@ -422,51 +673,35 @@ describe('InventoryPanel', () => {
 
       renderInventoryRoute();
 
-      const deskGroup = await screen.findByRole('group', {
+      const deskGroup = await screen.findByRole('radiogroup', {
         name: 'Decoración del escritorio',
       });
-      const headGroup = screen.getByRole('group', { name: 'Cabeza' });
+      const headGroup = screen.getByRole('radiogroup', { name: 'Cabeza' });
       await waitFor(() => {
-        expect(optionNames(deskGroup)).toContain('Lámpara de escritorio');
+        expect(tileNames(deskGroup)).toContain('Lámpara de escritorio');
       });
-      expect(optionNames(headGroup)).toContain('Gorra azul');
+      expect(tileNames(headGroup)).toContain('Gorra azul');
     });
   });
 
   describe('slot resolution from catalog metadata', () => {
-    const glasses = () =>
-      makePurchase({
-        id: '00000000-0000-4000-8000-000000002003',
-        shopItemId: GLASSES_ID,
-        shopItemCode: 'glasses-star',
-        shopItemName: 'Lentes estrella',
-      });
-
-    function optionNames(group: HTMLElement): string[] {
-      return within(group)
-        .queryAllByRole('option')
-        .map((o) => o.textContent ?? '');
-    }
-
     it('offers a face accessory only under the Cara slot', async () => {
       const store = createClassroomEquipmentStore({
         classroomId: CLASSROOM_ID,
         itemMetadata: { ...CAP_METADATA, [GLASSES_ID]: { slot: 'face' } },
-        initialPurchases: [makePurchase(), glasses()],
+        initialPurchases: [makePurchase(), glassesPurchase()],
       });
       mswServer.use(...store.handlers);
 
       renderInventoryRoute();
 
-      const faceGroup = await screen.findByRole('group', { name: 'Cara' });
-      const headGroup = screen.getByRole('group', { name: 'Cabeza' });
-      const backGroup = screen.getByRole('group', { name: 'Espalda' });
-      expect(optionNames(faceGroup)).toContain('Lentes estrella');
-      expect(optionNames(faceGroup)).not.toContain('Gorra azul');
-      expect(optionNames(headGroup)).toContain('Gorra azul');
-      expect(optionNames(headGroup)).not.toContain('Lentes estrella');
-      expect(optionNames(backGroup)).not.toContain('Lentes estrella');
-      expect(optionNames(backGroup)).not.toContain('Gorra azul');
+      const faceGroup = await screen.findByRole('radiogroup', {
+        name: 'Cara',
+      });
+      const headGroup = screen.getByRole('radiogroup', { name: 'Cabeza' });
+      expect(tileNames(faceGroup)).toEqual(['Lentes estrella']);
+      expect(tileNames(headGroup)).toEqual(['Gorra azul']);
+      expect(screen.queryByRole('radiogroup', { name: 'Espalda' })).toBeNull();
     });
 
     it('does not offer items without a valid catalog slot or missing from the catalog', async () => {
@@ -481,7 +716,7 @@ describe('InventoryPanel', () => {
         omitFromCatalog: [GHOST_ID],
         initialPurchases: [
           makePurchase(),
-          glasses(),
+          glassesPurchase(),
           makePurchase({
             id: '00000000-0000-4000-8000-000000002004',
             shopItemId: BROKEN_ID,
@@ -504,22 +739,14 @@ describe('InventoryPanel', () => {
 
       renderInventoryRoute();
 
-      await screen.findByRole('group', { name: 'Cabeza' });
+      await screen.findByRole('radiogroup', { name: 'Cabeza' });
       const offered = screen
-        .getAllByRole('group')
-        .flatMap((group) => optionNames(group));
-      expect(offered).toContain('Gorra azul');
-      for (const hidden of [
-        'Lentes estrella',
-        'Cola rara',
-        'Fantasma',
-        'Lámpara incompatible',
-      ]) {
-        expect(offered).not.toContain(hidden);
-      }
+        .getAllByRole('radiogroup')
+        .flatMap((group) => tileNames(group));
+      expect(offered).toEqual(['Gorra azul']);
     });
 
-    it('shows the load error state when the catalog fails to load', async () => {
+    it('shows the load error state with a short title distinct from its description', async () => {
       const store = createClassroomEquipmentStore({
         classroomId: CLASSROOM_ID,
         itemMetadata: CAP_METADATA,
@@ -537,47 +764,21 @@ describe('InventoryPanel', () => {
 
       renderInventoryRoute();
 
-      expect(
-        await screen.findByText(inventoryMessages.errors.loadError),
-      ).toBeInTheDocument();
-      expect(screen.queryByRole('group', { name: 'Cabeza' })).toBeNull();
+      const title = await screen.findByText(inventoryMessages.errors.loadTitle);
+      expect(title.tagName).toMatch(/^H[1-6]$/);
+      // The description (the API's user message) is not a copy of the title.
+      expect(title.parentElement).not.toHaveTextContent(
+        inventoryMessages.errors.loadError,
+      );
+      expect(screen.queryByRole('radiogroup')).toBeNull();
     });
+  });
 
-    it.each([
-      [409, 'CONFLICT', inventoryMessages.errors.conflict],
-      [404, 'NOT_FOUND', inventoryMessages.errors.notFound],
-      [429, 'TOO_MANY_REQUESTS', inventoryMessages.errors.rateLimited],
-    ] as const)(
-      'shows the right message when the equip endpoint answers %i',
-      async (status, code, message) => {
-        const store = createClassroomEquipmentStore({
-          classroomId: CLASSROOM_ID,
-          itemMetadata: CAP_METADATA,
-          initialPurchases: [makePurchase()],
-        });
-        mswServer.use(...store.handlers);
-
-        renderInventoryRoute();
-
-        const headGroup = await screen.findByRole('group', { name: 'Cabeza' });
-        store.failNext('setSlot', {
-          status,
-          body: { code, message: 'rejected', correlationId: `req-${status}` },
-        });
-        fireEvent.change(within(headGroup).getByRole('combobox'), {
-          target: { value: CAP_ID },
-        });
-        fireEvent.click(
-          within(headGroup).getByRole('button', {
-            name: inventoryMessages.actions.equip,
-          }),
-        );
-
-        expect(await within(headGroup).findByRole('alert')).toHaveTextContent(
-          message,
-        );
-        expect(store.getSlots().head).toBeNull();
-      },
-    );
+  describe('slot labels', () => {
+    it('falls back to a human label and never shows a raw slot key', () => {
+      expect(getSlotLabel('head')).toBe('Cabeza');
+      expect(getSlotLabel('mystery_slot')).toBe(inventoryMessages.slotFallback);
+      expect(getSlotLabel('constructor')).toBe(inventoryMessages.slotFallback);
+    });
   });
 });
