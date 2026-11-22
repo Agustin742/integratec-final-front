@@ -12,7 +12,7 @@ teacher editor, multiple-choice builder, one-way publish flow, and deactivation 
 teacher grading queue, submission viewer, and grading/regrading workflow for `publish_content`-authorized staff, while showing the honest pending state to students and parents — see the [grading feature doc](./classroom-grading.md)),
 `notices` renders `NoticeBoardPanel` ([`#49`](https://github.com/Agustin742/integratec-final-front/issues/49)),
 `shop` renders `ShopPanel` ([`#48`](https://github.com/Agustin742/integratec-final-front/issues/48)
-student classroom shop catalog, idempotent purchase confirmation, and purchase history — see the [classroom shop doc](./classroom-shop.md)),
+student classroom shop catalog, idempotent purchase confirmation, purchase history, and the [`#57`](https://github.com/Agustin742/integratec-final-front/issues/57) student inventory selector tab — see the [classroom shop doc](./classroom-shop.md) and [inventory guide](./ui-inventory.md)),
 `grades` renders `GradesPanel` ([`#46`](https://github.com/Agustin742/integratec-final-front/issues/46),
 see the [grades guide](./ui-grades.md)) and
 `members` renders `ClassroomMembersPanel`

@@ -1,3 +1,4 @@
+import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createApiClient } from '@/api/client';
 import { ApiError } from '@/api/errors';
@@ -12,7 +13,9 @@ import {
   createPurchaseIdempotencyKey,
   isAbortError,
   isUncertainShopWriteError,
+  listAllShopPurchases,
   listShopItems,
+  MAX_ALL_PAGES,
   listShopPurchases,
   purchaseShopItem,
 } from './shop-service';
@@ -165,5 +168,43 @@ describe('shop-service', () => {
         idempotencyKey: 'key-malformed',
       }),
     ).rejects.toSatisfy((error: unknown) => isUncertainShopWriteError(error));
+  });
+
+  it('stops paging at the safety bound when the server keeps reporting more rows', async () => {
+    const client = createApiClient({ baseUrl: TEST_API_BASE_URL });
+    let requests = 0;
+    mswServer.use(
+      http.get(
+        `${TEST_API_BASE_URL}/classrooms/:id/shop/purchases`,
+        ({ request }) => {
+          requests += 1;
+          const page = Number(new URL(request.url).searchParams.get('page'));
+          return HttpResponse.json({
+            items: [
+              {
+                id: `00000000-0000-4000-8000-00000000${String(1000 + page)}`,
+                classroomId: CLASSROOM_ID,
+                studentId: '00000000-0000-4000-8000-000000007001',
+                shopItemId: `00000000-0000-4000-8000-00000000${String(5000 + page)}`,
+                shopItemCode: `item-${page}`,
+                shopItemName: `Item ${page}`,
+                shopItemKind: 'AVATAR_ACCESSORY',
+                pointTransactionId: '00000000-0000-4000-8000-000000003001',
+                pricePaid: 10,
+                createdAt: '2026-11-20T10:00:00.000Z',
+              },
+            ],
+            page,
+            pageSize: 100,
+            total: 1_000_000,
+          });
+        },
+      ),
+    );
+
+    const all = await listAllShopPurchases(client, CLASSROOM_ID);
+
+    expect(requests).toBe(MAX_ALL_PAGES);
+    expect(all.items).toHaveLength(MAX_ALL_PAGES);
   });
 });
