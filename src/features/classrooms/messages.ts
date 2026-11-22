@@ -62,6 +62,7 @@ export const classroomMessages = {
     desksLoading: 'Verificando tu pupitre asignado…',
     desksUnavailable:
       'No pudimos verificar tu pupitre asignado en este momento.',
+    retryDesksAction: 'Reintentar',
     entranceHint: 'Volver a Mis aulas',
     petHint: 'Saludo decorativo',
     openHint: (panelTitle: string) => `Abrir ${panelTitle}`,

@@ -265,6 +265,7 @@ export function InteractableHighlight({
     return group;
   }, []);
   const beaconElapsedRef = useRef(0);
+  const beaconPulseActiveRef = useRef(false);
   const lastPetNonceRef = useRef(petReactionNonce);
   const petHopRef = useRef({ active: false, elapsed: 0 });
 
@@ -285,6 +286,9 @@ export function InteractableHighlight({
         highlighted.beaconHeight,
         highlighted.worldPosition[2],
       );
+      beaconPulseActiveRef.current = !reducedMotion;
+    } else {
+      beaconPulseActiveRef.current = false;
     }
     invalidate();
   }, [beaconGroup, highlighted, ownDesk, reducedMotion, invalidate]);
@@ -314,7 +318,7 @@ export function InteractableHighlight({
     const dt = Math.min(delta, 0.05);
     let needsMoreFrames = false;
 
-    if (highlighted) {
+    if (highlighted && beaconPulseActiveRef.current) {
       if (reducedMotion) {
         resetBeaconTransform(
           beaconGroup,
@@ -322,15 +326,18 @@ export function InteractableHighlight({
           highlighted.beaconHeight,
           highlighted.worldPosition[2],
         );
+        beaconPulseActiveRef.current = false;
       } else {
         beaconElapsedRef.current += dt;
-        stepBeaconTransform(
+        const stillPulsing = stepBeaconTransform(
           beaconGroup,
           highlighted.beaconHeight,
           beaconElapsedRef.current,
-          dt,
         );
-        needsMoreFrames = true;
+        beaconPulseActiveRef.current = stillPulsing;
+        if (stillPulsing) {
+          needsMoreFrames = true;
+        }
       }
     }
 

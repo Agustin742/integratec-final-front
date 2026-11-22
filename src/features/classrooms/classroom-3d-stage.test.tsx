@@ -64,8 +64,14 @@ function renderStage(classroomId = 'aula-7') {
           <ClassroomPanelsProvider
             userId={profile.id}
             classroomId={classroomId}
-            registry={[]}
-            availability={{ confirmed: true, keys: [] }}
+            registry={[
+              {
+                key: 'grades',
+                title: 'Calificaciones',
+                component: () => <p>Calificaciones</p>,
+              },
+            ]}
+            availability={{ confirmed: true, keys: ['grades'] }}
             description="Paneles"
             fallbackFocus={() => null}
           >

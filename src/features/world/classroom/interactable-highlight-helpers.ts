@@ -1,6 +1,7 @@
 import { Group } from 'three';
 
 export const PET_HOP_DURATION_SECONDS = 0.45;
+export const BEACON_PULSE_DURATION_SECONDS = 0.65;
 const PET_HOP_PEAK_METERS = 0.24;
 
 export function applyPointerCursor(
@@ -25,10 +26,17 @@ export function stepBeaconTransform(
   group: Group,
   baseY: number,
   elapsed: number,
-  dt: number,
-): void {
-  group.position.y = baseY + Math.sin(elapsed * 3) * 0.06;
-  group.rotation.y += dt * 1.4;
+): boolean {
+  if (elapsed >= BEACON_PULSE_DURATION_SECONDS) {
+    group.position.y = baseY;
+    group.rotation.y = Math.PI / 4;
+    return false;
+  }
+  const progress = elapsed / BEACON_PULSE_DURATION_SECONDS;
+  group.position.y =
+    baseY + Math.sin(progress * Math.PI * 2) * 0.1 * (1 - progress);
+  group.rotation.y = progress * (Math.PI / 4);
+  return true;
 }
 
 export function resetPetPosition(sceneRoot: Group): void {

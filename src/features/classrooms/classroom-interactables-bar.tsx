@@ -13,11 +13,16 @@ import { classroomMessages } from './messages';
 export interface InteractableFeedback {
   readonly kind: 'info' | 'denied' | 'pet';
   readonly text: string;
+  readonly retry?: {
+    readonly label: string;
+    readonly onClick: () => void;
+  };
 }
 
 export interface ClassroomInteractablesBarProps {
   readonly highlightedId?: string | undefined;
   readonly myDeskIndex: number | null;
+  readonly desksStatus?: 'idle' | 'pending' | 'ready' | 'error';
   readonly petName?: string | null | undefined;
   readonly feedback: InteractableFeedback | null;
   readonly canOpenPanel: (key: string) => boolean;
@@ -219,6 +224,7 @@ function describeHighlightedTarget(
 export function ClassroomInteractablesBar({
   highlightedId,
   myDeskIndex,
+  desksStatus = 'ready',
   petName,
   feedback,
   canOpenPanel,
@@ -262,6 +268,12 @@ export function ClassroomInteractablesBar({
           })
         : null;
 
+    const deskChipAvailable =
+      canOpenPanel('grades') &&
+      (myDeskIndex !== null ||
+        desksStatus === 'pending' ||
+        desksStatus === 'error');
+
     const deskChip: QuickChipItem = {
       key: 'student-desk',
       label:
@@ -269,7 +281,7 @@ export function ClassroomInteractablesBar({
       iconType: 'student-desk',
       targetId: ownDesk3D ? ownDeskTargetId : undefined,
       interactable: ownDeskInteractable,
-      available: myDeskIndex !== null && canOpenPanel('grades'),
+      available: deskChipAvailable,
     };
 
     const panelChip = (
@@ -295,7 +307,7 @@ export function ClassroomInteractablesBar({
     const petItem = byId.get('pet') ?? null;
     const entranceItem = byId.get('entrance') ?? null;
 
-    return [
+    const items: QuickChipItem[] = [
       deskChip,
       panelChip('board'),
       panelChip('shelf'),
@@ -320,7 +332,8 @@ export function ClassroomInteractablesBar({
         available: true,
       },
     ];
-  }, [byId, canOpenPanel, copy, myDeskIndex, resolvedPetName]);
+    return items.filter((chip) => chip.available);
+  }, [byId, canOpenPanel, copy, desksStatus, myDeskIndex, resolvedPetName]);
 
   return (
     <div className="min-w-0 space-y-2.5">
@@ -356,14 +369,30 @@ export function ClassroomInteractablesBar({
         className={cn(
           feedback === null
             ? 'sr-only'
-            : 'min-w-0 rounded-xl border px-3.5 py-2 text-sm font-medium wrap-anywhere',
+            : 'flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border px-3.5 py-2 text-sm font-medium wrap-anywhere',
           feedback?.kind === 'denied' &&
             'border-warning-edge bg-warning text-warning-foreground',
           (feedback?.kind === 'pet' || feedback?.kind === 'info') &&
             'border-info-edge bg-info text-info-foreground',
         )}
       >
-        {feedback?.text ?? ''}
+        {feedback ? (
+          <>
+            <span className="min-w-0">{feedback.text}</span>
+            {feedback.retry && (
+              <button
+                type="button"
+                onClick={feedback.retry.onClick}
+                className={cn(
+                  buttonStyles({ variant: 'outline', size: 'sm' }),
+                  'min-h-9 shrink-0',
+                )}
+              >
+                {feedback.retry.label}
+              </button>
+            )}
+          </>
+        ) : null}
       </div>
 
       <nav aria-label={copy.navLabel} className="min-w-0">
@@ -393,7 +422,6 @@ export function ClassroomInteractablesBar({
                     }),
                     'h-auto min-h-11 max-w-full justify-start gap-2 px-3.5 py-2 text-left whitespace-normal wrap-anywhere',
                     isHighlighted && 'border-primary',
-                    !chip.available && 'opacity-85',
                   )}
                 >
                   <InteractableIcon type={chip.iconType} />

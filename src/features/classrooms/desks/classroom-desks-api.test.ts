@@ -231,4 +231,97 @@ describe('useClassroomDesks', () => {
 
     await waitFor(() => expect(result.current.myDeskIndex).toBe(4));
   });
+
+  test('preserves confirmed desk assignment on transient refresh failure and clears on 403/404', async () => {
+    let mode: 'ok' | 'server-error' | 'forbidden' = 'ok';
+    const { result } = setup(async () => {
+      if (mode === 'server-error') {
+        return new Response(
+          JSON.stringify({
+            error: {
+              code: 'INTERNAL',
+              message: 'Server error',
+              correlationId: 'c-500',
+            },
+          }),
+          { status: 500, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      if (mode === 'forbidden') {
+        return new Response(
+          JSON.stringify({
+            error: {
+              code: 'FORBIDDEN',
+              message: 'Forbidden',
+              correlationId: 'c-403',
+            },
+          }),
+          { status: 403, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      return Response.json(makeDesksPayload(profile.id));
+    });
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.myDeskIndex).toBe(1);
+
+    mode = 'server-error';
+    act(() => result.current.retry());
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+    expect(result.current.status).toBe('ready');
+    expect(result.current.myDeskIndex).toBe(1);
+    expect(result.current.items).toHaveLength(3);
+
+    mode = 'forbidden';
+    act(() => result.current.retry());
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.myDeskIndex).toBeNull();
+    expect(result.current.items).toEqual([]);
+  });
+
+  test('stays pending across transient retry failures until settled', async () => {
+    let attempts = 0;
+    const queryClient = createAppQueryClient({
+      defaultOptions: { queries: { retry: 1, retryDelay: 0 } },
+    });
+    const session = fakeSession(
+      { status: 'authenticated', user: profile },
+      createApiClient({
+        baseUrl: 'https://api.example.invalid',
+        fetch: async () => {
+          attempts += 1;
+          if (attempts === 1) {
+            return new Response(
+              JSON.stringify({
+                error: {
+                  code: 'UNAVAILABLE',
+                  message: 'Retry',
+                  correlationId: 'c-retry',
+                },
+              }),
+              { status: 503, headers: { 'content-type': 'application/json' } },
+            );
+          }
+          return Response.json(makeDesksPayload(profile.id));
+        },
+      }),
+    );
+
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(ApiQueryProvider, {
+        client: queryClient,
+        children: createElement(SessionProvider, {
+          service: session.service,
+          children,
+        }),
+      });
+
+    const { result } = renderHook(() => useClassroomDesks('room-1'), {
+      wrapper,
+    });
+    expect(result.current.status).toBe('pending');
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(attempts).toBe(2);
+    expect(result.current.myDeskIndex).toBe(1);
+  });
 });

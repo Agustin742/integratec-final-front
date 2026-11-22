@@ -159,6 +159,31 @@ describe('InteractableHighlight', () => {
     expect(r3f.invalidate).not.toHaveBeenCalled();
   });
 
+  test('runs a bounded beacon entrance pulse and returns demand rendering to idle while highlighted', () => {
+    const { root } = makeSceneRoot();
+    render(
+      <InteractableHighlight
+        interactablesById={byId}
+        highlightedId="board"
+        sceneRoot={root}
+      />,
+    );
+    const beacon = root.parent ?? undefined;
+    expect(beacon).toBeUndefined();
+
+    r3f.invalidate.mockClear();
+    act(() => r3f.callback?.({}, 0.05));
+    expect(r3f.invalidate).toHaveBeenCalledTimes(1);
+
+    for (let step = 0; step < 15; step += 1) {
+      act(() => r3f.callback?.({}, 0.05));
+    }
+
+    r3f.invalidate.mockClear();
+    act(() => r3f.callback?.({}, 0.05));
+    expect(r3f.invalidate).not.toHaveBeenCalled();
+  });
+
   test('skips pet hop and beacon motion under prefers-reduced-motion', () => {
     stubReducedMotion(true);
     const { root, pet } = makeSceneRoot();

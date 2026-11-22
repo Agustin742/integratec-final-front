@@ -1,6 +1,95 @@
 import type { ClassroomLayout } from '@/realtime';
 import type { PlaceholderKind } from './build-classroom-scene';
-import { DESK_HEIGHT, deriveDesks } from './classroom-desks';
+import {
+  DESK_HEIGHT,
+  TEACHER_DESK_INDEX,
+  deriveDesks,
+} from './classroom-desks';
+
+export const ENTRANCE_WIDTH = 2;
+
+export interface ClassroomPropSpec {
+  readonly position: readonly [number, number, number];
+  readonly rotationY?: number;
+  readonly interactablePosition: readonly [number, number, number];
+  readonly footprint: readonly [number, number];
+  readonly beaconHeight: number;
+}
+
+export interface ClassroomPropSpecs {
+  readonly board: ClassroomPropSpec;
+  readonly shelf: ClassroomPropSpec;
+  readonly bulletinBoard: ClassroomPropSpec;
+  readonly shop: ClassroomPropSpec;
+  readonly pet: ClassroomPropSpec;
+  readonly tutorBot: ClassroomPropSpec;
+  readonly entrance: ClassroomPropSpec;
+}
+
+/**
+ * Single source of truth for classroom prop placements, footprints, and
+ * beacon heights shared between `buildClassroomScene` and the interactable
+ * picking/highlight catalog. Keeps zero `three` runtime imports so the
+ * accessible DOM bar never pulls Three.js into the eager chunk.
+ */
+export function deriveClassroomPropSpecs(
+  layout: ClassroomLayout,
+): ClassroomPropSpecs {
+  const { bounds } = layout;
+  const frontZ = bounds.minZ;
+  const teacher = deriveDesks(layout).find((desk) => desk.kind === 'teacher');
+  const tutorBotPos: readonly [number, number, number] = [
+    teacher ? teacher.centerX + teacher.width / 2 - 0.5 : 0,
+    DESK_HEIGHT,
+    teacher ? teacher.centerZ : 0,
+  ];
+
+  return {
+    board: {
+      position: [0, 0, frontZ],
+      interactablePosition: [0, 0, frontZ + 0.14],
+      footprint: [4.4, 0.28],
+      beaconHeight: 2.65,
+    },
+    shelf: {
+      position: [-6.7, 0, frontZ],
+      interactablePosition: [-6.7, 0, frontZ + 0.14],
+      footprint: [1.8, 0.32],
+      beaconHeight: 1.85,
+    },
+    bulletinBoard: {
+      position: [bounds.minX, 0, bounds.maxZ - 1.8],
+      rotationY: Math.PI / 2,
+      interactablePosition: [bounds.minX + 0.16, 0, bounds.maxZ - 1.8],
+      footprint: [0.32, 2.0],
+      beaconHeight: 2.35,
+    },
+    shop: {
+      position: [4.8, 0, frontZ],
+      interactablePosition: [4.8, 0, frontZ + 0.14],
+      footprint: [2.0, 0.32],
+      beaconHeight: 2.25,
+    },
+    pet: {
+      position: [7, 0, frontZ],
+      interactablePosition: [7, 0, frontZ + 0.14],
+      footprint: [1.0, 0.32],
+      beaconHeight: 0.85,
+    },
+    tutorBot: {
+      position: tutorBotPos,
+      interactablePosition: tutorBotPos,
+      footprint: [0.45, 0.45],
+      beaconHeight: DESK_HEIGHT + 0.95,
+    },
+    entrance: {
+      position: [0, 0.012, bounds.maxZ + 0.05],
+      interactablePosition: [0, 0, bounds.maxZ + 0.05],
+      footprint: [ENTRANCE_WIDTH, 0.6],
+      beaconHeight: 0.55,
+    },
+  };
+}
 
 export type InteractionClass =
   'decorative' | 'opens_panel' | 'direct_transition';
@@ -69,8 +158,7 @@ const PLACEHOLDER_INTERACTABLE_IDS: ReadonlySet<PlaceholderKind> = new Set([
 export function deriveClassroomInteractables(
   layout: ClassroomLayout,
 ): ClassroomInteractable[] {
-  const { bounds } = layout;
-  const frontZ = bounds.minZ;
+  const specs = deriveClassroomPropSpecs(layout);
   const desks = deriveDesks(layout);
   const teacher = desks.find((desk) => desk.kind === 'teacher');
   const students = desks.filter((desk) => desk.kind === 'student');
@@ -81,57 +169,53 @@ export function deriveClassroomInteractables(
       type: 'board',
       interactionClass: 'opens_panel',
       panelKey: 'activities',
-      worldPosition: [0, 0, frontZ + 0.14],
-      footprint: [4.4, 0.28],
-      beaconHeight: 2.65,
+      worldPosition: specs.board.interactablePosition,
+      footprint: specs.board.footprint,
+      beaconHeight: specs.board.beaconHeight,
     },
     {
       id: 'shelf',
       type: 'shelf',
       interactionClass: 'opens_panel',
       panelKey: 'material',
-      worldPosition: [-6.7, 0, frontZ + 0.14],
-      footprint: [1.8, 0.32],
-      beaconHeight: 1.85,
+      worldPosition: specs.shelf.interactablePosition,
+      footprint: specs.shelf.footprint,
+      beaconHeight: specs.shelf.beaconHeight,
     },
     {
       id: 'bulletin-board',
       type: 'bulletin-board',
       interactionClass: 'opens_panel',
       panelKey: 'notices',
-      worldPosition: [bounds.minX + 0.16, 0, bounds.maxZ - 1.8],
-      footprint: [0.32, 2.0],
-      beaconHeight: 2.35,
+      worldPosition: specs.bulletinBoard.interactablePosition,
+      footprint: specs.bulletinBoard.footprint,
+      beaconHeight: specs.bulletinBoard.beaconHeight,
     },
     {
       id: 'shop',
       type: 'shop',
       interactionClass: 'opens_panel',
       panelKey: 'shop',
-      worldPosition: [4.8, 0, frontZ + 0.14],
-      footprint: [2.0, 0.32],
-      beaconHeight: 2.25,
+      worldPosition: specs.shop.interactablePosition,
+      footprint: specs.shop.footprint,
+      beaconHeight: specs.shop.beaconHeight,
     },
     {
       id: 'pet',
       type: 'pet',
       interactionClass: 'decorative',
-      worldPosition: [7, 0, frontZ + 0.14],
-      footprint: [1.0, 0.32],
-      beaconHeight: 0.85,
+      worldPosition: specs.pet.interactablePosition,
+      footprint: specs.pet.footprint,
+      beaconHeight: specs.pet.beaconHeight,
     },
     {
       id: 'tutor-bot',
       type: 'tutor-bot',
       interactionClass: 'opens_panel',
       panelKey: 'bot',
-      worldPosition: [
-        teacher ? teacher.centerX + teacher.width / 2 - 0.5 : 0,
-        DESK_HEIGHT,
-        teacher ? teacher.centerZ : 0,
-      ],
-      footprint: [0.45, 0.45],
-      beaconHeight: DESK_HEIGHT + 0.95,
+      worldPosition: specs.tutorBot.interactablePosition,
+      footprint: specs.tutorBot.footprint,
+      beaconHeight: specs.tutorBot.beaconHeight,
     },
   ];
 
@@ -165,9 +249,9 @@ export function deriveClassroomInteractables(
     id: 'entrance',
     type: 'entrance',
     interactionClass: 'direct_transition',
-    worldPosition: [0, 0, bounds.maxZ + 0.05],
-    footprint: [2.0, 0.6],
-    beaconHeight: 0.55,
+    worldPosition: specs.entrance.interactablePosition,
+    footprint: specs.entrance.footprint,
+    beaconHeight: specs.entrance.beaconHeight,
   });
 
   return interactables;
@@ -201,8 +285,11 @@ export function resolveInteractableHit(
 
   if (object.name === 'desk-legs' && instanceId !== undefined) {
     const deskIdx = Math.floor(instanceId / 4);
-    const id = deskIdx === 0 ? 'teacher-desk' : `student-desk:${deskIdx}`;
-    return interactablesById.get(id);
+    if (deskIdx === TEACHER_DESK_INDEX) {
+      return interactablesById.get('teacher-desk');
+    }
+    const studentNumber = deskIdx > TEACHER_DESK_INDEX ? deskIdx : deskIdx + 1;
+    return interactablesById.get(`student-desk:${studentNumber}`);
   }
 
   for (

@@ -173,6 +173,13 @@ describe('resolveInteractableHit', () => {
         expect(resolveInteractableHit([{ object: childMesh }], byId)?.id).toBe(
           expectedId,
         );
+        const interactable = byId.get(expectedId)!;
+        expect(
+          Math.abs(group.position.x - interactable.worldPosition[0]),
+        ).toBeLessThanOrEqual(0.2);
+        expect(
+          Math.abs(group.position.z - interactable.worldPosition[2]),
+        ).toBeLessThanOrEqual(0.2);
       }
 
       const entrance = built.root.getObjectByName('entrance')!;

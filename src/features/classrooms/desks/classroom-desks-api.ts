@@ -108,9 +108,7 @@ export function useClassroomDesks(
   });
 
   const activeError =
-    queryEnabled && (query.isError || query.failureCount > 0)
-      ? toApiError(query.error ?? query.failureReason)
-      : null;
+    queryEnabled && query.isError ? toApiError(query.error) : null;
 
   const reconciledErrorRef = useRef<unknown>(null);
   useEffect(() => {
@@ -136,6 +134,29 @@ export function useClassroomDesks(
     return IDLE_STATE;
   }
 
+  if (query.data !== undefined) {
+    if (
+      activeError !== null &&
+      (activeError.kind === 'not-found' || activeError.kind === 'forbidden')
+    ) {
+      return {
+        status: 'error',
+        items: [],
+        myDeskIndex: null,
+        error: activeError,
+        retry: () => void query.refetch(),
+      };
+    }
+    const assigned = query.data.items.find((item) => item.userId === userId);
+    return {
+      status: 'ready',
+      items: query.data.items,
+      myDeskIndex: assigned ? assigned.deskIndex : null,
+      error: activeError,
+      retry: () => void query.refetch(),
+    };
+  }
+
   if (activeError !== null) {
     return {
       status: 'error',
@@ -146,21 +167,10 @@ export function useClassroomDesks(
     };
   }
 
-  if (query.data === undefined) {
-    return {
-      status: 'pending',
-      items: [],
-      myDeskIndex: null,
-      error: null,
-      retry: () => void query.refetch(),
-    };
-  }
-
-  const assigned = query.data.items.find((item) => item.userId === userId);
   return {
-    status: 'ready',
-    items: query.data.items,
-    myDeskIndex: assigned ? assigned.deskIndex : null,
+    status: 'pending',
+    items: [],
+    myDeskIndex: null,
     error: null,
     retry: () => void query.refetch(),
   };

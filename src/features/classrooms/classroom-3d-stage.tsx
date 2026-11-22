@@ -147,6 +147,14 @@ function Classroom3DStageContent({
     }
   }, [headingRef]);
 
+  const handleRetryDesks = useCallback(() => {
+    setFeedback({
+      kind: 'info',
+      text: classroomMessages.interactables.desksLoading,
+    });
+    desks.retry();
+  }, [desks]);
+
   const handleActivateInteractable = useCallback(
     (interactable: ClassroomInteractable | null, invoker?: HTMLElement) => {
       if (interactionLocked) return;
@@ -156,7 +164,14 @@ function Classroom3DStageContent({
         if (desks.status === 'pending' || desks.status === 'idle') {
           setFeedback({ kind: 'info', text: copy.desksLoading });
         } else if (desks.status === 'error') {
-          setFeedback({ kind: 'denied', text: copy.desksUnavailable });
+          setFeedback({
+            kind: 'denied',
+            text: copy.desksUnavailable,
+            retry: {
+              label: copy.retryDesksAction,
+              onClick: handleRetryDesks,
+            },
+          });
         } else {
           setFeedback({ kind: 'denied', text: copy.noAssignedDeskShort });
         }
@@ -185,7 +200,14 @@ function Classroom3DStageContent({
           return;
         }
         if (desks.status === 'error') {
-          setFeedback({ kind: 'denied', text: copy.desksUnavailable });
+          setFeedback({
+            kind: 'denied',
+            text: copy.desksUnavailable,
+            retry: {
+              label: copy.retryDesksAction,
+              onClick: handleRetryDesks,
+            },
+          });
           return;
         }
         if (desks.myDeskIndex === null) {
@@ -221,6 +243,7 @@ function Classroom3DStageContent({
       interactionLocked,
       desks.status,
       desks.myDeskIndex,
+      handleRetryDesks,
       resolvedPetName,
       navigate,
       panels,
@@ -236,6 +259,12 @@ function Classroom3DStageContent({
     (key: string) => panels?.canOpenPanel(key) ?? false,
     [panels],
   );
+
+  const effectiveFeedback =
+    desks.status === 'ready' &&
+    feedback?.text === classroomMessages.interactables.desksLoading
+      ? null
+      : feedback;
 
   return (
     <section
@@ -259,8 +288,9 @@ function Classroom3DStageContent({
       <ClassroomInteractablesBar
         highlightedId={effectiveHighlightedId}
         myDeskIndex={desks.myDeskIndex}
+        desksStatus={desks.status}
         petName={petName}
-        feedback={feedback}
+        feedback={effectiveFeedback}
         canOpenPanel={canOpenPanel}
         onFocusInteractable={handleHoverInteractable}
         onActivateInteractable={handleActivateInteractable}

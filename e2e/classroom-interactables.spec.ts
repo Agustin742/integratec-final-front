@@ -239,16 +239,20 @@ test('picks 3D objects on canvas, handles pet and keyboard chips, and captures r
     page.getByRole('button', { name: 'Mi pupitre #1' }),
   ).toBeVisible();
 
-  if (!isMobile) {
-    // Wait for any initial low-fps banner layout shift on software WebGL to settle before picking.
-    const dismissLowFps = page.getByRole('button', {
-      name: classroomMessages.performanceOffer.dismiss,
-    });
-    if (await dismissLowFps.isVisible({ timeout: 2500 }).catch(() => false)) {
-      await dismissLowFps.click();
-    }
-    await canvas.scrollIntoViewIfNeeded();
+  const declineLowFps = page.getByRole('button', {
+    name: classroomMessages.performanceOffer.decline,
+  });
+  const offerAppeared = await declineLowFps
+    .waitFor({ state: 'visible', timeout: 2500 })
+    .then(() => true)
+    .catch(() => false);
+  if (offerAppeared) {
+    await declineLowFps.click();
+    await expect(declineLowFps).toHaveCount(0);
+  }
+  await canvas.scrollIntoViewIfNeeded();
 
+  if (!isMobile) {
     // Project the board center [0, 1.55, -5.9] onto the canvas and click it directly.
     const boardPos = await projectClassroomPoint(
       canvas,
@@ -328,6 +332,11 @@ test('picks 3D objects on canvas, handles pet and keyboard chips, and captures r
     await devStats.evaluate((el) => {
       el.style.visibility = 'hidden';
     });
+  }
+
+  if (await declineLowFps.isVisible().catch(() => false)) {
+    await declineLowFps.click();
+    await expect(declineLowFps).toHaveCount(0);
   }
 
   await page.screenshot({

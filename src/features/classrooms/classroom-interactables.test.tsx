@@ -101,6 +101,7 @@ interface SetupOptions {
   readonly myRole?: components['schemas']['ClassroomContextResponseDto']['myRole'];
   readonly assignedDeskIndex?: number | null;
   readonly petName?: string | null;
+  readonly shouldFailDesks?: () => boolean;
 }
 
 function setup(options: SetupOptions = {}) {
@@ -117,6 +118,7 @@ function setup(options: SetupOptions = {}) {
     myRole = 'STUDENT',
     assignedDeskIndex = 2,
     petName = 'Michi',
+    shouldFailDesks,
   } = options;
 
   const session = fakeSession(
@@ -132,6 +134,18 @@ function setup(options: SetupOptions = {}) {
           });
         }
         if (url.pathname.endsWith('/desks')) {
+          if (shouldFailDesks?.()) {
+            return new Response(
+              JSON.stringify({
+                error: {
+                  code: 'UNAVAILABLE',
+                  message: 'Unavailable',
+                  correlationId: 'corr-desks-err',
+                },
+              }),
+              { status: 503, headers: { 'content-type': 'application/json' } },
+            );
+          }
           return Response.json({
             items: Array.from({ length: 12 }, (_, idx) => {
               const deskIndex = idx + 1;
@@ -301,7 +315,7 @@ describe('Classroom interactables HUD and 3D intent wiring (#38)', () => {
     expect(shopChip).toHaveFocus();
   });
 
-  test('denies unavailable panels honestly without opening any dialog', async () => {
+  test('filters unavailable panel chips from the bar while 3D picking denies them honestly', async () => {
     setup({ availablePanels: ['activities'] });
     await screen.findByTestId('world-mock');
 
@@ -309,11 +323,15 @@ describe('Classroom interactables HUD and 3D intent wiring (#38)', () => {
     expect(status).toHaveAttribute('role', 'status');
     expect(status).toBeEmptyDOMElement();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Tienda' }));
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(status).toHaveTextContent(
-      classroomMessages.interactables.panelDenied,
-    );
+    expect(screen.getByRole('button', { name: 'Pizarra' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Michi' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Puerta' })).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Tienda' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Cartelera' }),
+    ).not.toBeInTheDocument();
 
     act(() => {
       worldMock.latestProps?.onSelectInteractable?.(
@@ -324,6 +342,62 @@ describe('Classroom interactables HUD and 3D intent wiring (#38)', () => {
     expect(status).toHaveTextContent(
       classroomMessages.interactables.panelDenied,
     );
+  });
+
+  test('omits the desk chip for teachers without an assigned desk while refusing 3D student desk clicks', async () => {
+    setup({
+      myRole: 'TEACHER',
+      assignedDeskIndex: null,
+      availablePanels: ['activities', 'members', 'grades'],
+    });
+    await screen.findByTestId('world-mock');
+
+    await waitFor(() => expect(worldMock.latestProps?.ownDeskIndex).toBeNull());
+    expect(
+      screen.queryByRole('button', {
+        name: classroomMessages.interactables.desksTitle,
+      }),
+    ).not.toBeInTheDocument();
+
+    act(() => {
+      worldMock.latestProps?.onSelectInteractable?.(
+        interactablesById.get('student-desk:1')!,
+      );
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId('classroom-interactable-status'),
+    ).toHaveTextContent(classroomMessages.interactables.noAssignedDesk);
+  });
+
+  test('offers a retry button when the desk map fails to load and recovers assigned desk on retry', async () => {
+    let failDesks = true;
+    setup({ assignedDeskIndex: 3, shouldFailDesks: () => failDesks });
+    await screen.findByTestId('world-mock');
+
+    const desksChip = await screen.findByRole('button', {
+      name: classroomMessages.interactables.desksTitle,
+    });
+    const status = screen.getByTestId('classroom-interactable-status');
+
+    // Wait until the failed /desks query moves out of pending before clicking.
+    await waitFor(() => {
+      fireEvent.click(desksChip);
+      expect(status).toHaveTextContent(
+        classroomMessages.interactables.desksUnavailable,
+      );
+    });
+
+    const retryBtn = within(status).getByRole('button', {
+      name: classroomMessages.interactables.retryDesksAction,
+    });
+    failDesks = false;
+    fireEvent.click(retryBtn);
+
+    expect(
+      await screen.findByRole('button', { name: 'Mi pupitre #3' }),
+    ).toBeVisible();
+    await waitFor(() => expect(status).toBeEmptyDOMElement());
   });
 
   test('distinguishes own assigned desk from another student desk without leaking foreign data', async () => {
