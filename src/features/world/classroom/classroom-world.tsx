@@ -3,6 +3,7 @@ import type { AvatarInput } from '@/realtime';
 import { useOwnProfile } from '@/features/profile/use-own-profile';
 import { worldMessages } from '../messages';
 import { WorldCanvas, type WorldCanvasProps } from '../world-canvas';
+import type { ClassroomInteractable } from './classroom-interactables';
 import { ClassroomScene } from './classroom-scene';
 
 export interface ClassroomWorldProps extends Pick<
@@ -11,6 +12,13 @@ export interface ClassroomWorldProps extends Pick<
 > {
   /** Movement intent of the local avatar, for the realtime sender (#37). */
   onIntentChange?: (intent: AvatarInput) => void;
+  highlightedInteractableId?: string | undefined;
+  ownDeskIndex?: number | null | undefined;
+  petReactionNonce?: number | undefined;
+  interactionLocked?: boolean | undefined;
+  onHoverInteractable?: ((id: string | undefined) => void) | undefined;
+  onSelectInteractable?:
+    ((interactable: ClassroomInteractable) => void) | undefined;
   /** Extra in-canvas nodes, such as the performance probe (#56). */
   children?: ReactNode;
 }
@@ -24,6 +32,12 @@ export function ClassroomWorld({
   label,
   scopeKey,
   onIntentChange,
+  highlightedInteractableId,
+  ownDeskIndex,
+  petReactionNonce,
+  interactionLocked,
+  onHoverInteractable,
+  onSelectInteractable,
   children,
 }: ClassroomWorldProps) {
   const { query } = useOwnProfile();
@@ -38,6 +52,12 @@ export function ClassroomWorld({
         avatar={query.data?.avatar}
         scopeKey={scopeKey}
         onIntentChange={onIntentChange}
+        highlightedInteractableId={highlightedInteractableId}
+        ownDeskIndex={ownDeskIndex}
+        petReactionNonce={petReactionNonce}
+        interactionLocked={interactionLocked}
+        onHoverInteractable={onHoverInteractable}
+        onSelectInteractable={onSelectInteractable}
       />
       {children}
     </WorldCanvas>

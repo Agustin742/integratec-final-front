@@ -184,4 +184,7 @@ pending functionality rather than fabricated data; verification results and
 synthetic boundaries are recorded in the contributor trackers and `e2e/` specs.
 Accessible Classic 2D panel navigation backed by the same `ClassroomPanelsProvider`
 contract and `availablePanels` server list is documented in
-[classroom workspace #34](./classroom-workspace.md#classic-2d-mode-switch-34).
+[classroom workspace #34](./classroom-workspace.md#classic-2d-mode-switch-34),
+and 3D object picking + keyboard/touch quick-select wiring (`#38`, keeping
+`availablePanels` authoritative and `pet` strictly decorative) is documented in
+[3D interactable objects #38](./classroom-workspace.md#3d-interactable-objects-and-server-desk-map-38).

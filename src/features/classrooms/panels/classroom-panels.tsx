@@ -39,6 +39,7 @@ export type ClassroomPanelsController = {
     onClose?: () => void,
     routeOwner?: string,
   ) => boolean;
+  hasActivePanel: boolean;
 };
 const PanelsContext = createContext<ClassroomPanelsController | null>(null);
 
@@ -46,6 +47,10 @@ export function useClassroomPanels(): ClassroomPanelsController {
   const controller = useContext(PanelsContext);
   if (!controller) throw new Error('ClassroomPanelsProvider is required');
   return controller;
+}
+
+export function useOptionalClassroomPanels(): ClassroomPanelsController | null {
+  return useContext(PanelsContext);
 }
 
 export function ClassroomPanelsProvider(props: ClassroomPanelsProps) {
@@ -125,11 +130,13 @@ function ScopedPanels(props: ClassroomPanelsProps) {
     return true;
   }
   const Panel = descriptor?.component;
+  const hasActivePanel = Boolean(active && descriptor && Panel);
   return (
     <PanelsContext.Provider
       value={{
         openPanel,
         canOpenPanel: (key) => Boolean(findPanel(props, key)),
+        hasActivePanel,
       }}
     >
       {props.children}

@@ -45,6 +45,43 @@ export const classroomMessages = {
     mode2dEmptyDescription:
       'El servidor todavía no habilitó paneles para tu cuenta en esta aula. Si cambia tu disponibilidad, los vas a ver acá al instante.',
   },
+  desks: {
+    loadError: 'No pudimos verificar el mapa de pupitres del aula.',
+  },
+  interactables: {
+    navLabel: 'Objetos interactivos del aula',
+    defaultPrompt: 'Elegí un objeto del aula o usá los accesos rápidos',
+    petDefaultName: 'Mascota del aula',
+    petGreeting: (petName: string) => `${petName} te saluda desde su rincón.`,
+    panelDenied: 'No tenés acceso a este panel en esta aula.',
+    foreignDesk:
+      'Ese pupitre no es el tuyo. Solo podés abrir tu pupitre asignado.',
+    noAssignedDesk:
+      'Ese pupitre no es el tuyo. No tenés un pupitre asignado en esta aula.',
+    noAssignedDeskShort: 'No tenés un pupitre asignado en esta aula.',
+    desksLoading: 'Verificando tu pupitre asignado…',
+    desksUnavailable:
+      'No pudimos verificar tu pupitre asignado en este momento.',
+    retryDesksAction: 'Reintentar',
+    entranceHint: 'Volver a Mis aulas',
+    petHint: 'Saludo decorativo',
+    openHint: (panelTitle: string) => `Abrir ${panelTitle}`,
+    ownDeskTitle: (deskIndex: number) => `Mi pupitre #${deskIndex}`,
+    desksTitle: 'Pupitres',
+    foreignDeskTitle: (deskIndex: number) => `Pupitre #${deskIndex}`,
+    foreignDeskHint: 'Solo podés abrir tu pupitre asignado',
+    unassignedDeskHint: 'Sin pupitre asignado',
+    labels: {
+      board: 'Pizarra',
+      shelf: 'Estantería',
+      'bulletin-board': 'Cartelera',
+      shop: 'Tienda',
+      'tutor-bot': 'Asistente de estudio',
+      'teacher-desk': 'Escritorio docente',
+      entrance: 'Puerta del aula',
+      entranceShort: 'Puerta',
+    },
+  },
   performanceOffer: {
     title: 'La vista 3D está lenta en este dispositivo',
     body: 'El Modo 2D Clásico muestra los paneles del aula en una vista más liviana, sin 3D. Tus herramientas y tu contexto no cambian. Para volver a la vista 3D, usá el botón "Cambiar a Vista 3D" en la parte superior del aula o el atajo Alt+M.',
