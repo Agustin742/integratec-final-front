@@ -120,6 +120,7 @@ async function openReadyClassroomStage(page: Page) {
         requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
       ),
   );
+  await canvas.scrollIntoViewIfNeeded();
 
   return { stageHeading, region, canvas };
 }
@@ -239,6 +240,15 @@ test('picks 3D objects on canvas, handles pet and keyboard chips, and captures r
   ).toBeVisible();
 
   if (!isMobile) {
+    // Wait for any initial low-fps banner layout shift on software WebGL to settle before picking.
+    const dismissLowFps = page.getByRole('button', {
+      name: classroomMessages.performanceOffer.dismiss,
+    });
+    if (await dismissLowFps.isVisible({ timeout: 2500 }).catch(() => false)) {
+      await dismissLowFps.click();
+    }
+    await canvas.scrollIntoViewIfNeeded();
+
     // Project the board center [0, 1.55, -5.9] onto the canvas and click it directly.
     const boardPos = await projectClassroomPoint(
       canvas,
