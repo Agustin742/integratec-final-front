@@ -20,7 +20,7 @@ The 2D inventory selector lets enrolled students inspect their classroom-scoped 
 - **Per-slot grid:** each slot is a `role="radiogroup"` and each item a tile (`button role="radio"`) with a roving tabindex. Arrow keys move focus; Enter, Space, or a click equips the item. The equipped tile shows "Equipado" with an icon, and an explicit "Desequipar" button empties the slot. An empty slot shows a hint.
 - **Per-slot status region:** "Guardando…" while pending, "Guardado" cleared after 4 s, and errors kept until the next interaction.
 - **Concurrent equips:** when several slots are saved at once, each confirmation merges only its own slot into the cached equipment state, so one response never overwrites another slot.
-- **Heading focus:** `InventoryPanel` takes `focusHeadingOnMount` (default off). It is enabled only where the panel mounts as a new view: the shop tab and the profile section.
+- **Heading focus:** `InventoryPanel` takes `focusHeadingOnMount` (default off). No current mount (the shop tab and the profile section) enables it, so opening the panel never moves focus; it exists for a future standalone route.
 
 ## Visual evidence
 
