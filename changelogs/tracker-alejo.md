@@ -2,11 +2,11 @@
 
 ## 2026-11-22 — Add modular 3D avatar asset authoring rule
 
-- **Status:** in review (branch `docs/modular-avatar-assets-rule` off `origin/develop` `30ec66c`, PR opened against `develop` with reviewers `Agustin742` and `Calegaris`)
-- **Area / files:** `rules/modular-avatar-assets.md`, `rules/index.md`, `rules/README.md`, `changelogs/tracker-alejo.md`
-- **Change:** Added a dedicated technical rule (`rules/modular-avatar-assets.md`) governing modular 3D avatar construction and Blender/MCP export aligned with `docs/art/asset-wishlist.md` (PR #117) and the verified baseline transforms, T-pose rest rig, and 34-bone core skeleton of `public/models/avatars/{male,female}/body.glb`, and registered it in `rules/index.md` and `rules/README.md`.
+- **Status:** in review ([PR #119](https://github.com/Agustin742/integratec-final-front/pull/119) on `docs/modular-avatar-assets-rule` off `origin/develop` `30ec66c`, reviewers `Agustin742` and `Calegaris`)
+- **Area / files:** `rules/modular-avatar-assets.md`, `changelogs/tracker-alejo.md`
+- **Change:** Added a dedicated technical rule (`rules/modular-avatar-assets.md`) governing modular 3D avatar construction and Blender/MCP export aligned with `docs/art/asset-wishlist.md` (PR #117) and the verified baseline transforms, T-pose rest rig, and 34-bone core skeleton of `public/models/avatars/{male,female}/body.glb`, keeping `rules/index.md` and `rules/README.md` untouched per contributor scope.
 - **Reason:** Establish a single canonical 34-bone skeleton (preserving female mesh anatomy without female-only secondary bones), semantic split-body region naming (`Body_*`), rigid-accessory binding, material/slot conventions, incremental delivery scope, and Blender/MCP export guardrails before producing modular character assets.
-- **Verification:** `python3 scripts/ci/check_docs.py` passed across all tracked Markdown files including the new rule; `git diff --check origin/develop..HEAD --` clean; docs-only change (outside `format:check` paths). Disclosure: `unittest discover -s scripts/ci` hung locally on Windows (`test_public_checker_cases`) and runs in Ubuntu CI.
+- **Verification:** `python3 scripts/ci/check_docs.py` passed across all 84 tracked Markdown files; `git diff --check origin/develop..HEAD --` clean; docs-only change (outside `format:check` paths). Disclosure: `unittest discover -s scripts/ci` hung locally on Windows (`test_public_checker_cases`) and runs in Ubuntu CI.
 - **Next step:** Team review and approval by `Agustin742` and `Calegaris`, then merge into `develop`.
 
 ## 2026-11-21 — Review, develop conflict resolution, and merge of PR #112 (#36)
