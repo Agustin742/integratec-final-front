@@ -112,6 +112,18 @@ export function classroomDetailQueryKey(
   return createScopedQueryKey({ userId, classroomId }, 'classrooms', 'detail');
 }
 
+/**
+ * Key of `GET /classrooms/{id}/desks`: server-authoritative physical desk map
+ * for one classroom, scoped by `userId` and `classroomId`
+ * (`rules/state-management.md`).
+ */
+export function classroomDesksQueryKey(
+  userId: string,
+  classroomId: string,
+): ScopedQueryKey {
+  return createScopedQueryKey({ userId, classroomId }, 'classrooms', 'desks');
+}
+
 export type ClassroomSortOrder = 'createdAt' | '-createdAt' | 'name' | '-name';
 
 export interface ClassroomListQueryParams {

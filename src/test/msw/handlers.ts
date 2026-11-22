@@ -9,6 +9,9 @@ export type ClassroomDetailPayload =
   components['schemas']['ClassroomDetailResponseDto'];
 export type ClassroomContextPayload =
   components['schemas']['ClassroomContextResponseDto'];
+export type ClassroomDeskPayload = components['schemas']['ClassroomDeskDto'];
+export type ClassroomDeskMapPayload =
+  components['schemas']['ClassroomDeskMapDto'];
 export type AcceptInvitationPayload =
   components['schemas']['AcceptInvitationDto'];
 export type JoinClassroomWithCodePayload =
@@ -2723,6 +2726,75 @@ export function createClassroomContextHandler(
   };
   return http.get(`${baseUrl}/classrooms/${id}`, () =>
     HttpResponse.json(payload, { status: 200 }),
+  );
+}
+
+export interface CreateClassroomDesksHandlerOptions {
+  readonly baseUrl?: string;
+  readonly assignedUserId?: string | null;
+  readonly assignedDeskIndex?: number;
+  readonly totalDesks?: number;
+  readonly status?: number;
+  readonly error?: ErrorBodyPayload;
+  readonly items?: readonly ClassroomDeskPayload[];
+  readonly onRequest?: (request: Request) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `GET /classrooms/{id}/desks`
+ * (`ClassroomDesksController_read`): returns the unpaginated 1-based physical
+ * desk map with demo student desk assignment.
+ */
+export function createClassroomDesksHandler(
+  classroomId = '*',
+  options: CreateClassroomDesksHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const assignedUserId =
+    options.assignedUserId === undefined
+      ? '00000000-0000-4000-8000-000000000001'
+      : options.assignedUserId;
+  const assignedDeskIndex = options.assignedDeskIndex ?? 1;
+  const totalDesks = options.totalDesks ?? 12;
+
+  return http.get(
+    `${baseUrl}/classrooms/${classroomId}/desks`,
+    async ({ request }) => {
+      await options.onRequest?.(request);
+
+      const status = options.status ?? 200;
+      if (status >= 400) {
+        return createErrorEnvelopeResponse(
+          status,
+          options.error ?? {
+            code: status === 403 ? 'FORBIDDEN' : 'NOT_FOUND',
+            message: 'Cannot read classroom desk map.',
+            correlationId: `corr-desks-${status}`,
+          },
+        );
+      }
+
+      const items: ClassroomDeskPayload[] = options.items
+        ? [...options.items]
+        : Array.from({ length: totalDesks }, (_, idx) => {
+            const deskIndex = idx + 1;
+            const isAssigned =
+              assignedUserId !== null && deskIndex === assignedDeskIndex;
+            const suffix = String(deskIndex).padStart(4, '0');
+            return {
+              id: `00000000-0000-4000-8000-00000000d${suffix.slice(-3)}`,
+              deskIndex,
+              membershipId: isAssigned
+                ? '00000000-0000-4000-8000-00000000m001'
+                : null,
+              userId: isAssigned ? assignedUserId : null,
+            };
+          });
+
+      return HttpResponse.json({ items } satisfies ClassroomDeskMapPayload, {
+        status: 200,
+      });
+    },
   );
 }
 
@@ -5822,6 +5894,10 @@ export const defaultHandlers: readonly HttpHandler[] = [
   http.get(`${TEST_API_BASE_URL}/chats`, () =>
     HttpResponse.json({ items: [] }),
   ),
+  createClassroomDesksHandler('*', {
+    assignedUserId: '00000000-0000-4000-8000-000000000001',
+    assignedDeskIndex: 1,
+  }),
 ];
 
 export type ReportCardItemPayload = components['schemas']['ReportCardItemDto'];
