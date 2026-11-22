@@ -4,6 +4,13 @@ Course declaration of AI use in the development process (see [course requirement
 
 > Status: partial evidence recorded. Sections marked _Pending_ still require team input and human review.
 
+## Basic T-shirt asset evidence
+
+- **Tools and scope:** Pi and Blender MCP reused the existing editable school-polo shells for male/female basic T-shirts, omitting collar/placket/button objects. No body, lower-half, runtime or legacy T-shirt replacement. See [asset evidence and limits](art/basic-tshirt.md).
+- **Useful result:** Isolated Draco exports passed structural checks and budget checks; decoded weights remained normalized with at most two influences. Existing shell geometry and weight hashes were preserved.
+- **Correction:** Isolated preview creation initially failed on view-layer hiding and an unavailable render-engine identifier. Initial copied animation strips left garments static; the final preview binds decoded garments to independent animated body-rig copies. Final renders were regenerated without body edits or weakened checks.
+- **Human verification:** Pending. The separate animated viewer and pose samples are review aids, not approval. Independent item6 review passed structural/scope checks but left S3 partial and S4 visual acceptance pending; some images were not discernible in that verifier's tool. Wishlist is not marked merged.
+
 ## School polo authoring and repair evidence
 
 - **Approved scope:** One modular school polo fitted to both existing bodies, with no anatomy, lower-body, body-rig, or runtime changes. See the [asset guide and verification limits](art/school-polo.md).

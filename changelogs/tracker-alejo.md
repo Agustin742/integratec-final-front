@@ -1,5 +1,25 @@
 # Tracker — Alejo
 
+## 2026-11-22 — Fit basic T-shirt pair to existing avatars
+
+- **Status:** blocked (human visual acceptance pending; structural candidate prepared)
+- **Area / files:** `assets/blender/avatars/shared/top/`, `public/models/avatars/{male,female}/`, asset checks and documentation; local plan `odd/tasks/avatar-basic-tshirt.md`.
+- **Change:** User selected basic T-shirt for both existing bodies. Inspect the existing exports and reuse the proven editable polo shell where suitable; no body, lower-half, polo, or runtime changes.
+- **Reason:** Continue incremental modular upper-body assets with correct sleeve attachment and preserved anatomy.
+- **Coordination:** Project item `PVTI_lAHOCevXNc4BoRd2zhK9fEI`, related issue #91; owner AlejoElPaisano.
+- **Evidence:** Authored isolated `basic-tshirt.blend` and new garment-only `top-basic-tshirt.glb` exports: male17,120B/female17,148B; legacy top-tshirt unchanged. RED missing export exit1, GREEN structural/polo/budget checks exit0 (26 assets within budget, three existing exceptions). Final decoded pair760vertices each, at most2 influences, normalized error2.98e-8. Four resolution renders and24 pose samples plus ignored animated viewer produced. Parent git diff confirms body/polo/legacy files unchanged. Source and render details in `docs/art/basic-tshirt.md`; checks are not visual approval.
+- **Independent disposition:** S1 structural pass, S2 preservation pass, S3 partial (rest/hierarchy and complete skin not independently inspected in Blender), S4 visual acceptance pending. Node3 checks and scoped docs3files passed exit0; five image samples not discernible in verifier interface. Parent inspected female Sit123 plus two rear views; no all-pose acceptance. Viewer open on female with autoplay; both named scenes populated and only one decoded garment visible each. Additional rear artifacts remain ignored.
+- **Checks and checkpoint:** Scoped docs passed (3 files); initial staged whitespace check failed on CRLF in the new test, corrected to LF without assertion changes. New/polo structural checks and staged whitespace then passed. Local checkpoint contains only the new candidate unit and its evidence, excluding all `odd/` viewer/scripts/plans.
+- **Next step:** Await human review of both viewer scenes, especially neckline, shoulder folds and scalloped hem. No merge-ready, runtime integration, all-animation-interval, mobile GPU or broad application checks claimed.
+
+## 2026-11-22 — Broaden modular avatar asset branch
+
+- **Status:** completed (branch rename and scope review)
+- **Area / files:** Local branch in `odd/worktrees/91-modular-existing-avatar-bodies`; this tracker.
+- **Change:** Renamed the polo-specific branch to `feat/91-modular-avatar-assets`, retaining the worktree and checkpoint `0a98748`. Read modular asset rules and upper-body wishlist entries. Branch verification and whitespace check passed; only this tracker changed. No asset edits, commits, push, or remote branch deletion.
+- **Reason:** Continue incremental wearable production on the unchanged existing male and female bodies, not just the polo.
+- **Next step:** Basic T-shirt pair selected and tracked in the newer entry; no lower-body assets or runtime changes.
+
 ## 2026-11-22 — Author modular school polo on existing bodies
 
 - **Status:** blocked (independent final verification unavailable); requested minimal hem adjustment completed
