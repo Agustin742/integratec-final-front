@@ -74,6 +74,7 @@ The [rule routing index](./index.md) maps tasks and touched areas to the rules b
 - [Security](./security.md) — secrets, permissions, validation, and frontend/backend boundaries.
 - [Responsible AI usage](./ai-usage.md) — human verification, privacy, and declaration of use.
 - [Art direction](./art-direction.md) — visual language, palette, avatars, environments, materials, lighting, camera, and acceptance criteria.
+- [Modular avatar 3D assets](./modular-avatar-assets.md) — split base body regions, single canonical 34-bone skeleton, wearable binding, naming, animations, expressions, and Blender/MCP export guardrails.
 
 ## How to use the rules
 

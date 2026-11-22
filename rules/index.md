@@ -21,6 +21,7 @@ Rule descriptions and writing criteria live in the [rules README](./README.md). 
 | Code change (feature, fix, refactor, test) | [Quality and testing](./quality-and-testing.md), [Security](./security.md), [Frontend conventions](./frontend-conventions.md), plus the area rules below |
 | New or changed screen, panel, or component | [UI and accessibility](./ui-and-accessibility.md), [Frontend conventions](./frontend-conventions.md), plus the product rule for the feature |
 | New or changed 3D scene, object, or camera behavior | [3D world and camera](./3d-world-and-camera.md), [Art direction](./art-direction.md), [Movement and interactions](./movement-and-interactions.md) |
+| Authoring, rigging, splitting, or exporting 3D avatar models or wearables | [Modular avatar 3D assets](./modular-avatar-assets.md), [Art direction](./art-direction.md), [3D world and camera](./3d-world-and-camera.md) |
 | Documentation-only change | [Documentation and decisions](./documentation-and-decisions.md); add area rules only if the text states their requirements |
 | Recording or changing a technical or product decision | [Documentation and decisions](./documentation-and-decisions.md), plus the rules the decision affects |
 | Creating or updating a rule document | [rules README](./README.md), [`example.md`](./example.md) |
@@ -63,6 +64,7 @@ Rule descriptions and writing criteria live in the [rules README](./README.md). 
 |---|---|---|
 | [UI and accessibility](./ui-and-accessibility.md) | Controls, styling, keyboard and touch access, focus, responsive layout, motion, drag and drop | No visible interface change |
 | [Art direction](./art-direction.md) | Palette, avatars, environments, materials, lighting, visual assets, styling of the scene | No visual or asset change |
+| [Modular avatar 3D assets](./modular-avatar-assets.md) | Base character bodies, split body regions, canonical 34-bone skeleton, modular wearables, avatar animations/expressions, Blender/MCP export | No 3D character or wearable asset work |
 | [Forms and validation](./forms-and-validation.md) | Forms, schemas, field and server errors, pending submissions, drafts | No form is added or changed |
 | [Error handling and feedback](./error-handling-and-feedback.md) | Loading, empty, error, and uncertain states; retries; user-visible failures | Failure behavior is unchanged |
 | [Configuration and environments](./configuration-and-environments.md) | Environment variables, build configuration, public configuration, `.env.example` | No configuration is added or read |
