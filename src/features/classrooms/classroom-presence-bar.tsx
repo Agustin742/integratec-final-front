@@ -1,6 +1,5 @@
 import type { components } from '@/api/schema.generated';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { classroomMessages as messages } from './messages';
 import type { ClassroomPresence } from './use-classroom-presence';
@@ -23,19 +22,38 @@ function formatParticipantRole(role: string): string {
   return role;
 }
 
-function statusBadgeMeta(status: ClassroomPresence['status']): {
+function statusIndicatorMeta(status: ClassroomPresence['status']): {
   readonly label: string;
-  readonly variant: 'success' | 'warning' | 'outline';
+  readonly pillClassName: string;
+  readonly dotClassName: string;
 } {
   switch (status) {
     case 'connected':
-      return { label: messages.presence.liveBadge, variant: 'success' };
+      return {
+        label: messages.presence.liveBadge,
+        pillClassName:
+          'border-success-edge/40 bg-success/60 text-success-foreground',
+        dotClassName: 'bg-success-foreground',
+      };
     case 'reconnecting':
-      return { label: messages.presence.reconnectingBadge, variant: 'warning' };
+      return {
+        label: messages.presence.reconnectingBadge,
+        pillClassName:
+          'border-warning-edge/50 bg-warning/60 text-warning-foreground',
+        dotClassName: 'bg-warning-foreground motion-safe:animate-pulse',
+      };
     case 'connecting':
-      return { label: messages.presence.connectingBadge, variant: 'outline' };
+      return {
+        label: messages.presence.connectingBadge,
+        pillClassName: 'border-edge/70 bg-tray/70 text-muted-foreground',
+        dotClassName: 'bg-muted-foreground/70 motion-safe:animate-pulse',
+      };
     default:
-      return { label: messages.presence.disconnectedBadge, variant: 'outline' };
+      return {
+        label: messages.presence.disconnectedBadge,
+        pillClassName: 'border-edge/70 bg-tray/70 text-muted-foreground',
+        dotClassName: 'bg-muted-foreground/60',
+      };
   }
 }
 
@@ -78,7 +96,7 @@ export function ClassroomPresenceBar({
     );
   }
 
-  const badge = statusBadgeMeta(presence.status);
+  const statusMeta = statusIndicatorMeta(presence.status);
   const showParticipants =
     presence.status === 'connected' || presence.status === 'reconnecting';
   const activeControls: string[] = [];
@@ -100,33 +118,47 @@ export function ClassroomPresenceBar({
       className="min-w-0 space-y-2 rounded-xl border border-edge bg-card/90 p-3 text-sm text-card-foreground shadow-xs"
     >
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <Badge variant={badge.variant}>{badge.label}</Badge>
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-semibold ${statusMeta.pillClassName}`}
+        >
+          <span
+            aria-hidden="true"
+            className={`size-2 shrink-0 rounded-full ${statusMeta.dotClassName}`}
+          />
+          {statusMeta.label}
+        </span>
         {presence.presenceUncertain && (
-          <Badge variant="outline">{messages.presence.uncertainBadge}</Badge>
+          <span className="text-xs font-medium text-muted-foreground">
+            · {messages.presence.uncertainBadge}
+          </span>
         )}
         {presence.status !== 'connected' && presence.message && (
           <span className="min-w-0 text-xs text-muted-foreground">
-            {presence.message}
+            — {presence.message}
           </span>
+        )}
+        {activeControls.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {activeControls.map((label) => (
+              <span
+                key={label}
+                className="inline-flex items-center rounded-md border border-warning-edge/50 bg-warning/50 px-2 py-0.5 text-xs font-medium text-warning-foreground"
+              >
+                {label}
+              </span>
+            ))}
+          </div>
         )}
         {presence.status === 'disconnected' && (
           <Button
             type="button"
             variant="outline"
             size="sm"
+            className="sm:ml-auto"
             onClick={() => void presence.reconnect()}
           >
             {messages.presence.retryAction}
           </Button>
-        )}
-        {activeControls.length > 0 && (
-          <div className="ml-auto flex flex-wrap items-center gap-1.5">
-            {activeControls.map((label) => (
-              <Badge key={label} variant="warning">
-                {label}
-              </Badge>
-            ))}
-          </div>
         )}
       </div>
 
