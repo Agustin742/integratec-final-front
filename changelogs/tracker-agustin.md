@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-21 — Review and fixes on PR #114 (#56, runtime performance monitor)
+
+- **Status:** completed (pending CI and merge of PR #114)
+- **Area / files:** `src/features/world/` (performance monitor, probe, overlay, GPU estimate), `src/features/classrooms/` (performance offer banner, workspace, messages), `e2e/performance-offer.spec.ts`, `docs/3d-performance-monitor.md`, `docs/technical-justification.md`, `docs/assets/classroom-workspace/performance-offer-{1280,360}.png`, `changelogs/tracker-alejo.md`
+- **Change:** Merged `develop` (`3db911e`; the performance probe is now a child of `ClassroomWorld`, which forwards `children`). Review fixes: `400dc16` estimates GPU memory only on a stats refresh instead of every frame; `8545735` offers 2D mode on very slow devices (`minDecisionSpanMs` of 6000 ms); `1889277` banner behavior (focus returns after a decline, a manual 2D switch resolves the offer, full-width mobile buttons, clearer copy). Re-measure and docs (this commit): numbers now come from the populated classroom scene (56 draw calls, 66206 triangles, about 3 MB GPU estimate; 3.8 fps desktop and 4.5 fps mobile at 20x CPU throttle with the offer shown), the FD8 open item is updated, and the overlay is documented as runtime-gated by `appEnv !== 'production'` instead of removed from production bundles.
+- **Reason:** Review findings on PR #114; the earlier numbers described the empty stage.
+- **Verification:** Per-task strict TDD, `--changed origin/develop`, lint, typecheck, build, `security:check`; native review approved on each task commit; `e2e/performance-offer.spec.ts` 5 passed, 1 skipped by design (desktop and mobile).
+- **Next step:** CI green and merge.
+
 ## 2026-11-20 — Review and fixes on PR #113 (#51, classroom chat)
 
 - **Status:** completed (pending CI and Agustin's visual check before merging PR #113)
@@ -26,6 +35,15 @@
 - **Reason:** Review findings on PR #109; the visual check against the local backend returned 404 on every submission because back #47 shipped a different contract.
 - **Verification:** Per-task affected tests (exam suites 32/32, `--changed` 715 pass), lint, typecheck, build, `security:check`, `check_docs.py`, Playwright exam/submission/notification specs 16/16; live submission against the local backend stored `autoScore` 7/10. Native review approved on each task commit.
 - **Next step:** CI green and merge. MC auto-scores do not credit points until a teacher grades (back behavior, out of scope).
+
+## 2026-11-19 — 3D classroom scene and local avatar navigation (front #36)
+
+- **Status:** in-progress (branch `feat/36-classroom-scene`, cut from `feat/35-avatar-3d-preview` because the scene reuses `AvatarModel`; no PR yet)
+- **Area / files:** `src/features/world/movement/`, `src/features/world/input/`, `src/features/world/classroom/`, `src/features/world/camera.ts`, `src/features/world/world-canvas.tsx`, `src/lib/input-arbitration.ts`, `src/features/classrooms/classroom-3d-stage.tsx`, `src/features/classrooms/classroom-workspace.tsx`, `docs/classroom-workspace.md`
+- **Change:** The 3D classroom view now shows a placeholder room built from the shared `CLASSROOM_LAYOUT` (desks match server collisions) with the user's own avatar. It moves locally with W/A/S/D or arrows and by clicking or tapping the floor (grid A* path, no false arrival on unreachable targets), with Walk/Idle clips, a destination marker and `Escape` to cancel. Input arbitration is shared with the `Alt+M` shortcut. The movement intent is exposed for `#37`.
+- **Reason:** First visible step of HU-ESP-001: users can see and move their avatar in the classroom before realtime presence lands.
+- **Verification:** Per-task affected tests, lint, typecheck, build and `security:check`; RDD reviews of each task commit approved. Look and feel still need a visual check in a real browser.
+- **Next step:** Visual check, then open the PR to `develop`; `#37` sends the intent to the room.
 
 ## 2026-11-18 — 3D avatar preview and shared avatar component (front #35)
 

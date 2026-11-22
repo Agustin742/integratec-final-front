@@ -20,6 +20,10 @@ import { ErrorState, LoadingState } from '@/components/feedback/states';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { WalletIndicator } from '@/features/points/wallet-indicator';
 import { Button, buttonStyles } from '@/components/ui/button';
+import {
+  isEditableTarget,
+  isInteractionBlocked,
+} from '@/lib/input-arbitration';
 import { useSessionCleanup, useSessionSnapshot } from '@/session/provider';
 import { Classroom2DLayout } from './classroom-2d-layout';
 import { Classroom3DStage, clearLoadedWorldAssets } from './classroom-3d-stage';
@@ -27,6 +31,11 @@ import { useClassroomViewMode } from './classroom-mode-store';
 import { joinMessages } from './join-messages';
 import { readClassroomJoinOutcome } from './join-schema';
 import { classroomMessages as messages } from './messages';
+import { PerformanceOfferBanner } from './performance-offer-banner';
+import {
+  beginPerformanceOffer,
+  usePerformanceOfferStore,
+} from './performance-offer-store';
 import { useClassroomContext } from './use-classroom-capabilities';
 import { useClassroomContextEvents } from './use-classroom-context-events';
 import { classroomPanelCatalog } from './panels/classroom-panel-catalog';
@@ -56,20 +65,6 @@ export function ClassroomWorkspace({
         <NotFoundPage />
       )}
     </div>
-  );
-}
-
-function isEditableShortcutTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-  if (target.isContentEditable) {
-    return true;
-  }
-  return (
-    target.closest(
-      'input, textarea, select, [contenteditable=""], [contenteditable="true"], [contenteditable="plaintext-only"]',
-    ) !== null
   );
 }
 
@@ -159,7 +154,7 @@ function WorkspaceContext({
   const snapshot = useSessionSnapshot();
   const sessionUserId =
     snapshot.status === 'authenticated' ? snapshot.user.id : null;
-  const { mode, toggleMode } = useClassroomViewMode(sessionUserId);
+  const { mode, setMode, toggleMode } = useClassroomViewMode(sessionUserId);
 
   const isParent =
     context.status === 'ready' && context.classroom.myRole === 'PARENT';
@@ -167,8 +162,13 @@ function WorkspaceContext({
 
   const handleModeToggle = useCallback(() => {
     pendingFocusSwitchRef.current = true;
+    // Switching to 2D by hand answers a visible 2D offer (no-op otherwise),
+    // so it does not reappear stale after returning to 3D.
+    if (mode === '3d') {
+      usePerformanceOfferStore.getState().accept();
+    }
     toggleMode();
-  }, [toggleMode]);
+  }, [mode, toggleMode]);
 
   useLayoutEffect(() => {
     if (
@@ -198,10 +198,10 @@ function WorkspaceContext({
       }
       const keyMatches =
         event.code === 'KeyM' || event.key.toLowerCase() === 'm';
-      if (!keyMatches || isEditableShortcutTarget(event.target)) {
+      if (!keyMatches || isEditableTarget(event.target)) {
         return;
       }
-      if (document.querySelector('[role="dialog"]') !== null) {
+      if (isInteractionBlocked()) {
         return;
       }
       event.preventDefault();
@@ -350,10 +350,22 @@ function WorkspaceContext({
               headingRef={activeViewHeadingRef}
             />
           ) : (
-            <Classroom3DStage
-              headingRef={activeViewHeadingRef}
-              scopeKey={classroomId}
-            />
+            <>
+              {/* Sustained low fps shows a non-blocking offer (#56); the
+                  app never switches modes without the user's choice. */}
+              <PerformanceOfferBanner
+                onAccept={() => {
+                  pendingFocusSwitchRef.current = true;
+                  setMode('2d');
+                }}
+                onDecline={() => activeViewHeadingRef.current?.focus()}
+              />
+              <Classroom3DStage
+                headingRef={activeViewHeadingRef}
+                scopeKey={classroomId}
+                onSustainedLowFps={beginPerformanceOffer}
+              />
+            </>
           ))}
         <Outlet
           key={location.key}

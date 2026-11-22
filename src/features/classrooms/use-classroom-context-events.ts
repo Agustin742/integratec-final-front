@@ -6,6 +6,14 @@ import { classroomDetailQueryKey } from '@/api/query-keys';
 import { useSessionService, useSessionSnapshot } from '@/session/provider';
 import { readContextEvents } from './context-events';
 
+/**
+ * Client-side connection renewal. It must stay below the backend
+ * `CONTEXT_MAX_LIFETIME_MS` (60 s) in
+ * back/apps/api/src/classrooms/context-events/classroom-context-events.service.ts,
+ * so the server's lifetime-expiry hint is never received in normal operation.
+ */
+export const CONTEXT_RENEWAL_MS = 50_000;
+
 /** One workspace owner, not one subscription per capability consumer. */
 export function useClassroomContextEvents(classroomId: string): void {
   const { client, controller } = useSessionService();
@@ -42,7 +50,7 @@ export function useClassroomContextEvents(classroomId: string): void {
       if (stopped) return;
       connection = new AbortController();
       const signal = connection.signal;
-      renewal = setTimeout(() => connection?.abort(), 60_000);
+      renewal = setTimeout(() => connection?.abort(), CONTEXT_RENEWAL_MS);
       let terminal = false;
       try {
         const stream = await requestApi(() =>
@@ -75,7 +83,22 @@ export function useClassroomContextEvents(classroomId: string): void {
         }
         delay = 1_000;
         reconcileContext(); // Register first, then reconcile: no connection/read gap.
-        await readContextEvents(stream, classroomId, resetContext, signal);
+        // The server always writes one registration hint right after the stream
+        // opens; the reconcile above already covers it. Only later hints on the
+        // same connection are real invalidations that must reset.
+        let registrationHintSeen = false;
+        await readContextEvents(
+          stream,
+          classroomId,
+          () => {
+            if (!registrationHintSeen) {
+              registrationHintSeen = true;
+              return;
+            }
+            resetContext();
+          },
+          signal,
+        );
       } catch (error) {
         // Authentication recovery belongs exclusively to client middleware.
         terminal =
