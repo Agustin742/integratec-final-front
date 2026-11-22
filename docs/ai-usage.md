@@ -4,6 +4,14 @@ Course declaration of AI use in the development process (see [course requirement
 
 > Status: partial evidence recorded. Sections marked _Pending_ still require team input and human review.
 
+## School polo authoring and repair evidence
+
+- **Approved scope:** One modular school polo fitted to both existing bodies, with no anatomy, lower-body, body-rig, or runtime changes. See the [asset guide and verification limits](art/school-polo.md).
+- **Tools:** el Gentleman in Pi and Blender MCP inspected the user-opened file, preserved its unsaved state in a local copy, reused editable uniform masters, generated fitted garment drafts and isolated Draco GLBs, and produced pose/render evidence.
+- **Useful result:** Structural checks and a decode roundtrip verified garment isolation, canonical joints and bounded skin influences. Both existing body files stayed unchanged.
+- **Correction:** Default Draco attribute precision exceeded the weight-sum tolerance after decoding; increasing generic quantization to 20 bits resolved the numerical failure without weakening the check. Visual inspection also rejected the initial surface-fitted shell. After an explicit repair request, controlled torso/sleeve topology, bounded weights, shoulder coverage, and a waist-height hem replaced the damaged shell. The final GLBs were decoded and rendered at 24 animation samples on both unchanged references; independent repair verification could not complete because the verifier process exited unexpectedly (`3221226505`). It was not retried and is not counted as approval.
+- **Human verification:** The contributor praised the female appearance and sleeve motion, then requested a slight hem extension and a local checkpoint commit. Review of the adjusted hem and male fit remains pending; the unavailable independent verdict is not approval. No push, PR, merge, or completed wishlist claim.
+
 ## Tools used
 
 | Tool                                   | Tasks supported                                                                                                                                                                                 |

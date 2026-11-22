@@ -1,5 +1,16 @@
 # Tracker — Alejo
 
+## 2026-11-22 — Author modular school polo on existing bodies
+
+- **Status:** blocked (independent final verification unavailable); requested minimal hem adjustment completed
+- **Area / files:** Repaired candidate `public/models/avatars/{male,female}/top-school-polo.glb`, `assets/blender/avatars/shared/top/school-polo.blend`, `scripts/assets/test-school-polo.mjs`, `docs/art/school-polo.md`, `docs/assets/school-polo/`, `docs/ai-usage.md`; bodies unchanged.
+- **Change:** Scope corrected to the school polo wearable only, reusing existing garment masters through Blender MCP; body refactor abandoned. Inspect and preserve the user-opened uniform file before isolated authoring.
+- **Reason:** Deliver incremental modular GLB assets under `rules/modular-avatar-assets.md` while preserving existing anatomy and consumers.
+- **Verification:** Final exports are 26,364/26,808 bytes, canonical 34 joints, zero clips. Structural and budget checks pass (24 models within limits, three unchanged exceptions). Draco roundtrip: 1,108 vertices each, 1–4 influences, weight-sum error below 6.41e-7. Rendered 24 start/mid/end Idle/Walk/Sit/Wave samples and checked rear views after the hem adjustment. Body-file diff empty; documentation and whitespace checks pass. Independent repair verifier crashed with 3221226505 before a verdict and was not retried. No browser, full-animation interval, full application suite, or performance verification.
+- **Hem refinement:** Human praised female appearance and sleeve motion, requested slight additional length. Extended front/sides20mm and rear center26mm with smooth transition in both authoring/review variants. Other vertices, sleeve shape/weights and body files unchanged. Re-exported26364/26808B garment-only GLBs and reran24 decoded samples plus rear views; structural/budget/docs checks recorded separately. User still needs to inspect the adjusted hem and male fit.
+- **Human preview:** Prepared separate local `odd/previews/school-polo-review.blend` with `REVIEW_Polo_Female/Male`, material view, hidden controls, synchronized existing Idle/Walk/Sit/Wave sequence (frames1–231,24fps) and autoplay. Verified evaluated garment movement0.179m and material viewport screenshot. Original file/source/exports unchanged.
+- **Next step:** The contributor explicitly authorized a local checkpoint commit of the editable source, fitted GLBs, evidence, documentation and structural test; exclude the ignored viewer and all `odd/` files. This checkpoint is not final independent verification or merge approval. Updated hem and male visual review remain pending. No push, PR, or wishlist completion authorized.
+
 ## 2026-11-22 — Refine modular avatar reuse and body preservation (PR #119)
 
 - **Status:** completed
