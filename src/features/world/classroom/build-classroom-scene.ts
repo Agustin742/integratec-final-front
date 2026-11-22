@@ -144,11 +144,13 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   teachingZone.name = 'teaching-zone';
   root.add(teachingZone);
 
-  const entrance = flat(CLASSROOM_COLORS.coral, ENTRANCE_WIDTH, 0.6, [
-    0,
-    0.012,
-    bounds.maxZ + 0.05,
-  ]);
+  const entrance = flat(
+    CLASSROOM_COLORS.coral,
+    ENTRANCE_WIDTH,
+    0.6,
+    [0, 0.012, bounds.maxZ + 0.05],
+    true,
+  );
   entrance.name = 'entrance';
   entrance.userData.placeholder = 'entrance' satisfies PlaceholderKind;
   root.add(entrance);

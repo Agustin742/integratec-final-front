@@ -22,10 +22,19 @@ const click = (x: number, z: number, button = 0) => ({
   stopPropagation: vi.fn(),
 });
 
-function setup(props: { scopeKey?: string; onIntentChange?: () => void } = {}) {
+function setup(
+  props: {
+    scopeKey?: string;
+    onIntentChange?: () => void;
+    interactionLocked?: boolean;
+  } = {},
+) {
   return renderHook(
-    (p: { scopeKey?: string; onIntentChange?: () => void }) =>
-      useClassroomNavigation(p),
+    (p: {
+      scopeKey?: string;
+      onIntentChange?: () => void;
+      interactionLocked?: boolean;
+    }) => useClassroomNavigation(p),
     { initialProps: props },
   );
 }
@@ -131,5 +140,28 @@ describe('useClassroomNavigation', () => {
     });
     expect(three.invalidate).toHaveBeenCalled();
     expect(onIntentChange).toHaveBeenCalledTimes(1);
+  });
+
+  test('interactionLocked clears any active walk destination and ignores new clicks until unlocked', () => {
+    const { result, rerender } = setup({
+      scopeKey: 'room-1',
+      interactionLocked: false,
+    });
+    act(() => result.current.onFloorClick(click(-4, 5)));
+    expect(result.current.controller.hasDestination()).toBe(true);
+    expect(result.current.marker.object.visible).toBe(true);
+
+    rerender({ scopeKey: 'room-1', interactionLocked: true });
+    expect(result.current.controller.hasDestination()).toBe(false);
+    expect(result.current.marker.object.visible).toBe(false);
+
+    act(() => result.current.onFloorClick(click(-4, 5)));
+    expect(result.current.controller.hasDestination()).toBe(false);
+    expect(result.current.marker.object.visible).toBe(false);
+
+    // Unlocking must never replay an earlier destination.
+    rerender({ scopeKey: 'room-1', interactionLocked: false });
+    expect(result.current.controller.hasDestination()).toBe(false);
+    expect(result.current.marker.object.visible).toBe(false);
   });
 });
