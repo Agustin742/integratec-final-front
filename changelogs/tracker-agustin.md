@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-21 — Review and fixes on PR #115 (#57, inventory selector)
+
+- **Status:** completed (pending CI and merge of PR #115)
+- **Area / files:** `src/features/inventory/`, `src/features/shop/`, `src/features/profile/`, `src/test/msw/handlers.ts`, `e2e/inventory.spec.ts`, `docs/ui-inventory.md`, `docs/assets/inventory/`, `changelogs/tracker-alejo.md`
+- **Change:** Merged `develop` (`6e8fd52`, tracker conflict). Review fixes: `81a2260` resolves the slot from the catalog item `metadata.slot` and makes the MSW store return 409 like the back end; `ec87eca` keeps concurrent equips (each confirmation merges only its slot) and loads every purchase and catalog page; `59807b4` replaces the selector with a per-slot grid with accessibility (radiogroup, roving tabindex, status region; visual approved by Agustin); T4 (this commit) updates `docs/ui-inventory.md` and the trackers.
+- **Reason:** Review findings on PR #115.
+- **Verification:** inventory, shop and profile tests 87/87; `--changed origin/develop` 872/872; `e2e/inventory.spec.ts` 2/2; lint, typecheck, build and `security:check` pass.
+- **Next step:** CI green and merge.
+
 ## 2026-11-21 — Review and fixes on PR #114 (#56, runtime performance monitor)
 
 - **Status:** completed (pending CI and merge of PR #114)

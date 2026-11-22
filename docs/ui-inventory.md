@@ -13,6 +13,15 @@ The 2D inventory selector lets enrolled students inspect their classroom-scoped 
 - **Server authority:** `GET /classrooms/{id}/me/equipment` and `PUT /classrooms/{id}/me/equipment/{slot}` are the source of truth. Each slot shows distinct pending (`Guardando…`), confirmed (`Guardado`), and rejected states.
 - **403 / unowned and uncertain outcomes:** A `403` rejection (such as attempting to equip an unowned item) displays a clear alert and leaves the confirmed equipped state unchanged. Uncertain (`5xx` / network / malformed `2xx`) outcomes trigger authoritative cache invalidation to reconcile with the server.
 
+## Slot selector
+
+- **Slot resolution:** each purchased item is offered in the slot declared by its catalog item `metadata.slot` (mirrors the back end `deriveSlotForItem`). Items without a valid slot are not offered.
+- **Complete data:** every purchase page and every catalog page is loaded through a bounded `fetchAllPages` (at most 50 pages of 100), so no purchased item is missing from the grid.
+- **Per-slot grid:** each slot is a `role="radiogroup"` and each item a tile (`button role="radio"`) with a roving tabindex. Arrow keys move focus; Enter, Space, or a click equips the item. The equipped tile shows "Equipado" with an icon, and an explicit "Desequipar" button empties the slot. An empty slot shows a hint.
+- **Per-slot status region:** "Guardando…" while pending, "Guardado" cleared after 4 s, and errors kept until the next interaction.
+- **Concurrent equips:** when several slots are saved at once, each confirmation merges only its own slot into the cached equipment state, so one response never overwrites another slot.
+- **Heading focus:** `InventoryPanel` takes `focusHeadingOnMount` (default off). It is enabled only where the panel mounts as a new view: the shop tab and the profile section.
+
 ## Visual evidence
 
 | Desktop (`1280px`)                                        | Mobile (`360px`)                                        |
