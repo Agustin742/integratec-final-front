@@ -23,20 +23,24 @@ export interface UseClassroomNavigationOptions {
   scopeKey?: string | undefined;
   /** Movement intent for the realtime sender (#37); fired on change only. */
   onIntentChange?: ((intent: AvatarInput) => void) | undefined;
+  /** True while a modal panel blocks world movement and pointer picking. */
+  interactionLocked?: boolean | undefined;
 }
 
 /**
  * Everything the classroom needs to walk the local avatar: the controller
  * (keyboard + destination), the click handler for the floor, the destination
  * marker and Escape to stop. Input is ignored while the canvas is not
- * rendering (hidden tab, offscreen).
+ * rendering (hidden tab, offscreen) or while `interactionLocked` is true.
  */
 export function useClassroomNavigation({
   scopeKey,
   onIntentChange,
+  interactionLocked = false,
 }: UseClassroomNavigationOptions) {
   const invalidate = useThree((state) => state.invalidate);
-  const enabled = useThree((state) => state.frameloop) !== 'never';
+  const enabled =
+    useThree((state) => state.frameloop) !== 'never' && !interactionLocked;
   // A key press from rest must wake the demand loop itself; nothing else
   // (placeholder body, reduced motion) is guaranteed to be requesting frames.
   const listener = useRef(onIntentChange);
@@ -60,31 +64,40 @@ export function useClassroomNavigation({
   const marker = useMemo(() => createDestinationMarker(), []);
   useEffect(() => () => marker.dispose(), [marker]);
 
+  const clearDestination = useCallback(() => {
+    controller.clearDestination();
+    marker.hide();
+    invalidate();
+  }, [controller, marker, invalidate]);
+
   // Declared after the controller so it runs after the respawn it triggers.
   useEffect(() => {
     marker.hide();
     invalidate();
   }, [marker, invalidate, scopeKey]);
 
+  useEffect(() => {
+    if (interactionLocked) {
+      clearDestination();
+    }
+  }, [interactionLocked, clearDestination]);
+
   useEscapeKey({
     enabled,
-    onEscape: () => {
-      controller.clearDestination();
-      marker.hide();
-      invalidate();
-    },
+    onEscape: clearDestination,
   });
 
   const { setDestination } = controller;
   const onFloorClick = useCallback(
     (event: FloorClickEvent) => {
+      if (!enabled) return;
       const point = destinationFromFloorClick(event, setDestination);
       if (!point) return;
       marker.show(point);
       invalidate();
     },
-    [setDestination, marker, invalidate],
+    [enabled, setDestination, marker, invalidate],
   );
 
-  return { controller, marker, onFloorClick };
+  return { controller, marker, onFloorClick, clearDestination };
 }

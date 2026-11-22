@@ -2,19 +2,30 @@ import {
   Component,
   lazy,
   Suspense,
+  useCallback,
   useState,
   type ReactNode,
   type RefObject,
 } from 'react';
+import { useNavigate } from 'react-router';
+import type { ClassroomInteractable } from '../world/classroom/classroom-interactables';
 import { PerformanceProbeRuntime } from '../world/performance-monitor';
 import { PerformanceStatsOverlay } from '../world/performance-stats-overlay';
 import { worldMessages } from '../world/messages';
 import { WorldFallback } from '../world/world-fallback';
+import {
+  ClassroomInteractablesBar,
+  type InteractableFeedback,
+} from './classroom-interactables-bar';
+import { useClassroomDesks } from './desks/classroom-desks-api';
 import { classroomMessages } from './messages';
+import { useOptionalClassroomPanels } from './panels/classroom-panels';
 
 export interface Classroom3DStageProps {
   readonly headingRef?: RefObject<HTMLHeadingElement | null>;
   readonly scopeKey?: string;
+  readonly classroomId?: string;
+  readonly petName?: string | null;
   /** Fired when the canvas measures sustained low fps (#56). */
   readonly onSustainedLowFps?: () => void;
 }
@@ -76,12 +87,184 @@ class StageBoundary extends Component<
 export function Classroom3DStage({
   headingRef,
   scopeKey,
+  classroomId,
+  petName,
   onSustainedLowFps,
 }: Classroom3DStageProps) {
+  const resolvedClassroomId = classroomId ?? scopeKey ?? '';
+  return (
+    <Classroom3DStageContent
+      key={resolvedClassroomId}
+      headingRef={headingRef}
+      scopeKey={scopeKey}
+      classroomId={resolvedClassroomId}
+      petName={petName}
+      onSustainedLowFps={onSustainedLowFps}
+    />
+  );
+}
+
+function Classroom3DStageContent({
+  headingRef,
+  scopeKey,
+  classroomId,
+  petName,
+  onSustainedLowFps,
+}: {
+  readonly headingRef?: RefObject<HTMLHeadingElement | null>;
+  readonly scopeKey?: string;
+  readonly classroomId: string;
+  readonly petName?: string | null;
+  readonly onSustainedLowFps?: () => void;
+}) {
   const [LazyClassroomWorld] = useState(() => lazy(loadClassroomWorld));
   const [LazyWorldProbe] = useState(() => lazy(loadWorldProbe));
   const supportsBrowserObservers = typeof ResizeObserver !== 'undefined';
   const [performanceRuntime] = useState(() => new PerformanceProbeRuntime());
+
+  const navigate = useNavigate();
+  const panels = useOptionalClassroomPanels();
+  const desks = useClassroomDesks(classroomId, classroomId.trim().length > 0);
+
+  const [highlightedId, setHighlightedId] = useState<string | undefined>(
+    undefined,
+  );
+  const [petReactionNonce, setPetReactionNonce] = useState(0);
+  const [feedback, setFeedback] = useState<InteractableFeedback | null>(null);
+
+  const interactionLocked = panels?.hasActivePanel ?? false;
+  const effectiveHighlightedId = interactionLocked ? undefined : highlightedId;
+
+  const trimmedPetName = petName?.trim() ?? '';
+  const resolvedPetName =
+    trimmedPetName.length > 0
+      ? trimmedPetName
+      : classroomMessages.interactables.petDefaultName;
+
+  const restoreStageHeadingFocus = useCallback(() => {
+    if (headingRef?.current?.isConnected) {
+      headingRef.current.focus();
+    }
+  }, [headingRef]);
+
+  const handleRetryDesks = useCallback(() => {
+    setFeedback({
+      kind: 'info',
+      text: classroomMessages.interactables.desksLoading,
+    });
+    desks.retry();
+  }, [desks]);
+
+  const handleActivateInteractable = useCallback(
+    (interactable: ClassroomInteractable | null, invoker?: HTMLElement) => {
+      if (interactionLocked) return;
+      const copy = classroomMessages.interactables;
+
+      if (interactable === null) {
+        if (desks.status === 'pending' || desks.status === 'idle') {
+          setFeedback({ kind: 'info', text: copy.desksLoading });
+        } else if (desks.status === 'error') {
+          setFeedback({
+            kind: 'denied',
+            text: copy.desksUnavailable,
+            retry: {
+              label: copy.retryDesksAction,
+              onClick: handleRetryDesks,
+            },
+          });
+        } else {
+          setFeedback({ kind: 'denied', text: copy.noAssignedDeskShort });
+        }
+        return;
+      }
+
+      if (interactable.interactionClass === 'decorative') {
+        setPetReactionNonce((nonce) => nonce + 1);
+        setFeedback({
+          kind: 'pet',
+          text: copy.petGreeting(resolvedPetName),
+        });
+        return;
+      }
+
+      if (interactable.interactionClass === 'direct_transition') {
+        setHighlightedId(undefined);
+        setFeedback(null);
+        void navigate('/');
+        return;
+      }
+
+      if (interactable.type === 'student-desk') {
+        if (desks.status === 'pending' || desks.status === 'idle') {
+          setFeedback({ kind: 'info', text: copy.desksLoading });
+          return;
+        }
+        if (desks.status === 'error') {
+          setFeedback({
+            kind: 'denied',
+            text: copy.desksUnavailable,
+            retry: {
+              label: copy.retryDesksAction,
+              onClick: handleRetryDesks,
+            },
+          });
+          return;
+        }
+        if (desks.myDeskIndex === null) {
+          setFeedback({ kind: 'denied', text: copy.noAssignedDesk });
+          return;
+        }
+        if (interactable.deskIndex !== desks.myDeskIndex) {
+          setFeedback({ kind: 'denied', text: copy.foreignDesk });
+          return;
+        }
+      }
+
+      const panelKey = interactable.panelKey;
+      if (!panelKey || !panels || !panels.canOpenPanel(panelKey)) {
+        setFeedback({ kind: 'denied', text: copy.panelDenied });
+        return;
+      }
+
+      const opened = panels.openPanel(
+        panelKey,
+        invoker,
+        invoker ? undefined : restoreStageHeadingFocus,
+      );
+      if (!opened) {
+        setFeedback({ kind: 'denied', text: copy.panelDenied });
+        return;
+      }
+
+      setHighlightedId(undefined);
+      setFeedback(null);
+    },
+    [
+      interactionLocked,
+      desks.status,
+      desks.myDeskIndex,
+      handleRetryDesks,
+      resolvedPetName,
+      navigate,
+      panels,
+      restoreStageHeadingFocus,
+    ],
+  );
+
+  const handleHoverInteractable = useCallback((id: string | undefined) => {
+    setHighlightedId(id);
+  }, []);
+
+  const canOpenPanel = useCallback(
+    (key: string) => panels?.canOpenPanel(key) ?? false,
+    [panels],
+  );
+
+  const effectiveFeedback =
+    desks.status === 'ready' &&
+    feedback?.text === classroomMessages.interactables.desksLoading
+      ? null
+      : feedback;
 
   return (
     <section
@@ -102,19 +285,40 @@ export function Classroom3DStage({
         </p>
       </div>
 
+      <ClassroomInteractablesBar
+        highlightedId={effectiveHighlightedId}
+        myDeskIndex={desks.myDeskIndex}
+        desksStatus={desks.status}
+        petName={petName}
+        feedback={effectiveFeedback}
+        canOpenPanel={canOpenPanel}
+        onFocusInteractable={handleHoverInteractable}
+        onActivateInteractable={handleActivateInteractable}
+      />
+
       {supportsBrowserObservers ? (
         <StageBoundary>
-          <Suspense fallback={<p role="status">{worldMessages.loading}</p>}>
-            <LazyClassroomWorld
-              label={classroomMessages.viewMode.canvasLabel}
-              scopeKey={scopeKey}
-            >
-              <LazyWorldProbe
-                runtime={performanceRuntime}
-                onSustainedLowFps={onSustainedLowFps}
-              />
-            </LazyClassroomWorld>
-          </Suspense>
+          <div onPointerLeave={() => setHighlightedId(undefined)}>
+            <Suspense fallback={<p role="status">{worldMessages.loading}</p>}>
+              <LazyClassroomWorld
+                label={classroomMessages.viewMode.canvasLabel}
+                scopeKey={scopeKey}
+                highlightedInteractableId={effectiveHighlightedId}
+                ownDeskIndex={desks.myDeskIndex}
+                petReactionNonce={petReactionNonce}
+                interactionLocked={interactionLocked}
+                onHoverInteractable={handleHoverInteractable}
+                onSelectInteractable={(item) =>
+                  handleActivateInteractable(item)
+                }
+              >
+                <LazyWorldProbe
+                  runtime={performanceRuntime}
+                  onSustainedLowFps={onSustainedLowFps}
+                />
+              </LazyClassroomWorld>
+            </Suspense>
+          </div>
         </StageBoundary>
       ) : (
         <div

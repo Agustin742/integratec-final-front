@@ -363,6 +363,8 @@ function WorkspaceContext({
               <Classroom3DStage
                 headingRef={activeViewHeadingRef}
                 scopeKey={classroomId}
+                classroomId={classroomId}
+                petName={classroom.pet?.name ?? null}
                 onSustainedLowFps={beginPerformanceOffer}
               />
             </>
