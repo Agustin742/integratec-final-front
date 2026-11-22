@@ -1,4 +1,9 @@
 export { WorldCanvas, type WorldCanvasProps } from './world-canvas';
+export {
+  PerformanceProbe,
+  type PerformanceProbeProps,
+} from './performance-probe';
+export { PerformanceStatsOverlay } from './performance-stats-overlay';
 export { ClassroomScene } from './classroom/classroom-scene';
 export {
   ClassroomWorld,

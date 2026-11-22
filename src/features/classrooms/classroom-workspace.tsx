@@ -32,6 +32,11 @@ import { ClassroomPresenceBar } from './classroom-presence-bar';
 import { joinMessages } from './join-messages';
 import { readClassroomJoinOutcome } from './join-schema';
 import { classroomMessages as messages } from './messages';
+import { PerformanceOfferBanner } from './performance-offer-banner';
+import {
+  beginPerformanceOffer,
+  usePerformanceOfferStore,
+} from './performance-offer-store';
 import { useClassroomContext } from './use-classroom-capabilities';
 import { useClassroomContextEvents } from './use-classroom-context-events';
 import { useClassroomPresence } from './use-classroom-presence';
@@ -151,7 +156,7 @@ function WorkspaceContext({
   const snapshot = useSessionSnapshot();
   const sessionUserId =
     snapshot.status === 'authenticated' ? snapshot.user.id : null;
-  const { mode, toggleMode } = useClassroomViewMode(sessionUserId);
+  const { mode, setMode, toggleMode } = useClassroomViewMode(sessionUserId);
 
   const isParent =
     context.status === 'ready' && context.classroom.myRole === 'PARENT';
@@ -165,8 +170,13 @@ function WorkspaceContext({
 
   const handleModeToggle = useCallback(() => {
     pendingFocusSwitchRef.current = true;
+    // Switching to 2D by hand answers a visible 2D offer (no-op otherwise),
+    // so it does not reappear stale after returning to 3D.
+    if (mode === '3d') {
+      usePerformanceOfferStore.getState().accept();
+    }
     toggleMode();
-  }, [toggleMode]);
+  }, [mode, toggleMode]);
 
   useLayoutEffect(() => {
     if (
@@ -384,15 +394,27 @@ function WorkspaceContext({
               headingRef={activeViewHeadingRef}
             />
           ) : (
-            <Classroom3DStage
-              headingRef={activeViewHeadingRef}
-              scopeKey={classroomId}
-              selfPose={presence.selfPose}
-              connectionKey={presence.connectionKey}
-              frozen={presence.frozen}
-              remoteParticipants={presence.remoteParticipants}
-              onIntentChange={presence.sendIntent}
-            />
+            <>
+              {/* Sustained low fps shows a non-blocking offer (#56); the
+                  app never switches modes without the user's choice. */}
+              <PerformanceOfferBanner
+                onAccept={() => {
+                  pendingFocusSwitchRef.current = true;
+                  setMode('2d');
+                }}
+                onDecline={() => activeViewHeadingRef.current?.focus()}
+              />
+              <Classroom3DStage
+                headingRef={activeViewHeadingRef}
+                scopeKey={classroomId}
+                selfPose={presence.selfPose}
+                connectionKey={presence.connectionKey}
+                frozen={presence.frozen}
+                remoteParticipants={presence.remoteParticipants}
+                onIntentChange={presence.sendIntent}
+                onSustainedLowFps={beginPerformanceOffer}
+              />
+            </>
           ))}
         <Outlet
           key={location.key}

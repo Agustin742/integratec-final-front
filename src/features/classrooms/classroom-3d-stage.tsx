@@ -9,6 +9,8 @@ import {
 import type { AvatarInput } from '@/realtime';
 import type { Pose, RemoteClassroomParticipant } from '../world';
 import { worldMessages } from '../world/messages';
+import { PerformanceProbeRuntime } from '../world/performance-monitor';
+import { PerformanceStatsOverlay } from '../world/performance-stats-overlay';
 import { WorldFallback } from '../world/world-fallback';
 import { classroomMessages } from './messages';
 
@@ -21,6 +23,8 @@ export interface Classroom3DStageProps {
   readonly remoteParticipants?:
     readonly RemoteClassroomParticipant[] | undefined;
   readonly onIntentChange?: ((intent: AvatarInput) => void) | undefined;
+  /** Fired when the canvas measures sustained low fps (#56). */
+  readonly onSustainedLowFps?: () => void;
 }
 
 type ClearAssetCacheFn = (options?: {
@@ -35,6 +39,12 @@ const loadClassroomWorld = () =>
     loadedClearAssetCache = module.clearAssetCache;
     return { default: module.ClassroomWorld };
   });
+
+/** Same lazy chunk as the classroom world, so the probe never eagerly loads three. */
+const loadWorldProbe = () =>
+  import('../world').then((module) => ({
+    default: module.PerformanceProbe,
+  }));
 
 /**
  * Clears GLB assets/decoders only if the lazy `../world` chunk has been loaded,
@@ -79,9 +89,12 @@ export function Classroom3DStage({
   frozen,
   remoteParticipants,
   onIntentChange,
+  onSustainedLowFps,
 }: Classroom3DStageProps) {
   const [LazyClassroomWorld] = useState(() => lazy(loadClassroomWorld));
+  const [LazyWorldProbe] = useState(() => lazy(loadWorldProbe));
   const supportsBrowserObservers = typeof ResizeObserver !== 'undefined';
+  const [performanceRuntime] = useState(() => new PerformanceProbeRuntime());
 
   return (
     <section
@@ -113,7 +126,12 @@ export function Classroom3DStage({
               frozen={frozen}
               remoteParticipants={remoteParticipants}
               onIntentChange={onIntentChange}
-            />
+            >
+              <LazyWorldProbe
+                runtime={performanceRuntime}
+                onSustainedLowFps={onSustainedLowFps}
+              />
+            </LazyClassroomWorld>
           </Suspense>
         </StageBoundary>
       ) : (
@@ -125,6 +143,7 @@ export function Classroom3DStage({
           <canvas aria-hidden="true" className="block h-48 w-full rounded-lg" />
         </div>
       )}
+      <PerformanceStatsOverlay runtime={performanceRuntime} />
     </section>
   );
 }

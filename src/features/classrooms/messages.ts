@@ -65,6 +65,12 @@ export const classroomMessages = {
       frozen: 'Aula congelada',
     },
   },
+  performanceOffer: {
+    title: 'La vista 3D está lenta en este dispositivo',
+    body: 'El Modo 2D Clásico muestra los paneles del aula en una vista más liviana, sin 3D. Tus herramientas y tu contexto no cambian. Para volver a la vista 3D, usá el botón "Cambiar a Vista 3D" en la parte superior del aula o el atajo Alt+M.',
+    accept: 'Cambiar a Modo 2D Clásico',
+    decline: 'Seguir en la vista 3D y no volver a avisar en esta sesión',
+  },
   list: {
     subtitle:
       'Entrá a tus aulas virtuales o creá y configurá una nueva según tu rol.',
