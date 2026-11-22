@@ -53,24 +53,24 @@ export const equipItemDtoSchema = z.object({
 export type EquipItemDto = z.infer<typeof equipItemDtoSchema>;
 
 /**
- * Returns `true` when `kind` is equipable in `slot` for avatar/desk
- * customization (`AVATAR_ACCESSORY` -> `head`/`face`/`back`,
- * `DESK_UPGRADE` -> `desk_decor`).
+ * Resolves the slot an item must be equipped into from its catalog
+ * `metadata.slot`, mirroring the back's `deriveSlotForItem`
+ * (`AVATAR_ACCESSORY` -> `head`/`face`/`back`, `DESK_UPGRADE` -> `desk_decor`).
+ * Returns `null` when the slot is missing/invalid or does not fit the kind
+ * (the back answers `409`), so the item must not be offered anywhere.
  */
-export function isEquipableInSlot(
+export function resolveItemSlot(
   kind: ShopItemKind,
-  slot: EquippedSlotName,
-): boolean {
-  if (slot === 'desk_decor') {
-    return kind === 'DESK_UPGRADE';
+  metadata: Readonly<Record<string, unknown>> | undefined,
+): EquippedSlotName | null {
+  const parsed = equippedSlotNameSchema.safeParse(metadata?.slot);
+  if (!parsed.success) {
+    return null;
   }
-  return kind === 'AVATAR_ACCESSORY';
-}
-
-/**
- * Returns `true` when `kind` is an avatar or desk item covered by the
- * inventory panel (excluding classroom items and pet accessories).
- */
-export function isEquipableKind(kind: ShopItemKind): boolean {
-  return kind === 'AVATAR_ACCESSORY' || kind === 'DESK_UPGRADE';
+  const slot = parsed.data;
+  const fits =
+    slot === 'desk_decor'
+      ? kind === 'DESK_UPGRADE'
+      : kind === 'AVATAR_ACCESSORY';
+  return fits ? slot : null;
 }

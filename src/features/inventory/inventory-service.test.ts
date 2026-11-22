@@ -75,6 +75,7 @@ describe('inventory-service', () => {
     });
     const store = createClassroomEquipmentStore({
       classroomId: CLASSROOM_ID,
+      itemMetadata: { [CAP_ID]: { slot: 'head' } },
       initialPurchases: [makePurchase()],
     });
     mswServer.use(...store.handlers);

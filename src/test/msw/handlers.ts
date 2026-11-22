@@ -7777,7 +7777,8 @@ export interface EquipmentStoreSlotEntry {
   readonly kind: ShopStoreItemKind;
 }
 
-export type EquipmentStoreOp = 'getEquipment' | 'setSlot' | 'purchases';
+export type EquipmentStoreOp =
+  'getEquipment' | 'setSlot' | 'purchases' | 'catalog';
 
 export type EquipmentStoreFailure =
   MswErrorResponseSpec | 'network' | 'malformed-2xx';
@@ -7791,8 +7792,17 @@ export interface ClassroomEquipmentStoreOptions {
   readonly initialSlots?: Partial<
     Record<EquipmentSlotName, EquipmentStoreSlotEntry | null>
   >;
+  /**
+   * Catalog `metadata` per `shopItemId`. The equip handler derives the slot
+   * from `metadata.slot` like the back does; items without an entry have empty
+   * metadata and are rejected with `409`.
+   */
+  readonly itemMetadata?: Readonly<Record<string, Record<string, unknown>>>;
+  /** `shopItemId`s purchased but absent from the served catalog. */
+  readonly omitFromCatalog?: readonly string[];
   readonly setSlotDelayMs?: number;
   readonly includePurchasesHandler?: boolean;
+  readonly includeCatalogHandler?: boolean;
 }
 
 export interface ClassroomEquipmentStore {
@@ -7815,14 +7825,24 @@ function isValidEquipmentSlot(value: string): value is EquipmentSlotName {
   return (KNOWN_EQUIPMENT_SLOTS as readonly string[]).includes(value);
 }
 
-function isKindCompatibleWithSlot(
+/**
+ * Mirrors the back's `deriveSlotForItem`: the slot comes from
+ * `metadata.slot`; `null` means missing/invalid slot or a kind that does not
+ * fit it (the back answers `409`).
+ */
+function deriveEquipmentSlot(
   kind: ShopStoreItemKind,
-  slot: EquipmentSlotName,
-): boolean {
-  if (slot === 'desk_decor') {
-    return kind === 'DESK_UPGRADE';
+  metadata: Record<string, unknown> | undefined,
+): EquipmentSlotName | null {
+  const slot = metadata?.slot;
+  if (typeof slot !== 'string' || !isValidEquipmentSlot(slot)) {
+    return null;
   }
-  return kind === 'AVATAR_ACCESSORY';
+  const fits =
+    slot === 'desk_decor'
+      ? kind === 'DESK_UPGRADE'
+      : kind === 'AVATAR_ACCESSORY';
+  return fits ? slot : null;
 }
 
 /**
@@ -7851,6 +7871,7 @@ export function createClassroomEquipmentStore(
     getEquipment: 0,
     setSlot: 0,
     purchases: 0,
+    catalog: 0,
   };
 
   const consumeFailure = (
@@ -7963,7 +7984,11 @@ export function createClassroomEquipmentStore(
           });
         }
 
-        if (!isKindCompatibleWithSlot(owned.shopItemKind, rawSlot)) {
+        const expectedSlot = deriveEquipmentSlot(
+          owned.shopItemKind,
+          options.itemMetadata?.[owned.shopItemId],
+        );
+        if (expectedSlot !== rawSlot) {
           return createErrorEnvelopeResponse(409, {
             code: 'CONFLICT',
             message: 'This item cannot be equipped in the selected slot.',
@@ -8015,6 +8040,53 @@ export function createClassroomEquipmentStore(
           page: 1,
           pageSize: 100,
           total: purchases.length,
+        });
+      }),
+    );
+  }
+
+  if (options.includeCatalogHandler !== false) {
+    handlers.push(
+      http.get(`${baseUrl}/classrooms/:id/shop/items`, ({ params }) => {
+        counts.catalog += 1;
+        const failure = consumeFailure('catalog');
+        if (failure) {
+          return respondFailure(failure);
+        }
+        if (params.id !== options.classroomId) {
+          return createErrorEnvelopeResponse(404, {
+            code: 'NOT_FOUND',
+            message: 'Classroom not found.',
+            correlationId: 'req-equipment-catalog-404',
+          });
+        }
+        if (currentRole !== 'STUDENT') {
+          return createErrorEnvelopeResponse(403, {
+            code: 'FORBIDDEN',
+            message: 'Only students can view the catalog.',
+            correlationId: 'req-equipment-catalog-403',
+          });
+        }
+        const omitted = new Set(options.omitFromCatalog ?? []);
+        const catalog = purchases.filter((p) => !omitted.has(p.shopItemId));
+        return HttpResponse.json({
+          items: catalog.map((p) => ({
+            id: p.shopItemId,
+            code: p.shopItemCode,
+            name: p.shopItemName,
+            description: '',
+            kind: p.shopItemKind,
+            price: p.pricePaid,
+            isImplemented: true,
+            isPurchasable: false,
+            ownedByStudent: true,
+            ownedByClassroom: false,
+            metadata: options.itemMetadata?.[p.shopItemId] ?? {},
+            createdAt: p.createdAt,
+          })),
+          page: 1,
+          pageSize: 100,
+          total: catalog.length,
         });
       }),
     );

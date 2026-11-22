@@ -24,6 +24,10 @@ const STUDENT_ID = '00000000-0000-4000-8000-000000007001';
 const CAP_ID = '00000000-0000-4000-8000-000000001001';
 const GLASSES_ID = '00000000-0000-4000-8000-000000001002';
 const LAMP_ID = '00000000-0000-4000-8000-000000001003';
+const BROKEN_ID = '00000000-0000-4000-8000-000000001004';
+const GHOST_ID = '00000000-0000-4000-8000-000000001005';
+
+const CAP_METADATA = { [CAP_ID]: { slot: 'head' } };
 
 function makePurchase(
   overrides: Partial<ShopStorePurchase> = {},
@@ -140,6 +144,7 @@ describe('InventoryPanel', () => {
   it('equips and unequips a purchased item with pending and confirmed states', async () => {
     const store = createClassroomEquipmentStore({
       classroomId: CLASSROOM_ID,
+      itemMetadata: { ...CAP_METADATA, [LAMP_ID]: { slot: 'desk_decor' } },
       setSlotDelayMs: 40,
       initialPurchases: [
         makePurchase(),
@@ -201,6 +206,7 @@ describe('InventoryPanel', () => {
   it('shows 403 error for unowned item and leaves equipped state unchanged', async () => {
     const store = createClassroomEquipmentStore({
       classroomId: CLASSROOM_ID,
+      itemMetadata: { ...CAP_METADATA, [GLASSES_ID]: { slot: 'head' } },
       initialPurchases: [
         makePurchase(),
         makePurchase({
@@ -266,6 +272,7 @@ describe('InventoryPanel', () => {
   it('handles uncertain 500 error without changing equipped state and reconciles', async () => {
     const store = createClassroomEquipmentStore({
       classroomId: CLASSROOM_ID,
+      itemMetadata: CAP_METADATA,
       initialPurchases: [makePurchase()],
     });
     mswServer.use(...store.handlers);
@@ -299,5 +306,153 @@ describe('InventoryPanel', () => {
     await waitFor(() => {
       expect(store.getCounts().getEquipment).toBeGreaterThanOrEqual(2);
     });
+  });
+
+  describe('slot resolution from catalog metadata', () => {
+    const glasses = () =>
+      makePurchase({
+        id: '00000000-0000-4000-8000-000000002003',
+        shopItemId: GLASSES_ID,
+        shopItemCode: 'glasses-star',
+        shopItemName: 'Lentes estrella',
+      });
+
+    function optionNames(group: HTMLElement): string[] {
+      return within(group)
+        .queryAllByRole('option')
+        .map((o) => o.textContent ?? '');
+    }
+
+    it('offers a face accessory only under the Cara slot', async () => {
+      const store = createClassroomEquipmentStore({
+        classroomId: CLASSROOM_ID,
+        itemMetadata: { ...CAP_METADATA, [GLASSES_ID]: { slot: 'face' } },
+        initialPurchases: [makePurchase(), glasses()],
+      });
+      mswServer.use(...store.handlers);
+
+      renderInventoryRoute();
+
+      const faceGroup = await screen.findByRole('group', { name: 'Cara' });
+      const headGroup = screen.getByRole('group', { name: 'Cabeza' });
+      const backGroup = screen.getByRole('group', { name: 'Espalda' });
+      expect(optionNames(faceGroup)).toContain('Lentes estrella');
+      expect(optionNames(faceGroup)).not.toContain('Gorra azul');
+      expect(optionNames(headGroup)).toContain('Gorra azul');
+      expect(optionNames(headGroup)).not.toContain('Lentes estrella');
+      expect(optionNames(backGroup)).not.toContain('Lentes estrella');
+      expect(optionNames(backGroup)).not.toContain('Gorra azul');
+    });
+
+    it('does not offer items without a valid catalog slot or missing from the catalog', async () => {
+      const store = createClassroomEquipmentStore({
+        classroomId: CLASSROOM_ID,
+        itemMetadata: {
+          ...CAP_METADATA,
+          [GLASSES_ID]: {},
+          [BROKEN_ID]: { slot: 'tail' },
+          [LAMP_ID]: { slot: 'head' },
+        },
+        omitFromCatalog: [GHOST_ID],
+        initialPurchases: [
+          makePurchase(),
+          glasses(),
+          makePurchase({
+            id: '00000000-0000-4000-8000-000000002004',
+            shopItemId: BROKEN_ID,
+            shopItemName: 'Cola rara',
+          }),
+          makePurchase({
+            id: '00000000-0000-4000-8000-000000002005',
+            shopItemId: GHOST_ID,
+            shopItemName: 'Fantasma',
+          }),
+          makePurchase({
+            id: '00000000-0000-4000-8000-000000002006',
+            shopItemId: LAMP_ID,
+            shopItemName: 'Lámpara incompatible',
+            shopItemKind: 'DESK_UPGRADE',
+          }),
+        ],
+      });
+      mswServer.use(...store.handlers);
+
+      renderInventoryRoute();
+
+      await screen.findByRole('group', { name: 'Cabeza' });
+      const offered = screen
+        .getAllByRole('group')
+        .flatMap((group) => optionNames(group));
+      expect(offered).toContain('Gorra azul');
+      for (const hidden of [
+        'Lentes estrella',
+        'Cola rara',
+        'Fantasma',
+        'Lámpara incompatible',
+      ]) {
+        expect(offered).not.toContain(hidden);
+      }
+    });
+
+    it('shows the load error state when the catalog fails to load', async () => {
+      const store = createClassroomEquipmentStore({
+        classroomId: CLASSROOM_ID,
+        itemMetadata: CAP_METADATA,
+        initialPurchases: [makePurchase()],
+      });
+      store.failNext('catalog', {
+        status: 500,
+        body: {
+          code: 'INTERNAL_ERROR',
+          message: 'boom',
+          correlationId: 'req-catalog-500',
+        },
+      });
+      mswServer.use(...store.handlers);
+
+      renderInventoryRoute();
+
+      expect(
+        await screen.findByText(inventoryMessages.errors.loadError),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: 'Cabeza' })).toBeNull();
+    });
+
+    it.each([
+      [409, 'CONFLICT', inventoryMessages.errors.conflict],
+      [404, 'NOT_FOUND', inventoryMessages.errors.notFound],
+      [429, 'TOO_MANY_REQUESTS', inventoryMessages.errors.rateLimited],
+    ] as const)(
+      'shows the right message when the equip endpoint answers %i',
+      async (status, code, message) => {
+        const store = createClassroomEquipmentStore({
+          classroomId: CLASSROOM_ID,
+          itemMetadata: CAP_METADATA,
+          initialPurchases: [makePurchase()],
+        });
+        mswServer.use(...store.handlers);
+
+        renderInventoryRoute();
+
+        const headGroup = await screen.findByRole('group', { name: 'Cabeza' });
+        store.failNext('setSlot', {
+          status,
+          body: { code, message: 'rejected', correlationId: `req-${status}` },
+        });
+        fireEvent.change(within(headGroup).getByRole('combobox'), {
+          target: { value: CAP_ID },
+        });
+        fireEvent.click(
+          within(headGroup).getByRole('button', {
+            name: inventoryMessages.actions.equip,
+          }),
+        );
+
+        expect(await within(headGroup).findByRole('alert')).toHaveTextContent(
+          message,
+        );
+        expect(store.getSlots().head).toBeNull();
+      },
+    );
   });
 });

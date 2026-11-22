@@ -5,6 +5,7 @@ import { ApiError } from '@/api/errors';
 import {
   classroomEquipmentQueryKey,
   createClassroomEquipmentPredicate,
+  shopItemsQueryKey,
   shopPurchasesQueryKey,
 } from '@/api/query-keys';
 import {
@@ -17,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { useSessionService, useSessionSnapshot } from '@/session/provider';
 import { useClassroomContext } from '../classrooms/use-classroom-capabilities';
 import type { StudentPurchaseDto } from '../shop/shop-schema';
-import { listShopPurchases } from '../shop/shop-service';
+import { listShopItems, listShopPurchases } from '../shop/shop-service';
 import { inventoryMessages } from './inventory-messages';
 import {
   getEquipment,
@@ -25,8 +26,7 @@ import {
   setEquipmentSlot,
 } from './inventory-service';
 import {
-  isEquipableInSlot,
-  isEquipableKind,
+  resolveItemSlot,
   SLOT_NAMES,
   type EquipmentStateDto,
   type EquippedSlotDto,
@@ -34,6 +34,8 @@ import {
 } from './inventory-schema';
 
 const msgs = inventoryMessages;
+
+const CATALOG_PARAMS = { page: 1, pageSize: 100, sort: 'createdAt' } as const;
 
 export interface InventoryPanelProps {
   readonly classroomId?: string;
@@ -139,14 +141,49 @@ function InventoryPanelScoped({
     retry: false,
   });
 
+  // The purchases DTO carries no item metadata: the slot each item fits is
+  // resolved from the shop catalog (`metadata.slot`), like the back does.
+  const catalogQuery = useQuery({
+    queryKey: shopItemsQueryKey(
+      userId ?? 'anonymous',
+      classroomId || 'unknown',
+      CATALOG_PARAMS,
+    ),
+    queryFn: ({ signal }) =>
+      listShopItems(client, classroomId, CATALOG_PARAMS, { signal }),
+    enabled: Boolean(userId && classroomId) && isStudent,
+    retry: false,
+  });
+
   const uniquePurchases = useMemo(
     () => deduplicatePurchases(purchasesQuery.data?.items ?? []),
     [purchasesQuery.data?.items],
   );
 
-  const equipablePurchases = useMemo(
-    () => uniquePurchases.filter((p) => isEquipableKind(p.shopItemKind)),
-    [uniquePurchases],
+  const purchasesBySlot = useMemo(() => {
+    const metadataById = new Map(
+      (catalogQuery.data?.items ?? []).map((item) => [item.id, item.metadata]),
+    );
+    const bySlot: Record<EquippedSlotName, StudentPurchaseDto[]> = {
+      head: [],
+      face: [],
+      back: [],
+      desk_decor: [],
+    };
+    for (const purchase of uniquePurchases) {
+      const slot = resolveItemSlot(
+        purchase.shopItemKind,
+        metadataById.get(purchase.shopItemId),
+      );
+      if (slot !== null) {
+        bySlot[slot].push(purchase);
+      }
+    }
+    return bySlot;
+  }, [catalogQuery.data?.items, uniquePurchases]);
+
+  const hasEquipablePurchases = SLOT_NAMES.some(
+    (slot) => purchasesBySlot[slot].length > 0,
   );
 
   if (context.status === 'pending') {
@@ -191,7 +228,8 @@ function InventoryPanelScoped({
 
   if (
     (equipmentQuery.isLoading && equipmentQuery.data === undefined) ||
-    (purchasesQuery.isLoading && purchasesQuery.data === undefined)
+    (purchasesQuery.isLoading && purchasesQuery.data === undefined) ||
+    (catalogQuery.isLoading && catalogQuery.data === undefined)
   ) {
     return (
       <div className="flex flex-col gap-4 p-4">
@@ -205,9 +243,11 @@ function InventoryPanelScoped({
 
   if (
     (equipmentQuery.isError && equipmentQuery.data === undefined) ||
-    (purchasesQuery.isError && purchasesQuery.data === undefined)
+    (purchasesQuery.isError && purchasesQuery.data === undefined) ||
+    (catalogQuery.isError && catalogQuery.data === undefined)
   ) {
-    const err = equipmentQuery.error ?? purchasesQuery.error;
+    const err =
+      equipmentQuery.error ?? purchasesQuery.error ?? catalogQuery.error;
     const userMessage =
       err instanceof ApiError ? err.userMessage : msgs.errors.loadError;
     return (
@@ -221,6 +261,7 @@ function InventoryPanelScoped({
           onRetry={() => {
             void equipmentQuery.refetch();
             void purchasesQuery.refetch();
+            void catalogQuery.refetch();
           }}
         />
       </div>
@@ -243,7 +284,7 @@ function InventoryPanelScoped({
     );
   }
 
-  if (equipablePurchases.length === 0) {
+  if (!hasEquipablePurchases) {
     return (
       <div className="flex flex-col gap-4 p-4">
         <h2 ref={headingRef} className="text-xl font-semibold" tabIndex={-1}>
@@ -259,7 +300,8 @@ function InventoryPanelScoped({
 
   const hasStaleError =
     (equipmentQuery.isError && equipmentQuery.data !== undefined) ||
-    (purchasesQuery.isError && purchasesQuery.data !== undefined);
+    (purchasesQuery.isError && purchasesQuery.data !== undefined) ||
+    (catalogQuery.isError && catalogQuery.data !== undefined);
 
   return (
     <div className="flex flex-col gap-6 p-4">
@@ -279,21 +321,19 @@ function InventoryPanelScoped({
           onRetry={() => {
             void equipmentQuery.refetch();
             void purchasesQuery.refetch();
+            void catalogQuery.refetch();
           }}
         />
       ) : null}
 
       <div className="flex flex-col gap-4">
         {SLOT_NAMES.map((slot) => {
-          const slotPurchases = equipablePurchases.filter((p) =>
-            isEquipableInSlot(p.shopItemKind, slot),
-          );
           return (
             <SlotRow
               key={slot}
               slot={slot}
               equippedItem={equipment?.slots[slot] ?? null}
-              purchases={slotPurchases}
+              purchases={purchasesBySlot[slot]}
               classroomId={classroomId}
               onEquipmentConfirmed={(updated) => {
                 queryClient.setQueryData<EquipmentStateDto>(
