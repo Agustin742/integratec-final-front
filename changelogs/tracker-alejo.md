@@ -1,5 +1,18 @@
 # Tracker — Alejo
 
+## 2026-11-23 — Author modular shirt and tie on both avatars
+
+- **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
+- **Area / files:** `assets/blender/avatars/shared/top/shirt-and-tie.blend`, `public/models/avatars/{male,female}/top-shirt-and-tie.glb`, `docs/art/shirt-and-tie.md`, `docs/assets/shirt-and-tie/{male,female}-{1280,360}.png`, `scripts/assets/test-shirt-and-tie.mjs`, `scripts/assets/test-shirt-and-tie-sleeve-normals.py`, `docs/ai-usage.md`.
+- **Change:** Authored `Shirt and tie` (`camisa y corbata`) on the unchanged existing male and female avatar bodies, reusing the concentric closed spherical elbow-cap shell from `ELBOW_FIXED_SchoolSmock_{Male,Female}` without modifying any existing body or top. Added tailored shirt hem, smooth wrist cuffs, folded dress-shirt collar with pointed front wings, center-front placket, pentagonal left-chest pocket, Windsor tie knot, densely sampled surface-following pointed tie blade, and lower placket button (`10` meshes per gender; `AvatarTopTint` neutral `#FFFFFF` on shirt parts and `AvatarDetail` `#5B4F96` indigo on tie knot, tie blade, and button).
+- **Reason:** Continue incremental upper-body wearable delivery for issue `#91` under `rules/modular-avatar-assets.md` and `docs/art/asset-wishlist.md`.
+- **Coordination:** Existing Alejo Project item `PVTI_lAHOCevXNc4BoRd2zhK9fEI`, issue `#91`.
+- **Evidence:**
+  - Authoring clearance (`1, 25, 62, 123, 201`) passed with `0` exposed arm verts/tris, `0` collar-head collisions against `Reference_Head`, and `0` buried tie vertices (`odd/artifacts/shirt-and-tie-author-report.json`). Initial Cycles preview inspection caught and resolved hem/pants overlap, recessed button placement, and subtle collar wing relief, verified in color and grayscale renders.
+  - Exported canonical 34-bone master and isolated 20-bit Draco GLBs: `61,988 B` (male, `5,308` verts, `10` meshes, max sum error `7.45e-7`) and `63,228 B` (female, `5,348` verts, `10` meshes, max sum error `7.01e-7`); `0` exposed arm verts/tris on frames `1, 62, 123, 201`, and `0` inward sleeve triangles across `1,360` triangles per side (`test-shirt-and-tie-sleeve-normals.py`).
+  - Permanent `1280×1280` and `360×360` renders generated under `docs/assets/shirt-and-tie/`.
+- **Next step:** Human reviewed and approved the shirt and tie; committed locally on `feat/91-modular-avatar-assets` without pushing. All four `School uniform` tops are now committed locally (wishlist remains unchecked until merge); continue with the remaining Casual tops (`Sweater`, `Vest`, `Tank top`, `Denim jacket`, `Track jacket`, `Flannel shirt`) or another upper-body category.
+
 ## 2026-11-23 — Author modular school sweatshirt and hoodie on both avatars
 
 - **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)

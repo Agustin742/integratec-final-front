@@ -4,6 +4,13 @@ Course declaration of AI use in the development process (see [course requirement
 
 > Status: partial evidence recorded. Sections marked _Pending_ still require team input and human review.
 
+## Shirt and tie modular asset evidence
+
+- **Tools and scope:** Antigravity and Blender MCP reused the concentric closed spherical elbow-cap shell from the approved school smock for both unchanged male and female bodies, authoring `Shirt and tie` ([guide](art/shirt-and-tie.md)) without altering `male/body.glb`, `female/body.glb`, legacy `pants`/`boots`, or any previously exported top.
+- **Useful result:** Built a tailored shirt hem, smooth wrist cuffs, folded dress-shirt collar with pointed front wings, center-front placket, pentagonal left-chest pocket, Windsor tie knot, densely sampled surface-following pointed tie blade, and lower placket button (`10` meshes per gender). Isolated 20-bit Draco GLB roundtrips pass canonical 34-bone rest hierarchy, `<= 4` normalized weights, `0` inward sleeve triangles, `0` exposed arm vertices/triangles across `Idle 1`, `Walk 62`, `Sit 123`, and `Wave 201`, and `<= 1 MB` budget (`61,988 B` male / `63,228 B` female).
+- **Detected problems and corrections:** Visual inspection of initial Cycles previews caught three issues before export: (1) the initial lower placket button sat inside the hem bevel band (`z = 0.502`) and looked recessed, (2) a thinner/lower hem experiment (`z = 0.474..0.500`) exposed tiny rear/front pants peaks on both bodies, and (3) the initial collar points needed deeper fold relief to read clearly at isometric scale. Restoring the pants-clearing hem (`z = 0.474..0.508` with hip flare), replacing the button with a proud circular beveled disc at `z = 0.518`, and strengthening the collar wing fold/tie knot separation resolved all three issues across color and grayscale previews.
+- **Human verification:** Approved by human visual review with permanent `1280×1280` and `360×360` renders (`docs/assets/shirt-and-tie/`); committed locally on `feat/91-modular-avatar-assets` (not pushed; runtime catalog integration and wishlist merge-check remain separate).
+
 ## School sweatshirt and hoodie modular assets evidence
 
 - **Tools and scope:** Antigravity and Blender MCP reused the concentric closed spherical elbow-cap shell from the approved school smock for both unchanged male and female bodies, authoring `School sweatshirt` ([guide](art/school-sweatshirt.md)) and `Hoodie` ([guide](art/hoodie.md)) without altering `male/body.glb`, `female/body.glb`, legacy `pants`/`boots`, or any previously exported top.
