@@ -1,5 +1,14 @@
 # Tracker — Alejo
 
+## 2026-11-23 — Author 4 modular Afro-textured hairstyles (`shared/`) & refine `short-curls` on both avatars
+
+- **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
+- **Area / files:** `assets/blender/avatars/shared/hair/{afro,dreads,box-braids,afro-with-headband,short-curls}.blend`, `public/models/avatars/shared/hair-{afro,dreads,box-braids,afro-with-headband,short-curls}.glb`, `docs/art/hair-afro-textured.md`, `docs/art/hair-short.md`, `docs/assets/hair-{afro,dreads,box-braids,afro-with-headband,short-curls}/{male,female}-{1280,360}.png`, `scripts/assets/test-afro-hair.mjs`, `docs/ai-usage.md`.
+- **Change:** Authored the final 4 Afro-textured hairstyles from `docs/art/asset-wishlist.md` and refined `short-curls` per visual review (`Afro` `60,108 B` / `8,215` verts, `Dreads` `83,848 B` / `9,970` verts, `Box braids` `66,856 B` / `7,640` verts, `Afro with headband` `68,308 B` / `9,524` verts, `Short curls` `56,076 B` / `7,420` verts) as shared wearables under `shared/`: replaced sparse UV-sphere puffs on `afro`, `afro-with-headband`, and `short-curls` with cohesive fused-metaball curly/Afro silhouettes (including explicit rear-left and rear-right corner fill on `short-curls`), flattened/smoothed `afro-with-headband` rear band wrap in Coral `#E66861` `AvatarDetail` (`roughness = 0.85`), and upgraded `dreads` to full-head coiled dreadlocks across crown, brow, sides, and nape (smooth `DEF-spine.003` blending below `z = 0.82` on `Dreads` and `Box braids`, `100%` `DEF-spine.006` elsewhere, neutral `#FFFFFF` `AvatarHairTint` `roughness = 0.65`). Verified authoring and decoded GLB roundtrips (`0` eye/eyelash/ear/body hits across Idle `1, 25`, Walk `62`, Sit `123`, and Wave `201`), structural tests, budget checks, and docs checks on both unchanged avatar bodies.
+- **Reason:** Complete the final Hair batch (`Afro-textured (4)`) and address curl-cohesion / full-head dreads / rear `short-curls` fill visual review feedback for issue `#91`.
+- **Coordination:** Existing Alejo Project item `PVTI_lAHOCevXNc4BoRd2zhK9fEI`, issue `#91`.
+- **Next step:** Proceed to runtime catalog integration / accessories / shoes or push on `feat/91-modular-avatar-assets` when ready (wishlist checkboxes remain unchecked until merge).
+
 ## 2026-11-23 — Author 6 modular tied-up hairstyles (`shared/`) on both avatars
 
 - **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
