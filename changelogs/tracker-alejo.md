@@ -1,5 +1,18 @@
 # Tracker — Alejo
 
+## 2026-11-23 — Author 6 modular short hairstyles (`shared/`) on both avatars
+
+- **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
+- **Area / files:** `assets/blender/avatars/shared/hair/{buzz-cut,classic-short,fringe,short-curls,soft-mohawk,side-part}.blend`, `public/models/avatars/shared/hair-{buzz-cut,classic-short,fringe,short-curls,soft-mohawk,side-part}.glb`, `docs/art/hair-short.md`, `docs/assets/hair-{buzz-cut,classic-short,fringe,short-curls,soft-mohawk,side-part}/{male,female}-{1280,360}.png`, `scripts/assets/test-short-hair.mjs`, `docs/ai-usage.md`.
+- **Change:** Authored the 6 Short hairstyles from `docs/art/asset-wishlist.md` (`Buzz cut`, `Classic short`, `Fringe`, `Short curls`, `Soft mohawk`, `Side part`) as shared wearables under `shared/` weighted `100%` to canonical `DEF-spine.006` (`AvatarHairTint` neutral `#FFFFFF`, roughness `0.65`) and verified on both unchanged male and female avatar bodies under `rules/modular-avatar-assets.md` and `rules/art-direction.md`.
+- **Reason:** Start incremental Hair wearable delivery for issue `#91` (stopping before commit for human review).
+- **Coordination:** Existing Alejo Project item `PVTI_lAHOCevXNc4BoRd2zhK9fEI`, issue `#91`.
+- **Evidence:**
+  - Authoring clearance (`1, 25, 62, 123, 201`) passed with `0` eye, `0` female eyelash, and `0` ear hits across all 6 styles on both genders (`odd/artifacts/short-hair-author-report.json`); visual preview iterations resolved cheek-corner sideburn dips (`|phi| ≈ 0.95` → `1.27`), normal-aligned `ShortCurls` puffs (`norm.to_track_quat('Z', 'Y')`), tucked `Fringe`/`SoftMohawk` roots, and flush `SidePart`/`ClassicShort` front waves.
+  - Exported canonical 34-bone shared masters and isolated 20-bit Draco GLBs (`buzz-cut`: `20,280 B`, `1,658` verts; `classic-short`: `23,020 B`, `1,900` verts; `fringe`: `25,880 B`, `2,368` verts; `short-curls`: `46,744 B`, `5,826` verts; `soft-mohawk`: `25,088 B`, `2,156` verts; `side-part`: `26,540 B`, `2,586` verts); decoded GLB roundtrips verified exact 34-bone rest matrices, `1` bone influence (`DEF-spine.006`, weight `1.0`, sum error `0.0`), and `0` eye/lash/ear hits on frames `1, 62, 123, 201` on both genders (`odd/artifacts/short-hair-export.json`).
+  - Permanent `1280×1280` and `360×360` Cycles renders generated under `docs/assets/hair-*/`, and `REVIEW_HairClassicShort_Female` left active in Blender alongside all 12 `REVIEW_Hair*_{Male,Female}` scenes in `odd/previews/short-hair-review.blend`.
+- **Next step:** Human reviewed and approved all 6 short hairstyles; committed locally on `feat/91-modular-avatar-assets` without pushing (wishlist remains unchecked until merge). Next Hair batch: `Medium (4)` (`Bob`, `Wavy`, `Messy`, `Middle part`).
+
 ## 2026-11-23 — Author modular winter coat, holiday sweater, and national team jersey on both avatars
 
 - **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
