@@ -18,6 +18,7 @@ import { SessionProvider } from '@/session/provider';
 import { expectAccessible } from '@/test/accessibility';
 import {
   TEST_API_BASE_URL,
+  createClassroomListHandler,
   createLoginHandler,
   createLogoutHandler,
   createOwnProfileStore,
@@ -72,6 +73,7 @@ async function renderProfile(
   mswServer.use(
     createLoginHandler(),
     createOwnStreakAndBadgesHandler(),
+    createClassroomListHandler(),
     ...store.handlers,
   );
   const session = createSession({ baseUrl: TEST_API_BASE_URL });

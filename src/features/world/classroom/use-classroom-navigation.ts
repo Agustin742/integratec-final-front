@@ -29,6 +29,8 @@ export interface UseClassroomNavigationOptions {
   frozen?: boolean | undefined;
   /** Movement intent for the realtime sender (#37); fired on change only. */
   onIntentChange?: ((intent: AvatarInput) => void) | undefined;
+  /** True while a modal panel blocks world movement and pointer picking. */
+  interactionLocked?: boolean | undefined;
 }
 
 const SERVER_SNAP_DISTANCE = 1.5;
@@ -38,7 +40,8 @@ const SERVER_IDLE_SETTLE_EPSILON = 0.05;
  * Everything the classroom needs to walk the local avatar: the controller
  * (keyboard + destination), the click handler for the floor, the destination
  * marker and Escape to stop. Input is ignored while the canvas is not
- * rendering (hidden tab, offscreen) or while frozen.
+ * rendering (hidden tab, offscreen), while frozen, or while
+ * `interactionLocked` is true.
  */
 export function useClassroomNavigation({
   scopeKey,
@@ -46,9 +49,13 @@ export function useClassroomNavigation({
   connectionKey,
   frozen = false,
   onIntentChange,
+  interactionLocked = false,
 }: UseClassroomNavigationOptions) {
   const invalidate = useThree((state) => state.invalidate);
-  const enabled = useThree((state) => state.frameloop) !== 'never' && !frozen;
+  const enabled =
+    useThree((state) => state.frameloop) !== 'never' &&
+    !frozen &&
+    !interactionLocked;
   // A key press from rest must wake the demand loop itself; nothing else
   // (placeholder body, reduced motion) is guaranteed to be requesting frames.
   const listener = useRef(onIntentChange);
@@ -82,6 +89,12 @@ export function useClassroomNavigation({
   const serverX = serverPose?.x;
   const serverZ = serverPose?.z;
   const serverRotation = serverPose?.rotation;
+
+  const clearDestination = useCallback(() => {
+    clearControllerDestination();
+    marker.hide();
+    invalidate();
+  }, [clearControllerDestination, marker, invalidate]);
 
   // Declared after the controller so it runs after the respawn it triggers.
   useEffect(() => {
@@ -168,25 +181,28 @@ export function useClassroomNavigation({
     serverZ,
   ]);
 
+  useEffect(() => {
+    if (interactionLocked) {
+      clearDestination();
+    }
+  }, [interactionLocked, clearDestination]);
+
   useEscapeKey({
     enabled,
-    onEscape: () => {
-      controller.clearDestination();
-      marker.hide();
-      invalidate();
-    },
+    onEscape: clearDestination,
   });
 
   const { setDestination } = controller;
   const onFloorClick = useCallback(
     (event: FloorClickEvent) => {
+      if (!enabled) return;
       const point = destinationFromFloorClick(event, setDestination);
       if (!point) return;
       marker.show(point);
       invalidate();
     },
-    [setDestination, marker, invalidate],
+    [enabled, setDestination, marker, invalidate],
   );
 
-  return { controller, marker, onFloorClick };
+  return { controller, marker, onFloorClick, clearDestination };
 }

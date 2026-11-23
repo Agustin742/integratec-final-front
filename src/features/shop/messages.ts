@@ -17,6 +17,7 @@ export const shopMessages = {
     balanceRetry: 'Reintentar saldo',
     tabCatalog: 'Catálogo',
     tabPurchases: 'Mis compras',
+    tabInventory: 'Mi inventario',
     liveShopUpdated: 'Catálogo y saldo actualizados.',
   },
   filters: {

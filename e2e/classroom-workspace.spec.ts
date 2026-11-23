@@ -48,7 +48,20 @@ const profile: components['schemas']['OwnProfileDto'] = {
   },
 };
 const classroomURL = `${apiOrigin}/classrooms/${classroomId}`;
+const desksPathname = `/classrooms/${classroomId}/desks`;
 const walletPathname = `/classrooms/${classroomId}/points`;
+const desksPayload: components['schemas']['ClassroomDeskMapDto'] = {
+  items: Array.from({ length: 12 }, (_, idx) => {
+    const deskIndex = idx + 1;
+    const isMine = deskIndex === 1;
+    return {
+      id: `00000000-0000-4000-8000-00000000d0${String(deskIndex).padStart(2, '0')}`,
+      deskIndex,
+      membershipId: isMine ? '00000000-0000-4000-8000-00000000m001' : null,
+      userId: isMine ? profile.id : null,
+    };
+  }),
+};
 const wallet: components['schemas']['StudentWalletDto'] = {
   classroomId,
   studentId: '00000000-0000-4000-8000-000000000046',
@@ -138,6 +151,13 @@ test.beforeEach(async ({ page, baseURL }) => {
     }
     if (
       url.origin === apiOrigin &&
+      url.pathname === '/chats' &&
+      request.method() === 'GET'
+    ) {
+      return route.fulfill({ json: { items: [] } });
+    }
+    if (
+      url.origin === apiOrigin &&
       url.pathname === '/notifications' &&
       request.method() === 'GET'
     ) {
@@ -147,10 +167,11 @@ test.beforeEach(async ({ page, baseURL }) => {
     }
     if (
       url.origin === apiOrigin &&
-      url.pathname === '/chats' &&
+      url.pathname === desksPathname &&
       request.method() === 'GET'
     ) {
-      return route.fulfill({ json: { items: [] } });
+      expect(request.headers().authorization).toBe('Bearer synthetic-access');
+      return route.fulfill({ json: desksPayload });
     }
     if (
       url.origin === 'https://realtime.example.invalid' ||
@@ -218,7 +239,8 @@ test('loads server context only after confirmation', async ({ page }) => {
     release();
     await expect(heading(page, classroom.name)).toBeVisible();
     await expect(page.getByText(roleText, { exact: true })).toBeVisible();
-    await expect(page.getByRole('status')).toHaveCount(0);
+    await expect(page.getByText(classroomMessages.loading)).toHaveCount(0);
+    await expect(page.getByTestId('classroom-interactable-status')).toBeEmpty();
     await expect(page).toHaveTitle(`${classroom.name} · ${messages.title}`);
   } finally {
     release();

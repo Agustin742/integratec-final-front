@@ -14,6 +14,18 @@ export {
   type RemoteAvatarProps,
   type RemoteClassroomParticipant,
 } from './classroom/remote-avatar';
+export {
+  deriveClassroomInteractables,
+  indexClassroomInteractables,
+  resolveInteractableHit,
+  type ClassroomInteractable,
+  type ClassroomInteractablePanelKey,
+  type ClassroomInteractableType,
+  type InteractableIntersection,
+  type InteractableObjectNode,
+  type InteractablePointerEvent,
+  type InteractionClass,
+} from './classroom/classroom-interactables';
 export { WarmLighting } from './world-lighting';
 export { WorldReference } from './world-reference';
 export { GlbAsset, type GlbAssetProps } from './glb-asset';

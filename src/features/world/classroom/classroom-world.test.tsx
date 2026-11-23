@@ -85,7 +85,7 @@ test('forwards remote participants, server pose, connection key, and freeze flag
       userId: 'remote-1',
       displayName: 'Lucía',
       role: 'STUDENT',
-      status: 'online',
+      status: 'online' as const,
       x: 2,
       z: 3,
       rotation: 0,
@@ -108,5 +108,30 @@ test('forwards remote participants, server pose, connection key, and freeze flag
     connectionKey: 'room-1:s-1',
     frozen: true,
     remoteParticipants,
+  });
+});
+
+test('forwards interactable state and callbacks to ClassroomScene', () => {
+  const onHoverInteractable = vi.fn();
+  const onSelectInteractable = vi.fn();
+  render(
+    <ClassroomWorld
+      label="Escena"
+      scopeKey="aula-1"
+      highlightedInteractableId="board"
+      ownDeskIndex={3}
+      petReactionNonce={2}
+      interactionLocked={true}
+      onHoverInteractable={onHoverInteractable}
+      onSelectInteractable={onSelectInteractable}
+    />,
+  );
+  expect(canvas.sceneProps).toMatchObject({
+    highlightedInteractableId: 'board',
+    ownDeskIndex: 3,
+    petReactionNonce: 2,
+    interactionLocked: true,
+    onHoverInteractable,
+    onSelectInteractable,
   });
 });

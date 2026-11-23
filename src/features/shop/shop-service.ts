@@ -247,6 +247,84 @@ export async function listShopPurchases(
   return parsed.data;
 }
 
+/**
+ * Safety bound for {@link fetchAllPages}: at the contract maximum of 100 rows
+ * per page this covers 5000 rows, far above any classroom shop.
+ */
+export const MAX_ALL_PAGES = 50;
+
+const ALL_PAGES_SIZE = 100;
+
+interface PageLike<T> {
+  readonly items: readonly T[];
+  readonly total: number;
+}
+
+/**
+ * Walks `page = 1..n` until every row reported by `total` is collected, the
+ * server returns an empty page, or {@link MAX_ALL_PAGES} is reached. Stops
+ * early when the query signal aborts. Returns the first page's envelope with
+ * the items of every page concatenated.
+ */
+async function fetchAllPages<T, P extends PageLike<T>>(
+  fetchPage: (page: number) => Promise<P>,
+  signal: AbortSignal | undefined,
+): Promise<P> {
+  const first = await fetchPage(1);
+  const items: T[] = [...first.items];
+  for (
+    let page = 2;
+    page <= MAX_ALL_PAGES && items.length < first.total;
+    page += 1
+  ) {
+    signal?.throwIfAborted();
+    const next = await fetchPage(page);
+    if (next.items.length === 0) {
+      break;
+    }
+    items.push(...next.items);
+  }
+  return { ...first, items };
+}
+
+/** Every page of `GET /classrooms/{id}/shop/items` (`pageSize` 100). */
+export function listAllShopItems(
+  client: TypedApiClient,
+  classroomId: string,
+  params: Omit<ShopItemsQueryParams, 'page' | 'pageSize'> = {},
+  options: ShopServiceOptions = {},
+): Promise<PaginatedShopItemsDto> {
+  return fetchAllPages(
+    (page) =>
+      listShopItems(
+        client,
+        classroomId,
+        { ...params, page, pageSize: ALL_PAGES_SIZE },
+        options,
+      ),
+    options.signal,
+  );
+}
+
+/** Every page of `GET /classrooms/{id}/shop/purchases` (`pageSize` 100). */
+export function listAllShopPurchases(
+  client: TypedApiClient,
+  classroomId: string,
+  params: Omit<ShopPurchasesQueryParams, 'page' | 'pageSize'> = {},
+  options: ShopServiceOptions = {},
+): Promise<PaginatedShopPurchasesDto> {
+  return fetchAllPages(
+    (page) =>
+      listShopPurchases(
+        client,
+        classroomId,
+        { ...params, page, pageSize: ALL_PAGES_SIZE },
+        options,
+      ),
+    options.signal,
+  );
+}
+
 export interface PurchaseShopItemInput {
   readonly shopItemId: string;
   readonly idempotencyKey: string;

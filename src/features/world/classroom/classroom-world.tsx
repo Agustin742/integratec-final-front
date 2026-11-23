@@ -4,6 +4,7 @@ import { useOwnProfile } from '@/features/profile/use-own-profile';
 import { worldMessages } from '../messages';
 import type { Pose } from '../movement';
 import { WorldCanvas, type WorldCanvasProps } from '../world-canvas';
+import type { ClassroomInteractable } from './classroom-interactables';
 import { ClassroomScene } from './classroom-scene';
 import type { RemoteClassroomParticipant } from './remote-avatar';
 
@@ -21,6 +22,13 @@ export interface ClassroomWorldProps extends Pick<
   remoteParticipants?: readonly RemoteClassroomParticipant[] | undefined;
   /** Movement intent of the local avatar, for the realtime sender (#37). */
   onIntentChange?: (intent: AvatarInput) => void;
+  highlightedInteractableId?: string | undefined;
+  ownDeskIndex?: number | null | undefined;
+  petReactionNonce?: number | undefined;
+  interactionLocked?: boolean | undefined;
+  onHoverInteractable?: ((id: string | undefined) => void) | undefined;
+  onSelectInteractable?:
+    ((interactable: ClassroomInteractable) => void) | undefined;
   /** Extra in-canvas nodes, such as the performance probe (#56). */
   children?: ReactNode;
 }
@@ -38,6 +46,12 @@ export function ClassroomWorld({
   frozen,
   remoteParticipants,
   onIntentChange,
+  highlightedInteractableId,
+  ownDeskIndex,
+  petReactionNonce,
+  interactionLocked,
+  onHoverInteractable,
+  onSelectInteractable,
   children,
 }: ClassroomWorldProps) {
   const { query } = useOwnProfile();
@@ -56,6 +70,12 @@ export function ClassroomWorld({
         frozen={frozen}
         remoteParticipants={remoteParticipants}
         onIntentChange={onIntentChange}
+        highlightedInteractableId={highlightedInteractableId}
+        ownDeskIndex={ownDeskIndex}
+        petReactionNonce={petReactionNonce}
+        interactionLocked={interactionLocked}
+        onHoverInteractable={onHoverInteractable}
+        onSelectInteractable={onSelectInteractable}
       />
       {children}
     </WorldCanvas>

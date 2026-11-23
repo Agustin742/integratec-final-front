@@ -407,6 +407,8 @@ function WorkspaceContext({
               <Classroom3DStage
                 headingRef={activeViewHeadingRef}
                 scopeKey={classroomId}
+                classroomId={classroomId}
+                petName={classroom.pet?.name ?? null}
                 selfPose={presence.selfPose}
                 connectionKey={presence.connectionKey}
                 frozen={presence.frozen}

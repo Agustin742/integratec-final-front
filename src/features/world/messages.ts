@@ -5,7 +5,7 @@ export const worldMessages = {
   canvas: 'Vista isométrica de referencia',
   loading: 'Preparando la vista 3D…',
   classroomControls:
-    'Usá W, A, S, D o las flechas para moverte. Tocá o hacé clic en el piso para caminar hasta ahí. Escape cancela el recorrido.',
+    'Usá W, A, S, D o las flechas para moverte. Tocá o hacé clic en el piso para caminar hasta ahí, o elegí un objeto del aula para interactuar. Escape cancela el recorrido.',
   unavailable: 'La vista 3D no está disponible',
   alternative:
     'El modo clásico 2D todavía no está disponible (pendiente de #34). Esta referencia no necesita 3D: podés usar el botón de selección de abajo.',

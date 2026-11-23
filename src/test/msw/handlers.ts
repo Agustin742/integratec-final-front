@@ -9,6 +9,9 @@ export type ClassroomDetailPayload =
   components['schemas']['ClassroomDetailResponseDto'];
 export type ClassroomContextPayload =
   components['schemas']['ClassroomContextResponseDto'];
+export type ClassroomDeskPayload = components['schemas']['ClassroomDeskDto'];
+export type ClassroomDeskMapPayload =
+  components['schemas']['ClassroomDeskMapDto'];
 export type AcceptInvitationPayload =
   components['schemas']['AcceptInvitationDto'];
 export type JoinClassroomWithCodePayload =
@@ -2723,6 +2726,75 @@ export function createClassroomContextHandler(
   };
   return http.get(`${baseUrl}/classrooms/${id}`, () =>
     HttpResponse.json(payload, { status: 200 }),
+  );
+}
+
+export interface CreateClassroomDesksHandlerOptions {
+  readonly baseUrl?: string;
+  readonly assignedUserId?: string | null;
+  readonly assignedDeskIndex?: number;
+  readonly totalDesks?: number;
+  readonly status?: number;
+  readonly error?: ErrorBodyPayload;
+  readonly items?: readonly ClassroomDeskPayload[];
+  readonly onRequest?: (request: Request) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `GET /classrooms/{id}/desks`
+ * (`ClassroomDesksController_read`): returns the unpaginated 1-based physical
+ * desk map with demo student desk assignment.
+ */
+export function createClassroomDesksHandler(
+  classroomId = '*',
+  options: CreateClassroomDesksHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const assignedUserId =
+    options.assignedUserId === undefined
+      ? '00000000-0000-4000-8000-000000000001'
+      : options.assignedUserId;
+  const assignedDeskIndex = options.assignedDeskIndex ?? 1;
+  const totalDesks = options.totalDesks ?? 12;
+
+  return http.get(
+    `${baseUrl}/classrooms/${classroomId}/desks`,
+    async ({ request }) => {
+      await options.onRequest?.(request);
+
+      const status = options.status ?? 200;
+      if (status >= 400) {
+        return createErrorEnvelopeResponse(
+          status,
+          options.error ?? {
+            code: status === 403 ? 'FORBIDDEN' : 'NOT_FOUND',
+            message: 'Cannot read classroom desk map.',
+            correlationId: `corr-desks-${status}`,
+          },
+        );
+      }
+
+      const items: ClassroomDeskPayload[] = options.items
+        ? [...options.items]
+        : Array.from({ length: totalDesks }, (_, idx) => {
+            const deskIndex = idx + 1;
+            const isAssigned =
+              assignedUserId !== null && deskIndex === assignedDeskIndex;
+            const suffix = String(deskIndex).padStart(4, '0');
+            return {
+              id: `00000000-0000-4000-8000-00000000d${suffix.slice(-3)}`,
+              deskIndex,
+              membershipId: isAssigned
+                ? '00000000-0000-4000-8000-00000000m001'
+                : null,
+              userId: isAssigned ? assignedUserId : null,
+            };
+          });
+
+      return HttpResponse.json({ items } satisfies ClassroomDeskMapPayload, {
+        status: 200,
+      });
+    },
   );
 }
 
@@ -5822,6 +5894,10 @@ export const defaultHandlers: readonly HttpHandler[] = [
   http.get(`${TEST_API_BASE_URL}/chats`, () =>
     HttpResponse.json({ items: [] }),
   ),
+  createClassroomDesksHandler('*', {
+    assignedUserId: '00000000-0000-4000-8000-000000000001',
+    assignedDeskIndex: 1,
+  }),
 ];
 
 export type ReportCardItemPayload = components['schemas']['ReportCardItemDto'];
@@ -7764,5 +7840,399 @@ export function createChatInboxStore(
     },
     getCounts: () => ({ ...counts }),
     getMarkRequests: () => [...markRequests],
+  };
+}
+
+export type EquipmentSlotName = 'head' | 'face' | 'back' | 'desk_decor';
+
+export interface EquipmentStoreSlotEntry {
+  readonly slot: EquipmentSlotName;
+  readonly shopItemId: string;
+  readonly shopItemCode: string;
+  readonly shopItemName: string;
+  readonly kind: ShopStoreItemKind;
+}
+
+export type EquipmentStoreOp =
+  'getEquipment' | 'setSlot' | 'purchases' | 'catalog';
+
+export type EquipmentStoreFailure =
+  MswErrorResponseSpec | 'network' | 'malformed-2xx';
+
+export interface ClassroomEquipmentStoreOptions {
+  readonly baseUrl?: string;
+  readonly classroomId: string;
+  readonly studentId?: string;
+  readonly role?: string;
+  readonly initialPurchases?: readonly ShopStorePurchase[];
+  readonly initialSlots?: Partial<
+    Record<EquipmentSlotName, EquipmentStoreSlotEntry | null>
+  >;
+  /**
+   * Catalog `metadata` per `shopItemId`. The equip handler derives the slot
+   * from `metadata.slot` like the back does; items without an entry have empty
+   * metadata and are rejected with `409`.
+   */
+  readonly itemMetadata?: Readonly<Record<string, Record<string, unknown>>>;
+  /** `shopItemId`s purchased but absent from the served catalog. */
+  readonly omitFromCatalog?: readonly string[];
+  readonly setSlotDelayMs?: number;
+  /**
+   * Per-slot response delay. The server applies the change immediately and
+   * snapshots its state, then delivers that snapshot after the delay, so
+   * responses can land out of order like on a real network.
+   */
+  readonly setSlotDelaysMs?: Partial<Record<EquipmentSlotName, number>>;
+  /** Delay for equipment reads after the first one (reconciliation refetches). */
+  readonly refetchDelayMs?: number;
+  /**
+   * Largest page the served lists return, like a server-side `pageSize` cap.
+   * Defaults to the contract maximum (`100`).
+   */
+  readonly pageSizeCap?: number;
+  readonly includePurchasesHandler?: boolean;
+  readonly includeCatalogHandler?: boolean;
+}
+
+export interface ClassroomEquipmentStore {
+  readonly handlers: readonly HttpHandler[];
+  getSlots: () => Record<EquipmentSlotName, EquipmentStoreSlotEntry | null>;
+  setRole: (role: string) => void;
+  setPurchases: (purchases: readonly ShopStorePurchase[]) => void;
+  failNext: (op: EquipmentStoreOp, failure: EquipmentStoreFailure) => void;
+  getCounts: () => Record<EquipmentStoreOp, number>;
+}
+
+const KNOWN_EQUIPMENT_SLOTS: readonly EquipmentSlotName[] = [
+  'head',
+  'face',
+  'back',
+  'desk_decor',
+];
+
+function isValidEquipmentSlot(value: string): value is EquipmentSlotName {
+  return (KNOWN_EQUIPMENT_SLOTS as readonly string[]).includes(value);
+}
+
+/**
+ * Mirrors the back's `deriveSlotForItem`: the slot comes from
+ * `metadata.slot`; `null` means missing/invalid slot or a kind that does not
+ * fit it (the back answers `409`).
+ */
+function deriveEquipmentSlot(
+  kind: ShopStoreItemKind,
+  metadata: Record<string, unknown> | undefined,
+): EquipmentSlotName | null {
+  const slot = metadata?.slot;
+  if (typeof slot !== 'string' || !isValidEquipmentSlot(slot)) {
+    return null;
+  }
+  const fits =
+    slot === 'desk_decor'
+      ? kind === 'DESK_UPGRADE'
+      : kind === 'AVATAR_ACCESSORY';
+  return fits ? slot : null;
+}
+
+function readPageWindow(
+  request: Request,
+  pageSizeCap = 100,
+): { page: number; pageSize: number; start: number; end: number } {
+  const url = new URL(request.url);
+  const page = Math.max(1, Number(url.searchParams.get('page') ?? '1') || 1);
+  const requested = Number(url.searchParams.get('pageSize') ?? '100') || 100;
+  const pageSize = Math.min(Math.max(1, requested), pageSizeCap, 100);
+  return {
+    page,
+    pageSize,
+    start: (page - 1) * pageSize,
+    end: page * pageSize,
+  };
+}
+
+/**
+ * Stateful contract-faithful MSW store for classroom-scoped student inventory
+ * equipment (`GET /classrooms/:id/me/equipment`,
+ * `PUT /classrooms/:id/me/equipment/:slot`, and optionally
+ * `GET /classrooms/:id/shop/purchases`).
+ */
+export function createClassroomEquipmentStore(
+  options: ClassroomEquipmentStoreOptions,
+): ClassroomEquipmentStore {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const studentId = options.studentId ?? '00000000-0000-4000-8000-000000007001';
+  let currentRole = options.role ?? 'STUDENT';
+  let purchases: ShopStorePurchase[] = [...(options.initialPurchases ?? [])];
+
+  const slots: Record<EquipmentSlotName, EquipmentStoreSlotEntry | null> = {
+    head: options.initialSlots?.head ?? null,
+    face: options.initialSlots?.face ?? null,
+    back: options.initialSlots?.back ?? null,
+    desk_decor: options.initialSlots?.desk_decor ?? null,
+  };
+
+  const pending: Partial<Record<EquipmentStoreOp, EquipmentStoreFailure>> = {};
+  const counts: Record<EquipmentStoreOp, number> = {
+    getEquipment: 0,
+    setSlot: 0,
+    purchases: 0,
+    catalog: 0,
+  };
+
+  const consumeFailure = (
+    op: EquipmentStoreOp,
+  ): EquipmentStoreFailure | undefined => {
+    const failure = pending[op];
+    pending[op] = undefined;
+    return failure;
+  };
+
+  const respondFailure = (failure: EquipmentStoreFailure): Response => {
+    if (failure === 'network') {
+      return HttpResponse.error();
+    }
+    if (failure === 'malformed-2xx') {
+      return HttpResponse.json({ broken: true }, { status: 200 });
+    }
+    return createErrorEnvelopeResponse(failure.status, failure.body);
+  };
+
+  const buildStateDto = () => ({
+    classroomId: options.classroomId,
+    studentId,
+    slots: { ...slots },
+  });
+
+  const handlers: HttpHandler[] = [
+    http.get(`${baseUrl}/classrooms/:id/me/equipment`, async ({ params }) => {
+      counts.getEquipment += 1;
+      if (counts.getEquipment > 1 && options.refetchDelayMs) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, options.refetchDelayMs),
+        );
+      }
+      const failure = consumeFailure('getEquipment');
+      if (failure) {
+        return respondFailure(failure);
+      }
+      if (params.id !== options.classroomId) {
+        return createErrorEnvelopeResponse(404, {
+          code: 'NOT_FOUND',
+          message: 'Classroom not found.',
+          correlationId: 'req-equipment-get-404',
+        });
+      }
+      if (currentRole !== 'STUDENT') {
+        return createErrorEnvelopeResponse(403, {
+          code: 'FORBIDDEN',
+          message: 'Only active enrolled students have equipment.',
+          correlationId: 'req-equipment-get-403',
+        });
+      }
+      return HttpResponse.json(buildStateDto());
+    }),
+    http.put(
+      `${baseUrl}/classrooms/:id/me/equipment/:slot`,
+      async ({ params, request }) => {
+        counts.setSlot += 1;
+        const slotDelayMs =
+          options.setSlotDelaysMs?.[params.slot as EquipmentSlotName] ??
+          options.setSlotDelayMs ??
+          0;
+        // The state is applied and snapshotted first; only delivery is delayed.
+        const response = await applySetSlot(params, request);
+        if (slotDelayMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, slotDelayMs));
+        }
+        return response;
+      },
+    ),
+  ];
+
+  async function applySetSlot(
+    params: Record<string, string | readonly string[] | undefined>,
+    request: Request,
+  ): Promise<Response> {
+    const failure = consumeFailure('setSlot');
+    if (failure) {
+      return respondFailure(failure);
+    }
+    if (params.id !== options.classroomId) {
+      return createErrorEnvelopeResponse(404, {
+        code: 'NOT_FOUND',
+        message: 'Classroom not found.',
+        correlationId: 'req-equipment-put-404',
+      });
+    }
+    const rawSlot = String(params.slot ?? '');
+    if (!isValidEquipmentSlot(rawSlot)) {
+      return createErrorEnvelopeResponse(404, {
+        code: 'NOT_FOUND',
+        message: 'Unknown equipment slot.',
+        correlationId: 'req-equipment-slot-404',
+      });
+    }
+    if (currentRole !== 'STUDENT') {
+      return createErrorEnvelopeResponse(403, {
+        code: 'FORBIDDEN',
+        message: 'Only active enrolled students can equip items.',
+        correlationId: 'req-equipment-put-role-403',
+      });
+    }
+
+    const body = (await request.json().catch(() => ({}))) as {
+      shopItemId?: string | null;
+    };
+    const shopItemId = body.shopItemId ?? null;
+
+    if (shopItemId === null) {
+      slots[rawSlot] = null;
+      return HttpResponse.json(buildStateDto());
+    }
+
+    if (typeof shopItemId !== 'string' || shopItemId.trim() === '') {
+      return createErrorEnvelopeResponse(400, {
+        code: 'VALIDATION_FAILED',
+        message: 'shopItemId must be a valid UUID or null.',
+        correlationId: 'req-equipment-put-400',
+      });
+    }
+
+    const owned = purchases.find((p) => p.shopItemId === shopItemId);
+    if (!owned) {
+      return createErrorEnvelopeResponse(403, {
+        code: 'FORBIDDEN',
+        message: 'You do not own this item in this classroom.',
+        correlationId: 'req-equipment-put-403',
+      });
+    }
+
+    const expectedSlot = deriveEquipmentSlot(
+      owned.shopItemKind,
+      options.itemMetadata?.[owned.shopItemId],
+    );
+    if (expectedSlot !== rawSlot) {
+      return createErrorEnvelopeResponse(409, {
+        code: 'CONFLICT',
+        message: 'This item cannot be equipped in the selected slot.',
+        correlationId: 'req-equipment-put-409',
+      });
+    }
+
+    slots[rawSlot] = {
+      slot: rawSlot,
+      shopItemId: owned.shopItemId,
+      shopItemCode: owned.shopItemCode,
+      shopItemName: owned.shopItemName,
+      kind: owned.shopItemKind,
+    };
+
+    return HttpResponse.json(buildStateDto());
+  }
+
+  if (options.includePurchasesHandler !== false) {
+    handlers.push(
+      http.get(
+        `${baseUrl}/classrooms/:id/shop/purchases`,
+        ({ params, request }) => {
+          counts.purchases += 1;
+          const failure = consumeFailure('purchases');
+          if (failure) {
+            return respondFailure(failure);
+          }
+          if (params.id !== options.classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-equipment-purchases-404',
+            });
+          }
+          if (currentRole !== 'STUDENT') {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Only students can view purchases.',
+              correlationId: 'req-equipment-purchases-403',
+            });
+          }
+          const window = readPageWindow(request, options.pageSizeCap);
+          return HttpResponse.json({
+            items: purchases.slice(window.start, window.end).map((p) => ({
+              ...p,
+              classroomId: options.classroomId,
+              studentId,
+            })),
+            page: window.page,
+            pageSize: window.pageSize,
+            total: purchases.length,
+          });
+        },
+      ),
+    );
+  }
+
+  if (options.includeCatalogHandler !== false) {
+    handlers.push(
+      http.get(
+        `${baseUrl}/classrooms/:id/shop/items`,
+        ({ params, request }) => {
+          counts.catalog += 1;
+          const failure = consumeFailure('catalog');
+          if (failure) {
+            return respondFailure(failure);
+          }
+          if (params.id !== options.classroomId) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Classroom not found.',
+              correlationId: 'req-equipment-catalog-404',
+            });
+          }
+          if (currentRole !== 'STUDENT') {
+            return createErrorEnvelopeResponse(403, {
+              code: 'FORBIDDEN',
+              message: 'Only students can view the catalog.',
+              correlationId: 'req-equipment-catalog-403',
+            });
+          }
+          const omitted = new Set(options.omitFromCatalog ?? []);
+          const catalog = purchases.filter((p) => !omitted.has(p.shopItemId));
+          const window = readPageWindow(request, options.pageSizeCap);
+          return HttpResponse.json({
+            items: catalog.slice(window.start, window.end).map((p) => ({
+              id: p.shopItemId,
+              code: p.shopItemCode,
+              name: p.shopItemName,
+              description: '',
+              kind: p.shopItemKind,
+              price: p.pricePaid,
+              isImplemented: true,
+              isPurchasable: false,
+              ownedByStudent: true,
+              ownedByClassroom: false,
+              metadata: options.itemMetadata?.[p.shopItemId] ?? {},
+              createdAt: p.createdAt,
+            })),
+            page: window.page,
+            pageSize: window.pageSize,
+            total: catalog.length,
+          });
+        },
+      ),
+    );
+  }
+
+  return {
+    handlers,
+    getSlots: () => ({ ...slots }),
+    setRole: (role) => {
+      currentRole = role;
+    },
+    setPurchases: (next) => {
+      purchases = [...next];
+    },
+    failNext: (op, failure) => {
+      pending[op] = failure;
+    },
+    getCounts: () => ({ ...counts }),
   };
 }

@@ -37,6 +37,7 @@ import {
   useStudentWallet,
   type StudentWallet,
 } from '../points/use-student-wallet';
+import { InventoryPanel } from '../inventory/inventory-panel';
 import { shopMessages } from './messages';
 import {
   PurchaseConfirmDialog,
@@ -48,7 +49,7 @@ import { listShopItems, listShopPurchases } from './shop-service';
 const CATALOG_PAGE_SIZE = 12;
 const PURCHASES_PAGE_SIZE = 10;
 
-type ShopTab = 'catalog' | 'purchases';
+type ShopTab = 'catalog' | 'purchases' | 'inventory';
 
 const panelMessages = shopMessages.panel;
 const filterMessages = shopMessages.filters;
@@ -406,17 +407,24 @@ function ShopPanelScoped({ classroomId, userId }: ShopPanelScopedProps) {
       <Tabs
         value={activeTab}
         onValueChange={(next) => {
-          if (next === 'catalog' || next === 'purchases') {
+          if (
+            next === 'catalog' ||
+            next === 'purchases' ||
+            next === 'inventory'
+          ) {
             setActiveTab(next);
           }
         }}
       >
-        <TabsList className="w-full justify-start">
+        <TabsList className="h-auto w-full flex-wrap justify-start">
           <TabsTrigger value="catalog" className="min-h-11">
             {panelMessages.tabCatalog}
           </TabsTrigger>
           <TabsTrigger value="purchases" className="min-h-11">
             {panelMessages.tabPurchases}
+          </TabsTrigger>
+          <TabsTrigger value="inventory" className="min-h-11">
+            {panelMessages.tabInventory}
           </TabsTrigger>
         </TabsList>
 
@@ -783,6 +791,10 @@ function ShopPanelScoped({ classroomId, userId }: ShopPanelScopedProps) {
               ) : null}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="inventory" className="mt-4">
+          <InventoryPanel classroomId={classroomId} />
         </TabsContent>
       </Tabs>
 

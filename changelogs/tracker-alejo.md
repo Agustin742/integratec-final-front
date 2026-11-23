@@ -1,5 +1,32 @@
 # Tracker — Alejo
 
+## 2026-11-22 — Refine modular avatar reuse and body preservation (PR #119)
+
+- **Status:** completed
+- **Area / files:** `rules/modular-avatar-assets.md`, this tracker.
+- **Change:** Clarified mandatory master-garment reuse and fitted variants, unchanged female anatomy, coverage-safe skin hiding, canonical joint names/tolerance, pending weight/clip migrations, and current versus future runtime support. AI assisted the documentation correction; no models or runtime code changed.
+- **Reason:** Adapt existing wearables to each anatomy instead of rebuilding assets or reshaping the body to fit clothing; incorporate the technical review of PR #119.
+- **Verification:** `python scripts/ci/check_docs.py` passed (84 files); `git diff --check` clean; documentation diff inspected. No meaningful failing behavior test for passive documentation; application suites and full CI Python regression not run for this docs-only slice.
+- **Next step:** Merged `origin/develop` (`bead380c`, PR #118) to resolve the tracker conflict; awaiting team review/approval (`Agustin742`, `Calegaris`) and green CI before merging PR #119. Asset migrations and runtime extensions remain pending.
+
+## 2026-11-22 — Add modular 3D avatar asset authoring rule
+
+- **Status:** in review ([PR #119](https://github.com/Agustin742/integratec-final-front/pull/119) on `docs/modular-avatar-assets-rule` off `origin/develop` `30ec66c`, reviewers `Agustin742` and `Calegaris`)
+- **Area / files:** `rules/modular-avatar-assets.md`, `changelogs/tracker-alejo.md`
+- **Change:** Added a dedicated technical rule (`rules/modular-avatar-assets.md`) governing modular 3D avatar construction and Blender/MCP export aligned with `docs/art/asset-wishlist.md` (PR #117) and the verified baseline transforms, T-pose rest rig, and 34-bone core skeleton of `public/models/avatars/{male,female}/body.glb`, keeping `rules/index.md` and `rules/README.md` untouched per contributor scope.
+- **Reason:** Establish a single canonical 34-bone skeleton (preserving female mesh anatomy without female-only secondary bones), semantic split-body region naming (`Body_*`), rigid-accessory binding, material/slot conventions, incremental delivery scope, and Blender/MCP export guardrails before producing modular character assets.
+- **Verification:** `python3 scripts/ci/check_docs.py` passed across all 84 tracked Markdown files; `git diff --check origin/develop..HEAD --` clean; docs-only change (outside `format:check` paths). Disclosure: `unittest discover -s scripts/ci` hung locally on Windows (`test_public_checker_cases`) and runs in Ubuntu CI.
+- **Next step:** Team review and approval by `Agustin742` and `Calegaris`, then merge into `develop`.
+
+## 2026-11-22 — Review fixes for PR #118 (#38)
+
+- **Status:** completed (all review fixes applied, verified locally with Vitest, lint, typecheck, format, builds, security/asset checks, and Playwright E2E on `feat/38-interactable-classroom-objects`; pushing for Ubuntu CI, approval, and merge)
+- **Area / files:** `e2e/classroom-interactables.spec.ts`, `src/features/classrooms/desks/classroom-desks-api.ts`, `src/features/classrooms/desks/classroom-desks-api.test.ts`, `src/features/classrooms/classroom-3d-stage.tsx`, `src/features/classrooms/classroom-3d-stage.test.tsx`, `src/features/classrooms/classroom-interactables-bar.tsx`, `src/features/classrooms/classroom-interactables.test.tsx`, `src/features/classrooms/messages.ts`, `src/features/world/classroom/interactable-highlight-helpers.ts`, `src/features/world/classroom/interactable-highlight.tsx`, `src/features/world/classroom/interactable-highlight.test.tsx`, `src/features/world/classroom/classroom-interactables.ts`, `src/features/world/classroom/classroom-interactables.test.ts`, `src/features/world/classroom/build-classroom-scene.ts`, `docs/classroom-workspace.md`, `docs/ai-usage.md`, `docs/assets/classroom-workspace/interactables-{1280,360}.png`, and this tracker.
+- **Change:** Fixed the CI `typecheck`/`build` failure in `e2e/classroom-interactables.spec.ts` (`performanceOffer.decline` + `waitFor` before canvas click/tap), updated `useClassroomDesks` to preserve confirmed desk assignments across transient refresh failures while clearing `403`/`404` and exposing a `Reintentar` action in `Classroom3DStage`/`ClassroomInteractablesBar`, bounded the highlight beacon pulse (`650 ms`) so R3F `demand` rendering returns to idle while focus remains on a chip, filtered HUD panel chips by `availablePanels` and desk availability without weakening 3D denial guards, and shared `deriveClassroomPropSpecs` and `TEACHER_DESK_INDEX` between `classroom-interactables.ts` and `build-classroom-scene.ts`.
+- **Reason:** Resolve the failing CI `typecheck`/`build` and fix state, performance, and rule-compliance defects found while reviewing [PR #118](https://github.com/Agustin742/integratec-final-front/pull/118) (`#38`, `HU-ESP-002`).
+- **Verification:** `prettier --check`, `eslint` (`0` errors), `tsc --noEmit`, targeted Vitest across touched/related suites (**37/37 files, 368/368 tests passed**), `vite build` (`three` isolated in lazy `world` chunk), `security:check`, `assets:check` (`22` within limits, `3` tracked exceptions), `vite build --mode showcase`, Playwright E2E `e2e/classroom-interactables.spec.ts` + `e2e/classroom-workspace.spec.ts` (**24/24 passed** at `1280px` and `360px` with refreshed screenshots), and `git diff --check origin/develop..HEAD --`. Full Vitest regression on Windows (`1561/1565` prior to final E2E-only tweak) had only the 3 pre-existing Windows Node-24 `materials` failures documented on `develop`; Ubuntu GitHub Actions CI verifies the full suite and docs check on push.
+- **Next step:** Push to `feat/38-interactable-classroom-objects`, confirm green Ubuntu CI, approve PR #118, and merge into `develop`.
+
 ## 2026-11-21 — Real-time classroom presence, remote avatar interpolation, and reconnect states (#37)
 
 - **Status:** completed (implemented on `feat/37-realtime-presence`, verified with targeted Vitest suites, ESLint, TypeScript, production build + security check, and Playwright `classroom-workspace` E2E; ready for commits and PR against `develop`)
@@ -30,6 +57,19 @@
 - **Reason:** Detect devices that cannot sustain the 3D budget and offer, never force, the 2D Classic Mode.
 - **Verification:** Node v24.15.0 with `npm_config_engine_strict=false`: lint (pre-existing `jsx-ast-utils` warning), typecheck, build, `security:check`, `format:check`, `check_docs.py` and `git diff --check` pass; full vitest 1341/1344 with 3 failures (pre-existing `materials` class, see the ai-usage entry); `e2e/performance-offer.spec.ts` 5/5 (1 skipped by design) with screenshots. Measured on the empty reference stage: 33.4 fps unthrottled (resize-driven), 6.8 fps (desktop) and 4.3 fps (mobile) at 20x CPU throttle with the offer shown; 0 draw calls / 0 triangles. Other Playwright specs fail locally on the unmocked `GET /chats` from the chat dock merged with #113 (not changed here, not re-verified on clean `develop`). The Python CI `unittest` suite was not run on this Windows workstation.
 - **Next step:** CI green on PR #114 and merge.
+
+## 2026-11-20 — Inventory selector to equip purchased items on avatar and desk (#57)
+
+- **Status:** in review ([PR #115](https://github.com/Agustin742/integratec-final-front/pull/115) against `develop`; review fixes applied on branch `feat/57-inventory-selector`)
+- **Area / files:** `src/api/query-keys.ts`, `src/features/inventory/` (`inventory-schema.ts`, `inventory-service.ts`, `inventory-messages.ts`, `inventory-panel.tsx`, `profile-inventory-section.tsx`, `inventory-service.test.ts`, `inventory-panel.test.tsx`), `src/features/shop/shop-panel.tsx` + `messages.ts`, `src/features/profile/profile-view.tsx` + `profile-page.test.tsx`, `src/test/msw/handlers.ts` (`createClassroomEquipmentStore`), `e2e/inventory.spec.ts`, `docs/ui-inventory.md`, `docs/classroom-panels.md`, `docs/assets/inventory/`, this tracker.
+- **Change:** Implemented [issue #57](https://github.com/Agustin742/integratec-final-front/issues/57) (`HU-ESP-004` part 1/2):
+  1. Added classroom- and user-scoped equipment query keys/predicates (`classroomEquipmentQueryKey`, `createClassroomEquipmentPredicate`), jitless Zod schemas (`equipmentStateDtoSchema` supporting `null` empty slots, `isEquipableInSlot` / `isEquipableKind` compatibility helpers), and typed REST service (`getEquipment`, `setEquipmentSlot`) with Spanish (`es-AR`) error translation (`400`, `401`, `403` unowned item, `404`, `409`, `429`, `5xx`/network/malformed `2xx` uncertain-write classification).
+  2. Built `InventoryPanel` with student-only gating and cache eviction for non-student roles, loading/empty/stale/error states, per-slot equip/unequip controls (`head`, `face`, `back`, `desk_decor`), pending/confirmed/rejected states, `403` rejection alert without mutating confirmed equipped state, and uncertain-write cache reconciliation.
+  3. Wired `InventoryPanel` into the workspace `shop` panel (`Mi inventario` tab in `ShopPanel`) and `/profile` (`ProfileInventorySection` with student classroom selector).
+  4. Added contract-faithful `createClassroomEquipmentStore` MSW handlers, unit/RTL/axe tests (10/10), Playwright E2E `e2e/inventory.spec.ts` (desktop 1280px and mobile 360px), `docs/ui-inventory.md` with screenshots, and `docs/classroom-panels.md` cross-link.
+- **Reason:** Deliver the 2D inventory selector per `rules/avatars-and-customization.md`, `rules/points-and-shop.md`, `rules/state-management.md`, `rules/forms-and-validation.md`, `rules/ui-and-accessibility.md`.
+- **Verification:** On Node `v24.15.0` (`npm_config_engine_strict=false`; CI pins `>=22.23.4 <23`): `pnpm lint` pass (0 errors); `pnpm typecheck` pass (0 errors); focused Vitest `src/features/inventory src/features/shop` 5 files, 24/24 passed (and earlier `src/features/inventory src/features/shop src/features/profile` 10 files, 68/68 passed); `pnpm build` pass (`VITE_APP_ENV=test`, `VITE_API_BASE_URL=https://api.example.invalid`); `pnpm security:check` pass; `pnpm build:e2e` pass; Playwright `e2e/inventory.spec.ts` 2/2 passed (desktop 1280px + mobile 360px, CSP/pageerror/overflow clean) against local preview on port 4175; `check_docs.py` passed (80 files); `git diff --check` clean. MSW/Playwright evidence is not live-backend proof (`Agustin742/integratec-final-back#35`).
+- **Next step:** CI green on PR #115 and merge after the review fixes.
 
 ## 2026-11-19 — Implement real-time classroom chat panel (#51)
 

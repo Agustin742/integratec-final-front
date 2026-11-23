@@ -7,8 +7,10 @@ import { ClassroomScene } from './classroom-scene';
 const nav = vi.hoisted(() => ({
   options: null as unknown,
   onFloorClick: vi.fn(),
+  clearDestination: vi.fn(),
   localAvatarProps: null as unknown,
   remoteAvatars: [] as unknown[],
+  highlightProps: null as unknown,
 }));
 
 vi.mock('./use-classroom-navigation', () => ({
@@ -18,6 +20,7 @@ vi.mock('./use-classroom-navigation', () => ({
       controller: { poseRef: { current: { x: 0, z: 0, rotation: 0 } } },
       marker: { object: new Mesh() },
       onFloorClick: nav.onFloorClick,
+      clearDestination: nav.clearDestination,
     };
   },
 }));
@@ -33,6 +36,12 @@ vi.mock('./remote-avatar', () => ({
     return <div data-testid="remote-avatar" />;
   },
 }));
+vi.mock('./interactable-highlight', () => ({
+  InteractableHighlight: (props: unknown) => {
+    nav.highlightProps = props;
+    return <div data-testid="interactable-highlight" />;
+  },
+}));
 
 const avatar: Avatar = {
   bodyId: 'female',
@@ -45,6 +54,8 @@ const avatar: Avatar = {
 beforeEach(() => {
   nav.onFloorClick.mockClear();
   nav.remoteAvatars.length = 0;
+  nav.clearDestination.mockClear();
+  nav.highlightProps = null;
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -63,15 +74,31 @@ describe('ClassroomScene', () => {
     ).toBeUndefined();
   });
 
-  test('passes the intent listener through to the navigation', () => {
+  test('passes the intent listener and interactionLocked through to navigation and highlight', () => {
     const onIntentChange = vi.fn();
     render(
-      <ClassroomScene scopeKey="room-1" onIntentChange={onIntentChange} />,
+      <ClassroomScene
+        scopeKey="room-1"
+        onIntentChange={onIntentChange}
+        highlightedInteractableId="board"
+        ownDeskIndex={2}
+        petReactionNonce={3}
+        interactionLocked={true}
+      />,
     );
-    expect(nav.options).toMatchObject({ scopeKey: 'room-1', onIntentChange });
+    expect(nav.options).toMatchObject({
+      scopeKey: 'room-1',
+      onIntentChange,
+      interactionLocked: true,
+    });
+    expect(nav.highlightProps).toMatchObject({
+      highlightedId: undefined,
+      ownDeskIndex: 2,
+      petReactionNonce: 3,
+    });
   });
 
-  test('routes clicks on the scene root to the floor handler', () => {
+  test('routes clicks on the scene root to the floor handler when no interactable is hit', () => {
     const { container } = render(<ClassroomScene scopeKey="room-1" />);
     fireEvent.click(container.querySelector('primitive')!);
     expect(nav.onFloorClick).toHaveBeenCalledTimes(1);
@@ -113,6 +140,22 @@ describe('ClassroomScene', () => {
       targetPose: { x: 0, z: -3, rotation: 0 },
       avatar,
       scopeKey: 'room-1',
+    });
+  });
+
+  test('forwards highlight props when unlocked', () => {
+    render(
+      <ClassroomScene
+        scopeKey="room-1"
+        highlightedInteractableId="shop"
+        ownDeskIndex={1}
+        petReactionNonce={4}
+      />,
+    );
+    expect(nav.highlightProps).toMatchObject({
+      highlightedId: 'shop',
+      ownDeskIndex: 1,
+      petReactionNonce: 4,
     });
   });
 });

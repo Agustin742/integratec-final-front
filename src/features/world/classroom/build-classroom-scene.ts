@@ -16,6 +16,10 @@ import {
 import type { ClassroomLayout } from '@/realtime';
 import { CLASSROOM_WALL_HEIGHT } from '../camera';
 import { DESK_HEIGHT, deriveDesks } from './classroom-desks';
+import {
+  ENTRANCE_WIDTH,
+  deriveClassroomPropSpecs,
+} from './classroom-interactables';
 
 /** Art-direction palette (`rules/art-direction.md`). */
 export const CLASSROOM_COLORS = {
@@ -52,7 +56,6 @@ export interface ClassroomScene {
 const WALL_THICKNESS = 0.2;
 const SKIRTING_HEIGHT = 0.15;
 const SKIRTING_THICKNESS = 0.1;
-const ENTRANCE_WIDTH = 2;
 const DESK_TOP_THICKNESS = 0.06;
 const LEG_SIZE = 0.06;
 const LEG_INSET = 0.05;
@@ -68,6 +71,7 @@ type Vec3 = readonly [number, number, number];
  */
 export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   const { bounds } = layout;
+  const propSpecs = deriveClassroomPropSpecs(layout);
   const box = new BoxGeometry(1, 1, 1);
   const sphere = new SphereGeometry(0.5, 16, 12);
   const plane = new PlaneGeometry(1, 1);
@@ -144,11 +148,13 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   teachingZone.name = 'teaching-zone';
   root.add(teachingZone);
 
-  const entrance = flat(CLASSROOM_COLORS.coral, ENTRANCE_WIDTH, 0.6, [
-    0,
-    0.012,
-    bounds.maxZ + 0.05,
-  ]);
+  const entrance = flat(
+    CLASSROOM_COLORS.coral,
+    propSpecs.entrance.footprint[0],
+    propSpecs.entrance.footprint[1],
+    propSpecs.entrance.position,
+    true,
+  );
   entrance.name = 'entrance';
   entrance.userData.placeholder = 'entrance' satisfies PlaceholderKind;
   root.add(entrance);
@@ -287,16 +293,15 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
     root.add(group);
     return group;
   };
-  const frontZ = bounds.minZ;
 
   // Board on the front wall, above the teaching zone.
-  const board = prop('classroom-board', 'board', [0, 0, frontZ]);
+  const board = prop('classroom-board', 'board', propSpecs.board.position);
   block(board, CLASSROOM_COLORS.turquoise, [4.4, 1.5, 0.08], [0, 1.55, 0.04]);
   block(board, CLASSROOM_COLORS.boardGreen, [4, 1.1, 0.04], [0, 1.55, 0.1]);
   block(board, CLASSROOM_COLORS.wood, [1.6, 0.05, 0.12], [0, 0.78, 0.06]);
 
   // Shelf with muted books, front wall, left of the board.
-  const shelf = prop('classroom-shelf', 'shelf', [-6.7, 0, frontZ]);
+  const shelf = prop('classroom-shelf', 'shelf', propSpecs.shelf.position);
   block(shelf, CLASSROOM_COLORS.wood, [1.8, 1.5, 0.03], [0, 0.75, 0.015]);
   for (const x of [-0.88, 0.88])
     block(shelf, CLASSROOM_COLORS.wood, [0.04, 1.5, 0.28], [x, 0.75, 0.14]);
@@ -315,7 +320,7 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   );
 
   // Shop corner, front wall, right of the board.
-  const shop = prop('classroom-shop', 'shop', [4.8, 0, frontZ]);
+  const shop = prop('classroom-shop', 'shop', propSpecs.shop.position);
   block(shop, CLASSROOM_COLORS.peach, [2, 0.9, 0.28], [0, 0.45, 0.14]);
   block(shop, CLASSROOM_COLORS.wood, [2, 0.05, 0.28], [0, 0.925, 0.14]);
   block(shop, CLASSROOM_COLORS.peach, [1.4, 0.4, 0.05], [0, 1.7, 0.025]);
@@ -324,7 +329,7 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   block(shop, CLASSROOM_COLORS.coral, [0.18, 0.25, 0.18], [0.6, 1.075, 0.14]);
 
   // Pet corner (basket + green pet), front-right corner of the front wall.
-  const pet = prop('classroom-pet', 'pet', [7, 0, frontZ]);
+  const pet = prop('classroom-pet', 'pet', propSpecs.pet.position);
   block(pet, CLASSROOM_COLORS.wood, [1, 0.14, 0.28], [0, 0.07, 0.14]);
   part(
     pet,
@@ -345,8 +350,8 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   const bulletin = prop(
     'classroom-bulletin-board',
     'bulletin-board',
-    [bounds.minX, 0, bounds.maxZ - 1.8],
-    Math.PI / 2,
+    propSpecs.bulletinBoard.position,
+    propSpecs.bulletinBoard.rotationY ?? 0,
   );
   block(bulletin, CLASSROOM_COLORS.wood, [2, 1, 0.06], [0, 1.5, 0.03]);
   block(bulletin, CLASSROOM_COLORS.coral, [1.8, 0.8, 0.03], [0, 1.5, 0.075]);
@@ -361,11 +366,11 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   );
 
   // Tutor bot stands on the teacher desk, so its footprint is inside the obstacle.
-  const bot = prop('classroom-tutor-bot', 'tutor-bot', [
-    teacher ? teacher.centerX + teacher.width / 2 - 0.5 : 0,
-    DESK_HEIGHT,
-    teacher ? teacher.centerZ : 0,
-  ]);
+  const bot = prop(
+    'classroom-tutor-bot',
+    'tutor-bot',
+    propSpecs.tutorBot.position,
+  );
   block(bot, CLASSROOM_COLORS.lavender, [0.28, 0.3, 0.2], [0, 0.15, 0]);
   part(
     bot,

@@ -7,6 +7,7 @@ import {
   Mesh,
   Object3D,
   Quaternion,
+  Raycaster,
   Vector3,
   type BufferGeometry,
 } from 'three';
@@ -125,6 +126,24 @@ describe('cutaway walls', () => {
       color: { getHex(): number };
     };
     expect(colour.color.getHex()).toBe(0xe66861);
+  });
+
+  test('keeps the entrance raycastable while decorative floor zones let floor rays pass', () => {
+    const { root } = build();
+    root.updateMatrixWorld(true);
+    const raycaster = new Raycaster(
+      new Vector3(0, 5, layout.bounds.maxZ + 0.05),
+      new Vector3(0, -1, 0),
+    );
+    const entranceHits = raycaster.intersectObject(root, true);
+    expect(entranceHits[0]?.object.name).toBe('entrance');
+
+    raycaster.set(
+      new Vector3(2, 5, layout.bounds.minZ + 1.35),
+      new Vector3(0, -1, 0),
+    );
+    const zoneHits = raycaster.intersectObject(root, true);
+    expect(zoneHits[0]?.object.name).toBe('walkable-floor');
   });
 });
 
