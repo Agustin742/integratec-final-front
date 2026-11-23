@@ -4,6 +4,13 @@ Course declaration of AI use in the development process (see [course requirement
 
 > Status: partial evidence recorded. Sections marked _Pending_ still require team input and human review.
 
+## Vest modular asset evidence
+
+- **Tools and scope:** Antigravity and Blender MCP reused the concentric closed spherical elbow-cap shell from the approved school smock as a layered under-shirt for both unchanged male and female bodies, authoring `Vest` ([guide](art/vest.md)) without altering `male/body.glb`, `female/body.glb`, legacy `pants`/`boots`, or any previously exported top.
+- **Useful result:** Built a tailored buttoned V-neck vest (`VestBody`) with two welt pockets (`Pocket_L`, `Pocket_R`), three front buttons (`Buttons`), smooth shirt cuffs (`Cuff_L`, `Cuff_R`), and a folded dress-shirt collar (`Collar`) (`8` meshes per gender). Isolated 20-bit Draco GLB roundtrips pass canonical 34-bone rest hierarchy, `<= 4` normalized weights, `0` inward sleeve triangles, `0` exposed arm vertices/triangles across `Idle 1`, `Walk 62`, `Sit 123`, and `Wave 201`, and `<= 1 MB` budget.
+- **Detected problems and corrections:** Initial authoring hit two issues caught before export: (1) the head-clearance probe flagged hip vertices 25 cm below the head until bounded by spatial proximity (`dist < 0.04 m`), and (2) splitting `VestBody` horizontally at `z = 0.612` caused a mid-bust groove on the female mesh and rear/side raycast notches. Replacing the split torso with continuous hem-to-shoulder front and back panels (`z = 0.474..0.730`), using an elliptical raycast origin for the recessed side/hip wrap, and matching lower border thicknesses resolved the bust groove and rear notches cleanly across color and grayscale previews.
+- **Human verification:** Approved by human visual review with permanent `1280×1280` and `360×360` renders (`docs/assets/vest/`); committed locally on `feat/91-modular-avatar-assets` (not pushed; runtime catalog integration and wishlist merge-check remain separate).
+
 ## Sweater modular asset evidence
 
 - **Tools and scope:** Antigravity and Blender MCP reused the concentric closed spherical elbow-cap shell from the approved school smock for both unchanged male and female bodies, authoring `Sweater` ([guide](art/sweater.md)) without altering `male/body.glb`, `female/body.glb`, legacy `pants`/`boots`, or any previously exported top.

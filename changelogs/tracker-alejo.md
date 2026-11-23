@@ -1,5 +1,18 @@
 # Tracker — Alejo
 
+## 2026-11-23 — Author modular vest on both avatars
+
+- **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
+- **Area / files:** `assets/blender/avatars/shared/top/vest.blend`, `public/models/avatars/{male,female}/top-vest.glb`, `docs/art/vest.md`, `docs/assets/vest/{male,female}-{1280,360}.png`, `scripts/assets/test-vest.mjs`, `scripts/assets/test-vest-sleeve-normals.py`, `docs/ai-usage.md`.
+- **Change:** Authored `Vest` on the unchanged existing male and female avatar bodies, reusing the concentric closed spherical elbow-cap shell from `ELBOW_FIXED_SchoolSmock_{Male,Female}` as a layered cream under-shirt with smooth cuffs and folded dress-shirt collar, topped by a tailored buttoned V-neck vest (`VestBody`), two welt pockets (`Pocket_L`, `Pocket_R`), and three front buttons (`8` meshes per gender; `AvatarTopTint` neutral `#FFFFFF` on vest/pockets and `AvatarDetail` `#FFF9EB` pale cream on under-shirt, cuffs, collar, and buttons).
+- **Reason:** Continue incremental Casual upper-body wearable delivery for issue `#91` under `rules/modular-avatar-assets.md` and `docs/art/asset-wishlist.md`.
+- **Coordination:** Existing Alejo Project item `PVTI_lAHOCevXNc4BoRd2zhK9fEI`, issue `#91`.
+- **Evidence:**
+  - Authoring clearance (`1, 25, 62, 123, 201`) passed with `0` exposed arm verts/tris and `0` collar/vest-head collisions against `Reference_Head` (`odd/artifacts/vest-author-report.json`). Initial Cycles preview inspection caught and resolved a mid-bust seam and rear notches by switching to continuous hem-to-shoulder front/back panels over a recessed elliptical side wrap.
+  - Exported canonical 34-bone master and isolated 20-bit Draco GLBs (`odd/artifacts/vest-export.json`), verified decoded roundtrip (`<= 4` normalized weights, `0` exposed arm verts/tris on frames `1, 62, 123, 201`), and `0` inward sleeve triangles across `1,360` triangles per side (`test-vest-sleeve-normals.py`).
+  - Permanent `1280×1280` and `360×360` renders generated under `docs/assets/vest/`.
+- **Next step:** Human reviewed and approved the vest; committed locally on `feat/91-modular-avatar-assets` without pushing. Remaining wishlist tops: Casual (`Denim jacket`, `Track jacket`, `Flannel shirt`, `Tank top`) and Seasonal (`Winter coat`, `Holiday sweater`, `National team jersey`). Continue with `Denim jacket` or `Track jacket`.
+
 ## 2026-11-23 — Author modular sweater on both avatars
 
 - **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
