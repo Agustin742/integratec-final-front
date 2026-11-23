@@ -1,5 +1,18 @@
 # Tracker — Alejo
 
+## 2026-11-23 — Author 4 modular medium hairstyles (`shared/`) and refine soft mohawk
+
+- **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
+- **Area / files:** `assets/blender/avatars/shared/hair/{bob,wavy,messy,middle-part,soft-mohawk}.blend`, `public/models/avatars/shared/hair-{bob,wavy,messy,middle-part,soft-mohawk}.glb`, `docs/art/hair-medium.md`, `docs/art/hair-short.md`, `docs/assets/hair-{bob,wavy,messy,middle-part,soft-mohawk}/{male,female}-{1280,360}.png`, `scripts/assets/test-medium-hair.mjs`, `docs/ai-usage.md`.
+- **Change:** Authored the 4 Medium hairstyles from `docs/art/asset-wishlist.md` (`Bob`, `Wavy`, `Messy`, `Middle part`) under `shared/` weighted `100%` to `DEF-spine.006` above `z = 0.82` with smooth `DEF-spine.003` blending below `z = 0.82` (up to `0.30`), and refined Short `Soft mohawk` (`soft-mohawk` v2) from 5 segmented lobes into one continuous sculpted sagittal ridge weighted `100%` to `DEF-spine.006`, using neutral `#FFFFFF` `AvatarHairTint` (roughness `0.65`) on both unchanged male and female avatar bodies under `rules/modular-avatar-assets.md` and `rules/art-direction.md`.
+- **Reason:** Continue incremental Hair wearable delivery (`Medium (4)`) and address human visual feedback on `Soft mohawk` for issue `#91`.
+- **Coordination:** Existing Alejo Project item `PVTI_lAHOCevXNc4BoRd2zhK9fEI`, issue `#91`.
+- **Evidence:**
+  - Authoring clearance (`1, 25, 62, 123, 201`) passed with `0` eye, `0` female eyelash, `0` ear, and `0` body/Wave-arm hits across all styles on both genders (`odd/artifacts/medium-hair-author-report.json`, `odd/artifacts/soft-mohawk-v2-report.json`); iterative Cycles previews and human review resolved boxy ear-snap steps, Parallel Transport lobe twists, `Wave` arm collisions, `Wavy` vertical rear tubes, `Messy` vertical side/back stripes, and segmented `Soft mohawk` crest balls.
+  - Exported canonical 34-bone shared masters and isolated 20-bit Draco GLBs (`bob`: `51,504 B`, `5,746` verts / `483` `DEF-spine.003` blend; `wavy`: `60,568 B`, `7,630` verts / `727` blend; `messy`: `63,412 B`, `7,430` verts / `727` blend; `middle-part`: `49,908 B`, `5,622` verts / `481` blend; `soft-mohawk`: `22,876 B`, `1,868` verts); decoded GLB roundtrips verified exact 34-bone rest matrices, `1..2` normalized influences (max weight-sum error `<= 2.68e-7`), and `0` eye/lash/ear/body hits on frames `1, 62, 123, 201` on both genders (`odd/artifacts/medium-hair-export.json`).
+  - Permanent `1280×1280` and `360×360` Cycles renders generated under `docs/assets/hair-{bob,wavy,messy,middle-part,soft-mohawk}/`, and `REVIEW_HairBob_Female` left active in Blender.
+- **Next step:** Human reviewed and approved all 4 medium hairstyles plus the `Soft mohawk` refinement; committed locally on `feat/91-modular-avatar-assets` without pushing (wishlist remains unchecked until merge). Next Hair batch: `Long (3)` (`Long straight`, `Long wavy`, `Long curls`).
+
 ## 2026-11-23 — Author 6 modular short hairstyles (`shared/`) on both avatars
 
 - **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)

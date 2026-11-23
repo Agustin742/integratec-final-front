@@ -10,7 +10,7 @@
 | Classic short | [classic-short.blend](../../assets/blender/avatars/shared/hair/classic-short.blend) | [hair-classic-short.glb](../../public/models/avatars/shared/hair-classic-short.glb) | `23,020` B | `2` (`HairClassicShort_{Cap,FrontWave}`), `1,900` |
 | Fringe | [fringe.blend](../../assets/blender/avatars/shared/hair/fringe.blend) | [hair-fringe.glb](../../public/models/avatars/shared/hair-fringe.glb) | `25,880` B | `2` (`HairFringe_{Cap,Bangs}`), `2,368` |
 | Short curls | [short-curls.blend](../../assets/blender/avatars/shared/hair/short-curls.blend) | [hair-short-curls.glb](../../public/models/avatars/shared/hair-short-curls.glb) | `46,744` B | `2` (`HairShortCurls_{Cap,Curls}`), `5,826` |
-| Soft mohawk | [soft-mohawk.blend](../../assets/blender/avatars/shared/hair/soft-mohawk.blend) | [hair-soft-mohawk.glb](../../public/models/avatars/shared/hair-soft-mohawk.glb) | `25,088` B | `2` (`HairSoftMohawk_{Cap,Crest}`), `2,156` |
+| Soft mohawk | [soft-mohawk.blend](../../assets/blender/avatars/shared/hair/soft-mohawk.blend) | [hair-soft-mohawk.glb](../../public/models/avatars/shared/hair-soft-mohawk.glb) | `22,876` B | `2` (`HairSoftMohawk_{Cap,Crest}`), `1,868` |
 | Side part | [side-part.blend](../../assets/blender/avatars/shared/hair/side-part.blend) | [hair-side-part.glb](../../public/models/avatars/shared/hair-side-part.glb) | `26,540` B | `2` (`HairSidePart_{Cap,Sweep}`), `2,586` |
 
 - [Standalone structural test](../../scripts/assets/test-short-hair.mjs).
@@ -39,7 +39,7 @@
 | Check | Observed result |
 | --- | --- |
 | Authoring clearance (`1, 25, 62, 123, 201`) | `0` eye, `0` female eyelash, and `0` ear collisions across all 6 styles on both Male and Female (`odd/artifacts/short-hair-author-report.json`); minimum clearance `3.9 cm` eyes / `4.1 cm` eyelashes (`Fringe`), `4.6 cm+` ears |
-| Decoded GLB roundtrip (Blender MCP) | All 6 `shared/hair-*.glb` imports pass exact 34-bone canonical rest matrices (`< 1e-4`), `1` bone influence (`DEF-spine.006`, weight `1.0` with `0.0` sum error), and `0` eye/lash/ear hits across decoded frames `1, 62, 123, 201` on both genders (`odd/artifacts/short-hair-export.json`) |
+| Decoded GLB roundtrip (Blender MCP) | All 6 `shared/hair-*.glb` imports pass exact 34-bone canonical rest matrices (`< 1e-4`), `1` bone influence (`DEF-spine.006`, weight `1.0` with `0.0` sum error), and `0` eye/lash/ear hits across decoded frames `1, 62, 123, 201` on both genders (`odd/artifacts/short-hair-export.json`; `Soft mohawk` continuous-ridge v2 re-verified in `odd/artifacts/medium-hair-export.json`) |
 | Structural & budget (`test-short-hair.mjs`, `check-asset-budget.mjs`) | Valid Draco-compressed GLBs (`20.3 KB–46.7 KB`, all `<= 1 MB`), zero animations/cameras/lights, neutral `#FFFFFF` `AvatarHairTint` with roughness `0.65` |
 
 Rules: [modular assets](../../rules/modular-avatar-assets.md), [art direction](../../rules/art-direction.md).
