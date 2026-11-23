@@ -4,6 +4,13 @@ Course declaration of AI use in the development process (see [course requirement
 
 > Status: partial evidence recorded. Sections marked _Pending_ still require team input and human review.
 
+## School sweatshirt and hoodie modular assets evidence
+
+- **Tools and scope:** Antigravity and Blender MCP reused the concentric closed spherical elbow-cap shell from the approved school smock for both unchanged male and female bodies, authoring `School sweatshirt` ([guide](art/school-sweatshirt.md)) and `Hoodie` ([guide](art/hoodie.md)) without altering `male/body.glb`, `female/body.glb`, legacy `pants`/`boots`, or any previously exported top.
+- **Useful result:** Built reusable ribbed waistband and wrist cuffs plus garment-specific silhouette meshes (ribbed crewneck collar, front V-gusset, and left-chest school shield crest for the sweatshirt; resting draped hood, front kangaroo pouch with angled contrasting pocket openings, and chest-draped drawstrings for the hoodie). Isolated 20-bit Draco GLB roundtrips pass canonical 34-bone rest hierarchy, `<= 4` normalized weights, `0` inward sleeve triangles, `0` exposed arm vertices/triangles across `Idle 1`, `Walk 62`, `Sit 123`, and `Wave 201`, and `<= 1 MB` budget.
+- **Detected problems and corrections:** Visual inspection of initial Cycles renders caught three defects before export: (1) the female sweatshirt `CrewCollar` initially buried inside her forward-sloping upper chest (fixed by raycasting the collar path onto the outer shell surface), (2) two small rear-hip pants peaks poked through the lower rear waistband (fixed by raising the waistband span slightly and flaring rear-hip radial clearance while keeping the shell down to `z = 0.465`), and (3) tiny dark surface specks appeared along `Hoodie_Male_PocketOpening_L` (fixed by giving the pocket opening trim clean outward proud offset over the kangaroo pocket edge).
+- **Human verification:** Approved by human visual review with permanent `1280×1280` and `360×360` renders (`docs/assets/school-sweatshirt/`, `docs/assets/hoodie/`); committed locally on `feat/91-modular-avatar-assets` (not pushed; runtime catalog integration and wishlist merge-check remain separate).
+
 ## Short school-smock diagnostic evidence
 
 - **Tools:** Pi and Blender MCP reused existing editable T-shirt shells for both unchanged bodies, adding long sleeves, collar, placket and buttons. See [diagnostic candidate and limitations](art/school-smock.md).

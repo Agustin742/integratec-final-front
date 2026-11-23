@@ -1,5 +1,18 @@
 # Tracker — Alejo
 
+## 2026-11-23 — Author modular school sweatshirt and hoodie on both avatars
+
+- **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
+- **Area / files:** `assets/blender/avatars/shared/top/school-sweatshirt.blend`, `assets/blender/avatars/shared/top/hoodie.blend`, `public/models/avatars/{male,female}/top-school-sweatshirt.glb`, `public/models/avatars/{male,female}/top-hoodie.glb`, `docs/art/school-sweatshirt.md`, `docs/art/hoodie.md`, `docs/assets/{school-sweatshirt,hoodie}/{male,female}-{1280,360}.png`, `scripts/assets/test-school-sweatshirt.mjs`, `scripts/assets/test-hoodie.mjs`, `scripts/assets/test-sweatshirt-hoodie-sleeve-normals.py`, `docs/ai-usage.md`.
+- **Change:** Authored both `School sweatshirt` (buzo escolar sin capucha) and `Hoodie` (buzo con capucha) on the unchanged existing male and female avatar bodies, reusing the concentric closed spherical elbow-cap shell from `ELBOW_FIXED_SchoolSmock_{Male,Female}` without modifying any existing body or top. Added ribbed waistband and wrist cuffs, crewneck collar, V-gusset, and left-chest school shield crest for the sweatshirt; and resting draped hood, kangaroo front pocket with angled contrasting opening trims, and chest-draped drawstrings for the hoodie.
+- **Reason:** Continue incremental upper-body wearable delivery for issue `#91` under `rules/modular-avatar-assets.md` and `docs/art/asset-wishlist.md`.
+- **Coordination:** Existing Alejo Project item `PVTI_lAHOCevXNc4BoRd2zhK9fEI`, issue `#91`.
+- **Evidence:**
+  - Authoring clearance (`1, 25, 62, 123, 201`) passed with `0` exposed arm verts/tris and `0` collar/hood collisions against `Reference_Head` (`odd/artifacts/sweatshirt-hoodie-author-report.json`). Visual inspection of Cycles previews caught and fixed female `CrewCollar` chest burying, rear-hip pants protrusion through the waistband, and male kangaroo-pocket-opening specks, plus verified grayscale contrast.
+  - Exported canonical 34-bone masters and isolated 20-bit Draco GLBs: sweatshirt `48,936 B` (male, `4,292` verts, `7` meshes) / `50,320 B` (female, `4,340` verts, `7` meshes); hoodie `56,828 B` (male, `4,470` verts, `10` meshes) / `58,636 B` (female, `4,514` verts, `10` meshes). Decoded roundtrip checks passed `<= 4` influences, max sum error `<= 7.49e-7`, `0` exposed arm verts/tris on frames `1, 62, 123, 201`, and `0` inward sleeve triangles across `1,360` triangles per side (`test-sweatshirt-hoodie-sleeve-normals.py`).
+  - Permanent `1280×1280` and `360×360` renders generated under `docs/assets/school-sweatshirt/` and `docs/assets/hoodie/`.
+- **Next step:** Human reviewed and approved both garments (and confirmed `AvatarTopTint` neutral `#FFFFFF` runtime tintability); committed locally on `feat/91-modular-avatar-assets` without pushing. Wishlist remains unchecked until merge; continue with `Shirt and tie` (`camisa y corbata`).
+
 ## 2026-11-22 — Prototype long school smock on both avatars
 
 - **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
