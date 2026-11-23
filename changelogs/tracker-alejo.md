@@ -1,5 +1,18 @@
 # Tracker — Alejo
 
+## 2026-11-23 — Author modular sweater on both avatars
+
+- **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
+- **Area / files:** `assets/blender/avatars/shared/top/sweater.blend`, `public/models/avatars/{male,female}/top-sweater.glb`, `docs/art/sweater.md`, `docs/assets/sweater/{male,female}-{1280,360}.png`, `scripts/assets/test-sweater.mjs`, `scripts/assets/test-sweater-sleeve-normals.py`, `docs/ai-usage.md`.
+- **Change:** Authored `Sweater` on the unchanged existing male and female avatar bodies, reusing the concentric closed spherical elbow-cap shell from `ELBOW_FIXED_SchoolSmock_{Male,Female}` without modifying any existing body or top. Added chunky ribbed knit waistband and wrist cuffs, layered V-neck undershirt triangle, continuous folded V-neck knit collar trim, and horizontal chest knit accent band (`7` meshes per gender; `AvatarTopTint` neutral `#FFFFFF` on knit body/rib parts and `AvatarDetail` `#FFF9EB` pale cream on V-neck trim, inner shirt, and chest band).
+- **Reason:** Continue incremental upper-body wearable delivery for issue `#91` under `rules/modular-avatar-assets.md` and `docs/art/asset-wishlist.md`.
+- **Coordination:** Existing Alejo Project item `PVTI_lAHOCevXNc4BoRd2zhK9fEI`, issue `#91`.
+- **Evidence:**
+  - Authoring clearance (`1, 25, 62, 123, 201`) passed with `0` exposed arm verts/tris and `0` `VNeckTrim`-head collisions against `Reference_Head` (`odd/artifacts/sweater-author-report.json`). Initial Cycles preview inspection caught and resolved `ChestBand` per-ring sampling/bust clearance and `InnerShirt`/`VNeckTrim` neck-shoulder seam alignment, verified in color and grayscale renders.
+  - Exported canonical 34-bone master and isolated 20-bit Draco GLBs: `58,232 B` (male, `4,910` verts, `7` meshes, max sum error `7.32e-7`) and `59,192 B` (female, `4,966` verts, `7` meshes, max sum error `7.02e-7`); `0` exposed arm verts/tris on frames `1, 62, 123, 201`, and `0` inward sleeve triangles across `1,360` triangles per side (`test-sweater-sleeve-normals.py`).
+  - Permanent `1280×1280` and `360×360` renders generated under `docs/assets/sweater/`.
+- **Next step:** Human reviewed and approved the sweater; committed locally on `feat/91-modular-avatar-assets` without pushing. Continue with `Vest`.
+
 ## 2026-11-23 — Author modular shirt and tie on both avatars
 
 - **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)

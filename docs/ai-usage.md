@@ -4,6 +4,13 @@ Course declaration of AI use in the development process (see [course requirement
 
 > Status: partial evidence recorded. Sections marked _Pending_ still require team input and human review.
 
+## Sweater modular asset evidence
+
+- **Tools and scope:** Antigravity and Blender MCP reused the concentric closed spherical elbow-cap shell from the approved school smock for both unchanged male and female bodies, authoring `Sweater` ([guide](art/sweater.md)) without altering `male/body.glb`, `female/body.glb`, legacy `pants`/`boots`, or any previously exported top.
+- **Useful result:** Built a chunky ribbed waistband and wrist cuffs, layered V-neck undershirt triangle, continuous folded V-neck knit collar trim, and horizontal chest knit accent band (`7` meshes per gender). Isolated 20-bit Draco GLB roundtrips pass canonical 34-bone rest hierarchy, `<= 4` normalized weights, `0` inward sleeve triangles, `0` exposed arm vertices/triangles across `Idle 1`, `Walk 62`, `Sit 123`, and `Wave 201`, and `<= 1 MB` budget (`58,232 B` male / `59,192 B` female).
+- **Detected problems and corrections:** Visual inspection of initial Cycles previews caught three issues before export: (1) linear height interpolation in `ChestBand` buried its front and rear center behind the female bust and back curvature and caused a small male front raycast speck, (2) `InnerShirt` stopped at `z = 0.728`, leaving a thin coral gap below the neck, and (3) `VNeckTrim` flared horizontally toward the shoulders before dipping into the V-neck. Sampling every `ChestBand` ring height directly with bust/armhole-safe ray starts (`+0.0076..+0.0080 m` proud), extending `InnerShirt` up to `z = 0.738`, and tightening the collar neck radius (`r <= 0.105`) resolved all defects cleanly in color and grayscale renders.
+- **Human verification:** Approved by human visual review with permanent `1280×1280` and `360×360` renders (`docs/assets/sweater/`); committed locally on `feat/91-modular-avatar-assets` (not pushed; runtime catalog integration and wishlist merge-check remain separate).
+
 ## Shirt and tie modular asset evidence
 
 - **Tools and scope:** Antigravity and Blender MCP reused the concentric closed spherical elbow-cap shell from the approved school smock for both unchanged male and female bodies, authoring `Shirt and tie` ([guide](art/shirt-and-tie.md)) without altering `male/body.glb`, `female/body.glb`, legacy `pants`/`boots`, or any previously exported top.
