@@ -1,5 +1,18 @@
 # Tracker — Alejo
 
+## 2026-11-23 — Author 3 modular long hairstyles (`shared/`) on both avatars
+
+- **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
+- **Area / files:** `assets/blender/avatars/shared/hair/{long-straight,long-wavy,long-curls}.blend`, `public/models/avatars/shared/hair-{long-straight,long-wavy,long-curls}.glb`, `docs/art/hair-long.md`, `docs/assets/hair-{long-straight,long-wavy,long-curls}/{male,female}-{1280,360}.png`, `scripts/assets/test-long-hair.mjs`, `docs/ai-usage.md`.
+- **Change:** Authored the 3 Long hairstyles from `docs/art/asset-wishlist.md` (`Long straight`, `Long wavy`, `Long curls`) as shared wearables under `shared/` weighted `100%` to canonical `DEF-spine.006` above `z = 0.82` with smooth `DEF-spine.003` blending below `z = 0.82` (up to `0.50` at `z <= 0.56`) and neutral `#FFFFFF` `AvatarHairTint` (roughness `0.65`) on both unchanged male and female avatar bodies under `rules/modular-avatar-assets.md` and `rules/art-direction.md`.
+- **Reason:** Continue incremental Hair wearable delivery (`Long (3)`) for issue `#91`.
+- **Coordination:** Existing Alejo Project item `PVTI_lAHOCevXNc4BoRd2zhK9fEI`, issue `#91`.
+- **Evidence:**
+  - Authoring clearance (`1, 25, 62, 123, 201`) passed with `0` eye, `0` female eyelash, `0` ear, and `0` body/back/Wave-arm hits (`p.z > 0.42`) across all 3 styles on both genders (`odd/artifacts/long-hair-author-report.json`); iterative Cycles previews (`IsoFront`, `IsoRear`, `Front`, `Rear`, `Gray`) resolved `z < 0.87` neck-stub raycast collapse, rectangular ear-envelope boxes, `push_point_clear` Z-cutoff notches, single-centroid end-cap folding, `Cap`/`Curtain` temple rim grazing, and `Long curls` crown/ringlet continuity.
+  - Exported canonical 34-bone shared masters and isolated 20-bit Draco GLBs (`long-straight`: `71,152 B`, `9,602` verts / `1,871` `DEF-spine.003` blend; `long-wavy`: `83,192 B`, `11,998` verts / `2,535` blend; `long-curls`: `114,428 B`, `14,120` verts / `3,693` blend); decoded GLB roundtrips verified exact 34-bone rest matrices (`< 1e-4`), `1..2` normalized influences (max weight-sum error `<= 5.07e-7`), and `0` eye/lash/ear/body hits (`p.z > 0.42`) on frames `1, 62, 123, 201` on both genders (`odd/artifacts/long-hair-export.json`).
+  - Permanent `1280×1280` and `360×360` Cycles renders generated under `docs/assets/hair-{long-straight,long-wavy,long-curls}/`, and `REVIEW_HairLongWavy_Female` left active in Blender alongside all 6 `REVIEW_HairLong*_{Male,Female}` scenes in `odd/previews/long-hair-review.blend`.
+- **Next step:** Human reviewed and approved all 3 long hairstyles; committed locally on `feat/91-modular-avatar-assets` without pushing (wishlist remains unchecked until merge). Next Hair batch: `Tied up (6)` (`Ponytail`, `Two pigtails`, `Bun`, `Braid`, `Two braids`, `Half-up`).
+
 ## 2026-11-23 — Author 4 modular medium hairstyles (`shared/`) and refine soft mohawk
 
 - **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
