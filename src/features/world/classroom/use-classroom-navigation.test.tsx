@@ -255,4 +255,189 @@ describe('useClassroomNavigation', () => {
     expect(result.current.controller.hasDestination()).toBe(false);
     expect(result.current.marker.object.visible).toBe(false);
   });
+
+  test('re-rendering without serverPose value changes keeps controller stable and does not re-trigger reconciliation', () => {
+    const { result, rerender } = setup({
+      scopeKey: 'room-1',
+      connectionKey: 'room-a:session-1',
+      serverPose: { x: 0, z: 5, rotation: 0 },
+    });
+    const firstController = result.current.controller;
+
+    // Walk slightly within idle settle epsilon; a re-render with equivalent
+    // serverPose values must not re-run reconciliation or reset pose.
+    act(() => result.current.onFloorClick(click(-2, 5)));
+    act(() => {
+      result.current.controller.step(0.05);
+    });
+    const poseAfterStep = { ...result.current.controller.poseRef.current };
+    three.invalidate.mockClear();
+
+    rerender({
+      scopeKey: 'room-1',
+      connectionKey: 'room-a:session-1',
+      serverPose: { x: 0, z: 5, rotation: 0 },
+    });
+
+    expect(result.current.controller).toBe(firstController);
+    expect(result.current.controller.poseRef.current).toEqual(poseAfterStep);
+    expect(result.current.controller.hasDestination()).toBe(true);
+    expect(three.invalidate).not.toHaveBeenCalled();
+  });
+
+  test('drift snap preserves held keyboard direction while snapping pose', () => {
+    const onIntentChange = vi.fn();
+    const { result, rerender } = setup({
+      scopeKey: 'room-1',
+      connectionKey: 'room-a:session-1',
+      serverPose: { x: 0, z: 5, rotation: 0 },
+      onIntentChange,
+    });
+
+    act(() => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          code: 'KeyD',
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+    const heldIntent = result.current.controller.getIntent();
+    expect(heldIntent.x).toBeGreaterThan(0);
+    onIntentChange.mockClear();
+
+    // Server reports a drift exceeding SERVER_SNAP_DISTANCE (1.5).
+    rerender({
+      scopeKey: 'room-1',
+      connectionKey: 'room-a:session-1',
+      serverPose: { x: -3, z: 5, rotation: 0 },
+      onIntentChange,
+    });
+
+    expect(result.current.controller.poseRef.current).toEqual({
+      x: -3,
+      z: 5,
+      rotation: 0,
+    });
+    // Held WASD direction stays active without dropping to zero intent.
+    expect(result.current.controller.getIntent()).toEqual(heldIntent);
+    expect(onIntentChange).not.toHaveBeenCalled();
+
+    act(() => {
+      result.current.controller.step(0.05);
+    });
+    expect(result.current.controller.poseRef.current.x).toBeGreaterThan(-3);
+  });
+
+  test('applies rotation-only server corrections when idle or frozen', () => {
+    const { result, rerender } = setup({
+      scopeKey: 'room-1',
+      connectionKey: 'room-a:session-1',
+      serverPose: { x: 1, z: 5, rotation: 0 },
+      frozen: false,
+    });
+
+    // Idle rotation-only correction (> 0.02 rad).
+    rerender({
+      scopeKey: 'room-1',
+      connectionKey: 'room-a:session-1',
+      serverPose: { x: 1, z: 5, rotation: Math.PI / 2 },
+      frozen: false,
+    });
+    expect(result.current.controller.poseRef.current).toEqual({
+      x: 1,
+      z: 5,
+      rotation: Math.PI / 2,
+    });
+
+    // Frozen rotation-only correction wrapping across +-PI.
+    rerender({
+      scopeKey: 'room-1',
+      connectionKey: 'room-a:session-1',
+      serverPose: { x: 1, z: 5, rotation: -Math.PI + 0.1 },
+      frozen: true,
+    });
+    expect(result.current.controller.poseRef.current).toEqual({
+      x: 1,
+      z: 5,
+      rotation: -Math.PI + 0.1,
+    });
+  });
+
+  test('ignores NaN and Infinity server poses without poisoning local pose', () => {
+    const { result, rerender } = setup({
+      scopeKey: 'room-1',
+      connectionKey: 'room-a:session-1',
+      serverPose: { x: Number.NaN, z: 5, rotation: 0 },
+    });
+
+    // Non-finite initial pose falls back to LOCAL_SPAWN.
+    const first = CLASSROOM_LAYOUT.spawnPoints[0]!;
+    expect(result.current.controller.poseRef.current).toMatchObject(first);
+
+    // Valid pose applies cleanly.
+    rerender({
+      scopeKey: 'room-1',
+      connectionKey: 'room-a:session-1',
+      serverPose: { x: 2, z: 5, rotation: 0.5 },
+    });
+    expect(result.current.controller.poseRef.current).toEqual({
+      x: 2,
+      z: 5,
+      rotation: 0.5,
+    });
+
+    // Subsequent non-finite poses are ignored and leave current pose intact.
+    rerender({
+      scopeKey: 'room-1',
+      connectionKey: 'room-a:session-1',
+      serverPose: { x: Number.POSITIVE_INFINITY, z: 5, rotation: 0.5 },
+    });
+    expect(result.current.controller.poseRef.current).toEqual({
+      x: 2,
+      z: 5,
+      rotation: 0.5,
+    });
+
+    rerender({
+      scopeKey: 'room-1',
+      connectionKey: 'room-a:session-1',
+      serverPose: { x: 2, z: Number.NEGATIVE_INFINITY, rotation: Number.NaN },
+    });
+    expect(result.current.controller.poseRef.current).toEqual({
+      x: 2,
+      z: 5,
+      rotation: 0.5,
+    });
+  });
+
+  test('calls invalidate when returning from frameloop never to demand after a hidden pose reset', () => {
+    three.frameloop = 'never';
+    const { result, rerender } = setup({
+      scopeKey: 'room-1',
+      connectionKey: 'room-a:session-1',
+      serverPose: { x: 0, z: 5, rotation: 0 },
+    });
+
+    rerender({
+      scopeKey: 'room-1',
+      connectionKey: 'room-a:session-2',
+      serverPose: { x: 3, z: 5, rotation: 1 },
+    });
+    expect(result.current.controller.poseRef.current).toEqual({
+      x: 3,
+      z: 5,
+      rotation: 1,
+    });
+    expect(three.invalidate).not.toHaveBeenCalled();
+
+    three.frameloop = 'demand';
+    rerender({
+      scopeKey: 'room-1',
+      connectionKey: 'room-a:session-2',
+      serverPose: { x: 3, z: 5, rotation: 1 },
+    });
+    expect(three.invalidate).toHaveBeenCalledTimes(1);
+  });
 });

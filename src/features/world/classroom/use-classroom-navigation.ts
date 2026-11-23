@@ -6,10 +6,11 @@ import { useEscapeKey } from '../input/use-escape-key';
 import { useLocalAvatarController, type Pose } from '../movement';
 import { createDestinationMarker } from './destination-marker';
 import { destinationFromFloorClick, type FloorClickEvent } from './floor-click';
+import { shortestAngleDelta } from './remote-avatar-frame';
 
 /**
- * Local spawn: the first layout spawn point, facing the board (-z). #37 will
- * replace it with the position the server assigns when joining the room.
+ * Fallback local spawn: the first layout spawn point, facing the board (-z),
+ * used until the room assigns an authoritative server pose.
  */
 const FIRST_SPAWN = CLASSROOM_LAYOUT.spawnPoints[0] ?? { x: 0, z: 0 };
 export const LOCAL_SPAWN: Pose = {
@@ -35,6 +36,7 @@ export interface UseClassroomNavigationOptions {
 
 const SERVER_SNAP_DISTANCE = 1.5;
 const SERVER_IDLE_SETTLE_EPSILON = 0.05;
+const SERVER_IDLE_ANGLE_EPSILON = 0.02;
 
 /**
  * Everything the classroom needs to walk the local avatar: the controller
@@ -52,10 +54,8 @@ export function useClassroomNavigation({
   interactionLocked = false,
 }: UseClassroomNavigationOptions) {
   const invalidate = useThree((state) => state.invalidate);
-  const enabled =
-    useThree((state) => state.frameloop) !== 'never' &&
-    !frozen &&
-    !interactionLocked;
+  const frameloop = useThree((state) => state.frameloop);
+  const enabled = frameloop !== 'never' && !frozen && !interactionLocked;
   // A key press from rest must wake the demand loop itself; nothing else
   // (placeholder body, reduced motion) is guaranteed to be requesting frames.
   const listener = useRef(onIntentChange);
@@ -69,9 +69,26 @@ export function useClassroomNavigation({
     },
     [invalidate],
   );
+  const serverX = serverPose?.x;
+  const serverZ = serverPose?.z;
+  const serverRotation = serverPose?.rotation;
+  const validServerPose = useMemo<Pose | undefined>(() => {
+    if (
+      typeof serverX === 'number' &&
+      typeof serverZ === 'number' &&
+      typeof serverRotation === 'number' &&
+      Number.isFinite(serverX) &&
+      Number.isFinite(serverZ) &&
+      Number.isFinite(serverRotation)
+    ) {
+      return { x: serverX, z: serverZ, rotation: serverRotation };
+    }
+    return undefined;
+  }, [serverX, serverZ, serverRotation]);
+
   const controller = useLocalAvatarController({
     layout: CLASSROOM_LAYOUT,
-    spawn: serverPose ?? LOCAL_SPAWN,
+    spawn: validServerPose ?? LOCAL_SPAWN,
     enabled,
     resetKey: scopeKey ?? '',
     onIntentChange: wakeAndForward,
@@ -82,33 +99,50 @@ export function useClassroomNavigation({
   const appliedConnectionRef = useRef<string | null>(null);
   const spawnedForConnectionRef = useRef(false);
   const prevFrozenRef = useRef(false);
+  const frameloopRef = useRef(frameloop);
+  const pendingRenderRef = useRef(false);
+
+  const scheduleRender = useCallback(() => {
+    if (frameloopRef.current === 'never') {
+      pendingRenderRef.current = true;
+      return;
+    }
+    pendingRenderRef.current = false;
+    invalidate();
+  }, [invalidate]);
+
+  useEffect(() => {
+    frameloopRef.current = frameloop;
+    if (frameloop !== 'never' && pendingRenderRef.current) {
+      pendingRenderRef.current = false;
+      invalidate();
+    }
+  }, [frameloop, invalidate]);
+
   const {
+    poseRef,
+    getIntent,
+    hasDestination,
     reset: resetController,
+    snapPose: snapControllerPose,
     clearDestination: clearControllerDestination,
+    setDestination,
   } = controller;
-  const serverX = serverPose?.x;
-  const serverZ = serverPose?.z;
-  const serverRotation = serverPose?.rotation;
 
   const clearDestination = useCallback(() => {
     clearControllerDestination();
     marker.hide();
-    invalidate();
-  }, [clearControllerDestination, marker, invalidate]);
+    scheduleRender();
+  }, [clearControllerDestination, marker, scheduleRender]);
 
   // Declared after the controller so it runs after the respawn it triggers.
   useEffect(() => {
     marker.hide();
-    invalidate();
-  }, [marker, invalidate, scopeKey]);
+    scheduleRender();
+  }, [marker, scheduleRender, scopeKey]);
 
   useEffect(() => {
-    const resolvedPose: Pose | undefined =
-      serverX !== undefined &&
-      serverZ !== undefined &&
-      serverRotation !== undefined
-        ? { x: serverX, z: serverZ, rotation: serverRotation }
-        : undefined;
+    const resolvedPose = validServerPose;
     const effectiveKey =
       connectionKey !== undefined ? `${scopeKey ?? ''}:${connectionKey}` : null;
 
@@ -120,7 +154,7 @@ export function useClassroomNavigation({
       spawnedForConnectionRef.current = resolvedPose !== undefined;
       resetController(resolvedPose ?? LOCAL_SPAWN);
       marker.hide();
-      invalidate();
+      scheduleRender();
       prevFrozenRef.current = frozen;
       return;
     }
@@ -133,7 +167,7 @@ export function useClassroomNavigation({
       spawnedForConnectionRef.current = true;
       resetController(resolvedPose);
       marker.hide();
-      invalidate();
+      scheduleRender();
       prevFrozenRef.current = frozen;
       return;
     }
@@ -141,7 +175,7 @@ export function useClassroomNavigation({
     if (frozen && !prevFrozenRef.current) {
       clearControllerDestination();
       marker.hide();
-      invalidate();
+      scheduleRender();
     }
     prevFrozenRef.current = frozen;
 
@@ -149,36 +183,50 @@ export function useClassroomNavigation({
       return;
     }
 
-    const current = controller.poseRef.current;
+    const current = poseRef.current;
     const dist = Math.hypot(
       current.x - resolvedPose.x,
       current.z - resolvedPose.z,
     );
-    const intent = controller.getIntent();
+    const angleDelta = Math.abs(
+      shortestAngleDelta(current.rotation, resolvedPose.rotation),
+    );
+    const intent = getIntent();
     const isIdle = intent.x === 0 && intent.z === 0;
-    if (
-      dist > SERVER_SNAP_DISTANCE ||
-      (frozen && dist > SERVER_IDLE_SETTLE_EPSILON) ||
-      (!controller.hasDestination() &&
-        isIdle &&
-        dist > SERVER_IDLE_SETTLE_EPSILON)
-    ) {
+    const idleOrFrozenMismatch =
+      dist > SERVER_IDLE_SETTLE_EPSILON ||
+      angleDelta > SERVER_IDLE_ANGLE_EPSILON;
+
+    if (dist > SERVER_SNAP_DISTANCE) {
+      if (frozen) {
+        resetController(resolvedPose);
+      } else {
+        snapControllerPose(resolvedPose);
+      }
+      marker.hide();
+      scheduleRender();
+    } else if (frozen && idleOrFrozenMismatch) {
       resetController(resolvedPose);
       marker.hide();
-      invalidate();
+      scheduleRender();
+    } else if (!hasDestination() && isIdle && idleOrFrozenMismatch) {
+      snapControllerPose(resolvedPose);
+      marker.hide();
+      scheduleRender();
     }
   }, [
     clearControllerDestination,
     connectionKey,
-    controller,
     frozen,
-    invalidate,
+    getIntent,
+    hasDestination,
     marker,
+    poseRef,
     resetController,
+    scheduleRender,
     scopeKey,
-    serverRotation,
-    serverX,
-    serverZ,
+    snapControllerPose,
+    validServerPose,
   ]);
 
   useEffect(() => {
@@ -192,7 +240,6 @@ export function useClassroomNavigation({
     onEscape: clearDestination,
   });
 
-  const { setDestination } = controller;
   const onFloorClick = useCallback(
     (event: FloorClickEvent) => {
       if (!enabled) return;

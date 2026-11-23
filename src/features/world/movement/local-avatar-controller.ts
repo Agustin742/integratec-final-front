@@ -102,6 +102,16 @@ export class LocalAvatarController {
     this.publishIntent();
   }
 
+  /**
+   * Snaps the avatar to an authoritative pose and clears click waypoints
+   * without dropping held keyboard input so active WASD travel stays synced.
+   */
+  snapPose(pose: Pose): void {
+    this.current = { ...pose };
+    this.waypoints = [];
+    this.publishIntent();
+  }
+
   /** Advances one frame. Meant for `useFrame`; allocates nothing per call beyond the pose. */
   step(dtSeconds: number): StepResult {
     const dt = Math.min(Math.max(dtSeconds, 0), MAX_FRAME_SECONDS);

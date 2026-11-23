@@ -174,7 +174,7 @@ export function ClassroomScene({
       />
       {remoteParticipants.map((participant) => (
         <RemoteAvatar
-          key={participant.userId}
+          key={`${scopeKey ?? ''}:${participant.userId}`}
           userId={participant.userId}
           status={participant.status}
           targetPose={{

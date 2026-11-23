@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AvatarInput, ClassroomLayout } from '@/realtime';
 import { useKeyboardDirection } from '../input/use-keyboard-direction';
 import {
@@ -32,6 +32,8 @@ export interface LocalAvatarApi {
   clearDestination: () => void;
   /** Resets position and clears any held input or queued destination. */
   reset: (spawn: Pose) => void;
+  /** Snaps position and clears any queued destination while preserving held keyboard input. */
+  snapPose: (pose: Pose) => void;
   /** Advances one frame from `useFrame`; mutates refs only, never React state. */
   step: (dtSeconds: number) => StepResult;
 }
@@ -99,16 +101,34 @@ export function useLocalAvatarController({
     (nextSpawn: Pose) => controller.reset(nextSpawn),
     [controller],
   );
+  const snapPose = useCallback(
+    (nextPose: Pose) => controller.snapPose(nextPose),
+    [controller],
+  );
   const step = useCallback((dt: number) => controller.step(dt), [controller]);
 
-  return {
-    poseRef: api.poseRef,
-    intentRef: api.intentRef,
-    getIntent,
-    hasDestination,
-    setDestination,
-    clearDestination,
-    reset,
-    step,
-  };
+  return useMemo(
+    () => ({
+      poseRef: api.poseRef,
+      intentRef: api.intentRef,
+      getIntent,
+      hasDestination,
+      setDestination,
+      clearDestination,
+      reset,
+      snapPose,
+      step,
+    }),
+    [
+      api.intentRef,
+      api.poseRef,
+      clearDestination,
+      getIntent,
+      hasDestination,
+      reset,
+      setDestination,
+      snapPose,
+      step,
+    ],
+  );
 }

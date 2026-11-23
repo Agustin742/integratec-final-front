@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { useEffect } from 'react';
 import { Mesh } from 'three';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Avatar } from '@/features/profile/avatar-options';
@@ -10,6 +11,8 @@ const nav = vi.hoisted(() => ({
   clearDestination: vi.fn(),
   localAvatarProps: null as unknown,
   remoteAvatars: [] as unknown[],
+  remoteMounts: 0,
+  remoteUnmounts: 0,
   highlightProps: null as unknown,
 }));
 
@@ -33,6 +36,12 @@ vi.mock('./local-avatar', () => ({
 vi.mock('./remote-avatar', () => ({
   RemoteAvatar: (props: unknown) => {
     nav.remoteAvatars.push(props);
+    useEffect(() => {
+      nav.remoteMounts += 1;
+      return () => {
+        nav.remoteUnmounts += 1;
+      };
+    }, []);
     return <div data-testid="remote-avatar" />;
   },
 }));
@@ -54,6 +63,8 @@ const avatar: Avatar = {
 beforeEach(() => {
   nav.onFloorClick.mockClear();
   nav.remoteAvatars.length = 0;
+  nav.remoteMounts = 0;
+  nav.remoteUnmounts = 0;
   nav.clearDestination.mockClear();
   nav.highlightProps = null;
   vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -157,5 +168,45 @@ describe('ClassroomScene', () => {
       ownDeskIndex: 1,
       petReactionNonce: 4,
     });
+  });
+
+  test('remounts remote avatars when scopeKey changes even for the same userId', () => {
+    const participants = [
+      {
+        userId: 'remote-1',
+        displayName: 'Profe Ana',
+        role: 'TEACHER',
+        status: 'online',
+        x: 0,
+        z: -3,
+        rotation: 0,
+        avatar,
+      },
+    ];
+    const { rerender } = render(
+      <ClassroomScene scopeKey="room-1" remoteParticipants={participants} />,
+    );
+    expect(nav.remoteMounts).toBe(1);
+    expect(nav.remoteUnmounts).toBe(0);
+
+    // Same classroom keeps the existing remote avatar mounted.
+    rerender(
+      <ClassroomScene
+        scopeKey="room-1"
+        remoteParticipants={[{ ...participants[0]!, x: 2 }]}
+      />,
+    );
+    expect(nav.remoteMounts).toBe(1);
+    expect(nav.remoteUnmounts).toBe(0);
+
+    // Switching classroom scope remounts RemoteAvatar so poses never interpolate across rooms.
+    rerender(
+      <ClassroomScene
+        scopeKey="room-2"
+        remoteParticipants={[{ ...participants[0]!, x: -3, z: 4 }]}
+      />,
+    );
+    expect(nav.remoteMounts).toBe(2);
+    expect(nav.remoteUnmounts).toBe(1);
   });
 });
