@@ -1,5 +1,18 @@
 # Tracker — Alejo
 
+## 2026-11-23 — Author 6 modular tied-up hairstyles (`shared/`) on both avatars
+
+- **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
+- **Area / files:** `assets/blender/avatars/shared/hair/{ponytail,two-pigtails,bun,braid,two-braids,half-up}.blend`, `public/models/avatars/shared/hair-{ponytail,two-pigtails,bun,braid,two-braids,half-up}.glb`, `docs/art/hair-tied-up.md`, `docs/assets/hair-{ponytail,two-pigtails,bun,braid,two-braids,half-up}/{male,female}-{1280,360}.png`, `scripts/assets/test-tied-up-hair.mjs`, `docs/ai-usage.md`.
+- **Change:** Authored the 6 Tied-up hairstyles from `docs/art/asset-wishlist.md` (`Ponytail`, `Two pigtails`, `Bun`, `Braid`, `Two braids`, `Half-up`) as shared wearables under `shared/` weighted `100%` to canonical `DEF-spine.006` above `z = 0.82` with smooth `DEF-spine.003` blending below `z = 0.82` (up to `0.50` at `z <= 0.56`) and neutral `#FFFFFF` `AvatarHairTint` (roughness `0.65`) on both unchanged male and female avatar bodies under `rules/modular-avatar-assets.md` and `rules/art-direction.md`.
+- **Reason:** Continue incremental Hair wearable delivery (`Tied up (6)`) for issue `#91`.
+- **Coordination:** Existing Alejo Project item `PVTI_lAHOCevXNc4BoRd2zhK9fEI`, issue `#91`.
+- **Evidence:**
+  - Authoring clearance (`1, 25, 62, 123, 201`) passed with `0` eye, `0` female eyelash, `0` ear, and `0` body/back/Wave-arm hits (`p.z > 0.42`) across all 6 styles on both genders (`odd/artifacts/tied-up-hair-author-report.json`); iterative Cycles previews (`IsoFront`, `IsoRear`, `Front`, `Rear`, `Gray`) resolved pulled-back temple flaps, `Two pigtails`/`Two braids` bang temple horns, buried `Ponytail`/`Half-up` hair ties, `Bun` upper framing, thin/ear-kinked braids, and `Half-up` lower-curtain side wings.
+  - Exported canonical 34-bone shared masters and isolated 20-bit Draco GLBs (`ponytail`: `33,244 B`, `3,380` verts / `127` `DEF-spine.003` blend; `two-pigtails`: `32,980 B`, `3,682` verts / `0` blend; `bun`: `30,928 B`, `3,396` verts / `0` blend; `braid`: `38,424 B`, `3,820` verts / `1,036` blend; `two-braids`: `55,592 B`, `5,554` verts / `1,830` blend; `half-up`: `45,060 B`, `4,936` verts / `969` blend); decoded GLB roundtrips verified exact 34-bone rest matrices (`< 1e-4`), `1..2` normalized influences (max weight-sum error `<= 5.07e-7`), and `0` eye/lash/ear/body hits (`p.z > 0.42`) on frames `1, 62, 123, 201` on both genders (`odd/artifacts/tied-up-hair-export.json`).
+  - Permanent `1280×1280` and `360×360` Cycles renders generated under `docs/assets/hair-{ponytail,two-pigtails,bun,braid,two-braids,half-up}/`, and `REVIEW_HairPonytail_Female` left active in Blender alongside all 12 `REVIEW_Hair*_{Male,Female}` scenes in `odd/previews/tied-up-hair-review.blend`.
+- **Next step:** Human reviewed and approved all 6 tied-up hairstyles; committed locally on `feat/91-modular-avatar-assets` without pushing (wishlist remains unchecked until merge). Next Hair batch: `Afro-textured (4)` (`Afro`, `Dreads`, `Box braids`, `Afro with headband`).
+
 ## 2026-11-23 — Author 3 modular long hairstyles (`shared/`) on both avatars
 
 - **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
