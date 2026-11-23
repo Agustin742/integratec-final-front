@@ -38,9 +38,9 @@ function PanelOpener() {
   );
 }
 
-function Owner({ id }: { id: string }) {
-  useClassroomContextEvents(id);
-  const context = useClassroomContext(id);
+function Owner({ id, enabled = true }: { id: string; enabled?: boolean }) {
+  useClassroomContextEvents(id, enabled);
+  const context = useClassroomContext(id, { enabled });
   return (
     <>
       <output aria-label="context">
@@ -124,10 +124,10 @@ function setup(streamStatus: (request: Request) => number = () => 200) {
   const client = createAppQueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  const tree = (id: string) => (
+  const tree = (id: string, enabled = true) => (
     <ApiQueryProvider client={client}>
       <SessionProvider service={service}>
-        <Owner id={id} />
+        <Owner id={id} enabled={enabled} />
       </SessionProvider>
     </ApiQueryProvider>
   );
@@ -139,7 +139,7 @@ function setup(streamStatus: (request: Request) => number = () => 200) {
     streams,
     pending,
     detail,
-    switchTo: (id: string) => view.rerender(tree(id)),
+    switchTo: (id: string, enabled = true) => view.rerender(tree(id, enabled)),
     hold: () => {
       hold = true;
     },
@@ -463,4 +463,22 @@ test('the client renews the stream before the backend 60s lifetime', async () =>
     await vi.advanceTimersByTimeAsync(CONTEXT_RENEWAL_MS);
   });
   expect(view.streams[0].request.signal.aborted).toBe(true);
+});
+
+test('disabling context events aborts the active stream without reconnecting or reconciling', async () => {
+  vi.useFakeTimers();
+  const view = setup();
+  await ready();
+  expect(view.streams).toHaveLength(1);
+  const requestsBeforeDisable = view.h.requests.length;
+
+  view.switchTo('a', false);
+  expect(view.streams[0].request.signal.aborted).toBe(true);
+  expect(view.streams[0].cancel).toHaveBeenCalledOnce();
+
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(120_000);
+  });
+  expect(view.streams).toHaveLength(1);
+  expect(view.h.requests.length).toBe(requestsBeforeDisable);
 });

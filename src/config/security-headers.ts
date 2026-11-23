@@ -55,9 +55,20 @@ function toOrigin(endpointUrl: string): string {
   return parsed.origin;
 }
 
+function toMatchmakeHttpOrigin(endpointUrl: string): string | null {
+  const parsed = new URL(endpointUrl);
+  if (parsed.protocol === 'wss:') {
+    return `https://${parsed.host}`;
+  }
+  if (parsed.protocol === 'ws:') {
+    return `http://${parsed.host}`;
+  }
+  return null;
+}
+
 /**
- * Returns the expected `connect-src` token list (`'self'` plus deduplicated API and realtime origins)
- * for a validated `PublicConfig`.
+ * Returns the expected `connect-src` token list (`'self'` plus deduplicated API, realtime WebSocket,
+ * and paired Colyseus HTTP(S) matchmaking origins) for a validated `PublicConfig`.
  */
 export function getExpectedConnectSrcTokens(
   config: PublicConfig,
@@ -65,6 +76,10 @@ export function getExpectedConnectSrcTokens(
   const connectOrigins = new Set<string>(["'self'"]);
   connectOrigins.add(toOrigin(config.apiBaseUrl));
   connectOrigins.add(toOrigin(config.realtimeUrl));
+  const matchmakeOrigin = toMatchmakeHttpOrigin(config.realtimeUrl);
+  if (matchmakeOrigin !== null) {
+    connectOrigins.add(matchmakeOrigin);
+  }
   return Object.freeze(Array.from(connectOrigins));
 }
 

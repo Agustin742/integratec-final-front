@@ -169,4 +169,41 @@ describe('LocalAvatarController', () => {
     c.reset(spawn);
     expect(onIntentChange).toHaveBeenLastCalledWith({ x: 0, z: 0 });
   });
+
+  test('snapPose snaps position and clears click waypoints while preserving held keyboard input', () => {
+    const onIntentChange = vi.fn();
+    const c = make(onIntentChange);
+    c.setDestination({ x: 6, z: 5 });
+    c.setKeyboardDirection({ x: 1, z: 0 });
+    c.step(DT);
+    onIntentChange.mockClear();
+
+    const snapped: Pose = { x: -2, z: 4, rotation: Math.PI / 2 };
+    c.snapPose(snapped);
+
+    expect(c.pose).toEqual(snapped);
+    expect(c.hasDestination).toBe(false);
+    expect(c.intent).toEqual({ x: 1, z: 0 });
+    expect(onIntentChange).not.toHaveBeenCalled();
+
+    const next = c.step(DT);
+    expect(next.moving).toBe(true);
+    expect(next.pose.x).toBeGreaterThan(snapped.x);
+  });
+
+  test('snapPose clears click destination and publishes zero intent when idle on keyboard', () => {
+    const onIntentChange = vi.fn();
+    const c = make(onIntentChange);
+    c.setDestination({ x: 6, z: 5 });
+    c.step(DT);
+    onIntentChange.mockClear();
+
+    const snapped: Pose = { x: 1, z: 5, rotation: 0 };
+    c.snapPose(snapped);
+
+    expect(c.pose).toEqual(snapped);
+    expect(c.hasDestination).toBe(false);
+    expect(c.intent).toEqual({ x: 0, z: 0 });
+    expect(onIntentChange).toHaveBeenCalledWith({ x: 0, z: 0 });
+  });
 });

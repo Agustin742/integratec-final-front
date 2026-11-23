@@ -7,7 +7,10 @@ import { ApiQueryProvider, createAppQueryClient } from '@/api/query-client';
 import { fakeSession } from '@/app/router/fake-session';
 import { SessionProvider } from '@/session/provider';
 import { profile } from '@/session/test-fixtures';
-import { Classroom3DStage } from './classroom-3d-stage';
+import {
+  Classroom3DStage,
+  type Classroom3DStageProps,
+} from './classroom-3d-stage';
 import { classroomMessages } from './messages';
 import { ClassroomPanelsProvider } from './panels/classroom-panels';
 
@@ -35,7 +38,10 @@ vi.mock('../world', () => ({
 
 afterEach(() => vi.unstubAllGlobals());
 
-function renderStage(classroomId = 'aula-7') {
+function renderStage(
+  classroomId = 'aula-7',
+  stageProps: Partial<Classroom3DStageProps> = {},
+) {
   const session = fakeSession(
     { status: 'authenticated', user: profile },
     createApiClient({
@@ -79,6 +85,7 @@ function renderStage(classroomId = 'aula-7') {
               scopeKey={classroomId}
               classroomId={classroomId}
               petName="Michi"
+              {...stageProps}
             />
           </ClassroomPanelsProvider>
         </MemoryRouter>
@@ -87,7 +94,7 @@ function renderStage(classroomId = 'aula-7') {
   );
 }
 
-test('mounts the lazy classroom world with the stage label, scope, and interactables bar', async () => {
+test('mounts the lazy classroom world with the stage label, scope, presence props, and interactables bar', async () => {
   vi.stubGlobal(
     'ResizeObserver',
     class {
@@ -96,12 +103,38 @@ test('mounts the lazy classroom world with the stage label, scope, and interacta
       disconnect() {}
     },
   );
-  renderStage('aula-7');
+  const onIntentChange = vi.fn();
+  const selfPose = { x: 0, z: 5, rotation: Math.PI };
+  const remoteParticipants = [
+    {
+      userId: 'remote-1',
+      displayName: 'Mateo',
+      role: 'STUDENT',
+      status: 'online' as const,
+      x: 1,
+      z: 2,
+      rotation: 0,
+    },
+  ];
+  renderStage('aula-7', {
+    selfPose,
+    connectionKey: 'room-7:s-1',
+    frozen: true,
+    remoteParticipants,
+    onIntentChange,
+  });
   const region = await screen.findByRole('region', {
     name: classroomMessages.viewMode.canvasLabel,
   });
   expect(within(region).getByTestId('scene-host')).toBeInTheDocument();
-  expect(world.props.scopeKey).toBe('aula-7');
+  expect(world.props).toMatchObject({
+    scopeKey: 'aula-7',
+    selfPose,
+    connectionKey: 'room-7:s-1',
+    frozen: true,
+    remoteParticipants,
+    onIntentChange,
+  });
   expect(
     screen.getByRole('navigation', {
       name: classroomMessages.interactables.navLabel,

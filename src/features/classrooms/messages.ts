@@ -27,6 +27,7 @@ export const classroomMessages = {
     PARENT: 'Familiar',
     OWNER: 'Titular de la escuela',
     ADMIN: 'Administración escolar',
+    SCHOOL_ADMIN: 'Administración escolar',
   },
   viewMode: {
     switchTo2d: 'Cambiar a Modo 2D Clásico',
@@ -44,6 +45,26 @@ export const classroomMessages = {
     mode2dEmptyTitle: 'No hay paneles disponibles',
     mode2dEmptyDescription:
       'El servidor todavía no habilitó paneles para tu cuenta en esta aula. Si cambia tu disponibilidad, los vas a ver acá al instante.',
+  },
+  presence: {
+    regionLabel: 'Presencia en vivo del aula',
+    liveBadge: 'En vivo',
+    connectingBadge: 'Conectando…',
+    reconnectingBadge: 'Reconectando…',
+    uncertainBadge: 'Presencia sin confirmar',
+    disconnectedBadge: 'Sin conexión en vivo',
+    rejectedTitle: 'No se pudo ingresar al aula en vivo',
+    lostAccessTitle: 'Ya no tenés acceso a esta aula',
+    retryAction: 'Reintentar conexión',
+    youSuffix: '(vos)',
+    participantReconnecting: 'Reconectando…',
+    emptyParticipants: 'No hay otros participantes conectados en este momento.',
+    controls: {
+      chatMuted: 'Chat silenciado',
+      collaborationLocked: 'Colaboración bloqueada',
+      gamesDisabled: 'Juegos deshabilitados',
+      frozen: 'Aula congelada',
+    },
   },
   desks: {
     loadError: 'No pudimos verificar el mapa de pupitres del aula.',

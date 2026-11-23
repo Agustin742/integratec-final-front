@@ -74,14 +74,22 @@ const PENDING = Object.freeze({ status: 'pending' as const });
  *   role is insufficient; both arrive as `ApiError` in `error`. Callers decide
  *   how to present them (see `RequireCapability`).
  */
-export function useClassroomContext(classroomId: string): ClassroomContext {
+export interface UseClassroomContextOptions {
+  readonly enabled?: boolean;
+}
+
+export function useClassroomContext(
+  classroomId: string,
+  options?: UseClassroomContextOptions,
+): ClassroomContext {
+  const enabled = options?.enabled ?? true;
   const { client } = useSessionService();
   const snapshot = useSessionSnapshot();
   const userId = snapshot.status === 'authenticated' ? snapshot.user.id : null;
 
   const query = useQuery({
-    // Without a signed-in user the query stays disabled; the key only needs
-    // to be valid and is never fetched or filled.
+    // Without a signed-in user or while explicitly disabled, the query stays
+    // idle; the key only needs to be valid and is never fetched or filled.
     queryKey: classroomDetailQueryKey(userId ?? 'signed-out', classroomId),
     queryFn: ({ signal }) =>
       requestApi(() =>
@@ -90,10 +98,10 @@ export function useClassroomContext(classroomId: string): ClassroomContext {
           signal,
         }),
       ),
-    enabled: userId !== null,
+    enabled: userId !== null && enabled,
   });
 
-  if (userId === null) return PENDING;
+  if (userId === null || !enabled) return PENDING;
   // Even a retryable failed refresh stops exposing private confirmed content.
   if (query.isError || query.failureCount > 0) {
     return {

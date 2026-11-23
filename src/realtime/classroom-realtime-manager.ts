@@ -96,6 +96,8 @@ export function createClassroomRealtimeManager(
     connection.unsubscribe = client.subscribe(() => {
       const snapshot = client.getSnapshot();
       if (snapshot.status === 'connected') {
+        clearTimeout(connection.retryTimer);
+        connection.retryTimer = undefined;
         connection.retries = 0;
         return;
       }
@@ -125,6 +127,13 @@ export function createClassroomRealtimeManager(
       const id = classroomId.trim();
       if (disposed || id === '') return null;
       let connection = connections.get(id);
+      if (connection !== undefined && connection.leases === 0) {
+        const status = connection.client.getSnapshot().status;
+        if (status === 'lost-access' || status === 'rejected') {
+          close(id, connection);
+          connection = undefined;
+        }
+      }
       if (connection === undefined) {
         if (connections.size >= maxConnections) return null;
         connection = open(id);

@@ -208,6 +208,13 @@ test.beforeEach(async ({ page, baseURL }) => {
       });
     }
 
+    if (
+      url.origin === 'https://realtime.example.invalid' ||
+      url.pathname.startsWith('/matchmake/')
+    ) {
+      return route.abort();
+    }
+
     await route.abort();
     throw new Error(
       `Unexpected external request: ${url.origin}${url.pathname}`,

@@ -28,6 +28,7 @@ import { useSessionCleanup, useSessionSnapshot } from '@/session/provider';
 import { Classroom2DLayout } from './classroom-2d-layout';
 import { Classroom3DStage, clearLoadedWorldAssets } from './classroom-3d-stage';
 import { useClassroomViewMode } from './classroom-mode-store';
+import { ClassroomPresenceBar } from './classroom-presence-bar';
 import { joinMessages } from './join-messages';
 import { readClassroomJoinOutcome } from './join-schema';
 import { classroomMessages as messages } from './messages';
@@ -38,6 +39,7 @@ import {
 } from './performance-offer-store';
 import { useClassroomContext } from './use-classroom-capabilities';
 import { useClassroomContextEvents } from './use-classroom-context-events';
+import { useClassroomPresence } from './use-classroom-presence';
 import { classroomPanelCatalog } from './panels/classroom-panel-catalog';
 import {
   ClassroomPanelsProvider,
@@ -79,6 +81,7 @@ function WorkspaceContext({
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const activeViewHeadingRef = useRef<HTMLHeadingElement>(null);
+  const lostAccessHeadingRef = useRef<HTMLHeadingElement>(null);
   const pendingFocusSwitchRef = useRef(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -143,22 +146,45 @@ function WorkspaceContext({
       { replace: true, state: null },
     );
   }, [hasIncomingOutcome, location, navigate]);
-  const context = useClassroomContext(classroomId);
-  useClassroomContextEvents(classroomId);
+  const snapshot = useSessionSnapshot();
+  const sessionUserId =
+    snapshot.status === 'authenticated' ? snapshot.user.id : null;
+  const scopeKey =
+    sessionUserId !== null ? `${sessionUserId}:${classroomId}` : '';
+  const [revokedScopeKey, setRevokedScopeKey] = useState<string | null>(null);
+  const isRevoked = scopeKey !== '' && revokedScopeKey === scopeKey;
+
+  const context = useClassroomContext(classroomId, { enabled: !isRevoked });
+  useClassroomContextEvents(classroomId, !isRevoked);
   useSessionCleanup(() => clearLoadedWorldAssets({ disposeDecoders: true }));
   useEffect(() => {
     return () => {
       clearLoadedWorldAssets({ scopeKey: classroomId });
     };
   }, [classroomId]);
-  const snapshot = useSessionSnapshot();
-  const sessionUserId =
-    snapshot.status === 'authenticated' ? snapshot.user.id : null;
   const { mode, setMode, toggleMode } = useClassroomViewMode(sessionUserId);
 
   const isParent =
     context.status === 'ready' && context.classroom.myRole === 'PARENT';
   const modeToggleEnabled = context.status === 'ready' && !isParent;
+  const handleLostAccess = useCallback(() => {
+    if (scopeKey !== '') {
+      setRevokedScopeKey(scopeKey);
+    }
+  }, [scopeKey]);
+  const presence = useClassroomPresence({
+    classroomId,
+    userId: sessionUserId,
+    enabled: modeToggleEnabled && !isRevoked,
+    mode,
+    onLostAccess: handleLostAccess,
+  });
+
+  useEffect(() => {
+    if (presence.lostAccess) {
+      lostAccessHeadingRef.current?.focus();
+    }
+  }, [presence.lostAccess]);
 
   const handleModeToggle = useCallback(() => {
     pendingFocusSwitchRef.current = true;
@@ -211,9 +237,40 @@ function WorkspaceContext({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [modeToggleEnabled, handleModeToggle]);
   useDocumentTitle(
-    context.status === 'ready' ? context.classroom.name : messages.title,
+    presence.lostAccess
+      ? messages.presence.lostAccessTitle
+      : context.status === 'ready'
+        ? context.classroom.name
+        : messages.title,
   );
 
+  if (presence.lostAccess) {
+    return (
+      <section
+        key={`${sessionUserId ?? 'none'}:${classroomId}`}
+        className="min-w-0 space-y-4"
+      >
+        <Alert
+          variant="destructive"
+          role="alert"
+          data-testid="classroom-lost-access"
+        >
+          <AlertTitle as="h2" ref={lostAccessHeadingRef} tabIndex={-1}>
+            {messages.presence.lostAccessTitle}
+          </AlertTitle>
+          <AlertDescription className="space-y-3">
+            <p>{presence.lostAccessMessage}</p>
+            <Link
+              to="/"
+              className={buttonStyles({ variant: 'outline', size: 'sm' })}
+            >
+              {messages.backToList}
+            </Link>
+          </AlertDescription>
+        </Alert>
+      </section>
+    );
+  }
   if (context.status === 'pending')
     return <LoadingState label={messages.loading} />;
   if (context.status === 'error') {
@@ -314,6 +371,13 @@ function WorkspaceContext({
           {classroom.myRole === 'STUDENT' && (
             <WalletIndicator classroomId={classroomId} />
           )}
+          {!isParent && (
+            <ClassroomPresenceBar
+              presence={presence}
+              currentUserId={userId}
+              classroom={classroom}
+            />
+          )}
         </header>
         {joinOutcome && (
           <Alert
@@ -365,6 +429,11 @@ function WorkspaceContext({
                 scopeKey={classroomId}
                 classroomId={classroomId}
                 petName={classroom.pet?.name ?? null}
+                selfPose={presence.selfPose}
+                connectionKey={presence.connectionKey}
+                frozen={presence.frozen}
+                remoteParticipants={presence.remoteParticipants}
+                onIntentChange={presence.sendIntent}
                 onSustainedLowFps={beginPerformanceOffer}
               />
             </>
