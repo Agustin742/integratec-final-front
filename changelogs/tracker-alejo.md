@@ -1,5 +1,18 @@
 # Tracker — Alejo
 
+## 2026-11-23 — Author modular denim jacket and track jacket on both avatars
+
+- **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
+- **Area / files:** `assets/blender/avatars/shared/top/denim-jacket.blend`, `assets/blender/avatars/shared/top/track-jacket.blend`, `public/models/avatars/{male,female}/top-denim-jacket.glb`, `public/models/avatars/{male,female}/top-track-jacket.glb`, `docs/art/denim-jacket.md`, `docs/art/track-jacket.md`, `docs/assets/{denim-jacket,track-jacket}/{male,female}-{1280,360}.png`, `scripts/assets/test-denim-jacket.mjs`, `scripts/assets/test-track-jacket.mjs`, `scripts/assets/test-jackets-sleeve-normals.py`, `docs/ai-usage.md`.
+- **Change:** Authored modular `Denim jacket` (`top-denim-jacket`) and `Track jacket` (`top-track-jacket`) for both unchanged male and female avatar bodies, reusing the concentric closed spherical elbow-cap shell from `ELBOW_FIXED_SchoolSmock_{Male,Female}`.
+- **Reason:** Continue incremental Casual upper-body wearable delivery for issue `#91` under `rules/modular-avatar-assets.md` and `docs/art/asset-wishlist.md`.
+- **Coordination:** Existing Alejo Project item `PVTI_lAHOCevXNc4BoRd2zhK9fEI`, issue `#91`.
+- **Evidence:**
+  - Authoring clearance (`1, 25, 62, 123, 201`) passed with `0` exposed arm verts/tris and `0` collar/zipper-head collisions against `Reference_Head` across both genders (`odd/artifacts/jackets-author-report.json`). Initial Cycles preview inspection and human feedback updated `Denim jacket` to an open-front trucker silhouette over a cream `InnerTee` (with open horseshoe collar + lapels, side-edge buttons, and front-recessed waistband) and changed `Track jacket` `Waistband` from cream contrast to body-tinted `AvatarTopTint`, preserving `0` pants overlap and `0` head collisions.
+  - Exported canonical 34-bone masters and isolated 20-bit Draco GLBs: `DenimJacket` (`71,520 B` male / `73,732 B` female, `9` meshes, max `4` influences, max sum error `<= 7.30e-7`), `TrackJacket` (`70,040 B` male / `71,804 B` female, `9` meshes, max `4` influences, max sum error `<= 7.45e-7`); `0` inward sleeve triangles across `1,360` triangles/side and `0` exposed arm verts/tris on decoded frames `1, 62, 123, 201` (`odd/artifacts/jackets-export.json`).
+  - Permanent `1280×1280` and `360×360` renders generated under `docs/assets/denim-jacket/` and `docs/assets/track-jacket/`.
+- **Next step:** Human reviewed and approved both garments; committed locally on `feat/91-modular-avatar-assets` without pushing. Remaining wishlist tops: Casual (`Flannel shirt`, `Tank top`) and Seasonal (`Winter coat`, `Holiday sweater`, `National team jersey`). Continue with `Flannel shirt` and `Tank top`.
+
 ## 2026-11-23 — Author modular vest on both avatars
 
 - **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
