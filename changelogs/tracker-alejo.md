@@ -1,5 +1,18 @@
 # Tracker — Alejo
 
+## 2026-11-23 — Author modular flannel shirt and tank top on both avatars
+
+- **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
+- **Area / files:** `assets/blender/avatars/shared/top/{flannel-shirt,tank-top}.blend`, `public/models/avatars/{male,female}/top-{flannel-shirt,tank-top}.glb`, `docs/art/{flannel-shirt,tank-top}.md`, `docs/assets/{flannel-shirt,tank-top}/{male,female}-{1280,360}.png`, `scripts/assets/test-flannel-shirt.mjs`, `scripts/assets/test-tank-top.mjs`, `scripts/assets/test-flannel-shirt-sleeve-normals.py`, `docs/ai-usage.md`.
+- **Change:** Authored modular `Flannel shirt` (`top-flannel-shirt`, `9` meshes/gender: elbow-cap `Shell`, tailored `Hem`, `Cuff_L`/`Cuff_R`, folded `Collar`, `Placket`, twin pointed-flap `Pockets`, 3D woven `PlaidBands`, and `8` beveled `Buttons`) and `Tank top` (`top-tank-top`, `6` meshes/gender: unified seamless sleeveless `Shell` with sculpted straps, slim `Hem`, ringer `NeckBind` + `ArmholeBind_L`/`ArmholeBind_R`, and `ChestPocket`) for both unchanged male and female avatar bodies under `rules/modular-avatar-assets.md` and `docs/art/asset-wishlist.md`.
+- **Reason:** Continue incremental Casual upper-body wearable delivery for issue `#91` (uncommitted for human visual review).
+- **Coordination:** Existing Alejo Project item `PVTI_lAHOCevXNc4BoRd2zhK9fEI`, issue `#91`.
+- **Evidence:**
+  - Authoring clearance (`1, 25, 62, 123, 201`) passed with `0` exposed arm verts/tris (`FlannelShirt`), `0` torso poke (`TankTop`), and `0` collar/neck-binding collisions against `Reference_Head` (`odd/artifacts/flannel-and-tank-author-report.json`). Initial Cycles preview inspections caught and fixed `FlannelShirt` upper plaid-band bust/pocket clearance and redesigned `TankTop` from a trimmed cap-sleeve T-shirt shell into a single unified double-walled cylindrical bodice (`DEF-bust.L/R` remapped to `DEF-spine.002`, zero arm/leg weights) with smooth ringer bindings.
+  - Exported canonical 34-bone masters and isolated 20-bit Draco GLBs: `FlannelShirt` (`107,408 B` male / `110,088 B` female, `9` meshes, max `4` influences, max sum error `<= 7.41e-7`, `0` inward sleeve triangles across `1,360` tris/side, `0` exposed arm verts/tris on decoded frames `1, 62, 123, 201`), `TankTop` (`86,968 B` male / `87,248 B` female, `6` meshes, max `4` influences, max sum error `<= 7.72e-7`) (`odd/artifacts/flannel-and-tank-export.json`).
+  - Permanent `1280×1280` and `360×360` Cycles renders generated under `docs/assets/flannel-shirt/` and `docs/assets/tank-top/`, and `REVIEW_FlannelShirt_Female` left active in Blender (with `REVIEW_FlannelShirt_Male`, `REVIEW_TankTop_Female`, and `REVIEW_TankTop_Male` ready for inspection).
+- **Next step:** Human reviewed and approved both garments; committed locally on `feat/91-modular-avatar-assets` without pushing. Wishlist remains unchecked until merge. Next clothing batch: Seasonal tops (`Winter coat`, `Holiday sweater`, `National team jersey`), then Bottoms and Shoes.
+
 ## 2026-11-23 — Polish modular school polo, basic T-shirt, and school smock on both avatars
 
 - **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
