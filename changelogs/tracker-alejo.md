@@ -1,5 +1,19 @@
 # Tracker — Alejo
 
+## 2026-11-23 — Polish modular school polo, basic T-shirt, and school smock on both avatars
+
+- **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
+- **Area / files:** `assets/blender/avatars/shared/top/{school-polo,basic-tshirt,school-smock}.blend`, `public/models/avatars/{male,female}/top-{school-polo,basic-tshirt,school-smock}.glb`, `docs/art/{school-polo,basic-tshirt,school-smock}.md`, `docs/assets/{school-polo,basic-tshirt,school-smock}/{male,female}-{1280,360}.png`, `docs/ai-usage.md`.
+- **Change:** Upgraded the visual craftsmanship of `top-school-polo` (`8` meshes/gender: neckband + folded collar wings, 2-button placket, chest pocket, beveled short-sleeve cuffs, pants-clearing hem), `top-basic-tshirt` (`6` meshes/gender: crew-neck ribbed collar, rolled short-sleeve hems, rounded chest pocket, slim pants-clearing hem), and `top-school-smock` (`11` meshes/gender: full neckband + folded smoke-gray collar, center placket, Windsor knot + pointed tie blade, lower button, beveled lower pockets with raised top lip, tailored wrist cuffs, pants-clearing hem) while keeping all base bodies, the 760-vert short-sleeve shells, and the 2,044-vert concentric spherical elbow-cap smock shells untouched.
+- **Reason:** Align the three earliest modular tops with the visual quality of the later tops (`shirt-and-tie`, `sweater`, `denim-jacket`) for issue `#91` under `rules/modular-avatar-assets.md` and `rules/art-direction.md`.
+- **Coordination:** Existing Alejo Project item `PVTI_lAHOCevXNc4BoRd2zhK9fEI`, issue `#91`.
+- **Evidence:**
+  - Blender MCP authoring clearance (`1, 25, 62, 123, 201`) passed with `0` exposed arm verts/tris (`SchoolSmock`), `0` collar/head collisions, and `0` buried surface-patch verts across all 6 variants (`odd/artifacts/improved-early-tops-author.json`).
+  - Exported canonical 34-bone masters and 20-bit Draco GLBs (`school-polo`: `46,372 B` male / `46,764 B` female; `basic-tshirt`: `38,760 B` male / `38,784 B` female; `school-smock`: `66,840 B` male / `66,420 B` female); decoded GLB roundtrips verified canonical 34-bone rest matrices, `1..4` normalized weights (max sum error `< 7.5e-7`), `0` inward sleeve tris (`test-school-smock-sleeve-normals.py`), and `0` exposed arm verts/tris on frames `1, 62, 123, 201` (`odd/artifacts/improved-early-tops-export.json`).
+  - `test-school-polo.mjs`, `test-basic-tshirt.mjs`, `test-school-smock.mjs`, and `check-asset-budget.mjs` (`40` models within `1.00 MB`, `3` pre-existing `#91` exceptions) all exited `0`.
+  - Permanent `1280×1280` and `360×360` Cycles renders generated under `docs/assets/{school-polo,basic-tshirt,school-smock}/`.
+- **Next step:** Human reviewed and approved all three upgraded garments; committed locally on `feat/91-modular-avatar-assets` without pushing. Wishlist remains unchecked until merge.
+
 ## 2026-11-23 — Author modular denim jacket and track jacket on both avatars
 
 - **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)

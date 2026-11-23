@@ -1,12 +1,12 @@
 # Short school smock — modular asset checkpoint
 
-**Human visual review approved; committed locally on `feat/91-modular-avatar-assets` (not yet pushed, merged, or integrated into the runtime catalog).** Both production GLBs and the editable master include the accepted white + smoke-gray details + centered pointed tie design and the concentric closed spherical elbow-cap repair resolving bilateral seated elbow poke-through. Wishlist remains unchecked until merge.
+**Human visual review approved; committed locally on `feat/91-modular-avatar-assets` (not yet pushed, merged, or integrated into the runtime catalog).** Both production GLBs and the editable master preserve the 2,044-vertex concentric closed spherical elbow-cap shells (`0` inward sleeve triangles, `0` exposed arm verts/tris across `Idle`, `Walk`, `Sit`, and `Wave`) and upgrade the white + smoke-gray visual details: full neckband with folded smoke-gray collar, center placket, Windsor knot and surface-following pointed tie blade, lower placket button, rounded beveled lower pockets with raised top lip, tailored wrist cuffs, and a pants-clearing bottom hem. Wishlist remains unchecked until merge.
 
 ## Files and review
 
 - [Editable master](../../assets/blender/avatars/shared/top/school-smock.blend): `SchoolSmock_Master_Male` and `SchoolSmock_Master_Female` scenes (11 semantic garment meshes + canonical 34-bone `rig` each).
-- [Male export](../../public/models/avatars/male/top-school-smock.glb): 36,136 bytes.
-- [Female export](../../public/models/avatars/female/top-school-smock.glb): 51,620 bytes.
+- [Male export](../../public/models/avatars/male/top-school-smock.glb): 66,840 bytes.
+- [Female export](../../public/models/avatars/female/top-school-smock.glb): 66,420 bytes.
 - [Standalone structural test](../../scripts/assets/test-school-smock.mjs).
 - [Sleeve outward-normals regression test](../../scripts/assets/test-school-smock-sleeve-normals.py).
 - Ignored animated viewer: `odd/previews/school-smock-elbow-fixed-review.blend`, scenes `ELBOW_FIXED_SchoolSmock_Female` and `ELBOW_FIXED_SchoolSmock_Male` (scrub Idle `1–49`, Walk `50–74`, Sit `75–171`, Wave `172–231`).

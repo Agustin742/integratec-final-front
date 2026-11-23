@@ -1,14 +1,14 @@
 # Basic modular T-shirt
 
-Candidate upper-body wearable for both existing avatars (S1–S4). Not human-approved, independently verified, runtime-integrated, or marked merged in the wishlist.
+**Human visual review approved; committed locally on `feat/91-modular-avatar-assets` (not yet pushed, merged, or integrated into the runtime catalog).** Upgraded visual polish preserves the 760-vertex short-sleeve shells and weights while adding a crew-neck ribbed collar ring, slim beveled short-sleeve hems, rounded left-chest pocket with top lip, and a slim pants-clearing bottom hem (`AvatarTopTint`). Wishlist remains unchecked until merge.
 
 ## Source and outputs
 
 Derived only from the existing editable 760-vertex `Polo_Male_Shell` and `Polo_Female_Shell`, originally authored in [school-polo.blend](../../assets/blender/avatars/shared/top/school-polo.blend), available in the clean local school-polo review file. Shell geometry, shoulder/sleeve weights and hem are unchanged; collar, placket and button objects are omitted, not deleted from the polo. The inherited 40-vertex neckline is retained. No automated fitting loop or body reshaping was used.
 
-- [Editable master](../../assets/blender/avatars/shared/top/basic-tshirt.blend): separate `BasicTShirt_male` and `BasicTShirt_female` scenes.
-- [Male export](../../public/models/avatars/male/top-basic-tshirt.glb): 17,120 bytes.
-- [Female export](../../public/models/avatars/female/top-basic-tshirt.glb): 17,148 bytes.
+- [Editable master](../../assets/blender/avatars/shared/top/basic-tshirt.blend): canonical 34-bone `TShirt_Master_Male` and `TShirt_Master_Female` scenes.
+- [Male export](../../public/models/avatars/male/top-basic-tshirt.glb): 38,760 bytes.
+- [Female export](../../public/models/avatars/female/top-basic-tshirt.glb): 38,784 bytes.
 - [Structural test](../../scripts/assets/test-basic-tshirt.mjs).
 
 Exports use strict active-scene selection of garment and canonical34 rig only, no animations, Draco generic precision 20, neutral white `AvatarTopTint`, roughness 0.85. Legacy `top-tshirt` is not replaced. Existing bodies, lower halves, polo files and original open review file were never saved over. Geometry/weight SHA256 comparisons of source shells and body-reference meshes remained equal during authoring (local `odd/artifacts/basic-tshirt-author.json`). This is not a complete bytewise audit of every source datablock.

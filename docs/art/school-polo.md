@@ -1,14 +1,14 @@
 # Modular school polo
 
-The school polo is a garment-only asset fitted to the existing male and female avatars through Blender MCP. A topology repair replaces the previously rejected puckered shell with regular torso/sleeve loops and anatomically bounded weights. Structural export checks and decoded-GLB pose samples pass parental inspection; independent visual verification is unavailable: the verifier process exited with code `3221226505` before returning a verdict. The repaired candidate is not independently approved. This does not add the polo to the runtime catalog or mark the wishlist item merged.
+**Human visual review approved; committed locally on `feat/91-modular-avatar-assets` (not yet pushed, merged, or integrated into the runtime catalog).** Upgraded visual polish preserves the proven 760-vertex short-sleeve shells and weights while adding a full neckband with folded collar wings, 2-button center placket (`AvatarDetail`), pentagonal chest pocket with top lip, beveled short-sleeve cuffs, and a smooth tailored hem clearing the pants on both bodies. Wishlist remains unchecked until merge.
 
 ## Files
 
 | File | Purpose |
 | --- | --- |
 | [`school-polo.blend`](../../assets/blender/avatars/shared/top/school-polo.blend) | Editable master with separate male/female fitting scenes and unchanged body references |
-| [`male/top-school-polo.glb`](../../public/models/avatars/male/top-school-polo.glb) | Male fitted export, 26,364 bytes |
-| [`female/top-school-polo.glb`](../../public/models/avatars/female/top-school-polo.glb) | Female fitted export, 26,808 bytes |
+| [`male/top-school-polo.glb`](../../public/models/avatars/male/top-school-polo.glb) | Male fitted export, 46,372 bytes |
+| [`female/top-school-polo.glb`](../../public/models/avatars/female/top-school-polo.glb) | Female fitted export, 46,764 bytes |
 | [`test-school-polo.mjs`](../../scripts/assets/test-school-polo.mjs) | Structural check; does not prove visual fit |
 
 Both runtime exports contain only skinned garment meshes and the canonical 34-joint skeleton, without animation clips, cameras, lights, or reference-body meshes. `AvatarTopTint` is neutral white for runtime recoloring; `AvatarDetail` contains the fixed dark button. Draco compression uses 20-bit generic attributes to preserve weight precision. There are no textures requiring KTX2 compression.
