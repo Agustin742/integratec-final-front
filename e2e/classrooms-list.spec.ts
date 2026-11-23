@@ -226,6 +226,13 @@ test('teacher creates and configures a classroom, navigates to F16 workspace, an
       return;
     }
 
+    if (
+      url.origin === 'https://realtime.example.invalid' ||
+      url.pathname.startsWith('/matchmake/')
+    ) {
+      return route.abort();
+    }
+
     await route.abort();
     throw new Error(`Unexpected external request: ${request.method()} ${url}`);
   });
