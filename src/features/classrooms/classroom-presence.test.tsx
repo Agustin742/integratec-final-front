@@ -97,10 +97,17 @@ function setupPresenceWorkspace(
     readonly path?: string;
     readonly detailOverrides?: (id: string) => Partial<Detail>;
     readonly members?: readonly components['schemas']['ClassroomMemberDto'][];
+    readonly releaseGraceMs?: number;
+    readonly holdContextEvents?: boolean;
   } = {},
 ) {
   const sdk = createFakeRealtimeSdk();
   let currentDetailOverrides = options.detailOverrides;
+  let currentDetailResponse: ((id: string) => Response) | null = null;
+  let currentMembersResponse: (() => Response) | null = null;
+  const detailRequests: string[] = [];
+  const contextEventRequests: string[] = [];
+  const membersRequests: string[] = [];
 
   const session = fakeSession(
     { status: 'authenticated', user: profile },
@@ -110,6 +117,10 @@ function setupPresenceWorkspace(
         const request = input as Request;
         const url = new URL(request.url);
         if (url.pathname.endsWith('/context-events')) {
+          contextEventRequests.push(url.pathname);
+          if (options.holdContextEvents) {
+            return new Promise<Response>(() => {});
+          }
           return new Response(new ReadableStream(), {
             headers: { 'content-type': 'text/event-stream' },
           });
@@ -135,6 +146,10 @@ function setupPresenceWorkspace(
           });
         }
         if (url.pathname.endsWith('/members')) {
+          membersRequests.push(url.pathname);
+          if (currentMembersResponse) {
+            return currentMembersResponse();
+          }
           const items = options.members ?? [
             {
               id: REMOTE_TEACHER_ID,
@@ -160,6 +175,10 @@ function setupPresenceWorkspace(
         const match = /^\/classrooms\/([^/]+)$/.exec(url.pathname);
         if (match) {
           const id = match[1];
+          detailRequests.push(id);
+          if (currentDetailResponse) {
+            return currentDetailResponse(id);
+          }
           return Response.json(
             buildDetail(id, currentDetailOverrides?.(id) ?? {}),
           );
@@ -194,7 +213,7 @@ function setupPresenceWorkspace(
         <ClassroomRealtimeProvider
           realtimeUrl="wss://realtime.example.invalid"
           createSdkClient={sdk.createSdkClient}
-          releaseGraceMs={0}
+          releaseGraceMs={options.releaseGraceMs ?? 0}
         >
           <RouterProvider router={router} />
         </ClassroomRealtimeProvider>
@@ -208,8 +227,17 @@ function setupPresenceWorkspace(
     session,
     queryClient,
     router,
+    detailRequests,
+    contextEventRequests,
+    membersRequests,
     setDetailOverrides(fn: (id: string) => Partial<Detail>) {
       currentDetailOverrides = fn;
+    },
+    setDetailResponse(fn: ((id: string) => Response) | null) {
+      currentDetailResponse = fn;
+    },
+    setMembersResponse(fn: (() => Response) | null) {
+      currentMembersResponse = fn;
     },
   };
 }
@@ -547,7 +575,9 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
     expect(bar).toHaveTextContent(classroomMessages.presence.reconnectingBadge);
     expect(bar).toHaveTextContent(classroomMessages.presence.uncertainBadge);
     expect(bar).toHaveTextContent(realtimeMessages.reconnecting);
-    expect(stage.props?.connectionKey).toBe('reconnecting');
+    expect(stage.props?.connectionKey).toBe(
+      `${firstRoom.roomId}:${firstRoom.sessionId}`,
+    );
 
     releaseReconnect();
     await waitFor(() => {
@@ -557,8 +587,9 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
     });
   });
 
-  test('exits immediately on live access revocation (4001 access_revoked) and unmounts scene and panels', async () => {
-    const { sdk } = setupPresenceWorkspace();
+  test('exits immediately on live access revocation (4001 access_revoked), stops SSE/refetches/reconnects, and focuses lost-access heading', async () => {
+    const { sdk, detailRequests, contextEventRequests } =
+      setupPresenceWorkspace();
     await waitFor(() => {
       expect(sdk.roomFor(CLASSROOM_A)).toBeDefined();
     });
@@ -572,6 +603,9 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
       });
     });
     await screen.findByTestId('mock-3d-stage');
+
+    const detailCountBefore = detailRequests.length;
+    const sseCountBefore = contextEventRequests.length;
 
     act(() => {
       room.emitLeave(CLOSE_CODE_ACCESS_REVOKED, CLOSE_REASON_ACCESS_REVOKED);
@@ -593,6 +627,24 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
     expect(
       screen.getByRole('link', { name: classroomMessages.backToList }),
     ).toHaveAttribute('href', '/');
+
+    const lostAccessHeading = screen.getByRole('heading', {
+      level: 2,
+      name: classroomMessages.presence.lostAccessTitle,
+    });
+    expect(lostAccessHeading).toHaveAttribute('tabindex', '-1');
+    await waitFor(() => {
+      expect(document.activeElement).toBe(lostAccessHeading);
+    });
+
+    // Flush timers/microtasks to confirm zero post-4001 GET /classrooms/:id refetches,
+    // zero SSE reconnects, and zero extra Colyseus room joins.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 60));
+    });
+    expect(sdk.joinedClassrooms).toHaveLength(1);
+    expect(detailRequests.length).toBe(detailCountBefore);
+    expect(contextEventRequests.length).toBe(sseCountBefore);
   });
 
   test('shows rejected alert with retry on 4002 too_many_connections', async () => {
@@ -698,5 +750,346 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
     expect(
       screen.queryByTestId('classroom-presence-bar'),
     ).not.toBeInTheDocument();
+  });
+
+  test('reconciles REST classroom detail when initial realtime join is rejected as forbidden (403/4001)', async () => {
+    const { sdk, detailRequests, setDetailResponse } = setupPresenceWorkspace({
+      holdContextEvents: true,
+    });
+    // Initial GET /classrooms/:id was already dispatched during mount (returns 200);
+    // subsequent reconciliation read returns 403 once realtime join is rejected as forbidden.
+    setDetailResponse(() => new Response(null, { status: 403 }));
+    sdk.failNextJoinWith(
+      Object.assign(new Error(CLOSE_REASON_ACCESS_REVOKED), {
+        code: CLOSE_CODE_ACCESS_REVOKED,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(detailRequests).toHaveLength(2);
+      expect(screen.queryByTestId('mock-3d-stage')).not.toBeInTheDocument();
+    });
+  });
+
+  test('reconciles persisted controls after drop -> failed reconnect -> disconnected -> manual retry', async () => {
+    const { sdk, setDetailOverrides } = setupPresenceWorkspace();
+    await waitFor(() => {
+      expect(sdk.roomFor(CLASSROOM_A)).toBeDefined();
+    });
+    const firstRoom = sdk.roomFor(CLASSROOM_A)!;
+
+    await waitFor(() => {
+      expect(screen.getByTestId('classroom-presence-bar')).toHaveTextContent(
+        classroomMessages.presence.liveBadge,
+      );
+    });
+
+    // Next reconnect fails so client transitions to disconnected (with Retry button).
+    sdk.failNextReconnectWith(new Error('network unreachable'));
+    act(() => {
+      firstRoom.emitDrop(1006, 'network down');
+    });
+
+    const retryButton = await screen.findByRole('button', {
+      name: classroomMessages.presence.retryAction,
+    });
+    expect(stage.props?.connectionKey).toBeUndefined();
+
+    // Persisted controls change on the server while disconnected.
+    setDetailOverrides(() => ({
+      chatMuted: true,
+      collaborationLocked: true,
+      gamesDisabled: true,
+    }));
+
+    fireEvent.click(retryButton);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('classroom-presence-bar')).toHaveTextContent(
+        classroomMessages.presence.liveBadge,
+      );
+      expect(screen.getByTestId('workspace-controls-probe')).toHaveTextContent(
+        '"chatMuted":true',
+      );
+      expect(screen.getByTestId('workspace-controls-probe')).toHaveTextContent(
+        '"collaborationLocked":true',
+      );
+      expect(screen.getByTestId('workspace-controls-probe')).toHaveTextContent(
+        '"gamesDisabled":true',
+      );
+    });
+  });
+
+  test('keeps frozen latched across reconnecting and sends stop intent on unmount while lease lingers', async () => {
+    const sdk = createFakeRealtimeSdk();
+    let releaseReconnect!: () => void;
+    const reconnectGate = new Promise<void>((resolve) => {
+      releaseReconnect = resolve;
+    });
+    const wrappedSdkFactory: typeof sdk.createSdkClient = () => {
+      const inner = sdk.createSdkClient();
+      return {
+        ...inner,
+        reconnect: async (token) => {
+          await reconnectGate;
+          return inner.reconnect(token);
+        },
+      };
+    };
+
+    const session = fakeSession(
+      { status: 'authenticated', user: profile },
+      createApiClient({
+        baseUrl: 'https://api.example.invalid',
+        fetch: async (input) => {
+          const url = new URL((input as Request).url);
+          if (url.pathname.endsWith('/context-events')) {
+            return new Response(new ReadableStream(), {
+              headers: { 'content-type': 'text/event-stream' },
+            });
+          }
+          if (url.pathname === '/notifications') {
+            return Response.json({
+              items: [],
+              page: 1,
+              pageSize: 20,
+              total: 0,
+            });
+          }
+          if (url.pathname === '/chats') {
+            return Response.json({ items: [] });
+          }
+          if (url.pathname === '/users/me/daily-review') {
+            return Response.json({ status: 'not_due' });
+          }
+          if (url.pathname.endsWith('/points')) {
+            return Response.json({
+              classroomId: CLASSROOM_A,
+              studentId: profile.id,
+              balance: 0,
+              items: [],
+              page: 1,
+              pageSize: 20,
+              total: 0,
+            });
+          }
+          return Response.json(buildDetail(CLASSROOM_A));
+        },
+      }),
+    );
+    session.service.controller.getAccessToken = () => 'tok';
+    session.service.controller.refreshAccessToken = async () => 'tok';
+
+    const queryClient = createAppQueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const router = createMemoryRouter(createAppRoutes(), {
+      initialEntries: [`/classrooms/${CLASSROOM_A}`],
+    });
+
+    const view = render(
+      <ApiQueryProvider client={queryClient}>
+        <SessionProvider service={session.service}>
+          <ClassroomRealtimeProvider
+            realtimeUrl="wss://realtime.example.invalid"
+            createSdkClient={wrappedSdkFactory}
+            releaseGraceMs={500}
+          >
+            <RouterProvider router={router} />
+          </ClassroomRealtimeProvider>
+        </SessionProvider>
+      </ApiQueryProvider>,
+    );
+
+    await waitFor(() => {
+      expect(sdk.roomFor(CLASSROOM_A)).toBeDefined();
+    });
+    const firstRoom = sdk.roomFor(CLASSROOM_A)!;
+
+    act(() => {
+      firstRoom.setControls({ frozen: true });
+    });
+    await waitFor(() => {
+      expect(stage.props?.frozen).toBe(true);
+    });
+
+    // Drop while frozen: frozen lock must remain latched while reconnecting.
+    act(() => {
+      firstRoom.emitDrop(1006, 'drop while frozen');
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('classroom-presence-bar')).toHaveTextContent(
+        classroomMessages.presence.reconnectingBadge,
+      );
+    });
+    expect(stage.props?.frozen).toBe(true);
+
+    // Finish reconnect and unfreeze, then start walking and unmount while grace period keeps room alive.
+    releaseReconnect();
+    await waitFor(() => {
+      const next = sdk.roomFor(CLASSROOM_A);
+      expect(next).toBeDefined();
+      expect(next).not.toBe(firstRoom);
+    });
+    const reconnectedRoom = sdk.roomFor(CLASSROOM_A)!;
+    act(() => {
+      reconnectedRoom.setControls({ frozen: false });
+    });
+    await waitFor(() => {
+      expect(stage.props?.frozen).toBe(false);
+    });
+
+    act(() => {
+      stage.props?.onIntentChange?.({ x: 1, z: 0 });
+    });
+    expect(reconnectedRoom.send).toHaveBeenCalledWith(AVATAR_INPUT_MESSAGE, {
+      x: 1,
+      z: 0,
+    });
+
+    reconnectedRoom.send.mockClear();
+    view.unmount();
+    expect(reconnectedRoom.send).toHaveBeenCalledWith(AVATAR_INPUT_MESSAGE, {
+      x: 0,
+      z: 0,
+    });
+  });
+
+  test('formats SCHOOL_ADMIN role, scopes aria-live to status container, and refreshes directory avatars after failure and new members', async () => {
+    const NEW_STUDENT_ID = '00000000-0000-4000-8000-000000000077';
+    const { sdk, membersRequests, setMembersResponse } =
+      setupPresenceWorkspace();
+    let membersAttempt = 0;
+    setMembersResponse(() => {
+      membersAttempt += 1;
+      if (membersAttempt === 1) {
+        return new Response(null, { status: 503 });
+      }
+      if (membersAttempt === 2) {
+        return Response.json({
+          items: [
+            {
+              id: REMOTE_TEACHER_ID,
+              userId: REMOTE_TEACHER_ID,
+              displayName: 'Directora Ana',
+              role: 'SCHOOL_ADMIN',
+              avatar: {
+                bodyId: 'female',
+                hairId: 'original',
+                topId: 'tshirt',
+                hairColor: '#6C4D48',
+                clothingColor: '#5B4F96',
+              },
+            },
+          ],
+          page: 1,
+          pageSize: 100,
+          total: 1,
+        });
+      }
+      return Response.json({
+        items: [
+          {
+            id: REMOTE_TEACHER_ID,
+            userId: REMOTE_TEACHER_ID,
+            displayName: 'Directora Ana',
+            role: 'SCHOOL_ADMIN',
+            avatar: {
+              bodyId: 'female',
+              hairId: 'original',
+              topId: 'tshirt',
+              hairColor: '#6C4D48',
+              clothingColor: '#5B4F96',
+            },
+          },
+          {
+            id: NEW_STUDENT_ID,
+            userId: NEW_STUDENT_ID,
+            displayName: 'Lucas Nuevo',
+            role: 'STUDENT',
+            avatar: {
+              bodyId: 'male',
+              hairId: 'dreads',
+              topId: 'hoodie',
+              hairColor: '#353849',
+              clothingColor: '#75B7DA',
+            },
+          },
+        ],
+        page: 1,
+        pageSize: 100,
+        total: 2,
+      });
+    });
+
+    await waitFor(() => {
+      expect(sdk.roomFor(CLASSROOM_A)).toBeDefined();
+    });
+    const room = sdk.roomFor(CLASSROOM_A)!;
+
+    // First join of SCHOOL_ADMIN triggers directory lookup #1 (503 transient failure).
+    act(() => {
+      room.setAvatar({
+        userId: REMOTE_TEACHER_ID,
+        displayName: 'Directora Ana',
+        role: 'SCHOOL_ADMIN',
+        x: 0,
+        z: -3,
+      });
+    });
+
+    const bar = await screen.findByTestId('classroom-presence-bar');
+    expect(bar).toHaveTextContent('Directora Ana');
+    expect(bar).toHaveTextContent(classroomMessages.roles.SCHOOL_ADMIN);
+    expect(bar).not.toHaveAttribute('aria-live');
+    const liveRegion = bar.querySelector('[aria-live="polite"]');
+    expect(liveRegion).not.toBeNull();
+    expect(liveRegion?.querySelector('ul')).toBeNull();
+
+    await waitFor(() => {
+      expect(membersRequests.length).toBe(1);
+    });
+
+    // Adding a second missing participant retries after the 503 failure (lookup #2).
+    act(() => {
+      room.setAvatar({
+        userId: REMOTE_STUDENT_ID,
+        displayName: 'Mateo',
+        role: 'STUDENT',
+        x: 2,
+        z: 1,
+      });
+    });
+    await waitFor(() => {
+      expect(membersRequests.length).toBe(2);
+      const adminRemote = stage.props?.remoteParticipants?.find(
+        (p) => p.userId === REMOTE_TEACHER_ID,
+      );
+      expect(adminRemote?.avatar?.bodyId).toBe('female');
+    });
+
+    // Newly enrolled student arrives within the 60s window; staleTime: 0 fetches fresh directory (#3).
+    act(() => {
+      room.setAvatar({
+        userId: NEW_STUDENT_ID,
+        displayName: 'Lucas Nuevo',
+        role: 'STUDENT',
+        x: 3,
+        z: 2,
+      });
+    });
+    await waitFor(() => {
+      expect(membersRequests.length).toBe(3);
+      const newRemote = stage.props?.remoteParticipants?.find(
+        (p) => p.userId === NEW_STUDENT_ID,
+      );
+      expect(newRemote?.avatar).toEqual({
+        bodyId: 'male',
+        hairId: 'dreads',
+        topId: 'hoodie',
+        hairColor: '#353849',
+        clothingColor: '#75B7DA',
+      });
+    });
   });
 });

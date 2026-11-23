@@ -96,6 +96,7 @@ export interface RealtimeRoomLike<TState = ClassroomState> {
   readonly roomId: string;
   readonly sessionId: string;
   readonly reconnectionToken?: string;
+  readonly reconnection?: { enabled: boolean } | undefined;
   readonly state: TState;
   onStateChange(callback: (state: TState) => void): unknown;
   onDrop?(callback: (code: number, reason?: string) => void): unknown;
@@ -152,32 +153,42 @@ const DEFAULT_CONTROLS: RealtimeClassroomControls = Object.freeze({
   frozen: false,
 });
 
+function disableSdkAutoReconnect<T extends RealtimeRoomLike<ClassroomState>>(
+  room: T,
+): T {
+  if (room.reconnection) {
+    room.reconnection.enabled = false;
+  }
+  return room;
+}
+
 function createDefaultSdkClient(endpoint: string): RealtimeSdkClientLike {
   const sdk = new Client(endpoint);
   return {
     auth: sdk.auth as { token: string | undefined },
-    joinOrCreate: (roomName: string, options?: ClassroomJoinOptions) =>
-      sdk.joinOrCreate(roomName, options) as unknown as Promise<
-        RealtimeRoomLike<ClassroomState>
-      >,
-    reconnect: (reconnectionToken: string) =>
-      sdk.reconnect(reconnectionToken) as unknown as Promise<
-        RealtimeRoomLike<ClassroomState>
-      >,
+    joinOrCreate: async (roomName: string, options?: ClassroomJoinOptions) =>
+      disableSdkAutoReconnect(
+        (await sdk.joinOrCreate(
+          roomName,
+          options,
+        )) as unknown as RealtimeRoomLike<ClassroomState>,
+      ),
+    reconnect: async (reconnectionToken: string) =>
+      disableSdkAutoReconnect(
+        (await sdk.reconnect(
+          reconnectionToken,
+        )) as unknown as RealtimeRoomLike<ClassroomState>,
+      ),
   };
 }
 
-function readParticipantAppearance(
-  rawAvatar: unknown,
+function parseAppearanceFields(
+  source: unknown,
 ): RealtimeAvatarAppearance | undefined {
-  if (typeof rawAvatar !== 'object' || rawAvatar === null) {
+  if (typeof source !== 'object' || source === null) {
     return undefined;
   }
-  const appearance = (rawAvatar as { appearance?: unknown }).appearance;
-  if (typeof appearance !== 'object' || appearance === null) {
-    return undefined;
-  }
-  const candidate = appearance as Record<string, unknown>;
+  const candidate = source as Record<string, unknown>;
   const { bodyId, hairId, topId, hairColor, clothingColor } = candidate;
   if (
     typeof bodyId === 'string' &&
@@ -202,8 +213,32 @@ function readParticipantAppearance(
   return undefined;
 }
 
+function readParticipantAppearance(
+  rawAvatar: unknown,
+): RealtimeAvatarAppearance | undefined {
+  if (typeof rawAvatar !== 'object' || rawAvatar === null) {
+    return undefined;
+  }
+  const appearance = (rawAvatar as { appearance?: unknown }).appearance;
+  if (typeof appearance !== 'object' || appearance === null) {
+    return undefined;
+  }
+  return (
+    parseAppearanceFields(appearance) ??
+    parseAppearanceFields((appearance as { baseAvatar?: unknown }).baseAvatar)
+  );
+}
+
+function toFiniteCoordinate(value: unknown, fallback = 0): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  return Number.isFinite(fallback) ? fallback : 0;
+}
+
 function readParticipants(
   state: ClassroomState | undefined,
+  previousParticipants?: ReadonlyMap<string, RealtimeParticipant>,
 ): ReadonlyMap<string, RealtimeParticipant> {
   if (!state?.avatars) {
     return EMPTY_PARTICIPANTS;
@@ -211,6 +246,7 @@ function readParticipants(
   const next = new Map<string, RealtimeParticipant>();
   state.avatars.forEach((avatar, key) => {
     const userId = avatar.userId || key;
+    const previous = previousParticipants?.get(userId);
     const appearance = readParticipantAppearance(avatar);
     next.set(
       userId,
@@ -218,9 +254,9 @@ function readParticipants(
         userId,
         displayName: avatar.displayName,
         role: avatar.role,
-        x: avatar.x,
-        z: avatar.z,
-        rotation: avatar.rotation,
+        x: toFiniteCoordinate(avatar.x, previous?.x ?? 0),
+        z: toFiniteCoordinate(avatar.z, previous?.z ?? 0),
+        rotation: toFiniteCoordinate(avatar.rotation, previous?.rotation ?? 0),
         status: avatar.status,
         ...(appearance ? { avatar: appearance } : {}),
       }),
@@ -365,7 +401,7 @@ function classifyFailure(
   };
 }
 
-function isUnauthorizedJoinError(error: unknown): boolean {
+function isUnauthorizedError(error: unknown): boolean {
   const code = extractErrorCode(error);
   if (
     code === CLOSE_CODE_ACCESS_REVOKED ||
@@ -408,6 +444,7 @@ export function createClassroomRealtimeClient(
   let epoch = 0;
   let disposed = false;
   let activeRoom: RealtimeRoomLike<ClassroomState> | null = null;
+  let reconnectingRoom: RealtimeRoomLike<ClassroomState> | null = null;
   let inFlightConnect: {
     classroomId: string;
     promise: Promise<boolean>;
@@ -450,6 +487,9 @@ export function createClassroomRealtimeClient(
     }
     if (activeRoom === room) {
       activeRoom = null;
+    }
+    if (reconnectingRoom === room) {
+      reconnectingRoom = null;
     }
   }
 
@@ -511,6 +551,7 @@ export function createClassroomRealtimeClient(
     classroomId: string,
     roomEpoch: number,
   ): void {
+    disableSdkAutoReconnect(room);
     activeRoom = room;
     publish({
       status: 'connected',
@@ -534,7 +575,7 @@ export function createClassroomRealtimeClient(
         sessionId: room.sessionId,
         reason: snapshot.reason,
         message: snapshot.message,
-        participants: readParticipants(state),
+        participants: readParticipants(state, snapshot.participants),
         controls: readControls(state),
       });
     });
@@ -564,7 +605,12 @@ export function createClassroomRealtimeClient(
     });
 
     room.onDrop?.(() => {
-      if (disposed || roomEpoch !== epoch || activeRoom !== room) {
+      if (
+        disposed ||
+        roomEpoch !== epoch ||
+        activeRoom !== room ||
+        reconnectingRoom === room
+      ) {
         return;
       }
       const reconnectionToken = room.reconnectionToken;
@@ -594,21 +640,50 @@ export function createClassroomRealtimeClient(
         return;
       }
 
-      const sdk = createSdk(endpoint);
-      sdk.auth.token = auth.getAccessToken();
-      void sdk.reconnect(reconnectionToken).then(
-        (reconnectedRoom) => {
+      reconnectingRoom = room;
+
+      const reconnectWithToken = async (
+        token: string | undefined,
+      ): Promise<RealtimeRoomLike<ClassroomState>> => {
+        const sdk = createSdk(endpoint);
+        sdk.auth.token = token;
+        return sdk.reconnect(reconnectionToken);
+      };
+
+      const attemptReconnect = async (): Promise<void> => {
+        try {
+          let reconnectedRoom: RealtimeRoomLike<ClassroomState>;
+          try {
+            reconnectedRoom = await reconnectWithToken(auth.getAccessToken());
+          } catch (firstError) {
+            if (disposed || roomEpoch !== epoch || activeRoom !== room) {
+              return;
+            }
+            if (!isUnauthorizedError(firstError)) {
+              throw firstError;
+            }
+            const refreshedToken = await auth.refreshAccessToken();
+            if (disposed || roomEpoch !== epoch || activeRoom !== room) {
+              return;
+            }
+            if (!refreshedToken) {
+              throw firstError;
+            }
+            reconnectedRoom = await reconnectWithToken(refreshedToken);
+          }
+
           if (disposed || roomEpoch !== epoch || activeRoom !== room) {
             detachRoom(reconnectedRoom, true);
             return;
           }
+          reconnectingRoom = null;
           detachRoom(room, false);
           attachRoom(reconnectedRoom, classroomId, roomEpoch);
-        },
-        (error: unknown) => {
+        } catch (error: unknown) {
           if (disposed || roomEpoch !== epoch || activeRoom !== room) {
             return;
           }
+          reconnectingRoom = null;
           detachRoom(room, false);
           const failure = classifyFailure(error, true);
           publish({
@@ -621,12 +696,19 @@ export function createClassroomRealtimeClient(
             participants: EMPTY_PARTICIPANTS,
             controls: DEFAULT_CONTROLS,
           });
-        },
-      );
+        }
+      };
+
+      void attemptReconnect();
     });
 
     room.onLeave((code, reason) => {
-      if (disposed || roomEpoch !== epoch || activeRoom !== room) {
+      if (
+        disposed ||
+        roomEpoch !== epoch ||
+        activeRoom !== room ||
+        reconnectingRoom === room
+      ) {
         return;
       }
       detachRoom(room, false);
@@ -662,7 +744,7 @@ export function createClassroomRealtimeClient(
       }
       const failure = classifyFailure({ code, message }, true);
       if (failure.status === 'lost-access' || failure.status === 'rejected') {
-        detachRoom(room, false);
+        detachRoom(room, true);
         publish({
           status: failure.status,
           classroomId,
@@ -683,6 +765,7 @@ export function createClassroomRealtimeClient(
     resetMessageGuards();
     const current = activeRoom;
     activeRoom = null;
+    reconnectingRoom = null;
     detachRoom(current, true);
     publish({
       status: 'disconnected',
@@ -732,6 +815,7 @@ export function createClassroomRealtimeClient(
     resetMessageGuards();
     const previousRoom = activeRoom;
     activeRoom = null;
+    reconnectingRoom = null;
     detachRoom(previousRoom, true);
 
     publish({
@@ -780,7 +864,7 @@ export function createClassroomRealtimeClient(
           if (disposed || connectEpoch !== epoch) {
             return false;
           }
-          if (!isUnauthorizedJoinError(firstError)) {
+          if (!isUnauthorizedError(firstError)) {
             throw firstError;
           }
           const refreshedToken = await auth.refreshAccessToken();
@@ -882,6 +966,7 @@ export function createClassroomRealtimeClient(
       resetMessageGuards();
       const current = activeRoom;
       activeRoom = null;
+      reconnectingRoom = null;
       detachRoom(current, true);
       listeners.clear();
       messageHandlers.clear();

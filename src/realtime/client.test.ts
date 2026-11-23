@@ -28,6 +28,7 @@ class FakeRoom implements RealtimeRoomLike<ClassroomState> {
   readonly roomId: string;
   readonly sessionId: string;
   readonly reconnectionToken: string;
+  readonly reconnection = { enabled: true };
   state: ClassroomState;
   readonly sentMessages: Array<{ type: string; payload: unknown }> = [];
   leaveCalls = 0;
@@ -139,6 +140,12 @@ class FakeRoom implements RealtimeRoomLike<ClassroomState> {
   emitLeave(code: number, reason?: string): void {
     for (const listener of [...this.leaveListeners]) {
       listener(code, reason);
+    }
+  }
+
+  emitError(code: number, message?: string): void {
+    for (const listener of [...this.errorListeners]) {
+      listener(code, message);
     }
   }
 
@@ -758,6 +765,228 @@ describe('createClassroomRealtimeClient (#23)', () => {
 
     room.emitDrop(1006, 'drop');
     expect(client.getSnapshot().controls).toEqual({ frozen: false });
+
+    client.dispose();
+  });
+
+  it('disables built-in SDK auto-reconnection on join and reconnect and ignores dropped socket onLeave while manual reconnect is in flight', async () => {
+    const { auth } = createFakeAuth('valid-token');
+    const sdk = createFakeSdk();
+    const initialRoom = new FakeRoom({
+      classroomId: CLASSROOM_A,
+      reconnectionToken: 'room-a:race-1',
+    });
+    const reconnectedRoom = new FakeRoom({
+      classroomId: CLASSROOM_A,
+      sessionId: 'conn-race-reconnected',
+      reconnectionToken: 'room-a:race-2',
+    });
+    reconnectedRoom.setAvatar('user-race', { displayName: 'Race Winner' });
+
+    let resolveReconnect!: (room: FakeRoom) => void;
+    sdk.setJoinHandler(async () => initialRoom);
+    sdk.setReconnectHandler(
+      () =>
+        new Promise<FakeRoom>((resolve) => {
+          resolveReconnect = resolve;
+        }),
+    );
+
+    const client = createClassroomRealtimeClient({
+      auth,
+      realtimeUrl: 'wss://realtime.example.invalid',
+      createSdkClient: sdk.createSdkClient,
+    });
+
+    await client.connect(CLASSROOM_A);
+    expect(initialRoom.reconnection.enabled).toBe(false);
+
+    // Drop starts manual reconnect; socket's own onLeave(1006) firing mid-flight must be ignored.
+    initialRoom.emitDrop(1006, 'socket dropped');
+    initialRoom.emitLeave(1006, 'socket closed');
+    expect(client.getSnapshot().status).toBe('reconnecting');
+
+    resolveReconnect(reconnectedRoom);
+    await vi.waitFor(() => {
+      expect(client.getSnapshot().status).toBe('connected');
+    });
+    expect(reconnectedRoom.reconnection.enabled).toBe(false);
+    expect(reconnectedRoom.leaveCalls).toBe(0);
+    expect(client.getSnapshot().participants.has('user-race')).toBe(true);
+
+    client.dispose();
+  });
+
+  it('refreshes expired token at most once on onDrop 401 before failing terminally', async () => {
+    const { auth, refreshAccessToken, setToken } =
+      createFakeAuth('stale-drop-token');
+    const sdk = createFakeSdk();
+    const firstRoom = new FakeRoom({
+      classroomId: CLASSROOM_A,
+      reconnectionToken: 'room-a:drop-401-1',
+    });
+    const recoveredRoom = new FakeRoom({
+      classroomId: CLASSROOM_A,
+      sessionId: 'conn-recovered',
+      reconnectionToken: 'room-a:drop-401-2',
+    });
+
+    sdk.setJoinHandler(async () => firstRoom);
+    refreshAccessToken.mockImplementationOnce(async () => {
+      setToken('fresh-drop-token');
+      return 'fresh-drop-token';
+    });
+    sdk.setReconnectHandler(async ({ authToken }) => {
+      if (authToken !== 'fresh-drop-token') {
+        throw Object.assign(new Error('Unauthorized'), { code: 401 });
+      }
+      return recoveredRoom;
+    });
+
+    const client = createClassroomRealtimeClient({
+      auth,
+      realtimeUrl: 'wss://realtime.example.invalid',
+      createSdkClient: sdk.createSdkClient,
+    });
+
+    await client.connect(CLASSROOM_A);
+    firstRoom.emitDrop(1006, 'expired token drop');
+
+    await vi.waitFor(() => {
+      expect(client.getSnapshot().status).toBe('connected');
+    });
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1);
+    expect(sdk.reconnectCalls).toHaveLength(2);
+    expect(sdk.reconnectCalls[0].authToken).toBe('stale-drop-token');
+    expect(sdk.reconnectCalls[1].authToken).toBe('fresh-drop-token');
+
+    // Bounded check: repeated 401 after single refresh transitions to rejected/unauthorized.
+    refreshAccessToken.mockClear();
+    sdk.reconnectCalls.length = 0;
+    refreshAccessToken.mockResolvedValueOnce('still-invalid-token');
+    sdk.setReconnectHandler(async () => {
+      throw Object.assign(new Error('Unauthorized'), { code: 401 });
+    });
+
+    recoveredRoom.emitDrop(1006, 'second expired drop');
+    await vi.waitFor(() => {
+      expect(client.getSnapshot().status).toBe('rejected');
+    });
+    expect(refreshAccessToken).toHaveBeenCalledTimes(1);
+    expect(sdk.reconnectCalls).toHaveLength(2);
+    expect(client.getSnapshot()).toMatchObject({
+      status: 'rejected',
+      reason: 'unauthorized',
+      message: realtimeMessages.unauthorized,
+      presenceUncertain: true,
+    });
+
+    client.dispose();
+  });
+
+  it('tears down and leaves the room when room.onError classifies lost-access or rejected', async () => {
+    const { auth } = createFakeAuth('valid-token');
+    const sdk = createFakeSdk();
+    const room = new FakeRoom({ classroomId: CLASSROOM_A });
+    sdk.setJoinHandler(async () => room);
+
+    const client = createClassroomRealtimeClient({
+      auth,
+      realtimeUrl: 'wss://realtime.example.invalid',
+      createSdkClient: sdk.createSdkClient,
+    });
+
+    await client.connect(CLASSROOM_A);
+    room.emitError(CLOSE_CODE_ACCESS_REVOKED, CLOSE_REASON_ACCESS_REVOKED);
+
+    expect(room.leaveCalls).toBe(1);
+    expect(room.removeAllListenersCalls).toBe(1);
+    expect(client.getSnapshot()).toMatchObject({
+      status: 'lost-access',
+      reason: 'forbidden',
+      message: realtimeMessages.lostAccess,
+      presenceUncertain: true,
+    });
+
+    client.dispose();
+  });
+
+  it('reads nested memberAppearanceSchema baseAvatar and sanitizes non-finite coordinates', async () => {
+    const { auth } = createFakeAuth('valid-token');
+    const sdk = createFakeSdk();
+    const room = new FakeRoom({ classroomId: CLASSROOM_A });
+    room.setAvatar('nested-user', {
+      displayName: 'Valentina',
+      role: 'STUDENT',
+      x: Number.NaN,
+      z: Number.POSITIVE_INFINITY,
+      rotation: Number.NEGATIVE_INFINITY,
+      status: 'online',
+    });
+    const nestedAvatar = room.state.avatars.get('nested-user') as Avatar & {
+      appearance?: unknown;
+    };
+    nestedAvatar.appearance = {
+      baseAvatar: {
+        bodyId: 'female',
+        hairId: 'afro',
+        topId: 'hoodie',
+        hairColor: '#AF6D63',
+        clothingColor: '#7EBA8B',
+      },
+      items: {
+        head: null,
+        face: null,
+        back: null,
+        desk_decor: null,
+      },
+    };
+    sdk.setJoinHandler(async () => room);
+
+    const client = createClassroomRealtimeClient({
+      auth,
+      realtimeUrl: 'wss://realtime.example.invalid',
+      createSdkClient: sdk.createSdkClient,
+    });
+
+    await client.connect(CLASSROOM_A);
+    expect(client.getSnapshot().participants.get('nested-user')).toEqual({
+      userId: 'nested-user',
+      displayName: 'Valentina',
+      role: 'STUDENT',
+      x: 0,
+      z: 0,
+      rotation: 0,
+      status: 'online',
+      avatar: {
+        bodyId: 'female',
+        hairId: 'afro',
+        topId: 'hoodie',
+        hairColor: '#AF6D63',
+        clothingColor: '#7EBA8B',
+      },
+    });
+
+    // Valid patch updates pose; subsequent non-finite patch preserves last finite pose.
+    nestedAvatar.x = 3.5;
+    nestedAvatar.z = -2.25;
+    nestedAvatar.rotation = 1.2;
+    room.emitStateChange();
+    expect(client.getSnapshot().participants.get('nested-user')).toMatchObject({
+      x: 3.5,
+      z: -2.25,
+      rotation: 1.2,
+    });
+
+    nestedAvatar.x = Number.NaN;
+    nestedAvatar.z = Number.POSITIVE_INFINITY;
+    nestedAvatar.rotation = Number.NaN;
+    room.emitStateChange();
+    expect(client.getSnapshot().participants.get('nested-user')).toMatchObject({
+      x: 3.5,
+      z: -2.25,
+      rotation: 1.2,
+    });
 
     client.dispose();
   });

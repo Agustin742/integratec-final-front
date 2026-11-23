@@ -27,6 +27,7 @@ export const classroomMessages = {
     PARENT: 'Familiar',
     OWNER: 'Titular de la escuela',
     ADMIN: 'Administración escolar',
+    SCHOOL_ADMIN: 'Administración escolar',
   },
   viewMode: {
     switchTo2d: 'Cambiar a Modo 2D Clásico',

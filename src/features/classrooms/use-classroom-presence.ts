@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { requestApi } from '@/api/client';
 import {
@@ -22,6 +29,9 @@ import { clearLoadedWorldAssets } from './classroom-3d-stage';
 import type { ClassroomViewMode } from './classroom-mode-store';
 
 type ClassroomDetail = components['schemas']['ClassroomContextResponseDto'];
+type CachedDirectoryMembers = {
+  readonly items?: ReadonlyArray<{ readonly userId: string }>;
+};
 
 const EMPTY_AVATARS = new Map<string, Avatar>();
 const EMPTY_PARTICIPANTS: readonly RealtimeParticipant[] = [];
@@ -37,6 +47,7 @@ export interface UseClassroomPresenceOptions {
   readonly userId: string | null;
   readonly enabled: boolean;
   readonly mode: ClassroomViewMode;
+  readonly onLostAccess?: () => void;
 }
 
 export interface ClassroomPresence {
@@ -48,7 +59,7 @@ export interface ClassroomPresence {
   readonly lostAccess: boolean;
   readonly lostAccessMessage: string;
   readonly frozen: boolean;
-  readonly connectionKey: string;
+  readonly connectionKey: string | undefined;
   readonly selfPose: Pose | undefined;
   readonly participants: readonly RealtimeParticipant[];
   readonly remoteParticipants: readonly RemoteClassroomParticipant[];
@@ -70,59 +81,113 @@ export function useClassroomPresence({
   userId,
   enabled,
   mode,
+  onLostAccess,
 }: UseClassroomPresenceOptions): ClassroomPresence {
   const { client } = useSessionService();
   const queryClient = useQueryClient();
-  const realtime = useClassroomRealtime({ classroomId, enabled });
 
   const scopeKey = userId !== null ? `${userId}:${classroomId}` : '';
   const [lostAccessState, setLostAccessState] = useState<{
     readonly scopeKey: string;
     readonly message: string;
   } | null>(null);
+  const isLatchedLostAccess =
+    scopeKey !== '' && lostAccessState?.scopeKey === scopeKey;
+
+  const realtime = useClassroomRealtime({
+    classroomId,
+    enabled: enabled && !isLatchedLostAccess,
+  });
 
   const isLiveLostAccess =
     realtime.status === 'lost-access' && realtime.classroomId === classroomId;
-  const lostAccess =
-    isLiveLostAccess ||
-    (scopeKey !== '' && lostAccessState?.scopeKey === scopeKey);
+  const lostAccess = isLiveLostAccess || isLatchedLostAccess;
   const lostAccessMessage = isLiveLostAccess
     ? (realtime.message ?? realtimeMessages.lostAccess)
     : lostAccessState?.scopeKey === scopeKey
       ? lostAccessState.message
       : realtimeMessages.lostAccess;
 
+  const onLostAccessRef = useRef(onLostAccess);
+  useEffect(() => {
+    onLostAccessRef.current = onLostAccess;
+  }, [onLostAccess]);
+
   useEffect(() => {
     if (!isLiveLostAccess || userId === null) {
       return;
     }
+    const activeScopeKey = `${userId}:${classroomId}`;
+    const detailKey = classroomDetailQueryKey(userId, classroomId);
+    const directoryKey = classroomDirectoryMembersQueryKey(
+      userId,
+      classroomId,
+      { page: 1, pageSize: 100 },
+    );
     clearLoadedWorldAssets({ scopeKey: classroomId });
-    queryClient.removeQueries({
-      queryKey: classroomDetailQueryKey(userId, classroomId),
-      exact: true,
-    });
+    void queryClient.cancelQueries({ queryKey: detailKey, exact: true });
+    void queryClient.cancelQueries({ queryKey: directoryKey, exact: true });
     const message = realtime.message ?? realtimeMessages.lostAccess;
     queueMicrotask(() => {
-      setLostAccessState({ scopeKey: `${userId}:${classroomId}`, message });
+      setLostAccessState({ scopeKey: activeScopeKey, message });
+      onLostAccessRef.current?.();
     });
   }, [classroomId, isLiveLostAccess, queryClient, realtime.message, userId]);
+
+  useEffect(() => {
+    if (!lostAccess || userId === null) {
+      return;
+    }
+    const detailKey = classroomDetailQueryKey(userId, classroomId);
+    const directoryKey = classroomDirectoryMembersQueryKey(
+      userId,
+      classroomId,
+      { page: 1, pageSize: 100 },
+    );
+    queryClient.removeQueries({
+      queryKey: detailKey,
+      exact: true,
+      type: 'inactive',
+    });
+    queryClient.removeQueries({
+      queryKey: directoryKey,
+      exact: true,
+      type: 'inactive',
+    });
+  }, [classroomId, enabled, lostAccess, queryClient, userId]);
 
   const prevStatusRef = useRef<RealtimeConnectionStatus>(realtime.status);
   const hadConnectedRef = useRef(false);
   const prevScopeRef = useRef(scopeKey);
+  const reconciledForbiddenScopeRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (prevScopeRef.current !== scopeKey) {
       prevScopeRef.current = scopeKey;
       hadConnectedRef.current = false;
       prevStatusRef.current = 'disconnected';
+      reconciledForbiddenScopeRef.current = null;
     }
     if (userId === null || realtime.classroomId !== classroomId) {
       prevStatusRef.current = realtime.status;
       return;
     }
 
+    if (
+      !lostAccess &&
+      realtime.status === 'rejected' &&
+      realtime.reason === 'forbidden' &&
+      reconciledForbiddenScopeRef.current !== scopeKey
+    ) {
+      reconciledForbiddenScopeRef.current = scopeKey;
+      void queryClient.invalidateQueries({
+        queryKey: classroomDetailQueryKey(userId, classroomId),
+        exact: true,
+      });
+    }
+
     if (realtime.status === 'connected') {
+      reconciledForbiddenScopeRef.current = null;
       const { chatMuted, collaborationLocked, gamesDisabled } =
         realtime.controls;
       if (
@@ -157,7 +222,7 @@ export function useClassroomPresence({
 
       if (
         prevStatusRef.current === 'reconnecting' ||
-        (hadConnectedRef.current && prevStatusRef.current === 'disconnected')
+        (hadConnectedRef.current && prevStatusRef.current !== 'connected')
       ) {
         void queryClient.invalidateQueries({
           queryKey: classroomDetailQueryKey(userId, classroomId),
@@ -169,9 +234,11 @@ export function useClassroomPresence({
     prevStatusRef.current = realtime.status;
   }, [
     classroomId,
+    lostAccess,
     queryClient,
     realtime.classroomId,
     realtime.controls,
+    realtime.reason,
     realtime.status,
     scopeKey,
     userId,
@@ -200,9 +267,26 @@ export function useClassroomPresence({
     readonly avatars: ReadonlyMap<string, Avatar>;
   } | null>(null);
   const fetchedMissingKeyRef = useRef<string | null>(null);
+  const fetchedScopeRef = useRef<string | null>(null);
+  const directoryAvatars =
+    directoryState?.scopeKey === scopeKey
+      ? directoryState.avatars
+      : EMPTY_AVATARS;
+  const directoryAvatarsRef =
+    useRef<ReadonlyMap<string, Avatar>>(EMPTY_AVATARS);
+  useEffect(() => {
+    directoryAvatarsRef.current = directoryAvatars;
+  }, [directoryAvatars]);
 
   useEffect(() => {
     if (userId === null || missingAvatarUserIds === '') {
+      return;
+    }
+    const missingIds = missingAvatarUserIds.split(',');
+    const hasUnresolvedMissing = missingIds.some(
+      (id) => !directoryAvatarsRef.current.has(id),
+    );
+    if (fetchedScopeRef.current === scopeKey && !hasUnresolvedMissing) {
       return;
     }
     const fetchKey = `${scopeKey}:${missingAvatarUserIds}`;
@@ -210,15 +294,28 @@ export function useClassroomPresence({
       return;
     }
     fetchedMissingKeyRef.current = fetchKey;
+    const queryKey = classroomDirectoryMembersQueryKey(userId, classroomId, {
+      page: 1,
+      pageSize: 100,
+    });
+    const cached = queryClient.getQueryData<CachedDirectoryMembers>(queryKey);
+    const cachedUserIds = cached?.items
+      ? new Set(cached.items.map((member) => member.userId))
+      : null;
+    const hasUnseenInCache =
+      cachedUserIds !== null && missingIds.some((id) => !cachedUserIds.has(id));
+    const staleTime =
+      (fetchedScopeRef.current === scopeKey && hasUnresolvedMissing) ||
+      hasUnseenInCache
+        ? 0
+        : 60_000;
+
     let cancelled = false;
     let settled = false;
 
     void queryClient
       .fetchQuery({
-        queryKey: classroomDirectoryMembersQueryKey(userId, classroomId, {
-          page: 1,
-          pageSize: 100,
-        }),
+        queryKey,
         queryFn: ({ signal }) =>
           requestApi(() =>
             client.GET('/classrooms/{id}/members', {
@@ -229,11 +326,12 @@ export function useClassroomPresence({
               signal,
             }),
           ),
-        staleTime: 60_000,
+        staleTime,
       })
       .then((data) => {
         settled = true;
         if (cancelled) return;
+        fetchedScopeRef.current = scopeKey;
         const map = new Map<string, Avatar>();
         for (const member of data.items) {
           const valid = toValidAvatar(member.avatar);
@@ -245,6 +343,9 @@ export function useClassroomPresence({
       })
       .catch(() => {
         settled = true;
+        if (fetchedMissingKeyRef.current === fetchKey) {
+          fetchedMissingKeyRef.current = null;
+        }
         /* Fallback capsule remains visible if directory lookup fails. */
       });
 
@@ -253,6 +354,7 @@ export function useClassroomPresence({
       if (!settled && fetchedMissingKeyRef.current === fetchKey) {
         fetchedMissingKeyRef.current = null;
       }
+      void queryClient.cancelQueries({ queryKey, exact: true });
     };
   }, [
     classroomId,
@@ -263,13 +365,25 @@ export function useClassroomPresence({
     userId,
   ]);
 
-  const directoryAvatars =
-    directoryState?.scopeKey === scopeKey
-      ? directoryState.avatars
-      : EMPTY_AVATARS;
-
+  const [frozenState, setFrozenState] = useState<{
+    readonly scopeKey: string;
+    readonly frozen: boolean;
+  }>({ scopeKey, frozen: false });
+  const isRealtimeForCurrentClassroom = realtime.classroomId === classroomId;
   const frozen =
-    realtime.status === 'connected' ? realtime.controls.frozen : false;
+    !lostAccess && isRealtimeForCurrentClassroom
+      ? realtime.status === 'connected'
+        ? realtime.controls.frozen
+        : realtime.status === 'reconnecting'
+          ? frozenState.scopeKey === scopeKey
+            ? frozenState.frozen
+            : false
+          : false
+      : false;
+  if (frozenState.scopeKey !== scopeKey || frozenState.frozen !== frozen) {
+    setFrozenState({ scopeKey, frozen });
+  }
+
   const hasPresenceParticipants =
     !lostAccess &&
     (realtime.status === 'connected' || realtime.status === 'reconnecting');
@@ -334,6 +448,22 @@ export function useClassroomPresence({
 
   const lastSentIntentRef = useRef<AvatarInput>({ x: 0, z: 0 });
   const { sendAvatarInput } = realtime;
+  const sendAvatarInputRef = useRef(sendAvatarInput);
+  useLayoutEffect(() => {
+    sendAvatarInputRef.current = sendAvatarInput;
+  }, [sendAvatarInput]);
+
+  useLayoutEffect(() => {
+    return () => {
+      if (
+        lastSentIntentRef.current.x !== 0 ||
+        lastSentIntentRef.current.z !== 0
+      ) {
+        lastSentIntentRef.current = { x: 0, z: 0 };
+        sendAvatarInputRef.current({ x: 0, z: 0 });
+      }
+    };
+  }, [scopeKey]);
 
   useEffect(() => {
     if (mode !== '3d' || frozen || realtime.status !== 'connected') {
@@ -373,9 +503,11 @@ export function useClassroomPresence({
     realtime.message === null;
 
   const connectionKey =
-    realtime.status === 'connected'
-      ? `${realtime.roomId ?? ''}:${realtime.sessionId ?? ''}`
-      : realtime.status;
+    realtime.roomId !== null
+      ? realtime.sessionId !== null
+        ? `${realtime.roomId}:${realtime.sessionId}`
+        : realtime.roomId
+      : undefined;
 
   return {
     isIdle,

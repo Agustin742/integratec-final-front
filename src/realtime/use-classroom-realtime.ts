@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSessionService, useSessionSnapshot } from '@/session/provider';
+import type { ClassroomRealtimeLease } from './classroom-realtime-manager';
 import { useClassroomRealtimeManager } from './classroom-realtime-provider';
 import {
   createClassroomRealtimeClient,
@@ -70,11 +71,23 @@ export function useClassroomRealtime({
     readonly snapshot: RealtimeSnapshot;
   } | null>(null);
   const clientRef = useRef<ClassroomRealtimeClient | null>(null);
+  const leaseRef = useRef<ClassroomRealtimeLease | null>(null);
+  const leaseUnsubscribeRef = useRef<(() => void) | null>(null);
+  const activeScopeRef = useRef<{
+    readonly classroomId: string;
+    readonly userId: string;
+  } | null>(null);
 
   useEffect(() => {
     if (activeClassroomId === null || sessionUserId === null) {
+      activeScopeRef.current = null;
       return undefined;
     }
+
+    activeScopeRef.current = {
+      classroomId: activeClassroomId,
+      userId: sessionUserId,
+    };
 
     if (hasCustomOverride) {
       const client = createClassroomRealtimeClient({
@@ -93,6 +106,7 @@ export function useClassroomRealtime({
       void client.connect(activeClassroomId);
 
       return () => {
+        activeScopeRef.current = null;
         unsubscribe();
         if (clientRef.current === client) {
           clientRef.current = null;
@@ -102,15 +116,18 @@ export function useClassroomRealtime({
     }
 
     if (manager === null) {
-      return undefined;
+      return () => {
+        activeScopeRef.current = null;
+      };
     }
 
     let cancelled = false;
     const lease = manager.acquire(activeClassroomId);
     if (lease === null) {
+      leaseRef.current = null;
       clientRef.current = null;
       queueMicrotask(() => {
-        if (cancelled) return;
+        if (cancelled || leaseRef.current !== null) return;
         setOwnedSnapshot({
           ownerUserId: sessionUserId,
           snapshot: Object.freeze({
@@ -126,30 +143,31 @@ export function useClassroomRealtime({
           }),
         });
       });
-      return () => {
-        cancelled = true;
-        clientRef.current = null;
+    } else {
+      leaseRef.current = lease;
+      clientRef.current = lease.client;
+      const syncFromLease = () => {
+        if (cancelled || leaseRef.current !== lease) return;
+        setOwnedSnapshot({
+          ownerUserId: sessionUserId,
+          snapshot: lease.client.getSnapshot(),
+        });
       };
+      leaseUnsubscribeRef.current = lease.client.subscribe(syncFromLease);
+      queueMicrotask(syncFromLease);
     }
-
-    clientRef.current = lease.client;
-    const syncFromLease = () => {
-      if (cancelled) return;
-      setOwnedSnapshot({
-        ownerUserId: sessionUserId,
-        snapshot: lease.client.getSnapshot(),
-      });
-    };
-    const unsubscribe = lease.client.subscribe(syncFromLease);
-    queueMicrotask(syncFromLease);
 
     return () => {
       cancelled = true;
-      unsubscribe();
-      if (clientRef.current === lease.client) {
+      activeScopeRef.current = null;
+      leaseUnsubscribeRef.current?.();
+      leaseUnsubscribeRef.current = null;
+      const currentLease = leaseRef.current;
+      leaseRef.current = null;
+      if (currentLease && clientRef.current === currentLease.client) {
         clientRef.current = null;
       }
-      lease.release();
+      currentLease?.release();
     };
   }, [
     activeClassroomId,
@@ -162,11 +180,40 @@ export function useClassroomRealtime({
   ]);
 
   const reconnect = useCallback(async () => {
-    if (activeClassroomId === null || !clientRef.current) {
+    if (activeClassroomId === null || sessionUserId === null) {
       return false;
     }
-    return clientRef.current.connect(activeClassroomId);
-  }, [activeClassroomId]);
+    if (clientRef.current !== null) {
+      return clientRef.current.connect(activeClassroomId);
+    }
+    if (hasCustomOverride || manager === null) {
+      return false;
+    }
+    const scope = activeScopeRef.current;
+    if (
+      scope === null ||
+      scope.classroomId !== activeClassroomId ||
+      scope.userId !== sessionUserId
+    ) {
+      return false;
+    }
+    const lease = manager.acquire(activeClassroomId);
+    if (lease === null) {
+      return false;
+    }
+    leaseRef.current = lease;
+    clientRef.current = lease.client;
+    const syncFromLease = () => {
+      if (leaseRef.current !== lease) return;
+      setOwnedSnapshot({
+        ownerUserId: sessionUserId,
+        snapshot: lease.client.getSnapshot(),
+      });
+    };
+    leaseUnsubscribeRef.current = lease.client.subscribe(syncFromLease);
+    syncFromLease();
+    return lease.client.connect(activeClassroomId);
+  }, [activeClassroomId, hasCustomOverride, manager, sessionUserId]);
 
   const sendAvatarInput = useCallback(
     (input: AvatarInput) => {

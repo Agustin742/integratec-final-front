@@ -113,42 +113,46 @@ export function ClassroomPresenceBar({
   return (
     <section
       aria-label={messages.presence.regionLabel}
-      aria-live="polite"
       data-testid="classroom-presence-bar"
       className="min-w-0 space-y-2 rounded-xl border border-edge bg-card/90 p-3 text-sm text-card-foreground shadow-xs"
     >
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <span
-          className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-semibold ${statusMeta.pillClassName}`}
+        <div
+          aria-live="polite"
+          className="flex min-w-0 flex-wrap items-center gap-2"
         >
           <span
-            aria-hidden="true"
-            className={`size-2 shrink-0 rounded-full ${statusMeta.dotClassName}`}
-          />
-          {statusMeta.label}
-        </span>
-        {presence.presenceUncertain && (
-          <span className="text-xs font-medium text-muted-foreground">
-            · {messages.presence.uncertainBadge}
+            className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-semibold ${statusMeta.pillClassName}`}
+          >
+            <span
+              aria-hidden="true"
+              className={`size-2 shrink-0 rounded-full ${statusMeta.dotClassName}`}
+            />
+            {statusMeta.label}
           </span>
-        )}
-        {presence.status !== 'connected' && presence.message && (
-          <span className="min-w-0 text-xs text-muted-foreground">
-            — {presence.message}
-          </span>
-        )}
-        {activeControls.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            {activeControls.map((label) => (
-              <span
-                key={label}
-                className="inline-flex items-center rounded-md border border-warning-edge/50 bg-warning/50 px-2 py-0.5 text-xs font-medium text-warning-foreground"
-              >
-                {label}
-              </span>
-            ))}
-          </div>
-        )}
+          {presence.presenceUncertain && (
+            <span className="text-xs font-medium text-muted-foreground">
+              · {messages.presence.uncertainBadge}
+            </span>
+          )}
+          {presence.status !== 'connected' && presence.message && (
+            <span className="min-w-0 text-xs text-muted-foreground">
+              — {presence.message}
+            </span>
+          )}
+          {activeControls.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {activeControls.map((label) => (
+                <span
+                  key={label}
+                  className="inline-flex items-center rounded-md border border-warning-edge/50 bg-warning/50 px-2 py-0.5 text-xs font-medium text-warning-foreground"
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
         {presence.status === 'disconnected' && (
           <Button
             type="button"

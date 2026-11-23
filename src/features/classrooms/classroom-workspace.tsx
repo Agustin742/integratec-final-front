@@ -81,6 +81,7 @@ function WorkspaceContext({
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const activeViewHeadingRef = useRef<HTMLHeadingElement>(null);
+  const lostAccessHeadingRef = useRef<HTMLHeadingElement>(null);
   const pendingFocusSwitchRef = useRef(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -145,28 +146,45 @@ function WorkspaceContext({
       { replace: true, state: null },
     );
   }, [hasIncomingOutcome, location, navigate]);
-  const context = useClassroomContext(classroomId);
-  useClassroomContextEvents(classroomId);
+  const snapshot = useSessionSnapshot();
+  const sessionUserId =
+    snapshot.status === 'authenticated' ? snapshot.user.id : null;
+  const scopeKey =
+    sessionUserId !== null ? `${sessionUserId}:${classroomId}` : '';
+  const [revokedScopeKey, setRevokedScopeKey] = useState<string | null>(null);
+  const isRevoked = scopeKey !== '' && revokedScopeKey === scopeKey;
+
+  const context = useClassroomContext(classroomId, { enabled: !isRevoked });
+  useClassroomContextEvents(classroomId, !isRevoked);
   useSessionCleanup(() => clearLoadedWorldAssets({ disposeDecoders: true }));
   useEffect(() => {
     return () => {
       clearLoadedWorldAssets({ scopeKey: classroomId });
     };
   }, [classroomId]);
-  const snapshot = useSessionSnapshot();
-  const sessionUserId =
-    snapshot.status === 'authenticated' ? snapshot.user.id : null;
   const { mode, setMode, toggleMode } = useClassroomViewMode(sessionUserId);
 
   const isParent =
     context.status === 'ready' && context.classroom.myRole === 'PARENT';
   const modeToggleEnabled = context.status === 'ready' && !isParent;
+  const handleLostAccess = useCallback(() => {
+    if (scopeKey !== '') {
+      setRevokedScopeKey(scopeKey);
+    }
+  }, [scopeKey]);
   const presence = useClassroomPresence({
     classroomId,
     userId: sessionUserId,
-    enabled: modeToggleEnabled,
+    enabled: modeToggleEnabled && !isRevoked,
     mode,
+    onLostAccess: handleLostAccess,
   });
+
+  useEffect(() => {
+    if (presence.lostAccess) {
+      lostAccessHeadingRef.current?.focus();
+    }
+  }, [presence.lostAccess]);
 
   const handleModeToggle = useCallback(() => {
     pendingFocusSwitchRef.current = true;
@@ -237,7 +255,9 @@ function WorkspaceContext({
           role="alert"
           data-testid="classroom-lost-access"
         >
-          <AlertTitle as="h2">{messages.presence.lostAccessTitle}</AlertTitle>
+          <AlertTitle as="h2" ref={lostAccessHeadingRef} tabIndex={-1}>
+            {messages.presence.lostAccessTitle}
+          </AlertTitle>
           <AlertDescription className="space-y-3">
             <p>{presence.lostAccessMessage}</p>
             <Link

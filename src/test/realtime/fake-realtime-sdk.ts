@@ -16,6 +16,9 @@ type DropListener = (code: number, reason?: string) => void;
 type LeaveListener = (code: number, reason?: string) => void;
 type ErrorListener = (code: number, message?: string) => void;
 
+export type FakeAvatarAppearance =
+  RealtimeAvatarAppearance | { readonly baseAvatar: RealtimeAvatarAppearance };
+
 export interface FakeAvatarSeed {
   readonly userId: string;
   readonly displayName?: string;
@@ -24,10 +27,10 @@ export interface FakeAvatarSeed {
   readonly z?: number;
   readonly rotation?: number;
   readonly status?: string;
-  readonly appearance?: RealtimeAvatarAppearance;
+  readonly appearance?: FakeAvatarAppearance;
 }
 
-type FakeAvatarRecord = Avatar & { appearance?: RealtimeAvatarAppearance };
+type FakeAvatarRecord = Avatar & { appearance?: FakeAvatarAppearance };
 type FakeStateRecord = ClassroomState & {
   chatMuted?: boolean;
   collaborationLocked?: boolean;
@@ -41,6 +44,13 @@ const CONTROL_KEYS = [
   'gamesDisabled',
   'frozen',
 ] as const;
+
+function cloneAppearance(source: FakeAvatarAppearance): FakeAvatarAppearance {
+  if ('baseAvatar' in source) {
+    return { baseAvatar: { ...source.baseAvatar } };
+  }
+  return { ...source };
+}
 
 function cloneAvatarInto(
   target: MapSchema<Avatar>,
@@ -57,7 +67,7 @@ function cloneAvatarInto(
   copy.status = source.status;
   const sourceAppearance = (source as FakeAvatarRecord).appearance;
   if (sourceAppearance) {
-    copy.appearance = { ...sourceAppearance };
+    copy.appearance = cloneAppearance(sourceAppearance);
   }
   target.set(key, copy);
 }
@@ -70,6 +80,7 @@ export class FakeRealtimeRoom implements RealtimeRoomLike<ClassroomState> {
   readonly roomId: string;
   readonly sessionId: string;
   readonly reconnectionToken: string;
+  readonly reconnection = { enabled: true };
   readonly state: ClassroomState;
   readonly leave = vi.fn(async () => 1000);
   readonly send = vi.fn();
@@ -127,7 +138,7 @@ export class FakeRealtimeRoom implements RealtimeRoomLike<ClassroomState> {
     avatar.rotation = input.rotation ?? existing?.rotation ?? 0;
     avatar.status = input.status ?? existing?.status ?? 'online';
     if (input.appearance !== undefined) {
-      avatar.appearance = { ...input.appearance };
+      avatar.appearance = cloneAppearance(input.appearance);
     }
     this.state.avatars.set(input.userId, avatar);
     this.emitStateChange();
