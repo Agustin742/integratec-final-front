@@ -194,14 +194,14 @@ Seasonal:
 
 ### Furniture
 
-- [ ] Student desk
-- [ ] Student chair
-- [ ] Teacher desk
-- [ ] Board
-- [ ] Bookshelf
-- [ ] Cabinet
-- [ ] Coat rack
-- [ ] Trash bin
+- [x] Student desk
+- [x] Student chair
+- [x] Teacher desk
+- [x] Board
+- [x] Bookshelf
+- [x] Cabinet
+- [x] Coat rack
+- [x] Trash bin
 
 ### Decoration
 

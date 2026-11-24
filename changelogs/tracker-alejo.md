@@ -1,5 +1,14 @@
 # Tracker — Alejo
 
+## 2026-11-24 — Classroom Furniture 3D assets (8 modular GLBs & Blender masters)
+
+- **Status:** completed (committed locally on `feat/environment-objects-assets`; not pushed)
+- **Area / files:** `public/models/scenes/classroom/furniture/` (`8` GLBs), `assets/blender/environment/classroom-furniture/` (`8` `.blend` masters), `scripts/assets/test-classroom-furniture.mjs`, `docs/art/classroom-furniture.md`, `docs/art/asset-wishlist.md`, `docs/assets/classroom-furniture/` (`8` PNGs), `docs/ai-usage.md`, `changelogs/tracker-alejo.md`
+- **Change:** Delivered all 8 Section 3 Furniture wishlist items (`Student desk`, `Student chair`, `Teacher desk`, `Board`, `Bookshelf`, `Cabinet`, `Coat rack`, `Trash bin`) as origin-centered, grid-snapping modular assets (`128,616` bytes / `125.6` KB total, `50` meshes, `31,568` unique triangles) matching the classroom shell palette and `1.277 m` avatar scale (`DESK_HEIGHT = 0.75 m`, seat `Y = 0.40 m`). Assembled `ClassroomFurniture_Assembly` combining all `11` exported `shell/*.glb` modules + `8` exported `furniture/*.glb` modules + `2` reference avatars in Blender (`odd/previews/classroom-furniture-review.blend`), leaving `src/` and `e2e/` untouched.
+- **Reason:** Continue Section 3 Environment Objects after Classroom Shell (`f4ecdad7`), keeping cohesive school styling and modular runtime reusability.
+- **Verification:** `node scripts/assets/test-classroom-shell.mjs` (`11/11` PASS, `63,104` B); `node scripts/assets/test-classroom-furniture.mjs` (`8/8` PASS, `128,616` B); `node scripts/assets/check-asset-budget.mjs` (`41` models within FD8 limits, `187.2 KB / 8.00 MB` combined scene total, `3` pre-existing `#91` avatar exceptions); `eslint` (`0` errors, pre-existing `JSXEmptyExpression` notice); `tsc --noEmit` (`0` errors); `prettier --check` across all touched scripts/docs clean; `git diff --check` clean; Blender decoded-GLB roundtrip (`odd/artifacts/classroom-furniture-export.json`) and visual inspection of all `8` Cycles renders (`1280px`, close-up, `360px` mobile, grayscale, modular kit, and `3` category views) passed. Disclosures: `python3 scripts/ci/check_docs.py` and Python CI `unittest` are unavailable locally (Windows Store `python3` stub without Python installed) and run in Ubuntu CI; runtime Three.js wiring (`build-classroom-scene.ts`) remains a separate follow-up.
+- **Next step:** Proceed to Section 4 (`Interactive objects` & `Classroom Pet`) on `feat/environment-objects-assets` (or push and open PR once Environment Objects is ready).
+
 ## 2026-11-24 — Classroom Shell 3D assets (11 modular GLBs & Blender masters)
 
 - **Status:** completed (committed locally on `feat/environment-objects-assets`; not pushed)
