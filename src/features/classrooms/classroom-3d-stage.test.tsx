@@ -143,5 +143,7 @@ test('mounts the lazy classroom world with the stage label, scope, presence prop
   expect(
     await screen.findByRole('button', { name: 'Calificaciones' }),
   ).toBeVisible();
-  expect(screen.getByRole('button', { name: 'Michi' })).toBeVisible();
+  expect(
+    screen.queryByRole('button', { name: 'Michi' }),
+  ).not.toBeInTheDocument();
 });

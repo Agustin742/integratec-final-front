@@ -12,13 +12,11 @@ export interface Classroom3DTopBarProps {
   readonly onToggleMode: () => void;
   /** Student wallet chip, when the viewer has one. */
   readonly wallet?: ReactNode;
-  /** Live presence status and participants. */
-  readonly presence?: ReactNode;
 }
 
 /**
  * Floating rounded navbar over the full-screen 3D world (`#128`): back link,
- * classroom name and role, wallet, presence and the 2D / 3D switch. It is a
+ * classroom name and role, wallet and the 2D / 3D switch. It is a
  * semi-opaque blurred card so the text keeps its contrast over the scene; the
  * overlay that hosts it is click-through, only this card takes pointer events.
  */
@@ -29,13 +27,12 @@ export function Classroom3DTopBar({
   modeToggleLabel,
   onToggleMode,
   wallet,
-  presence,
 }: Classroom3DTopBarProps) {
   return (
     <header
       aria-label={messages.viewMode.immersive.topBarLabel}
       data-testid="classroom-3d-top-bar"
-      className="pointer-events-auto w-full max-w-4xl min-w-0 space-y-2 rounded-2xl border border-edge bg-card/85 px-3 py-2 text-card-foreground shadow-panel backdrop-blur-md"
+      className="pointer-events-auto w-full max-w-4xl min-w-0 rounded-2xl border border-edge bg-card/85 px-3 py-2 text-card-foreground shadow-panel backdrop-blur-md"
     >
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <div className="flex min-w-0 items-center gap-3">
@@ -92,9 +89,6 @@ export function Classroom3DTopBar({
           </Button>
         </div>
       </div>
-      {presence && (
-        <div className="max-h-28 min-w-0 overflow-y-auto">{presence}</div>
-      )}
     </header>
   );
 }

@@ -270,9 +270,6 @@ describe('Classroom interactables HUD and 3D intent wiring (#38)', () => {
       worldMock.latestProps?.onHoverInteractable?.('board');
     });
     expect(worldMock.latestProps?.highlightedInteractableId).toBe('board');
-    expect(screen.getByTestId('classroom-active-target')).toHaveTextContent(
-      'Pizarra — Abrir Actividades',
-    );
 
     act(() => {
       worldMock.latestProps?.onSelectInteractable?.(
@@ -300,9 +297,9 @@ describe('Classroom interactables HUD and 3D intent wiring (#38)', () => {
     const shopChip = screen.getByRole('button', { name: 'Tienda' });
     fireEvent.focus(shopChip);
     expect(worldMock.latestProps?.highlightedInteractableId).toBe('shop');
-    expect(screen.getByTestId('classroom-active-target')).toHaveTextContent(
-      'Tienda — Abrir Tienda',
-    );
+    expect(
+      screen.queryByTestId('classroom-active-target'),
+    ).not.toBeInTheDocument();
 
     shopChip.focus();
     fireEvent.click(shopChip);
@@ -325,7 +322,6 @@ describe('Classroom interactables HUD and 3D intent wiring (#38)', () => {
     expect(status).toBeEmptyDOMElement();
 
     expect(screen.getByRole('button', { name: 'Actividades' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Michi' })).toBeVisible();
     expect(
       screen.queryByRole('button', { name: 'Tienda' }),
     ).not.toBeInTheDocument();
@@ -429,18 +425,23 @@ describe('Classroom interactables HUD and 3D intent wiring (#38)', () => {
     ).toBeVisible();
   });
 
-  test('triggers decorative pet reaction distinct from tutor-bot without opening a panel', async () => {
+  test('keeps the decorative pet clickable in the world without a HUD button or hint strip', async () => {
     const { container } = setup({ petName: 'Michi' });
     await screen.findByTestId('world-mock');
 
-    const initialNonce = worldMock.latestProps?.petReactionNonce ?? 0;
-    const petChip = screen.getByRole('button', { name: 'Michi' });
-    const botChip = screen.getByRole('button', {
-      name: 'Asistente de estudio',
-    });
-    expect(petChip).not.toBe(botChip);
+    expect(
+      screen.queryByRole('button', { name: 'Michi' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('classroom-active-target'),
+    ).not.toBeInTheDocument();
 
-    fireEvent.click(petChip);
+    const initialNonce = worldMock.latestProps?.petReactionNonce ?? 0;
+    act(() => {
+      worldMock.latestProps?.onSelectInteractable?.(
+        interactablesById.get('pet')!,
+      );
+    });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(worldMock.latestProps?.petReactionNonce).toBe(initialNonce + 1);
     expect(
@@ -449,11 +450,23 @@ describe('Classroom interactables HUD and 3D intent wiring (#38)', () => {
 
     await expectAccessible(container);
 
-    fireEvent.click(botChip);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Asistente de estudio' }),
+    );
     expect(
       await screen.findByRole('dialog', { name: 'Asistente de estudio' }),
     ).toBeVisible();
     expect(worldMock.latestProps?.petReactionNonce).toBe(initialNonce + 1);
+  });
+
+  test('keeps an empty live status region by default so nothing visible sits at the bottom', async () => {
+    setup();
+    await screen.findByTestId('world-mock');
+
+    const status = screen.getByTestId('classroom-interactable-status');
+    expect(status).toHaveAttribute('role', 'status');
+    expect(status).toBeEmptyDOMElement();
+    expect(status).toHaveClass('sr-only');
   });
 
   test('navigates cleanly to Mis aulas from the floating back link', async () => {
@@ -503,7 +516,6 @@ describe('Immersive 3D classroom layout (#128)', () => {
       'Avisos',
     ]);
     expect(buttonNames(right)).toEqual([
-      'Chat',
       'Integrantes',
       'Asistente de estudio',
       'Tienda',
@@ -533,9 +545,40 @@ describe('Immersive 3D classroom layout (#128)', () => {
       name: classroomMessages.viewMode.immersive.workPanelsLabel,
     });
     expect(buttonNames(left)).toEqual(['Actividades']);
+  });
+
+  test('leaves chat to the global dock: no Chat button even when the server offers it', async () => {
+    setup({ availablePanels: allPanels });
+    await screen.findByTestId('world-mock');
+
     expect(
       screen.queryByRole('button', { name: 'Chat' }),
     ).not.toBeInTheDocument();
+  });
+
+  test('renders every panel button as a standalone card, not a flat item inside a grouped surface', async () => {
+    setup({ availablePanels: allPanels });
+    await screen.findByTestId('world-mock');
+
+    for (const side of ['left', 'right']) {
+      const group = screen.getByTestId(`classroom-3d-panels-${side}`);
+      expect(group).not.toHaveClass('bg-card/85');
+      expect(group).not.toHaveClass('border');
+      expect(group.querySelector('ul')).toHaveClass('gap-3');
+    }
+    for (const name of ['Actividades', 'Material', 'Integrantes', 'Tienda']) {
+      const button = screen.getByRole('button', { name });
+      for (const cls of [
+        'bg-card/85',
+        'border',
+        'border-edge',
+        'rounded-2xl',
+        'shadow-panel',
+        'backdrop-blur-md',
+      ]) {
+        expect(button).toHaveClass(cls);
+      }
+    }
   });
 
   test('gives each floating panel button a touch-sized target', async () => {
@@ -610,11 +653,14 @@ describe('Immersive 3D classroom layout (#128)', () => {
         name: classroomMessages.viewMode.immersive.workPanelsLabel,
       }),
     ).not.toBeInTheDocument();
+    const nav2d = screen.getByRole('navigation', {
+      name: classroomMessages.viewMode.mode2dNavLabel,
+    });
+    expect(nav2d).toBeVisible();
     expect(
-      screen.getByRole('navigation', {
-        name: classroomMessages.viewMode.mode2dNavLabel,
-      }),
-    ).toBeVisible();
+      within(nav2d).queryByRole('button', { name: /Chat/ }),
+    ).not.toBeInTheDocument();
+    expect(within(nav2d).getByRole('button', { name: /Tienda/ })).toBeVisible();
   });
 
   test('keeps the world visible behind panels in 3D only, with a translucent overlay', async () => {

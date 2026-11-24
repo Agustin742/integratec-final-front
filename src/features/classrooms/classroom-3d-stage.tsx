@@ -42,6 +42,8 @@ export interface Classroom3DStageProps {
    * The host wraps each card in `pointer-events-auto`.
    */
   readonly topSlot?: ReactNode;
+  /** Floating content anchored at the bottom-left (compact presence). */
+  readonly presenceSlot?: ReactNode;
 }
 
 type ClearAssetCacheFn = (options?: {
@@ -110,6 +112,7 @@ export function Classroom3DStage({
   onIntentChange,
   onSustainedLowFps,
   topSlot,
+  presenceSlot,
 }: Classroom3DStageProps) {
   const resolvedClassroomId = classroomId ?? scopeKey ?? '';
   return (
@@ -126,6 +129,7 @@ export function Classroom3DStage({
       onIntentChange={onIntentChange}
       onSustainedLowFps={onSustainedLowFps}
       topSlot={topSlot}
+      presenceSlot={presenceSlot}
     />
   );
 }
@@ -157,6 +161,7 @@ function Classroom3DStageContent({
   onIntentChange,
   onSustainedLowFps,
   topSlot,
+  presenceSlot,
 }: {
   readonly headingRef?: RefObject<HTMLHeadingElement | null>;
   readonly scopeKey?: string;
@@ -170,6 +175,7 @@ function Classroom3DStageContent({
   readonly onIntentChange?: ((intent: AvatarInput) => void) | undefined;
   readonly onSustainedLowFps?: () => void;
   readonly topSlot?: ReactNode;
+  readonly presenceSlot?: ReactNode;
 }) {
   useLockPageScroll();
   const [LazyClassroomWorld] = useState(() => lazy(loadClassroomWorld));
@@ -401,14 +407,15 @@ function Classroom3DStageContent({
         <div className="absolute inset-x-0 top-0 flex flex-col items-center gap-2 p-3 sm:p-4">
           {topSlot}
         </div>
+        <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4">
+          {presenceSlot}
+        </div>
         <ClassroomWorldHud
           highlightedId={effectiveHighlightedId}
           myDeskIndex={desks.myDeskIndex}
-          petName={petName}
           feedback={effectiveFeedback}
           canOpenPanel={canOpenPanel}
           onFocusInteractable={handleHoverInteractable}
-          onActivateInteractable={handleActivateInteractable}
           onOpenPanel={handleOpenPanel}
         />
       </div>

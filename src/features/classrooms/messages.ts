@@ -53,6 +53,11 @@ export const classroomMessages = {
   },
   presence: {
     regionLabel: 'Presencia en vivo del aula',
+    pill: {
+      label: (online: number) =>
+        `${online} ${online === 1 ? 'conectado' : 'conectados'}, ver todos`,
+      overflow: (hidden: number) => `+${hidden}`,
+    },
     liveBadge: 'En vivo',
     connectingBadge: 'Conectando…',
     reconnectingBadge: 'Reconectando…',
@@ -75,8 +80,6 @@ export const classroomMessages = {
     loadError: 'No pudimos verificar el mapa de pupitres del aula.',
   },
   interactables: {
-    navLabel: 'Objetos interactivos del aula',
-    defaultPrompt: 'Elegí un objeto del aula o usá los accesos rápidos',
     petDefaultName: 'Mascota del aula',
     petGreeting: (petName: string) => `${petName} te saluda desde su rincón.`,
     panelDenied: 'No tenés acceso a este panel en esta aula.',
@@ -89,24 +92,6 @@ export const classroomMessages = {
     desksUnavailable:
       'No pudimos verificar tu pupitre asignado en este momento.',
     retryDesksAction: 'Reintentar',
-    entranceHint: 'Volver a Mis aulas',
-    petHint: 'Saludo decorativo',
-    openHint: (panelTitle: string) => `Abrir ${panelTitle}`,
-    ownDeskTitle: (deskIndex: number) => `Mi pupitre #${deskIndex}`,
-    desksTitle: 'Pupitres',
-    foreignDeskTitle: (deskIndex: number) => `Pupitre #${deskIndex}`,
-    foreignDeskHint: 'Solo podés abrir tu pupitre asignado',
-    unassignedDeskHint: 'Sin pupitre asignado',
-    labels: {
-      board: 'Pizarra',
-      shelf: 'Estantería',
-      'bulletin-board': 'Cartelera',
-      shop: 'Tienda',
-      'tutor-bot': 'Asistente de estudio',
-      'teacher-desk': 'Escritorio docente',
-      entrance: 'Puerta del aula',
-      entranceShort: 'Puerta',
-    },
   },
   performanceOffer: {
     title: 'La vista 3D está lenta en este dispositivo',

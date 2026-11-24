@@ -535,6 +535,8 @@ test('renders honest disconnected presence bar with working retry when realtime 
   await page.goto(entry);
   await expect(heading(page, classroom.name)).toBeVisible();
 
+  // In 3D the presence is a compact pill; expand it to reach the full bar.
+  await page.getByRole('button', { name: /ver todos/ }).click();
   const presenceBar = page.getByTestId('classroom-presence-bar');
   await expect(presenceBar).toBeVisible();
   await expect(

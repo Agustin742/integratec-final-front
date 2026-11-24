@@ -30,6 +30,7 @@ import { Classroom3DStage, clearLoadedWorldAssets } from './classroom-3d-stage';
 import { Classroom3DTopBar } from './classroom-3d-top-bar';
 import { useClassroomViewMode } from './classroom-mode-store';
 import { ClassroomPresenceBar } from './classroom-presence-bar';
+import { ClassroomPresencePill } from './classroom-presence-pill';
 import { joinMessages } from './join-messages';
 import { readClassroomJoinOutcome } from './join-schema';
 import { classroomMessages as messages } from './messages';
@@ -350,6 +351,13 @@ function WorkspaceContext({
             remoteParticipants={presence.remoteParticipants}
             onIntentChange={presence.sendIntent}
             onSustainedLowFps={beginPerformanceOffer}
+            presenceSlot={
+              <ClassroomPresencePill
+                presence={presence}
+                currentUserId={userId}
+                classroom={classroom}
+              />
+            }
             topSlot={
               <>
                 <Classroom3DTopBar
@@ -362,13 +370,6 @@ function WorkspaceContext({
                     classroom.myRole === 'STUDENT' ? (
                       <WalletIndicator classroomId={classroomId} />
                     ) : null
-                  }
-                  presence={
-                    <ClassroomPresenceBar
-                      presence={presence}
-                      currentUserId={userId}
-                      classroom={classroom}
-                    />
                   }
                 />
                 {joinAlert && (

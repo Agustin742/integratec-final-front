@@ -46,6 +46,7 @@ vi.mock('./classroom-3d-stage', () => ({
         data-remote-count={String(props.remoteParticipants?.length ?? 0)}
       >
         {props.topSlot}
+        {props.presenceSlot}
       </div>
     );
   },
@@ -244,6 +245,11 @@ function setupPresenceWorkspace(
   };
 }
 
+async function expandPresence() {
+  const pill = await screen.findByRole('button', { name: /ver todos/ });
+  if (pill.getAttribute('aria-expanded') !== 'true') fireEvent.click(pill);
+}
+
 beforeEach(() => {
   stage.props = null;
   stage.mountCount = 0;
@@ -253,6 +259,7 @@ beforeEach(() => {
 describe('Classroom real-time presence & remote avatars (#37)', () => {
   test('connects two members, resolves remote avatars from directory & room appearance, and sends movement intents', async () => {
     const { container, sdk } = setupPresenceWorkspace();
+    await expandPresence();
 
     await waitFor(() => {
       expect(sdk.roomFor(CLASSROOM_A)).toBeDefined();
@@ -337,6 +344,7 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
 
   test('handles duplicate updates without ghost avatars and removes departed participants immediately', async () => {
     const { sdk } = setupPresenceWorkspace();
+    await expandPresence();
     await waitFor(() => {
       expect(sdk.roomFor(CLASSROOM_A)).toBeDefined();
     });
@@ -389,6 +397,7 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
 
   test('shows uncertain presence on connection drop, reconciles persisted controls and freeze on reconnect', async () => {
     const { sdk, setDetailOverrides } = setupPresenceWorkspace();
+    await expandPresence();
     await waitFor(() => {
       expect(sdk.roomFor(CLASSROOM_A)).toBeDefined();
     });
@@ -573,6 +582,7 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
       firstRoom.emitDrop(1006, 'drop');
     });
 
+    await expandPresence();
     const bar = await screen.findByTestId('classroom-presence-bar');
     expect(bar).toHaveTextContent(classroomMessages.presence.reconnectingBadge);
     expect(bar).toHaveTextContent(classroomMessages.presence.uncertainBadge);
@@ -669,6 +679,7 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
         name: classroomMessages.presence.retryAction,
       }),
     );
+    await expandPresence();
     await waitFor(() => {
       expect(screen.getByTestId('classroom-presence-bar')).toHaveTextContent(
         classroomMessages.presence.liveBadge,
@@ -775,6 +786,7 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
 
   test('reconciles persisted controls after drop -> failed reconnect -> disconnected -> manual retry', async () => {
     const { sdk, setDetailOverrides } = setupPresenceWorkspace();
+    await expandPresence();
     await waitFor(() => {
       expect(sdk.roomFor(CLASSROOM_A)).toBeDefined();
     });
@@ -919,6 +931,7 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
     act(() => {
       firstRoom.emitDrop(1006, 'drop while frozen');
     });
+    await expandPresence();
     await waitFor(() => {
       expect(screen.getByTestId('classroom-presence-bar')).toHaveTextContent(
         classroomMessages.presence.reconnectingBadge,
@@ -961,6 +974,7 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
     const NEW_STUDENT_ID = '00000000-0000-4000-8000-000000000077';
     const { sdk, membersRequests, setMembersResponse } =
       setupPresenceWorkspace();
+    await expandPresence();
     let membersAttempt = 0;
     setMembersResponse(() => {
       membersAttempt += 1;
@@ -1093,5 +1107,88 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
         clothingColor: '#75B7DA',
       });
     });
+  });
+});
+
+describe('Compact presence pill in the 3D stage (#128)', () => {
+  function seatMembers(
+    room: ReturnType<ReturnType<typeof createFakeRealtimeSdk>['roomFor']> & {},
+    names: string[],
+  ) {
+    act(() => {
+      room.setAvatar({
+        userId: profile.id,
+        displayName: profile.displayName,
+        role: 'STUDENT',
+        x: 0,
+        z: 5,
+      });
+      names.forEach((name, index) => {
+        room.setAvatar({
+          userId: `00000000-0000-4000-8000-0000000001${String(index).padStart(2, '0')}`,
+          displayName: name,
+          role: 'STUDENT',
+          x: index,
+          z: 1,
+        });
+      });
+    });
+  }
+
+  test('shows a compact collapsed pill instead of the full bar, with a counted accessible name', async () => {
+    const { sdk } = setupPresenceWorkspace();
+    await waitFor(() => expect(sdk.roomFor(CLASSROOM_A)).toBeDefined());
+    seatMembers(sdk.roomFor(CLASSROOM_A)!, ['Mateo', 'Lucia']);
+
+    const pill = await screen.findByRole('button', {
+      name: '3 conectados, ver todos',
+    });
+    expect(pill).toHaveAttribute('aria-expanded', 'false');
+    expect(pill).toHaveClass('min-h-11');
+    expect(
+      screen.queryByTestId('classroom-presence-bar'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('classroom-3d-top-bar')).not.toContainElement(
+      pill,
+    );
+  });
+
+  test('shows at most three avatars and a +N counter for the rest', async () => {
+    const { sdk } = setupPresenceWorkspace();
+    await waitFor(() => expect(sdk.roomFor(CLASSROOM_A)).toBeDefined());
+    seatMembers(sdk.roomFor(CLASSROOM_A)!, ['Ana', 'Beto', 'Caro', 'Dani']);
+
+    const pill = await screen.findByRole('button', {
+      name: '5 conectados, ver todos',
+    });
+    expect(pill.querySelectorAll('[data-presence-avatar]')).toHaveLength(3);
+    expect(pill).toHaveTextContent('+2');
+  });
+
+  test('expands to the full presence list on click and collapses on Escape returning focus', async () => {
+    const { sdk } = setupPresenceWorkspace();
+    await waitFor(() => expect(sdk.roomFor(CLASSROOM_A)).toBeDefined());
+    seatMembers(sdk.roomFor(CLASSROOM_A)!, ['Mateo']);
+
+    const pill = await screen.findByRole('button', {
+      name: '2 conectados, ver todos',
+    });
+    pill.focus();
+    fireEvent.click(pill);
+    expect(pill).toHaveAttribute('aria-expanded', 'true');
+    const bar = await screen.findByTestId('classroom-presence-bar');
+    expect(bar).toHaveTextContent('Mateo');
+    expect(bar).toHaveTextContent(classroomMessages.presence.liveBadge);
+
+    fireEvent.keyDown(bar, { key: 'Escape' });
+    expect(pill).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      screen.queryByTestId('classroom-presence-bar'),
+    ).not.toBeInTheDocument();
+    expect(pill).toHaveFocus();
+
+    fireEvent.click(pill);
+    fireEvent.click(pill);
+    expect(pill).toHaveAttribute('aria-expanded', 'false');
   });
 });

@@ -291,9 +291,7 @@ test('picks 3D objects on canvas, handles pet and floating panel buttons, and ca
     const shopChip = page.getByRole('button', { name: 'Tienda' });
     await shopChip.focus();
     await expect(shopChip).toBeFocused();
-    await expect(page.getByTestId('classroom-active-target')).toHaveText(
-      'Tienda — Abrir Tienda',
-    );
+    await expect(page.getByTestId('classroom-active-target')).toHaveCount(0);
     await page.keyboard.press('Enter');
 
     const shopDialog = page.getByRole('dialog', {
@@ -321,8 +319,12 @@ test('picks 3D objects on canvas, handles pet and floating panel buttons, and ca
     await expect(activitiesDialog).toHaveCount(0);
     await expect(stageHeading).toBeFocused();
 
-    // Touch tap on pet chip verifies decorative greeting without hover.
-    await page.getByRole('button', { name: 'Michi' }).tap();
+    // Touch tap on the pet in the world verifies the decorative greeting without hover.
+    const petPos = await projectClassroomPoint(
+      canvas,
+      new Vector3(7, 0.25, -5.86),
+    );
+    await canvas.tap({ position: petPos });
     await expect(page.getByTestId('classroom-interactable-status')).toHaveText(
       'Michi te saluda desde su rincón.',
     );

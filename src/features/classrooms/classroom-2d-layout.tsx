@@ -22,7 +22,10 @@ export function Classroom2DLayout({
   headingRef,
 }: Classroom2DLayoutProps) {
   const { canOpenPanel, openPanel } = useClassroomPanels();
-  const visiblePanels = panels.filter((panel) => canOpenPanel(panel.key));
+  // Chat is reached through the global chat dock, so it has no entry here.
+  const visiblePanels = panels.filter(
+    (panel) => panel.key !== 'chat' && canOpenPanel(panel.key),
+  );
 
   return (
     <section
