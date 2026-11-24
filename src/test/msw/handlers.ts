@@ -1,5 +1,9 @@
 import { delay, HttpResponse, http, type HttpHandler } from 'msw';
 import type { components, operations } from '../../api/schema.generated';
+import {
+  FREE_HAIR_IDS,
+  FREE_TOP_IDS,
+} from '../../features/profile/avatar-options';
 
 export type HealthStatusPayload = components['schemas']['HealthStatus'];
 export type ErrorBodyPayload = components['schemas']['ErrorBody'];
@@ -866,8 +870,18 @@ export type OwnProfileFailure =
   /** The write is stored but the response never arrives (uncertain outcome). */
   | 'drop-response';
 
+export interface AvatarStyleRef {
+  readonly styleType: 'hair' | 'top';
+  readonly styleId: string;
+}
+
 export interface OwnProfileStoreOptions {
   readonly baseUrl?: string;
+  /**
+   * Paid styles the user bought (global to the user). Defaults to every paid
+   * style, so tests that do not care about the shop can pick any style.
+   */
+  readonly ownedPaidStyles?: readonly AvatarStyleRef[] | 'all';
   readonly initial?: Partial<OwnProfilePayload>;
   readonly onProfileRequest?: (body: unknown) => void | Promise<void>;
   readonly onAvatarRequest?: (body: unknown) => void | Promise<void>;
@@ -882,6 +896,14 @@ export interface OwnProfileStore {
   failNext(target: 'profile' | 'avatar', failure: OwnProfileFailure): void;
   /** Makes the next `GET /users/me` fail with the given error. */
   failNextRead(failure: MswErrorResponseSpec | 'network'): void;
+  /** Makes the next `GET /users/me/avatar/styles` fail with the given error. */
+  failNextStyles(failure: MswErrorResponseSpec | 'network'): void;
+  /** Simulates buying a paid style in a classroom shop. */
+  grantStyle(style: AvatarStyleRef): void;
+  /** Simulates the user losing ownership of a paid style. */
+  revokeStyle(style: AvatarStyleRef): void;
+  /** Number of `GET /users/me/avatar/styles` requests received. */
+  readonly stylesRequests: () => number;
 }
 
 /**
@@ -904,6 +926,23 @@ export function createOwnProfileStore(
   };
   const pending: Partial<Record<'profile' | 'avatar', OwnProfileFailure>> = {};
   let pendingRead: MswErrorResponseSpec | 'network' | undefined;
+  let pendingStyles: MswErrorResponseSpec | 'network' | undefined;
+  let stylesRequests = 0;
+  const owned = new Set<string>(
+    options.ownedPaidStyles === 'all' || options.ownedPaidStyles === undefined
+      ? []
+      : options.ownedPaidStyles.map((s) => `${s.styleType}:${s.styleId}`),
+  );
+  const ownsEveryStyle =
+    options.ownedPaidStyles === 'all' || options.ownedPaidStyles === undefined;
+  const revoked = new Set<string>();
+  const isOwned = (styleType: 'hair' | 'top', styleId: string): boolean =>
+    !revoked.has(`${styleType}:${styleId}`) &&
+    (ownsEveryStyle ||
+      (styleType === 'hair' ? FREE_HAIR_IDS : FREE_TOP_IDS).has(
+        styleId as never,
+      ) ||
+      owned.has(`${styleType}:${styleId}`));
 
   const fail = (failure: MswErrorResponseSpec | 'network'): Response =>
     failure === 'network'
@@ -918,7 +957,50 @@ export function createOwnProfileStore(
     failNextRead(failure) {
       pendingRead = failure;
     },
+    failNextStyles(failure) {
+      pendingStyles = failure;
+    },
+    grantStyle(style) {
+      owned.add(`${style.styleType}:${style.styleId}`);
+    },
+    revokeStyle(style) {
+      owned.delete(`${style.styleType}:${style.styleId}`);
+      revoked.add(`${style.styleType}:${style.styleId}`);
+    },
+    stylesRequests: () => stylesRequests,
     handlers: [
+      http.get(`${baseUrl}/users/me/avatar/styles`, () => {
+        stylesRequests += 1;
+        if (pendingStyles !== undefined) {
+          const failure = pendingStyles;
+          pendingStyles = undefined;
+          return fail(failure);
+        }
+        const items = [
+          ...AVATAR_CONTRACT.hairId.map((styleId) => ({
+            styleType: 'hair' as const,
+            styleId,
+          })),
+          ...AVATAR_CONTRACT.topId.map((styleId) => ({
+            styleType: 'top' as const,
+            styleId,
+          })),
+        ].map(({ styleType, styleId }) => {
+          const free = (
+            styleType === 'hair' ? FREE_HAIR_IDS : FREE_TOP_IDS
+          ).has(styleId as never);
+          return {
+            styleType,
+            styleId,
+            free,
+            owned: isOwned(styleType, styleId),
+            shopItemCode: free
+              ? null
+              : `${styleType}_${styleId.replaceAll('-', '_')}`,
+          };
+        });
+        return HttpResponse.json({ items });
+      }),
       http.get(`${baseUrl}/users/me`, () => {
         if (pendingRead !== undefined) {
           const failure = pendingRead;
@@ -952,6 +1034,16 @@ export function createOwnProfileStore(
         }
         const result = validateAvatar(body);
         if ('details' in result) return validationEnvelope(result.details);
+        if (
+          !isOwned('hair', result.value.hairId) ||
+          !isOwned('top', result.value.topId)
+        ) {
+          return createErrorEnvelopeResponse(403, {
+            code: 'FORBIDDEN',
+            message: 'Avatar style has not been unlocked in the shop',
+            correlationId: 'corr-style-locked',
+          });
+        }
         saved = { ...saved, avatar: result.value };
         return failure === 'drop-response'
           ? HttpResponse.error()
@@ -5385,7 +5477,11 @@ export function createClassroomGradingStore(
 }
 
 export type ShopStoreItemKind =
-  'CLASSROOM_ITEM' | 'AVATAR_ACCESSORY' | 'DESK_UPGRADE' | 'PET_ACCESSORY';
+  | 'CLASSROOM_ITEM'
+  | 'AVATAR_ACCESSORY'
+  | 'DESK_UPGRADE'
+  | 'PET_ACCESSORY'
+  | 'AVATAR_STYLE';
 
 export interface ShopStoreCatalogItem {
   readonly id: string;

@@ -10,6 +10,7 @@ import { RouterProvider } from 'react-router/dom';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createApiClient } from '@/api/client';
 import { ApiQueryProvider, createAppQueryClient } from '@/api/query-client';
+import { ownAvatarStylesQueryKey } from '@/api/query-keys';
 import type { components } from '@/api/schema.generated';
 import { fakeSession } from '@/app/router/fake-session';
 import { SessionProvider } from '@/session/provider';
@@ -191,6 +192,53 @@ describe('ShopPanel (#48)', () => {
     fireEvent.click(purchasesTab);
     expect(await screen.findByText('Pagado: 100 puntos')).toBeVisible();
     expect(screen.getByText('Gorra clásica')).toBeVisible();
+  });
+
+  it('lists avatar styles as "Peinados y ropa" and unlocks them in the profile after a purchase', async () => {
+    const STYLE_ID = '00000000-0000-4000-8000-000000001005';
+    const store = createClassroomShopStore({
+      classroomId: CLASSROOM_ID,
+      initialBalance: 400,
+      initialItems: [
+        makeItem({
+          id: STYLE_ID,
+          code: 'hair_dreads',
+          name: 'Rastas',
+          description: 'Peinado para tu avatar.',
+          kind: 'AVATAR_STYLE',
+          price: 150,
+          metadata: { styleType: 'hair', styleId: 'dreads' },
+        }),
+      ],
+    });
+    mswServer.use(...store.handlers);
+
+    const { queryClient } = renderShopRoute({ role: 'STUDENT' });
+    const stylesKey = ownAvatarStylesQueryKey('student-user-1');
+    queryClient.setQueryData(stylesKey, { items: [] });
+
+    expect(await screen.findByText('Rastas')).toBeVisible();
+    expect(screen.getAllByText('Peinados y ropa').length).toBeGreaterThan(0);
+    expect(
+      within(screen.getByLabelText('Categoría')).getByRole('option', {
+        name: 'Peinados y ropa',
+      }),
+    ).toBeInTheDocument();
+    // Styles are unlocked by buying, never equipped from the shop.
+    expect(screen.queryByRole('button', { name: /equipar/i })).toBeNull();
+    expect(queryClient.getQueryState(stylesKey)?.isInvalidated).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Comprar' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Confirmar compra',
+    });
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Confirmar compra' }),
+    );
+    expect(await screen.findByText('Ya lo tenés')).toBeVisible();
+    await waitFor(() =>
+      expect(queryClient.getQueryState(stylesKey)?.isInvalidated).toBe(true),
+    );
   });
 
   it('guards against rapid double clicks so only one purchase request is sent', async () => {

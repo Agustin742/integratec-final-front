@@ -16,7 +16,12 @@ export const AVATAR_FIELDS = [
 export interface AvatarOption<TValue extends string> {
   readonly value: TValue;
   readonly label: string;
+  /** Paid style the user has not bought: shown, never selectable. */
+  readonly locked?: boolean;
 }
+
+/** `hair:<id>` / `top:<id>` to whether the user owns that style. */
+export type StyleAvailability = ReadonlyMap<string, boolean>;
 
 function toOptions<TValue extends string>(
   labels: Readonly<Record<TValue, string>>,
@@ -57,6 +62,38 @@ export const FREE_TOP_IDS: ReadonlySet<TopId> = new Set<TopId>([
   'basic-tshirt',
   'tank-top',
 ]);
+
+/**
+ * Whether a style can be picked. Server availability wins; without it only
+ * free styles are known to be pickable, so paid ones read as locked.
+ */
+export function isStyleOwned(
+  styleType: 'hair' | 'top',
+  styleId: string,
+  availability: StyleAvailability | null,
+): boolean {
+  const known = availability?.get(`${styleType}:${styleId}`);
+  if (known !== undefined) return known;
+  const free: ReadonlySet<string> =
+    styleType === 'hair' ? FREE_HAIR_IDS : FREE_TOP_IDS;
+  return free.has(styleId);
+}
+
+/** Marks as locked every option the user cannot pick, except `keep`. */
+export function withLockedStyles<TValue extends string>(
+  styleType: 'hair' | 'top',
+  options: readonly AvatarOption<TValue>[],
+  availability: StyleAvailability | null,
+  keep: string,
+): readonly AvatarOption<TValue>[] {
+  return options.map((option) => ({
+    ...option,
+    // The saved style is already the user's, whatever the lookup says.
+    locked:
+      option.value !== keep &&
+      !isStyleOwned(styleType, option.value, availability),
+  }));
+}
 
 /**
  * The catalog is the same for both bodies (`AvatarDto` descriptions). The

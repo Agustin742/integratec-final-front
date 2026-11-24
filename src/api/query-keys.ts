@@ -280,6 +280,15 @@ export function ownProfileQueryKey(userId: string): ScopedQueryKey {
 }
 
 /**
+ * Key of `GET /users/me/avatar/styles`: which hair and top styles the user
+ * can pick. Ownership is global to the user, so it is scoped by user only;
+ * a purchase in any classroom shop invalidates it.
+ */
+export function ownAvatarStylesQueryKey(userId: string): ScopedQueryKey {
+  return createScopedQueryKey({ userId }, 'profile', 'avatar-styles');
+}
+
+/**
  * Key of `GET /users/me/streak-and-badges`: server-confirmed study streak and
  * earned/locked badges for the authenticated user (`HU-GAM-002`).
  */
@@ -1192,7 +1201,11 @@ export function createClassroomActivityMetricsPredicate(
 }
 
 export type ShopItemKindFilter =
-  'CLASSROOM_ITEM' | 'AVATAR_ACCESSORY' | 'DESK_UPGRADE' | 'PET_ACCESSORY';
+  | 'CLASSROOM_ITEM'
+  | 'AVATAR_ACCESSORY'
+  | 'AVATAR_STYLE'
+  | 'DESK_UPGRADE'
+  | 'PET_ACCESSORY';
 
 export type ShopItemsSortOrder =
   | 'createdAt'
@@ -1237,6 +1250,7 @@ function normalizeShopItemKind(
   if (
     value === 'CLASSROOM_ITEM' ||
     value === 'AVATAR_ACCESSORY' ||
+    value === 'AVATAR_STYLE' ||
     value === 'DESK_UPGRADE' ||
     value === 'PET_ACCESSORY'
   ) {

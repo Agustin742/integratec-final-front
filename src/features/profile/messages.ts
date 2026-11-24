@@ -77,6 +77,15 @@ export const profileMessages = {
       hairColor: 'Color de pelo',
       clothingColor: 'Color de la prenda',
     },
+    styleLockedLabel: 'Bloqueado — se compra en la tienda del aula',
+    styleLockedHint:
+      'Las opciones con candado se compran en la tienda de un aula y quedan desbloqueadas en tu perfil.',
+    stylesUnavailable:
+      'No pudimos consultar qué estilos tenés desbloqueados. Las opciones pagas se muestran bloqueadas; podés seguir eligiendo las gratuitas.',
+    errors: {
+      styleLocked:
+        'Alguna de las opciones elegidas todavía no está desbloqueada. Comprala en la tienda de un aula y volvé a guardar; tu avatar guardado no cambió.',
+    },
     validation: {
       incompatibleHair:
         'Ese peinado no está disponible para el cuerpo elegido.',
