@@ -12,6 +12,7 @@ import {
   type ClassroomInteractable,
   type InteractablePointerEvent,
 } from './classroom-interactables';
+import { deriveFurniturePlacements } from './classroom-furniture-placements';
 import { deriveShellPlacements } from './classroom-shell-placements';
 import type { FloorClickEvent } from './floor-click';
 import { InteractableHighlight } from './interactable-highlight';
@@ -52,8 +53,8 @@ export interface ClassroomSceneProps {
 type ScenePointerEvent = FloorClickEvent & InteractablePointerEvent;
 
 /**
- * Classroom (modular shell with cutaway near walls, desks from the layout
- * and the named prop placeholders) with the shared warm lighting and cream backdrop,
+ * Classroom (modular shell with cutaway near walls, modular furniture placed
+ * from the layout and the remaining named prop placeholders) with the shared warm lighting and cream backdrop,
  * plus the user's own avatar and live remote participants. Shadowless; the
  * object graph is built once per layout and disposed on unmount because
  * `<primitive>` objects are not owned by R3F. Only the scene root takes pointer
@@ -78,8 +79,11 @@ export function ClassroomScene({
 }: ClassroomSceneProps) {
   const scene = useMemo(() => buildClassroomScene(CLASSROOM_LAYOUT), []);
   useEffect(() => () => scene.dispose(), [scene]);
-  const shellPlacements = useMemo(
-    () => deriveShellPlacements(CLASSROOM_LAYOUT),
+  const kitPlacements = useMemo(
+    () => [
+      ...deriveShellPlacements(CLASSROOM_LAYOUT),
+      ...deriveFurniturePlacements(CLASSROOM_LAYOUT),
+    ],
     [],
   );
   const interactablesById = useMemo(
@@ -167,7 +171,7 @@ export function ClassroomScene({
         onPointerMove={handlePointerMove}
         onPointerOut={handlePointerOut}
       />
-      <ClassroomKit placements={shellPlacements} scopeKey={scopeKey} />
+      <ClassroomKit placements={kitPlacements} scopeKey={scopeKey} />
       <InteractableHighlight
         interactablesById={interactablesById}
         highlightedId={

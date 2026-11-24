@@ -97,6 +97,13 @@ describe('ClassroomScene', () => {
       192,
     );
     expect(placements.some((p) => p.moduleId === 'wall-solid')).toBe(true);
+    expect(
+      placements.filter((p) => p.moduleId === 'student-desk'),
+    ).toHaveLength(12);
+    expect(
+      placements.filter((p) => p.moduleId === 'student-chair'),
+    ).toHaveLength(12);
+    expect(placements.some((p) => p.moduleId === 'teacher-desk')).toBe(true);
   });
 
   test('still renders without a profile avatar', () => {

@@ -60,9 +60,10 @@ type Vec3 = readonly [number, number, number];
  * shared geometries and one matte material per colour. Desks come from the
  * layout obstacles, so what is drawn is exactly what collides. Front of the
  * room = negative z (board, shelf, shop, pet); the entrance is at the back.
- * The shell (floor, walls, skirting, lights) is the modular kit rendered by
- * `<ClassroomKit>`; this scene keeps the invisible walkable-floor and entrance
- * raycast planes, the teaching zone, desks and the prop placeholders.
+ * The shell and the furniture (desks, board, shelf) are the modular kit
+ * rendered by `<ClassroomKit>`; this scene keeps the invisible walkable-floor
+ * and entrance raycast planes, invisible picking proxies for desks, board and
+ * shelf, the teaching zone and the remaining prop placeholders.
  */
 export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   const { bounds } = layout;
@@ -82,6 +83,24 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
       materials.set(color, found);
     }
     return found;
+  };
+
+  // Furniture is drawn by the modular kit; these meshes only keep the picking
+  // contract (names, instance ids, placeholder tags), so their material is
+  // invisible yet still raycast.
+  const proxyMaterial = new MeshStandardMaterial({
+    color: CLASSROOM_COLORS.wood,
+    metalness: 0,
+    roughness: 0.88,
+    visible: false,
+  });
+  materials.set('picking-proxy', proxyMaterial);
+  const proxy = (parent: Object3D, size: Vec3, position: Vec3) => {
+    const mesh = new Mesh(box, proxyMaterial);
+    mesh.scale.set(...size);
+    mesh.position.set(...position);
+    parent.add(mesh);
+    return mesh;
   };
 
   const part = (
@@ -168,11 +187,7 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   const topY = DESK_HEIGHT - DESK_TOP_THICKNESS / 2;
   const matrix = new Matrix4();
   const identity = new Quaternion();
-  const studentTops = new InstancedMesh(
-    box,
-    material(CLASSROOM_COLORS.butter),
-    students.length,
-  );
+  const studentTops = new InstancedMesh(box, proxyMaterial, students.length);
   studentTops.name = 'student-desks';
   students.forEach((desk, index) => {
     matrix.compose(
@@ -186,9 +201,8 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   root.add(studentTops);
 
   if (teacher) {
-    const top = block(
+    const top = proxy(
       root,
-      CLASSROOM_COLORS.butter,
       [teacher.width, DESK_TOP_THICKNESS, teacher.depth],
       [teacher.centerX, topY, teacher.centerZ],
     );
@@ -196,11 +210,7 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   }
 
   const legHeight = DESK_HEIGHT - DESK_TOP_THICKNESS;
-  const legs = new InstancedMesh(
-    box,
-    material(CLASSROOM_COLORS.wood),
-    desks.length * 4,
-  );
+  const legs = new InstancedMesh(box, proxyMaterial, desks.length * 4);
   legs.name = 'desk-legs';
   desks.forEach((desk, deskIndex) => {
     const dx = desk.width / 2 - LEG_INSET - LEG_SIZE / 2;
@@ -242,30 +252,13 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
     return group;
   };
 
-  // Board on the front wall, above the teaching zone.
+  // Board and shelf: the kit models draw them; the groups keep an invisible
+  // hit box matching the kit dimensions (4.4 x 1.5 m; 1.8 x 1.54 m).
   const board = prop('classroom-board', 'board', propSpecs.board.position);
-  block(board, CLASSROOM_COLORS.turquoise, [4.4, 1.5, 0.08], [0, 1.55, 0.04]);
-  block(board, CLASSROOM_COLORS.boardGreen, [4, 1.1, 0.04], [0, 1.55, 0.1]);
-  block(board, CLASSROOM_COLORS.wood, [1.6, 0.05, 0.12], [0, 0.78, 0.06]);
+  proxy(board, [4.4, 1.5, 0.2], [0, 1.7, 0.1]);
 
-  // Shelf with muted books, front wall, left of the board.
   const shelf = prop('classroom-shelf', 'shelf', propSpecs.shelf.position);
-  block(shelf, CLASSROOM_COLORS.wood, [1.8, 1.5, 0.03], [0, 0.75, 0.015]);
-  for (const x of [-0.88, 0.88])
-    block(shelf, CLASSROOM_COLORS.wood, [0.04, 1.5, 0.28], [x, 0.75, 0.14]);
-  for (const y of [0.02, 0.5, 1.0, 1.48])
-    block(shelf, CLASSROOM_COLORS.wood, [1.72, 0.04, 0.28], [0, y, 0.14]);
-  (
-    [
-      [-0.55, 0.66, CLASSROOM_COLORS.bookSage],
-      [-0.4, 0.66, CLASSROOM_COLORS.bookClay],
-      [0.3, 0.66, CLASSROOM_COLORS.bookSlate],
-      [-0.2, 1.16, CLASSROOM_COLORS.bookClay],
-      [0.5, 1.16, CLASSROOM_COLORS.bookSage],
-    ] as const
-  ).forEach(([x, y, color]) =>
-    block(shelf, color, [0.1, 0.28, 0.2], [x, y, 0.14]),
-  );
+  proxy(shelf, [1.8, 1.54, 0.3], [0, 0.77, 0.15]);
 
   // Shop corner, front wall, right of the board.
   const shop = prop('classroom-shop', 'shop', propSpecs.shop.position);

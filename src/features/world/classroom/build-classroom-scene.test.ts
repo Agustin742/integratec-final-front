@@ -152,6 +152,46 @@ describe('desks', () => {
   });
 });
 
+describe('furniture ownership', () => {
+  test('desks, board and shelf are invisible picking proxies; the kit draws them', () => {
+    const { root } = build();
+    for (const name of ['student-desks', 'desk-legs', 'teacher-desk']) {
+      expect(((named(root, name) as Mesh).material as Material).visible).toBe(
+        false,
+      );
+    }
+    for (const name of ['classroom-board', 'classroom-shelf']) {
+      const group = named(root, name);
+      expect(group.userData.placeholder).toBeDefined();
+      const proxies = meshes(group);
+      expect(proxies.length).toBeGreaterThan(0);
+      for (const mesh of proxies) {
+        expect((mesh.material as Material).visible).toBe(false);
+      }
+    }
+  });
+
+  test('rays still hit the invisible proxies (desk instance, board, shelf)', () => {
+    const { root } = build();
+    root.updateMatrixWorld(true);
+    const hit = (x: number, y: number, z: number) =>
+      new Raycaster(new Vector3(x, y, z), new Vector3(0, -1, 0))
+        .intersectObject(root, true)
+        .find((h) => h.object.name !== 'walkable-floor');
+    const desk = hit(-4.5, 5, -1.8);
+    expect(desk?.object.name).toBe('student-desks');
+    expect(desk?.instanceId).toBe(0);
+
+    const front = (x: number, y: number) =>
+      new Raycaster(
+        new Vector3(x, y, layout.bounds.minZ + 3),
+        new Vector3(0, 0, -1),
+      ).intersectObject(root, true)[0];
+    expect(front(0, 1.6)?.object.parent?.name).toBe('classroom-board');
+    expect(front(-6.7, 0.8)?.object.parent?.name).toBe('classroom-shelf');
+  });
+});
+
 describe('placeholders', () => {
   const expected = {
     'classroom-board': 'board',
