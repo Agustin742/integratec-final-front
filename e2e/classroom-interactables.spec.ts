@@ -1,8 +1,6 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
-import { OrthographicCamera, Vector3 } from 'three';
+import { expect, test, type Page } from '@playwright/test';
 import type { components } from '../src/api/schema.generated';
 import { classroomMessages } from '../src/features/classrooms/messages';
-import { CLASSROOM_BOUNDS, frameCamera } from '../src/features/world/camera';
 
 const apiOrigin = 'https://api.example.invalid';
 const classroomId = '00000000-0000-4000-8000-000000000038';
@@ -77,18 +75,6 @@ const wallet: components['schemas']['StudentWalletDto'] = {
   total: 0,
 };
 
-async function projectClassroomPoint(canvas: Locator, worldPoint: Vector3) {
-  const box = await canvas.boundingBox();
-  if (!box) throw new Error('Classroom canvas is not visible');
-  const camera = new OrthographicCamera();
-  frameCamera(camera, box.width, box.height, CLASSROOM_BOUNDS);
-  const projected = worldPoint.clone().project(camera);
-  return {
-    x: ((projected.x + 1) / 2) * box.width,
-    y: (1 - (projected.y + 1) / 2) * box.height,
-  };
-}
-
 async function openReadyClassroomStage(page: Page) {
   await page.goto(`./classrooms/${classroomId}`);
   const stageHeading = page.getByRole('heading', {
@@ -123,6 +109,42 @@ async function openReadyClassroomStage(page: Page) {
   await canvas.scrollIntoViewIfNeeded();
 
   return { stageHeading, region, canvas };
+}
+
+async function dismissLowFpsOfferIfPresent(page: Page) {
+  const declineLowFps = page.getByRole('button', {
+    name: classroomMessages.performanceOffer.decline,
+  });
+  const offerAppeared = await declineLowFps
+    .waitFor({ state: 'visible', timeout: 2500 })
+    .then(() => true)
+    .catch(() => false);
+  if (offerAppeared) {
+    await declineLowFps.click();
+    await expect(declineLowFps).toHaveCount(0);
+  }
+}
+
+async function waitSimulatedSeconds(page: Page, targetSeconds: number) {
+  await page.evaluate(
+    (seconds) =>
+      new Promise<void>((resolve) => {
+        let accumulated = 0;
+        let last = performance.now();
+        function step(now: number) {
+          const dt = Math.min(Math.max((now - last) / 1000, 0), 0.05);
+          last = now;
+          accumulated += dt;
+          if (accumulated >= seconds) {
+            resolve();
+            return;
+          }
+          requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      }),
+    targetSeconds,
+  );
 }
 
 test.beforeEach(async ({ page, baseURL }) => {
@@ -191,6 +213,14 @@ test.beforeEach(async ({ page, baseURL }) => {
       });
     }
     if (
+      url.pathname === `/classrooms/${classroomId}/announcements` &&
+      request.method() === 'GET'
+    ) {
+      return route.fulfill({
+        json: { items: [], page: 1, pageSize: 20, total: 0 },
+      });
+    }
+    if (
       url.pathname === `/classrooms/${classroomId}/shop/items` &&
       request.method() === 'GET'
     ) {
@@ -222,9 +252,10 @@ test.beforeEach(async ({ page, baseURL }) => {
   });
 });
 
-test('picks 3D objects on canvas, handles pet and keyboard chips, and captures responsive evidence', async ({
+test('opens panels from the floating HUD buttons, triggers proximity prompt with KeyE, and captures responsive evidence', async ({
   page,
 }, testInfo) => {
+  test.setTimeout(30_000);
   const isMobile = testInfo.project.name === 'mobile';
   const width = isMobile ? 360 : 1280;
   const cspViolations: string[] = [];
@@ -243,90 +274,74 @@ test('picks 3D objects on canvas, handles pet and keyboard chips, and captures r
   const { stageHeading, canvas } = await openReadyClassroomStage(page);
 
   await expect(
-    page.getByRole('button', { name: 'Mi pupitre #1' }),
+    page.getByRole('button', { name: 'Calificaciones' }),
   ).toBeVisible();
 
-  const declineLowFps = page.getByRole('button', {
-    name: classroomMessages.performanceOffer.decline,
-  });
-  const offerAppeared = await declineLowFps
-    .waitFor({ state: 'visible', timeout: 2500 })
-    .then(() => true)
-    .catch(() => false);
-  if (offerAppeared) {
-    await declineLowFps.click();
-    await expect(declineLowFps).toHaveCount(0);
-  }
+  await dismissLowFpsOfferIfPresent(page);
   await canvas.scrollIntoViewIfNeeded();
 
-  if (!isMobile) {
-    // Project the board center [0, 1.55, -5.9] onto the canvas and click it directly.
-    const boardPos = await projectClassroomPoint(
-      canvas,
-      new Vector3(0, 1.55, -5.9),
-    );
-    await canvas.click({ position: boardPos });
+  // The follow camera keeps only a third of the room in view, so panels open
+  // from the standalone HUD buttons; the world objects are no longer clickable
+  // from the spawn point.
+  const activitiesButton = page.getByRole('button', {
+    name: classroomMessages.panels.activities,
+    exact: true,
+  });
+  await activitiesButton.click();
+  const activitiesDialog = page.getByRole('dialog', {
+    name: classroomMessages.panels.activities,
+    exact: true,
+  });
+  await expect(activitiesDialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(activitiesDialog).toHaveCount(0);
+  await expect(activitiesButton).toBeFocused();
 
-    const activitiesDialog = page.getByRole('dialog', {
-      name: classroomMessages.panels.activities,
-      exact: true,
-    });
-    await expect(activitiesDialog).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(activitiesDialog).toHaveCount(0);
-    await expect(stageHeading).toBeFocused();
+  // Keyboard navigation on the floating panel groups opens a panel and restores focus to that button.
+  const shopChip = page.getByRole('button', { name: 'Tienda' });
+  await shopChip.focus();
+  await expect(shopChip).toBeFocused();
+  await expect(page.getByTestId('classroom-active-target')).toHaveCount(0);
+  await page.keyboard.press('Enter');
 
-    // Activate the decorative pet without opening any panel or conflating with tutor-bot.
-    const petPos = await projectClassroomPoint(
-      canvas,
-      new Vector3(7, 0.25, -5.86),
-    );
-    await canvas.click({ position: petPos });
-    await expect(page.getByRole('dialog')).toHaveCount(0);
-    await expect(page.getByTestId('classroom-interactable-status')).toHaveText(
-      'Michi te saluda desde su rincón.',
-    );
+  const shopDialog = page.getByRole('dialog', {
+    name: classroomMessages.panels.shop,
+    exact: true,
+  });
+  await expect(shopDialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(shopDialog).toHaveCount(0);
+  await expect(shopChip).toBeFocused();
 
-    // Keyboard navigation on the quick-select strip opens a panel and restores focus to that chip.
-    const shopChip = page.getByRole('button', { name: 'Tienda' });
-    await shopChip.focus();
-    await expect(shopChip).toBeFocused();
-    await expect(page.getByTestId('classroom-active-target')).toHaveText(
-      'Tienda — Abrir Tienda',
-    );
-    await page.keyboard.press('Enter');
-
-    const shopDialog = page.getByRole('dialog', {
-      name: classroomMessages.panels.shop,
-      exact: true,
-    });
-    await expect(shopDialog).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(shopDialog).toHaveCount(0);
-    await expect(shopChip).toBeFocused();
-  } else {
-    // Mobile touch tap without hover: tap board directly on canvas, then close.
-    const boardPos = await projectClassroomPoint(
-      canvas,
-      new Vector3(0, 1.55, -5.9),
-    );
-    await canvas.tap({ position: boardPos });
-
-    const activitiesDialog = page.getByRole('dialog', {
-      name: classroomMessages.panels.activities,
-      exact: true,
-    });
-    await expect(activitiesDialog).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(activitiesDialog).toHaveCount(0);
-    await expect(stageHeading).toBeFocused();
-
-    // Touch tap on pet chip verifies decorative greeting without hover.
-    await page.getByRole('button', { name: 'Michi' }).tap();
-    await expect(page.getByTestId('classroom-interactable-status')).toHaveText(
-      'Michi te saluda desde su rincón.',
-    );
+  // Walk slightly left from spawn (-6, 5) toward the bulletin board (-7.84, 4.2)
+  // to reveal the #128 proximity prompt, open it with KeyE, and restore focus on Escape.
+  await page.keyboard.down('KeyA');
+  await page.keyboard.down('KeyW');
+  const proximityPrompt = page.getByTestId('classroom-proximity-prompt');
+  try {
+    await expect(proximityPrompt).toBeVisible();
+  } finally {
+    await page.keyboard.up('KeyA');
+    await page.keyboard.up('KeyW');
   }
+  await expect(proximityPrompt).toContainText('Abrir avisos');
+  await expect(page.getByTestId('classroom-proximity-status')).toHaveText(
+    classroomMessages.proximity.announce('Abrir avisos'),
+  );
+  const promptBox = await proximityPrompt.boundingBox();
+  expect(promptBox).not.toBeNull();
+  expect(promptBox!.x).toBeGreaterThanOrEqual(0);
+  expect(promptBox!.x + promptBox!.width).toBeLessThanOrEqual(width);
+
+  await page.keyboard.press('KeyE');
+  const noticesDialog = page.getByRole('dialog', {
+    name: classroomMessages.panels.notices,
+    exact: true,
+  });
+  await expect(noticesDialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(noticesDialog).toHaveCount(0);
+  await expect(stageHeading).toBeFocused();
 
   expect(
     await page.evaluate(
@@ -341,6 +356,9 @@ test('picks 3D objects on canvas, handles pet and keyboard chips, and captures r
     });
   }
 
+  const declineLowFps = page.getByRole('button', {
+    name: classroomMessages.performanceOffer.decline,
+  });
   if (await declineLowFps.isVisible().catch(() => false)) {
     await declineLowFps.click();
     await expect(declineLowFps).toHaveCount(0);
@@ -350,6 +368,62 @@ test('picks 3D objects on canvas, handles pet and keyboard chips, and captures r
     path: `docs/assets/classroom-workspace/interactables-${width}.png`,
     fullPage: true,
   });
+
+  expect(cspViolations).toEqual([]);
+  expect(pageErrors).toEqual([]);
+});
+
+test('greets the decorative pet Michi via proximity KeyE without opening a dialog and auto-dismisses the greeting', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(60_000);
+  const width = testInfo.project.name === 'mobile' ? 360 : 1280;
+  const cspViolations: string[] = [];
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('console', (msg) => {
+    if (
+      msg.type() === 'error' &&
+      /Content Security Policy|CSP/i.test(msg.text())
+    ) {
+      cspViolations.push(msg.text());
+    }
+  });
+
+  await page.setViewportSize({ width, height: 800 });
+  const { canvas } = await openReadyClassroomStage(page);
+  await dismissLowFpsOfferIfPresent(page);
+  await canvas.scrollIntoViewIfNeeded();
+
+  // Walk along the clear back aisle (+x) to the right wall, then straight up (-z) to Michi at (7, -5.86).
+  await page.keyboard.down('KeyD');
+  await page.keyboard.down('KeyS');
+  try {
+    await waitSimulatedSeconds(page, 4.7);
+  } finally {
+    await page.keyboard.up('KeyD');
+    await page.keyboard.up('KeyS');
+  }
+
+  const petPrompt = page.getByRole('button', { name: /Saludar a Michi/ });
+  await page.keyboard.down('KeyW');
+  await page.keyboard.down('KeyD');
+  try {
+    await expect(petPrompt).toBeVisible({ timeout: 15_000 });
+  } finally {
+    await page.keyboard.up('KeyW');
+    await page.keyboard.up('KeyD');
+  }
+
+  await expect(petPrompt).toBeVisible();
+  await expect(page.getByTestId('classroom-proximity-status')).toHaveText(
+    classroomMessages.proximity.announce('Saludar a Michi'),
+  );
+  await page.keyboard.press('KeyE');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const status = page.getByTestId('classroom-interactable-status');
+  await expect(status).toHaveText('Michi te saluda desde su rincón.');
+  await expect(status).toBeEmpty({ timeout: 6_000 });
 
   expect(cspViolations).toEqual([]);
   expect(pageErrors).toEqual([]);

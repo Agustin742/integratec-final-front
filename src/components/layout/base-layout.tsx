@@ -5,6 +5,7 @@ import { SkipLink } from './skip-link';
 
 export type BaseLayoutProps = {
   header: ReactNode;
+  headerInert?: boolean;
   children: ReactNode;
   sidebar?: ReactNode;
   sidebarLabel?: string;
@@ -14,6 +15,7 @@ export type BaseLayoutProps = {
 
 export function BaseLayout({
   header,
+  headerInert,
   children,
   sidebar,
   sidebarLabel = layoutMessages.sidebar,
@@ -36,7 +38,11 @@ export function BaseLayout({
         targetId={contentId}
         onActivate={() => mainRef.current?.focus()}
       />
-      <header className="border-b border-edge bg-card text-card-foreground shadow-panel">
+      <header
+        inert={headerInert || undefined}
+        aria-hidden={headerInert || undefined}
+        className="border-b border-edge bg-card text-card-foreground shadow-panel"
+      >
         <div className="mx-auto w-full max-w-6xl min-w-0 px-4 py-4 sm:px-6">
           {header}
         </div>

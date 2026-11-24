@@ -6,6 +6,7 @@ import type { Pose } from '../movement';
 import { WorldCanvas, type WorldCanvasProps } from '../world-canvas';
 import type { ClassroomInteractable } from './classroom-interactables';
 import { ClassroomScene } from './classroom-scene';
+import type { ProximityAnchor } from './proximity-tracker';
 import type { RemoteClassroomParticipant } from './remote-avatar';
 
 export interface ClassroomWorldProps extends Pick<
@@ -29,12 +30,21 @@ export interface ClassroomWorldProps extends Pick<
   onHoverInteractable?: ((id: string | undefined) => void) | undefined;
   onSelectInteractable?:
     ((interactable: ClassroomInteractable) => void) | undefined;
+  isProximityTarget?:
+    ((interactable: ClassroomInteractable) => boolean) | undefined;
+  onProximityChange?: ((id: string | undefined) => void) | undefined;
+  onProximityAnchor?: ((anchor: ProximityAnchor) => void) | undefined;
+  /**
+   * Fills the positioned parent instead of using the fixed card height, for
+   * a full-screen world (#128). The parent must have a definite size.
+   */
+  fill?: boolean;
   /** Extra in-canvas nodes, such as the performance probe (#56). */
   children?: ReactNode;
 }
 
 /**
- * The isometric classroom canvas: `WorldCanvas` framed to the room plus its
+ * The isometric classroom canvas: `WorldCanvas` with the follow camera plus its
  * scene and the signed-in user's avatar. The profile is read here, outside the
  * canvas, so the scene never depends on providers crossing the R3F boundary.
  */
@@ -52,6 +62,10 @@ export function ClassroomWorld({
   interactionLocked,
   onHoverInteractable,
   onSelectInteractable,
+  isProximityTarget,
+  onProximityChange,
+  onProximityAnchor,
+  fill = false,
   children,
 }: ClassroomWorldProps) {
   const { query } = useOwnProfile();
@@ -59,8 +73,21 @@ export function ClassroomWorld({
     <WorldCanvas
       label={label}
       scopeKey={scopeKey}
-      framing="classroom"
+      framing="follow"
       description={worldMessages.classroomControls}
+      {...(fill && {
+        fill: true,
+        canvasClassName: 'h-full w-full',
+        hostClassName: 'h-full',
+        loading: (
+          <p
+            role="status"
+            className="absolute inset-x-0 top-1/2 text-center text-sm text-foreground"
+          >
+            {worldMessages.loading}
+          </p>
+        ),
+      })}
     >
       <ClassroomScene
         avatar={query.data?.avatar}
@@ -76,6 +103,9 @@ export function ClassroomWorld({
         interactionLocked={interactionLocked}
         onHoverInteractable={onHoverInteractable}
         onSelectInteractable={onSelectInteractable}
+        isProximityTarget={isProximityTarget}
+        onProximityChange={onProximityChange}
+        onProximityAnchor={onProximityAnchor}
       />
       {children}
     </WorldCanvas>

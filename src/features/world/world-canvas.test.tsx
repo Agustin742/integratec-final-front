@@ -369,6 +369,13 @@ test('frames the whole classroom by default and the small reference on request',
   render(<WorldCanvas label="Reference" framing="reference" />);
   expect(state.camera.top).toBeLessThan(classroomHeight);
 });
+test('leaves the camera to the scene when the framing is follow', () => {
+  state.size = { width: 360, height: 480 };
+  state.camera = new OrthographicCamera();
+  const before = state.camera.projectionMatrix.clone();
+  render(<WorldCanvas label="Follow" framing="follow" />);
+  expect(state.camera.projectionMatrix.equals(before)).toBe(true);
+});
 test('lets a host size the canvas and drop the loading line', () => {
   renderer.delayOnCreated = true;
   const { container } = render(
@@ -426,4 +433,19 @@ test('adds no description when none is given', () => {
   render(<WorldCanvas label="Technical world" />);
   const region = screen.getByRole('region', { name: 'Technical world' });
   expect(region).not.toHaveAttribute('aria-describedby');
+});
+
+test('centers the fallback below the floating top bar when fill is true', () => {
+  renderer.fail = true;
+  render(<WorldCanvas label="Full world" fill />);
+  const fallback = screen.getByRole('status');
+  expect(fallback).toHaveTextContent('La vista 3D no está disponible');
+  expect(fallback.parentElement).toHaveClass(
+    'flex',
+    'h-full',
+    'items-center',
+    'justify-center',
+    'p-4',
+    'pt-28',
+  );
 });

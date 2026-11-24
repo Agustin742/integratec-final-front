@@ -3,25 +3,38 @@ import {
   lazy,
   Suspense,
   useCallback,
+  useEffect,
+  useMemo,
+  useRef,
   useState,
   type ReactNode,
   type RefObject,
 } from 'react';
 import { useNavigate } from 'react-router';
-import type { AvatarInput } from '@/realtime';
+import { CLASSROOM_LAYOUT, type AvatarInput } from '@/realtime';
 import type { Pose, RemoteClassroomParticipant } from '../world';
-import type { ClassroomInteractable } from '../world/classroom/classroom-interactables';
+import {
+  deriveClassroomInteractables,
+  indexClassroomInteractables,
+  type ClassroomInteractable,
+} from '../world/classroom/classroom-interactables';
 import { worldMessages } from '../world/messages';
 import { PerformanceProbeRuntime } from '../world/performance-monitor';
 import { PerformanceStatsOverlay } from '../world/performance-stats-overlay';
 import { WorldFallback } from '../world/world-fallback';
 import {
-  ClassroomInteractablesBar,
+  ClassroomWorldHud,
   type InteractableFeedback,
-} from './classroom-interactables-bar';
+} from './classroom-3d-hud';
+import {
+  canTargetByProximity,
+  proximityActionLabel,
+} from './classroom-proximity';
 import { useClassroomDesks } from './desks/classroom-desks-api';
 import { classroomMessages } from './messages';
 import { useOptionalClassroomPanels } from './panels/classroom-panels';
+import { anchorProximityPrompt, ProximityPrompt } from './proximity-prompt';
+import { useInteractKey } from './use-interact-key';
 
 export interface Classroom3DStageProps {
   readonly headingRef?: RefObject<HTMLHeadingElement | null>;
@@ -36,6 +49,13 @@ export interface Classroom3DStageProps {
   readonly onIntentChange?: ((intent: AvatarInput) => void) | undefined;
   /** Fired when the canvas measures sustained low fps (#56). */
   readonly onSustainedLowFps?: () => void;
+  /**
+   * Floating content pinned to the top of the world (navbar, alerts, offers).
+   * The host wraps each card in `pointer-events-auto`.
+   */
+  readonly topSlot?: ReactNode;
+  /** Floating content anchored at the bottom-left (compact presence). */
+  readonly presenceSlot?: ReactNode;
 }
 
 type ClearAssetCacheFn = (options?: {
@@ -82,7 +102,13 @@ class StageBoundary extends Component<
     return { failed: true };
   }
   render() {
-    return this.state.failed ? <WorldFallback /> : this.props.children;
+    return this.state.failed ? (
+      <div className="flex h-full items-center justify-center p-4 pt-28">
+        <WorldFallback />
+      </div>
+    ) : (
+      this.props.children
+    );
   }
 }
 
@@ -103,6 +129,8 @@ export function Classroom3DStage({
   remoteParticipants,
   onIntentChange,
   onSustainedLowFps,
+  topSlot,
+  presenceSlot,
 }: Classroom3DStageProps) {
   const resolvedClassroomId = classroomId ?? scopeKey ?? '';
   return (
@@ -118,8 +146,31 @@ export function Classroom3DStage({
       remoteParticipants={remoteParticipants}
       onIntentChange={onIntentChange}
       onSustainedLowFps={onSustainedLowFps}
+      topSlot={topSlot}
+      presenceSlot={presenceSlot}
     />
   );
+}
+
+/**
+ * The stage is a full-screen layer, so the page behind it must not scroll.
+ * Restores the previous value on unmount (2D switch, route change).
+ */
+const ALL_INTERACTABLES = deriveClassroomInteractables(CLASSROOM_LAYOUT);
+const INTERACTABLES_BY_ID = indexClassroomInteractables(ALL_INTERACTABLES);
+
+/** Pet greetings fade on their own; errors with a retry never do. */
+const PET_FEEDBACK_MS = 3500;
+
+function useLockPageScroll() {
+  useEffect(() => {
+    const root = document.documentElement;
+    const previous = root.style.overflow;
+    root.style.overflow = 'hidden';
+    return () => {
+      root.style.overflow = previous;
+    };
+  }, []);
 }
 
 function Classroom3DStageContent({
@@ -133,6 +184,8 @@ function Classroom3DStageContent({
   remoteParticipants,
   onIntentChange,
   onSustainedLowFps,
+  topSlot,
+  presenceSlot,
 }: {
   readonly headingRef?: RefObject<HTMLHeadingElement | null>;
   readonly scopeKey?: string;
@@ -145,7 +198,10 @@ function Classroom3DStageContent({
     readonly RemoteClassroomParticipant[] | undefined;
   readonly onIntentChange?: ((intent: AvatarInput) => void) | undefined;
   readonly onSustainedLowFps?: () => void;
+  readonly topSlot?: ReactNode;
+  readonly presenceSlot?: ReactNode;
 }) {
+  useLockPageScroll();
   const [LazyClassroomWorld] = useState(() => lazy(loadClassroomWorld));
   const [LazyWorldProbe] = useState(() => lazy(loadWorldProbe));
   const supportsBrowserObservers = typeof ResizeObserver !== 'undefined';
@@ -158,11 +214,13 @@ function Classroom3DStageContent({
   const [highlightedId, setHighlightedId] = useState<string | undefined>(
     undefined,
   );
+  // Object the local avatar stands next to (set by the world, id changes only).
+  const [proximityId, setProximityId] = useState<string | undefined>(undefined);
+  const promptAnchorRef = useRef<HTMLDivElement | null>(null);
   const [petReactionNonce, setPetReactionNonce] = useState(0);
   const [feedback, setFeedback] = useState<InteractableFeedback | null>(null);
 
   const interactionLocked = panels?.hasActivePanel ?? false;
-  const effectiveHighlightedId = interactionLocked ? undefined : highlightedId;
 
   const trimmedPetName = petName?.trim() ?? '';
   const resolvedPetName =
@@ -170,11 +228,48 @@ function Classroom3DStageContent({
       ? trimmedPetName
       : classroomMessages.interactables.petDefaultName;
 
+  // Ids a click could act on right now; only these can be proximity targets.
+  const availableKey = ALL_INTERACTABLES.filter((item) =>
+    canTargetByProximity(item, {
+      canOpenPanel: (key) => panels?.canOpenPanel(key) ?? false,
+      myDeskIndex: desks.myDeskIndex,
+    }),
+  )
+    .map((item) => item.id)
+    .join('|');
+  const proximityTargetIds = useMemo(
+    () => new Set(availableKey.split('|')),
+    [availableKey],
+  );
+  const isProximityTarget = useCallback(
+    (item: ClassroomInteractable) => proximityTargetIds.has(item.id),
+    [proximityTargetIds],
+  );
+  const proximityTarget =
+    !interactionLocked && proximityId && proximityTargetIds.has(proximityId)
+      ? INTERACTABLES_BY_ID.get(proximityId)
+      : undefined;
+
+  /**
+   * Highlight precedence: while a panel is open nothing is highlighted;
+   * otherwise the HUD hover/focus (or world hover) wins, and the object the
+   * avatar stands next to is highlighted when none of those is active.
+   */
+  const effectiveHighlightedId = interactionLocked
+    ? undefined
+    : (highlightedId ?? proximityTarget?.id);
+
   const restoreStageHeadingFocus = useCallback(() => {
     if (headingRef?.current?.isConnected) {
       headingRef.current.focus();
     }
   }, [headingRef]);
+
+  useEffect(() => {
+    if (feedback?.kind !== 'pet') return;
+    const timer = window.setTimeout(() => setFeedback(null), PET_FEEDBACK_MS);
+    return () => window.clearTimeout(timer);
+  }, [feedback]);
 
   const handleRetryDesks = useCallback(() => {
     setFeedback({
@@ -280,6 +375,30 @@ function Classroom3DStageContent({
     ],
   );
 
+  const handleOpenPanel = useCallback(
+    (key: string, invoker: HTMLElement) => {
+      if (interactionLocked) return;
+      const copy = classroomMessages.interactables;
+      if (
+        !panels ||
+        !panels.canOpenPanel(key) ||
+        !panels.openPanel(key, invoker)
+      ) {
+        setFeedback({ kind: 'denied', text: copy.panelDenied });
+        return;
+      }
+      setHighlightedId(undefined);
+      setFeedback(null);
+    },
+    [interactionLocked, panels],
+  );
+
+  useInteractKey(true, () => {
+    if (!proximityTarget) return false;
+    handleActivateInteractable(proximityTarget);
+    return true;
+  });
+
   const handleHoverInteractable = useCallback((id: string | undefined) => {
     setHighlightedId(id);
   }, []);
@@ -298,38 +417,26 @@ function Classroom3DStageContent({
   return (
     <section
       aria-labelledby="classroom-3d-heading"
-      className="min-w-0 space-y-3 rounded-2xl border border-edge bg-card p-5 text-card-foreground shadow-panel"
+      className="fixed inset-0 z-30 overflow-hidden bg-background text-foreground"
     >
-      <div className="min-w-0 space-y-1">
-        <h3
-          id="classroom-3d-heading"
-          ref={headingRef}
-          tabIndex={-1}
-          className="font-display text-lg font-semibold text-foreground outline-none"
-        >
-          {classroomMessages.viewMode.stage3dHeading}
-        </h3>
-        <p className="max-w-prose text-sm text-pretty text-muted-foreground">
-          {classroomMessages.viewMode.stage3dDescription}
-        </p>
-      </div>
-
-      <ClassroomInteractablesBar
-        highlightedId={effectiveHighlightedId}
-        myDeskIndex={desks.myDeskIndex}
-        desksStatus={desks.status}
-        petName={petName}
-        feedback={effectiveFeedback}
-        canOpenPanel={canOpenPanel}
-        onFocusInteractable={handleHoverInteractable}
-        onActivateInteractable={handleActivateInteractable}
-      />
-
       {supportsBrowserObservers ? (
         <StageBoundary>
-          <div onPointerLeave={() => setHighlightedId(undefined)}>
-            <Suspense fallback={<p role="status">{worldMessages.loading}</p>}>
+          <div
+            className="absolute inset-0"
+            onPointerLeave={() => setHighlightedId(undefined)}
+          >
+            <Suspense
+              fallback={
+                <p
+                  role="status"
+                  className="absolute inset-x-0 top-1/2 text-center text-sm text-foreground"
+                >
+                  {worldMessages.loading}
+                </p>
+              }
+            >
               <LazyClassroomWorld
+                fill
                 label={classroomMessages.viewMode.canvasLabel}
                 scopeKey={scopeKey}
                 selfPose={selfPose}
@@ -345,6 +452,11 @@ function Classroom3DStageContent({
                 onSelectInteractable={(item) =>
                   handleActivateInteractable(item)
                 }
+                isProximityTarget={isProximityTarget}
+                onProximityChange={setProximityId}
+                onProximityAnchor={(anchor) =>
+                  anchorProximityPrompt(promptAnchorRef.current, anchor)
+                }
               >
                 <LazyWorldProbe
                   runtime={performanceRuntime}
@@ -358,11 +470,55 @@ function Classroom3DStageContent({
         <div
           role="region"
           aria-label={classroomMessages.viewMode.canvasLabel}
-          className="min-w-0 rounded-xl border border-edge bg-tray/50 p-4"
+          className="absolute inset-0 bg-tray/50 p-4"
         >
-          <canvas aria-hidden="true" className="block h-48 w-full rounded-lg" />
+          <canvas aria-hidden="true" className="block size-full" />
         </div>
       )}
+
+      {/* Click-through overlay: only the floating cards take pointer events. */}
+      <div className="pointer-events-none absolute inset-0 z-10">
+        <div className="absolute inset-x-0 top-0 flex flex-col items-center gap-2 p-3 sm:p-4">
+          {topSlot}
+        </div>
+        <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4">
+          {presenceSlot}
+        </div>
+        <ProximityPrompt
+          anchorRef={promptAnchorRef}
+          action={
+            proximityTarget
+              ? proximityActionLabel(proximityTarget, resolvedPetName)
+              : undefined
+          }
+          onActivate={(invoker) => {
+            if (proximityTarget) {
+              handleActivateInteractable(proximityTarget, invoker);
+            }
+          }}
+        />
+        <ClassroomWorldHud
+          highlightedId={effectiveHighlightedId}
+          myDeskIndex={desks.myDeskIndex}
+          feedback={effectiveFeedback}
+          canOpenPanel={canOpenPanel}
+          onFocusInteractable={handleHoverInteractable}
+          onOpenPanel={handleOpenPanel}
+        />
+      </div>
+      {/* Kept after the floating bar so heading levels stay in order, for screen readers and as the Alt+M focus target. */}
+      <div className="sr-only">
+        <h3
+          id="classroom-3d-heading"
+          ref={headingRef}
+          tabIndex={-1}
+          className="outline-none"
+        >
+          {classroomMessages.viewMode.stage3dHeading}
+        </h3>
+        <p>{classroomMessages.viewMode.stage3dDescription}</p>
+      </div>
+
       <PerformanceStatsOverlay runtime={performanceRuntime} />
     </section>
   );
