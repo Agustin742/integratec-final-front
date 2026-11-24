@@ -193,9 +193,7 @@ describe('resolveInteractableHit', () => {
       );
 
       const zone = built.root.getObjectByName('teaching-zone')!;
-      expect(
-        resolveInteractableHit([{ object: zone }], byId),
-      ).toBeUndefined();
+      expect(resolveInteractableHit([{ object: zone }], byId)).toBeUndefined();
     } finally {
       built.dispose();
     }

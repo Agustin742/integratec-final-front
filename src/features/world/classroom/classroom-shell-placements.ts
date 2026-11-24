@@ -40,9 +40,7 @@ function bayCentres(from: number, to: number): number[] {
  * solid), corners, wall baseboards, a low cutaway skirting on the two near
  * sides with the entrance gap and doorway posts, and ceiling lights. Pure.
  */
-export function deriveShellPlacements(
-  layout: ClassroomLayout,
-): KitPlacement[] {
+export function deriveShellPlacements(layout: ClassroomLayout): KitPlacement[] {
   const { minX, maxX, minZ, maxZ } = layout.bounds;
   const placements: KitPlacement[] = [];
 

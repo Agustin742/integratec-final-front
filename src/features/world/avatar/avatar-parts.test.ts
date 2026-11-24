@@ -45,8 +45,9 @@ describe('resolveAvatarParts', () => {
   describe.each(['male', 'female'] as const)('%s catalog files', (bodyId) => {
     it('has a GLB for every hair option', () => {
       const missing = hairOptionsFor(bodyId)
-        .map(({ value }) =>
-          resolveAvatarParts({ ...base, bodyId, hairId: value }).hairUrl,
+        .map(
+          ({ value }) =>
+            resolveAvatarParts({ ...base, bodyId, hairId: value }).hairUrl,
         )
         .filter((url) => url === null || !existsSync(fileFor(url)));
       expect(missing).toEqual([]);
@@ -54,8 +55,9 @@ describe('resolveAvatarParts', () => {
 
     it('has a GLB for every top option', () => {
       const missing = topOptionsFor(bodyId)
-        .map(({ value }) =>
-          resolveAvatarParts({ ...base, bodyId, topId: value }).topUrl,
+        .map(
+          ({ value }) =>
+            resolveAvatarParts({ ...base, bodyId, topId: value }).topUrl,
         )
         .filter((url) => url === null || !existsSync(fileFor(url)));
       expect(missing).toEqual([]);

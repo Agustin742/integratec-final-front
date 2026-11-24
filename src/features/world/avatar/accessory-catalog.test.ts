@@ -179,9 +179,9 @@ describe('resolveHeadwearHiding', () => {
       'side-part',
       'soft-mohawk',
     ]) {
-      expect(resolveHeadwearHiding(hair, 'astronaut-helmet').hairHidden).toEqual(
-        [],
-      );
+      expect(
+        resolveHeadwearHiding(hair, 'astronaut-helmet').hairHidden,
+      ).toEqual([]);
     }
   });
 
@@ -198,19 +198,25 @@ describe('resolveHeadwearHiding', () => {
     const result = resolveHeadwearHiding('afro', 'headband');
     expect(result.hairId).toBe('afro-with-headband');
     expect(result.hairHidden).toEqual([]);
-    expect(result.headHidden).toEqual(['HeadHeadband_Band', 'HeadHeadband_Trim']);
+    expect(result.headHidden).toEqual([
+      'HeadHeadband_Band',
+      'HeadHeadband_Trim',
+    ]);
   });
 
   it('suppresses a redundant headband over the afro-with-headband hair', () => {
     const result = resolveHeadwearHiding('afro-with-headband', 'headband');
     expect(result.hairId).toBe('afro-with-headband');
-    expect(result.headHidden).toEqual(['HeadHeadband_Band', 'HeadHeadband_Trim']);
+    expect(result.headHidden).toEqual([
+      'HeadHeadband_Band',
+      'HeadHeadband_Trim',
+    ]);
   });
 
   it('hides the sewn-in headband of the fitted afro under a hat', () => {
-    expect(resolveHeadwearHiding('afro-with-headband', 'cap').hairHidden).toEqual(
-      ['HairAfroWithHeadband_Cloud', 'HairAfroWithHeadband_Headband'],
-    );
+    expect(
+      resolveHeadwearHiding('afro-with-headband', 'cap').hairHidden,
+    ).toEqual(['HairAfroWithHeadband_Cloud', 'HairAfroWithHeadband_Headband']);
   });
 
   it('keeps the hair id and hides nothing without a head accessory', () => {
@@ -229,7 +235,9 @@ describe('resolveHeadwearHiding', () => {
         const hairNodes = glbNodeNames(
           `/models/avatars/shared/hair-${result.hairId}.glb`,
         );
-        const headNodes = glbNodeNames(`/models/avatars/shared/head-${head}.glb`);
+        const headNodes = glbNodeNames(
+          `/models/avatars/shared/head-${head}.glb`,
+        );
         for (const name of result.hairHidden) expect(hairNodes).toContain(name);
         for (const name of result.headHidden) expect(headNodes).toContain(name);
       }

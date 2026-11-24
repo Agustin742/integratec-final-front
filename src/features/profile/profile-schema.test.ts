@@ -75,9 +75,9 @@ describe('avatarFormSchema and avatar options', () => {
       ).toBe(false);
     }
     for (const topId of ['tank', 'tshirt', 'nope']) {
-      expect(
-        avatarFormSchema.safeParse({ ...baseAvatar, topId }).success,
-      ).toBe(false);
+      expect(avatarFormSchema.safeParse({ ...baseAvatar, topId }).success).toBe(
+        false,
+      );
     }
   });
 
@@ -108,19 +108,17 @@ describe('avatarFormSchema and avatar options', () => {
     const tops = topOptionsFor('male').map((o) => o.value);
     expect(hair).toHaveLength(23);
     expect(tops).toHaveLength(15);
-    expect([...FREE_HAIR_IDS].sort()).toEqual(
-      [
-        'afro',
-        'bob',
-        'bun',
-        'buzz-cut',
-        'classic-short',
-        'long-straight',
-        'middle-part',
-        'ponytail',
-        'short-curls',
-      ],
-    );
+    expect([...FREE_HAIR_IDS].sort()).toEqual([
+      'afro',
+      'bob',
+      'bun',
+      'buzz-cut',
+      'classic-short',
+      'long-straight',
+      'middle-part',
+      'ponytail',
+      'short-curls',
+    ]);
     expect([...FREE_TOP_IDS].sort()).toEqual([
       'basic-tshirt',
       'school-smock',

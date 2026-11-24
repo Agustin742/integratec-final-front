@@ -79,9 +79,7 @@ describe('ClassroomKit', () => {
     );
 
     await waitFor(() => expect(spy).toHaveBeenCalled());
-    const results = spy.mock.results.map(
-      (r) => r.value as builder.BatchedKit,
-    );
+    const results = spy.mock.results.map((r) => r.value as builder.BatchedKit);
     // Only the surviving module is in the batch.
     for (const [modules] of spy.mock.calls) {
       expect([...modules.keys()]).toEqual(['board']);

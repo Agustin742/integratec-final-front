@@ -182,9 +182,9 @@ describe('buildBatchedKit', () => {
     const built = buildBatchedKit(modules([['window', m.scene]]), [
       place('window', [0, 0, 0]),
     ]);
-    expect((built.meshes[0]?.material as MeshStandardMaterial).transparent).toBe(
-      true,
-    );
+    expect(
+      (built.meshes[0]?.material as MeshStandardMaterial).transparent,
+    ).toBe(true);
   });
 
   it('merges geometries with mismatched attributes and indexing without crashing', () => {

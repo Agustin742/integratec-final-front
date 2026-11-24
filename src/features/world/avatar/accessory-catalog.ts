@@ -208,5 +208,7 @@ export function resolveHairMorphs(
   hairId: string,
   backAssetId: string | null,
 ): Record<string, number> {
-  return backAssetId && BACK_TUCK_HAIR.has(hairId) ? { [BACK_TUCK_MORPH]: 1 } : {};
+  return backAssetId && BACK_TUCK_HAIR.has(hairId)
+    ? { [BACK_TUCK_MORPH]: 1 }
+    : {};
 }
