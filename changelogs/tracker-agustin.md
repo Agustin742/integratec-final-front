@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-24 — Immersive 3D classroom (#128)
+
+- **Status:** completed (pending CI and merge of the PR)
+- **Area / files:** `src/features/classrooms/` (3D stage, floating HUD and top bar, presence pill, proximity prompt, E key, back-to-list link, panels overlay), `src/features/world/` (follow camera, avatar yaw and clip blending, proximity tracker), `src/features/notifications/notification-host.tsx`, `src/features/profile/profile-nav-link.tsx`, `src/app/router/app-shell.tsx`, `src/app/pages/{profile,chats}-page.tsx`, `src/components/ui/dialog.tsx`, `e2e/classroom-{interactables,workspace}.spec.ts`
+- **Change:** In 3D mode the world fills the screen with floating rounded UI: top navbar (back, classroom, wallet, mode toggle, profile icon, messages, notifications), standalone side buttons (Activities, Material, Grades, Notices / Members, Bot, Shop), compact presence pill bottom-left, and centered panels with a translucent overlay (`d096df1`, `9011016`, `f38eba0`). Chat is reached only through the chat dock (removed from the side group and the 2D layout); the hint strip and pet button are gone and the pet greeting auto-dismisses; `/profile` and `/chats` get the back-to-list link (`b572207`). Follow camera with a fixed closer zoom that keeps the avatar centered (`46cef87`, `1b7b27e`). `Run` clip with crossfade and smooth shortest-path turning for local and remote avatars (`839031b`). Proximity highlight with an "E" prompt and the E key to interact (`a0a0770`).
+- **Reason:** The 3D world had no leading role (a card below the header), the camera was far and static, avatars looked stiff and turned abruptly, and objects could only be used by click or the bar.
+- **Verification:** Per-task strict TDD; `--changed origin/develop`, lint, typecheck, build and `security:check` on each task (only load flakes in untouched files, passing alone); native review approved on each task (T1–T4); visual approval by Agustin on each task. E2E specs not run locally (CI).
+- **Next step:** CI green and merge.
+
 ## 2026-11-21 — Review and fixes on PR #115 (#57, inventory selector)
 
 - **Status:** completed (pending CI and merge of PR #115)

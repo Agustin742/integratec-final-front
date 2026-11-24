@@ -92,7 +92,7 @@ describe('RemoteAvatar', () => {
     tick(0.05);
     expect(screen.getByTestId('remote-avatar-model')).toHaveAttribute(
       'data-animation',
-      'Walk',
+      'Run',
     );
     const afterWalkFlip = frame.renders;
     expect(afterWalkFlip).toBeGreaterThan(baseline);
@@ -244,7 +244,7 @@ describe('RemoteAvatar', () => {
     tick(0.05);
     expect(screen.getByTestId('remote-avatar-model')).toHaveAttribute(
       'data-animation',
-      'Walk',
+      'Run',
     );
   });
 
@@ -302,7 +302,7 @@ describe('RemoteAvatar', () => {
     tick(0.05);
     expect(screen.getByTestId('remote-avatar-model')).toHaveAttribute(
       'data-animation',
-      'Walk',
+      'Run',
     );
   });
 
@@ -329,7 +329,7 @@ describe('RemoteAvatar', () => {
     tick(0.05);
     expect(screen.getByTestId('remote-avatar-model')).toHaveAttribute(
       'data-animation',
-      'Walk',
+      'Run',
     );
 
     rerender(

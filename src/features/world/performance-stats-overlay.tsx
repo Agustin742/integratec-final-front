@@ -70,7 +70,7 @@ export function PerformanceStatsOverlay({
     <div
       data-testid="dev-performance-stats"
       aria-hidden="true"
-      className="pointer-events-none fixed bottom-2 left-2 z-50 rounded-md bg-black/80 px-2 py-1 font-mono text-[10px] leading-tight text-lime-300"
+      className="pointer-events-none fixed top-28 right-2 z-50 rounded-md bg-black/80 px-2 py-1 font-mono text-[10px] leading-tight text-lime-300"
     >
       <p>DEV — 3D performance (estimates, FD8 budget)</p>
       <p>
