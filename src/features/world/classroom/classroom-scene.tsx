@@ -15,9 +15,11 @@ import {
 import { deriveFurniturePlacements } from './classroom-furniture-placements';
 import { deriveShellPlacements } from './classroom-shell-placements';
 import type { FloorClickEvent } from './floor-click';
+import { FollowCamera } from './follow-camera';
 import { InteractableHighlight } from './interactable-highlight';
 import { ClassroomKit } from './kit/classroom-kit';
 import { LocalAvatar } from './local-avatar';
+import { ProximityTracker, type ProximityAnchor } from './proximity-tracker';
 import { RemoteAvatar, type RemoteClassroomParticipant } from './remote-avatar';
 import { useClassroomNavigation } from './use-classroom-navigation';
 
@@ -48,6 +50,13 @@ export interface ClassroomSceneProps {
   onHoverInteractable?: ((id: string | undefined) => void) | undefined;
   onSelectInteractable?:
     ((interactable: ClassroomInteractable) => void) | undefined;
+  /** Whether walking up to this object should offer an action; omit to disable proximity. */
+  isProximityTarget?:
+    ((interactable: ClassroomInteractable) => boolean) | undefined;
+  /** Nearby target id; fires only when it changes. */
+  onProximityChange?: ((id: string | undefined) => void) | undefined;
+  /** Screen point of the nearby target, every frame it is shown. */
+  onProximityAnchor?: ((anchor: ProximityAnchor) => void) | undefined;
 }
 
 type ScenePointerEvent = FloorClickEvent & InteractablePointerEvent;
@@ -76,6 +85,9 @@ export function ClassroomScene({
   interactionLocked = false,
   onHoverInteractable,
   onSelectInteractable,
+  isProximityTarget,
+  onProximityChange,
+  onProximityAnchor,
 }: ClassroomSceneProps) {
   const scene = useMemo(() => buildClassroomScene(CLASSROOM_LAYOUT), []);
   useEffect(() => () => scene.dispose(), [scene]);
@@ -92,6 +104,14 @@ export function ClassroomScene({
         deriveClassroomInteractables(CLASSROOM_LAYOUT),
       ),
     [],
+  );
+
+  const proximityCandidates = useMemo(
+    () =>
+      isProximityTarget
+        ? [...interactablesById.values()].filter(isProximityTarget)
+        : [],
+    [interactablesById, isProximityTarget],
   );
 
   const { controller, marker, onFloorClick, clearDestination } =
@@ -187,6 +207,14 @@ export function ClassroomScene({
         avatar={avatar}
         equipped={selfEquipped}
         scopeKey={scopeKey}
+      />
+      {/* After LocalAvatar so its frame callback sees the freshly stepped pose. */}
+      <FollowCamera poseRef={controller.poseRef} />
+      <ProximityTracker
+        poseRef={controller.poseRef}
+        interactables={proximityCandidates}
+        onChange={onProximityChange}
+        onAnchor={onProximityAnchor}
       />
       {remoteParticipants.map((participant) => (
         <RemoteAvatar

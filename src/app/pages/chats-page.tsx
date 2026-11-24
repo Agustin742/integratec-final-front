@@ -1,4 +1,5 @@
 import { useParams } from 'react-router';
+import { BackToListLink } from '@/features/classrooms/back-to-list-link';
 import { ChatsPageView } from '@/features/chat-page/chats-page-view';
 import { useSessionSnapshot } from '@/session/provider';
 
@@ -10,10 +11,15 @@ export function ChatsPage() {
     return null;
   }
   return (
-    <ChatsPageView
-      key={snapshot.user.id}
-      userId={snapshot.user.id}
-      classroomId={classroomId}
-    />
+    <>
+      <div>
+        <BackToListLink />
+      </div>
+      <ChatsPageView
+        key={snapshot.user.id}
+        userId={snapshot.user.id}
+        classroomId={classroomId}
+      />
+    </>
   );
 }

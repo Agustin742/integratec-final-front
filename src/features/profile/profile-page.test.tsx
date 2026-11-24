@@ -623,6 +623,16 @@ describe('Profile page (/profile)', () => {
     await waitFor(() => expect(view.router.state.location.pathname).toBe('/'));
   });
 
+  test('starts with a back link to the classrooms list', async () => {
+    await renderProfile(createOwnProfileStore());
+    await waitForProfile();
+    const back = await screen.findByRole('link', {
+      name: 'Volver a mis aulas',
+    });
+    expect(back).toHaveAttribute('href', '/');
+    expect(back).toHaveClass('min-h-11');
+  });
+
   test('the shell links to the profile page', async () => {
     const view = await renderProfile(createOwnProfileStore(), {
       path: '/',

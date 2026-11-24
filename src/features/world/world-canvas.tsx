@@ -15,6 +15,7 @@ import {
   SRGBColorSpace,
   WebGLRenderer,
 } from 'three';
+import { cn } from '@/lib/utils';
 import { CLASSROOM_BOUNDS, frameAvatarCamera, frameCamera } from './camera';
 import {
   DEFAULT_SCOPE,
@@ -24,7 +25,7 @@ import {
 import { worldMessages as copy } from './messages';
 import { WorldFallback } from './world-fallback';
 
-export type WorldFraming = 'classroom' | 'avatar' | 'reference';
+export type WorldFraming = 'classroom' | 'follow' | 'avatar' | 'reference';
 
 export interface WorldCanvasProps {
   children?: ReactNode;
@@ -32,14 +33,22 @@ export interface WorldCanvasProps {
   /** Changing `scopeKey` or unmounting disposes cached scene assets. */
   scopeKey?: string;
   /**
-   * Camera framing: the whole isometric classroom (default), one standing
-   * avatar, or the small 6x4 m technical reference.
+   * Camera framing: the whole isometric classroom (default), a scene-owned
+   * follow camera (`follow`, driven by a child such as `FollowCamera`), one
+   * standing avatar, or the small 6x4 m technical reference.
    */
   framing?: WorldFraming;
   /** Landmark role of the host; `img` suits a decorative preview. */
   role?: 'region' | 'img';
   /** Sizing classes for the canvas box; defaults to the classroom height. */
   canvasClassName?: string;
+  /** Extra classes for the landmark host that wraps the canvas box. */
+  hostClassName?: string;
+  /**
+   * Centers the fallback below a floating top bar when filling a full-screen
+   * host (#128).
+   */
+  fill?: boolean;
   /** Visually hidden text that describes the canvas (for example its controls). */
   description?: string;
   /** Replaces the loading announcement; `null` hides it. */
@@ -73,6 +82,7 @@ class SceneBoundary extends Component<
 function CameraFraming({ framing }: { framing: WorldFraming }) {
   const { camera, size, invalidate } = useThree();
   useLayoutEffect(() => {
+    if (framing === 'follow') return;
     if (camera instanceof OrthographicCamera) {
       if (framing === 'avatar')
         frameAvatarCamera(camera, size.width, size.height);
@@ -92,6 +102,8 @@ export function WorldCanvas({
   framing = 'classroom',
   role = 'region',
   canvasClassName,
+  hostClassName,
+  fill = false,
   description,
   loading,
   onUnavailable,
@@ -210,7 +222,7 @@ export function WorldCanvas({
         aria-label={label}
         aria-describedby={description ? descriptionId : undefined}
         aria-busy={!failed && !canvas}
-        className="min-w-0"
+        className={cn('min-w-0', hostClassName)}
       >
         {description && (
           <p id={descriptionId} className="sr-only">
@@ -218,7 +230,13 @@ export function WorldCanvas({
           </p>
         )}
         {failed ? (
-          <WorldFallback />
+          fill ? (
+            <div className="flex h-full items-center justify-center p-4 pt-28">
+              <WorldFallback />
+            </div>
+          ) : (
+            <WorldFallback />
+          )
         ) : (
           <SceneBoundary onError={() => setFailed(true)}>
             <div

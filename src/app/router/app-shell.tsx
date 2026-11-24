@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { NavLink, Outlet } from 'react-router';
+import { Outlet } from 'react-router';
 import { LoadingState } from '@/components/feedback/states';
 import { BaseLayout } from '@/components/layout/base-layout';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,12 @@ import { ChatsNavLink } from '@/features/chat-page/chats-nav-link';
 import { resetClassroomModeStore } from '@/features/classrooms/classroom-mode-store';
 import { resetPerformanceOfferStore } from '@/features/classrooms/performance-offer-store';
 import { DailyReviewDialog } from '@/features/daily-review/daily-review-dialog';
-import { NotificationCenter } from '@/features/notifications/notification-center';
+import {
+  NotificationHostProvider,
+  ShellNotificationCenter,
+  useNotificationHostClaimed,
+} from '@/features/notifications/notification-host';
+import { ProfileNavLink } from '@/features/profile/profile-nav-link';
 import {
   useSessionCleanup,
   useSessionService,
@@ -28,10 +33,19 @@ export const SHOWCASE_PATH = '/dev/ui';
  * features that need it, and an empty aside would only take space.
  */
 export function AppShell() {
+  return (
+    <NotificationHostProvider>
+      <AppShellContent />
+    </NotificationHostProvider>
+  );
+}
+
+function AppShellContent() {
   const snapshot = useSessionSnapshot();
   const { controller } = useSessionService();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const isLoggingOutRef = useRef(false);
+  const headerCovered = useNotificationHostClaimed();
   // The shell outlives every protected route, so logout from any page clears
   // the per-user classroom view preference and the session 2D offer decision
   // (rules/state-management.md).
@@ -72,6 +86,7 @@ export function AppShell() {
     <>
       <BaseLayout
         mainId={MAIN_CONTENT_ID}
+        headerInert={headerCovered}
         header={
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-2xl font-bold text-primary">
@@ -87,14 +102,9 @@ export function AppShell() {
                     {snapshot.user.displayName}
                   </span>
                 </p>
-                <NavLink
-                  to="/profile"
-                  className="inline-flex min-h-11 items-center rounded-sm px-1 text-sm font-semibold text-primary underline underline-offset-4 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
-                >
-                  {messages.shell.profileLink}
-                </NavLink>
+                <ProfileNavLink />
                 <ChatsNavLink />
-                <NotificationCenter />
+                <ShellNotificationCenter />
                 <DailyReviewDialog />
                 <Button
                   type="button"

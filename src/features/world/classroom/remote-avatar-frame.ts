@@ -1,6 +1,9 @@
 import type { Object3D } from 'three';
 import type { Pose } from '../movement';
+import { shortestAngleDelta } from './avatar-yaw';
 import { placeAvatar } from './local-avatar-frame';
+
+export { shortestAngleDelta };
 
 /** Convergence rate (1/s) tuned for 20 Hz Colyseus state patches. */
 export const REMOTE_INTERPOLATION_RATE = 12;
@@ -9,16 +12,6 @@ export const REMOTE_ANGLE_EPSILON = 0.01;
 /** Large server corrections snap directly instead of gliding through desks. */
 export const REMOTE_TELEPORT_DISTANCE = 4;
 export const MAX_REMOTE_DT = 0.1;
-
-/** Shortest signed angle difference wrapped into `[-Math.PI, Math.PI]`. */
-export function shortestAngleDelta(from: number, to: number): number {
-  if (!Number.isFinite(from) || !Number.isFinite(to)) {
-    return 0;
-  }
-  const diff = (to - from + Math.PI) % (2 * Math.PI);
-  const wrapped = diff < 0 ? diff + 2 * Math.PI : diff;
-  return wrapped - Math.PI;
-}
 
 function isFinitePose(pose: Pose): boolean {
   return (

@@ -1,6 +1,8 @@
-import type { RefObject } from 'react';
+import { QueryClientContext } from '@tanstack/react-query';
+import { useContext, type RefObject } from 'react';
 import { EmptyState } from '@/components/feedback/states';
 import { Button } from '@/components/ui/button';
+import { useChatInbox } from '@/features/chat-inbox/use-chat-inbox';
 import { classroomMessages } from './messages';
 import {
   useClassroomPanels,
@@ -8,6 +10,7 @@ import {
 } from './panels/classroom-panels';
 
 export interface Classroom2DLayoutProps {
+  readonly classroomId?: string;
   readonly panels: readonly PanelDescriptor[];
   readonly headingRef?: RefObject<HTMLHeadingElement | null>;
 }
@@ -16,13 +19,51 @@ export interface Classroom2DLayoutProps {
  * Accessible 2D Classic Mode workspace layout (`HU-ESP-003`, `#34`).
  * Mounts zero WebGL/Three.js canvas elements and derives reachable panel
  * controls strictly from server-confirmed `availablePanels` (`canOpenPanel`).
+ * Hides `chat` only when the global chat dock actually has a live inbox entry
+ * for this classroom; otherwise keeps `chat` in the 2D panel grid as fallback.
  */
-export function Classroom2DLayout({
+export function Classroom2DLayout(props: Classroom2DLayoutProps) {
+  const queryClient = useContext(QueryClientContext);
+  if (!queryClient || !props.classroomId) {
+    return <Classroom2DLayoutContent {...props} hideChat={false} />;
+  }
+  return (
+    <Classroom2DLayoutWithInbox
+      classroomId={props.classroomId}
+      panels={props.panels}
+      headingRef={props.headingRef}
+    />
+  );
+}
+
+function Classroom2DLayoutWithInbox({
+  classroomId,
   panels,
   headingRef,
-}: Classroom2DLayoutProps) {
+}: Classroom2DLayoutProps & { readonly classroomId: string }) {
+  const { inbox } = useChatInbox();
+  const hideChat =
+    inbox?.items.some((item) => item.classroomId === classroomId) ?? false;
+  return (
+    <Classroom2DLayoutContent
+      panels={panels}
+      headingRef={headingRef}
+      hideChat={hideChat}
+    />
+  );
+}
+
+function Classroom2DLayoutContent({
+  panels,
+  headingRef,
+  hideChat,
+}: Pick<Classroom2DLayoutProps, 'panels' | 'headingRef'> & {
+  readonly hideChat: boolean;
+}) {
   const { canOpenPanel, openPanel } = useClassroomPanels();
-  const visiblePanels = panels.filter((panel) => canOpenPanel(panel.key));
+  const visiblePanels = panels.filter(
+    (panel) => !(hideChat && panel.key === 'chat') && canOpenPanel(panel.key),
+  );
 
   return (
     <section

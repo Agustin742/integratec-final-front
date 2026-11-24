@@ -16,6 +16,7 @@ import { ClassroomPanelsProvider } from './panels/classroom-panels';
 
 const world = vi.hoisted(() => ({
   props: {} as Record<string, unknown>,
+  shouldThrow: false,
 }));
 
 vi.mock('../world', () => ({
@@ -26,6 +27,9 @@ vi.mock('../world', () => ({
     scopeKey?: string;
     children?: ReactNode;
   }) => {
+    if (world.shouldThrow) {
+      throw new Error('3D boundary failure');
+    }
     world.props = props;
     return (
       <div role="region" aria-label={props.label}>
@@ -36,7 +40,11 @@ vi.mock('../world', () => ({
   },
 }));
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  world.shouldThrow = false;
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 function renderStage(
   classroomId = 'aula-7',
@@ -94,7 +102,7 @@ function renderStage(
   );
 }
 
-test('mounts the lazy classroom world with the stage label, scope, presence props, and interactables bar', async () => {
+test('mounts the lazy classroom world with the stage label, scope, presence props, and floating panel groups', async () => {
   vi.stubGlobal(
     'ResizeObserver',
     class {
@@ -137,11 +145,38 @@ test('mounts the lazy classroom world with the stage label, scope, presence prop
   });
   expect(
     screen.getByRole('navigation', {
-      name: classroomMessages.interactables.navLabel,
+      name: classroomMessages.viewMode.immersive.workPanelsLabel,
     }),
   ).toBeVisible();
   expect(
-    await screen.findByRole('button', { name: 'Mi pupitre #1' }),
+    await screen.findByRole('button', { name: 'Calificaciones' }),
   ).toBeVisible();
-  expect(screen.getByRole('button', { name: 'Michi' })).toBeVisible();
+  expect(
+    screen.queryByRole('button', { name: 'Michi' }),
+  ).not.toBeInTheDocument();
+});
+
+test('centers the StageBoundary fallback inside a padded wrapper below the floating top bar', async () => {
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+  world.shouldThrow = true;
+  renderStage('aula-7');
+  const fallback = await screen.findByText('La vista 3D no está disponible');
+  const status = fallback.closest('[role="status"]');
+  expect(status).not.toBeNull();
+  expect(status?.parentElement).toHaveClass(
+    'flex',
+    'h-full',
+    'items-center',
+    'justify-center',
+    'p-4',
+    'pt-28',
+  );
 });

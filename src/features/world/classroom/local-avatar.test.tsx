@@ -54,7 +54,7 @@ function makeController(moving: () => boolean) {
       arrived: false,
     })),
     hasDestination: vi.fn(() => false),
-    poseRef: { current: { x: -6, z: 5, rotation: Math.PI } },
+    poseRef: { current: { x: -6, z: 5, rotation: 0.5 } },
   };
 }
 
@@ -117,7 +117,7 @@ describe('LocalAvatar', () => {
     tick();
     expect(screen.getByTestId('avatar-model')).toHaveAttribute(
       'data-animation',
-      'Walk',
+      'Run',
     );
     const afterFlip = frame.renders;
     expect(afterFlip).toBeGreaterThan(baseline);

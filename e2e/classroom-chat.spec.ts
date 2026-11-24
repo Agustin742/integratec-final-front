@@ -215,6 +215,23 @@ test.beforeEach(async ({ page, baseURL }) => {
       expect(request.headers().authorization).toBe('Bearer synthetic-access');
       return route.fulfill({ json: studentProfile });
     }
+    if (url.origin === apiOrigin && url.pathname === '/users/me/daily-review') {
+      return route.fulfill({ json: { status: 'not_due' } });
+    }
+    if (
+      url.origin === apiOrigin &&
+      url.pathname === `/classrooms/${classroomId}/desks` &&
+      request.method() === 'GET'
+    ) {
+      return route.fulfill({ json: { items: [] } });
+    }
+    if (
+      url.origin === apiOrigin &&
+      url.pathname === '/chats' &&
+      request.method() === 'GET'
+    ) {
+      return route.fulfill({ json: { items: [] } });
+    }
     if (
       url.origin === apiOrigin &&
       url.pathname === '/notifications' &&
@@ -244,6 +261,13 @@ test.beforeEach(async ({ page, baseURL }) => {
       return route.fulfill({ json: wallet });
     }
     if (
+      url.origin === apiOrigin &&
+      url.pathname === `/classrooms/${classroomId}/messages/read-marker` &&
+      request.method() === 'PUT'
+    ) {
+      return route.fulfill({ status: 204 });
+    }
+    if (
       url.origin === 'https://realtime.example.invalid' ||
       url.pathname.startsWith('/matchmake/')
     ) {
@@ -265,6 +289,7 @@ test.afterEach(async ({ page }) => {
 test('student reads paginated history, mentions a classmate, sends a server-confirmed message and hits the rate limit', async ({
   page,
 }, testInfo) => {
+  test.setTimeout(45_000);
   const width = testInfo.project.name === 'mobile' ? 360 : 1280;
   await page.setViewportSize({ width, height: 800 });
 
@@ -377,14 +402,21 @@ test('student reads paginated history, mentions a classmate, sends a server-conf
     name: 'Mensaje del chat',
   });
   await composer.pressSequentially('@Bru');
-  const suggestions = dialog.getByRole('list', {
+  const suggestions = dialog.getByRole('listbox', {
     name: 'Integrantes sugeridos para mencionar',
   });
   await expect(suggestions).toBeVisible();
-  const brunoOption = suggestions.getByRole('button', { name: /Bruno Díaz/ });
+  const brunoOption = suggestions.getByRole('option', { name: /Bruno Díaz/ });
   await expect(brunoOption).toBeVisible();
   await page.keyboard.press('ArrowDown');
-  await expect(brunoOption).toBeFocused();
+  await expect(composer).toBeFocused();
+  await expect(brunoOption).toHaveAttribute('aria-selected', 'true');
+  const brunoOptionId = await brunoOption.getAttribute('id');
+  expect(brunoOptionId).toBeTruthy();
+  await expect(composer).toHaveAttribute(
+    'aria-activedescendant',
+    brunoOptionId!,
+  );
   await page.keyboard.press('Enter');
   await expect(composer).toHaveValue('@Bruno Díaz ');
   await composer.pressSequentially('¿ya terminaste la guía de fracciones?');

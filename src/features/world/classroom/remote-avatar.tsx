@@ -113,7 +113,7 @@ function PlaceholderBody({ reconnecting }: { readonly reconnecting: boolean }) {
 /**
  * Renders one remote classroom participant driven strictly by authoritative
  * room state (`rules/realtime-and-presence.md`, `#37`). Interpolation runs in
- * `useFrame` on refs; React re-renders only on `Idle`/`Walk` clip flips or
+ * `useFrame` on refs; React re-renders only on `Idle`/`Run` clip flips or
  * server appearance/status changes.
  */
 export function RemoteAvatar({
