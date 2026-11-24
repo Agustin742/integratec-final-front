@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useId,
   useRef,
   useState,
@@ -20,6 +21,9 @@ import { materialMessages } from './messages';
 export interface MaterialUploadSectionProps {
   readonly client: TypedApiClient;
   readonly classroomId: string;
+  readonly canManage?: boolean;
+  /** Module the file is filed under; omitted or null means unassigned. */
+  readonly moduleId?: string | null;
   readonly onUploaded: (filename: string) => Promise<void> | void;
   readonly onReconcileRequired: () => Promise<void> | void;
   readonly onInteraction?: () => void;
@@ -51,6 +55,8 @@ function isAbortError(cause: unknown): boolean {
 export function MaterialUploadSection({
   client,
   classroomId,
+  canManage = true,
+  moduleId,
   onUploaded,
   onReconcileRequired,
   onInteraction,
@@ -59,14 +65,24 @@ export function MaterialUploadSection({
   const hintId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const isMountedRef = useRef(true);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [clientError, setClientError] = useState<string | null>(null);
   const [phase, setPhase] = useState<UploadPhase>({ kind: 'idle' });
   const [isDragging, setIsDragging] = useState(false);
 
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      abortRef.current?.abort();
+      abortRef.current = null;
+    };
+  }, []);
+
   function selectCandidateFile(file: File | undefined) {
-    if (!file || phase.kind === 'uploading') return;
+    if (!canManage || !file || phase.kind === 'uploading') return;
     onInteraction?.();
     setPhase({ kind: 'idle' });
     const check = validateMaterialFile(file);
@@ -87,7 +103,7 @@ export function MaterialUploadSection({
 
   function handleDragOver(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
-    if (phase.kind !== 'uploading') setIsDragging(true);
+    if (canManage && phase.kind !== 'uploading') setIsDragging(true);
   }
 
   function handleDragLeave() {
@@ -101,7 +117,7 @@ export function MaterialUploadSection({
   }
 
   async function startUpload() {
-    if (!selectedFile || phase.kind === 'uploading') return;
+    if (!canManage || !selectedFile || phase.kind === 'uploading') return;
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -114,15 +130,25 @@ export function MaterialUploadSection({
         client,
         classroomId,
         selectedFile,
-        { signal: controller.signal },
+        { signal: controller.signal, moduleId },
       );
-      abortRef.current = null;
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+      }
+      if (!isMountedRef.current || controller.signal.aborted) {
+        return;
+      }
       setSelectedFile(null);
       setPhase({ kind: 'idle' });
       await onUploaded(created.filename);
     } catch (error) {
-      abortRef.current = null;
-      if (isAbortError(error)) {
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+      }
+      if (!isMountedRef.current) {
+        return;
+      }
+      if (isAbortError(error) || controller.signal.aborted) {
         setPhase({ kind: 'cancelled' });
         return;
       }

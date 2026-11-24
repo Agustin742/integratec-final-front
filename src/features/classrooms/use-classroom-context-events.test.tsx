@@ -20,6 +20,7 @@ import {
   useClassroomContext,
   useClassroomCapabilities,
 } from './use-classroom-capabilities';
+import { markOwnClassroomChange } from './own-classroom-change';
 import {
   CONTEXT_RENEWAL_MS,
   useClassroomContextEvents,
@@ -136,6 +137,7 @@ function setup(streamStatus: (request: Request) => number = () => 200) {
     ...view,
     h,
     service,
+    client,
     streams,
     pending,
     detail,
@@ -443,6 +445,45 @@ test('a second hint on the same connection resets; a reconnect makes the next fi
   });
   expect(screen.getByLabelText('guard')).toHaveTextContent('private');
   await view.hint(); // Second hint of the same connection: reset.
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(50);
+  });
+  expect(screen.getByLabelText('guard')).toHaveTextContent('denied');
+});
+
+test('a hint echoing the user own classroom change refetches instead of resetting, so open panels survive; the next real hint still resets', async () => {
+  vi.useFakeTimers();
+  const view = setup();
+  await ready();
+  view.hold();
+  await view.hint(); // Registration hint of this connection.
+  markOwnClassroomChange(view.client, profile.id, 'a'); // The settings save is about to echo.
+  await view.hint(); // Echo of the own write.
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(50);
+  });
+  expect(screen.getByLabelText('context')).toHaveTextContent('Confirmed');
+  expect(screen.getByLabelText('guard')).toHaveTextContent('private');
+  expect(view.pending.length).toBeGreaterThan(0); // Still reconciled with the server.
+  await view.hint(); // Anything else is a real invalidation again.
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(50);
+  });
+  expect(screen.getByLabelText('guard')).toHaveTextContent('denied');
+});
+
+test('own classroom change marks are scoped per user so another account does not suppress a reset', async () => {
+  vi.useFakeTimers();
+  const view = setup();
+  await ready();
+  view.hold();
+  await view.hint(); // Registration hint of this connection.
+  markOwnClassroomChange(
+    view.client,
+    '00000000-0000-4000-8000-000000009999',
+    'a',
+  );
+  await view.hint();
   await act(async () => {
     await vi.advanceTimersByTimeAsync(50);
   });

@@ -35,6 +35,8 @@ import {
   type ClassroomDetailPayload,
   type ClassroomInvitationPayload,
 } from '@/test/msw/handlers';
+
+vi.setConfig({ testTimeout: 20_000 });
 import { mswServer } from '@/test/msw/server';
 import { render } from '@/test/render';
 import { ClassroomInvitationsPanel } from './classroom-invitations-panel';

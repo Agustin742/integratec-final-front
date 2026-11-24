@@ -947,11 +947,35 @@ export interface ClassroomMaterialItem {
   readonly filename: string;
   readonly contentType: 'application/pdf' | 'image/png' | 'image/jpeg';
   readonly sizeBytes: number;
+  /** Module the material sits in; absent or null means unassigned. */
+  readonly moduleId?: string | null;
   readonly createdAt: string;
 }
 
+/** Mirrors `MaterialModuleDto` minus the derived `materialCount`. */
+export interface ClassroomMaterialModuleItem {
+  readonly id: string;
+  readonly classroomId: string;
+  readonly name: string;
+  readonly description: string | null;
+  readonly position: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
 export type MaterialStoreOp =
-  'list' | 'upload' | 'download' | 'remove' | 'botList' | 'botToggle';
+  | 'list'
+  | 'upload'
+  | 'download'
+  | 'remove'
+  | 'botList'
+  | 'botToggle'
+  | 'moduleList'
+  | 'moduleCreate'
+  | 'moduleUpdate'
+  | 'moduleReorder'
+  | 'moduleRemove'
+  | 'move';
 export type MaterialStoreFailure =
   MswErrorResponseSpec | 'network' | 'drop-response';
 
@@ -970,6 +994,11 @@ export interface ClassroomMaterialsStoreOptions {
   readonly authorId?: string;
   readonly initialItems?: readonly ClassroomMaterialItem[];
   readonly initialBotStates?: readonly BotMaterialStateEntry[];
+  readonly initialModules?: readonly ClassroomMaterialModuleItem[];
+  /** Writes answer 403 when false (a student session). Defaults to true. */
+  readonly canWrite?: boolean;
+  /** Active-module cap; the server's is 100 (409 beyond it). */
+  readonly moduleCap?: number;
   readonly signedUrlBase?: string;
   readonly expiresInSeconds?: number;
 }
@@ -977,6 +1006,9 @@ export interface ClassroomMaterialsStoreOptions {
 export interface ClassroomMaterialsStore {
   readonly handlers: readonly HttpHandler[];
   read(): readonly ClassroomMaterialItem[];
+  readModules(): readonly ClassroomMaterialModuleItem[];
+  /** Number of `GET /materials` calls received per `moduleId` filter. */
+  readonly listCalls: readonly (string | null)[];
   readBotStates(): readonly BotMaterialStateEntry[];
   setBotState(
     materialId: string,
@@ -1014,7 +1046,14 @@ export function createClassroomMaterialsStore(
   const botStates = new Map<string, BotMaterialStateEntry>(
     (options.initialBotStates ?? []).map((entry) => [entry.materialId, entry]),
   );
+  let modules: ClassroomMaterialModuleItem[] = [
+    ...(options.initialModules ?? []),
+  ];
+  const canWrite = options.canWrite ?? true;
+  const moduleCap = options.moduleCap ?? 100;
+  const listCalls: (string | null)[] = [];
   let seq = items.length + 1;
+  let moduleSeq = modules.length + 1;
   const pending: Partial<Record<MaterialStoreOp, MaterialStoreFailure>> = {};
 
   const fail = (failure: MswErrorResponseSpec | 'network'): Response =>
@@ -1022,7 +1061,52 @@ export function createClassroomMaterialsStore(
       ? HttpResponse.error()
       : createErrorEnvelopeResponse(failure.status, failure.body);
 
+  const takeFailure = (op: MaterialStoreOp): Response | null => {
+    const failure = pending[op];
+    pending[op] = undefined;
+    return failure !== undefined && failure !== 'drop-response'
+      ? fail(failure)
+      : null;
+  };
+  const forbidden = (id: string): Response =>
+    createErrorEnvelopeResponse(403, {
+      code: 'FORBIDDEN',
+      message: 'Teacher-level staff only.',
+      correlationId: `req-materials-${id}-403`,
+    });
+  const notFound = (message: string, id: string): Response =>
+    createErrorEnvelopeResponse(404, {
+      code: 'NOT_FOUND',
+      message,
+      correlationId: `req-materials-${id}-404`,
+    });
+  const badRequest = (message: string, id: string): Response =>
+    createErrorEnvelopeResponse(400, {
+      code: 'VALIDATION_FAILED',
+      message,
+      correlationId: `req-materials-${id}-400`,
+    });
+  const moduleDto = (entry: ClassroomMaterialModuleItem) => ({
+    ...entry,
+    materialCount: items.filter((item) => item.moduleId === entry.id).length,
+  });
+  const orderedModules = () =>
+    [...modules].sort((a, b) => a.position - b.position);
+  const reindex = (ordered: readonly ClassroomMaterialModuleItem[]) => {
+    modules = ordered.map((entry, position) => ({ ...entry, position }));
+  };
+  const materialDto = (item: ClassroomMaterialItem) => ({
+    ...item,
+    moduleId: item.moduleId ?? null,
+  });
+  const UUID_PATTERN =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const NAME_MAX = 80;
+  const DESCRIPTION_MAX = 500;
+
   return {
+    listCalls,
+    readModules: () => orderedModules(),
     read: () => [...items],
     readBotStates: () => [...botStates.values()],
     setBotState(materialId, state) {
@@ -1053,20 +1137,34 @@ export function createClassroomMaterialsStore(
           });
         }
         const url = new URL(request.url);
+        const moduleFilter = url.searchParams.get('moduleId');
+        listCalls.push(moduleFilter);
+        let scoped = items;
+        if (moduleFilter === 'unassigned') {
+          scoped = items.filter((item) => (item.moduleId ?? null) === null);
+        } else if (moduleFilter !== null) {
+          if (!UUID_PATTERN.test(moduleFilter)) {
+            return badRequest('moduleId must be a UUID or unassigned.', 'list');
+          }
+          if (!modules.some((entry) => entry.id === moduleFilter)) {
+            return notFound('Module not found.', 'list-module');
+          }
+          scoped = items.filter((item) => item.moduleId === moduleFilter);
+        }
         const page = Math.max(1, Number(url.searchParams.get('page') ?? '1'));
         const pageSize = Math.min(
           100,
           Math.max(1, Number(url.searchParams.get('pageSize') ?? '20')),
         );
         const sort = url.searchParams.get('sort') ?? '-createdAt';
-        const sorted = [...items].sort((a, b) =>
+        const sorted = [...scoped].sort((a, b) =>
           sort === 'createdAt'
             ? a.createdAt.localeCompare(b.createdAt)
             : b.createdAt.localeCompare(a.createdAt),
         );
         const start = (page - 1) * pageSize;
         return HttpResponse.json({
-          items: sorted.slice(start, start + pageSize),
+          items: sorted.slice(start, start + pageSize).map(materialDto),
           page,
           pageSize,
           total: sorted.length,
@@ -1087,7 +1185,17 @@ export function createClassroomMaterialsStore(
               correlationId: 'req-materials-upload-404',
             });
           }
+          if (!canWrite) return forbidden('upload');
           const formData = await request.formData();
+          const targetModule = formData.get('moduleId');
+          if (typeof targetModule === 'string' && targetModule !== '') {
+            if (!UUID_PATTERN.test(targetModule)) {
+              return badRequest('moduleId must be a UUID.', 'upload');
+            }
+            if (!modules.some((entry) => entry.id === targetModule)) {
+              return notFound('Module not found.', 'upload-module');
+            }
+          }
           const entry = formData.get('file');
           if (
             typeof entry !== 'object' ||
@@ -1133,6 +1241,10 @@ export function createClassroomMaterialsStore(
             filename: fileName,
             contentType: entry.type as ClassroomMaterialItem['contentType'],
             sizeBytes: entry.size,
+            moduleId:
+              typeof targetModule === 'string' && targetModule !== ''
+                ? targetModule
+                : null,
             createdAt: new Date(
               Date.UTC(2026, 10, 18, 3, seq, 0),
             ).toISOString(),
@@ -1141,7 +1253,7 @@ export function createClassroomMaterialsStore(
           items = [created, ...items];
           return failure === 'drop-response'
             ? HttpResponse.error()
-            : HttpResponse.json(created, { status: 201 });
+            : HttpResponse.json(materialDto(created), { status: 201 });
         },
       ),
       http.get(
@@ -1174,6 +1286,7 @@ export function createClassroomMaterialsStore(
           if (failure !== undefined && failure !== 'drop-response') {
             return fail(failure);
           }
+          if (!canWrite) return forbidden('remove');
           const index = items.findIndex(
             (item) => item.id === params.materialId,
           );
@@ -1186,6 +1299,193 @@ export function createClassroomMaterialsStore(
           }
           items = items.filter((item) => item.id !== params.materialId);
           botStates.delete(String(params.materialId));
+          return new HttpResponse(null, { status: 204 });
+        },
+      ),
+      http.patch(
+        `${baseUrl}/classrooms/:id/materials/:materialId`,
+        async ({ params, request }) => {
+          const failed = takeFailure('move');
+          if (failed) return failed;
+          if (!canWrite) return forbidden('move');
+          const found = items.find((item) => item.id === params.materialId);
+          if (!found) return notFound('Material not found.', 'move');
+          const body = (await request.json().catch(() => null)) as {
+            moduleId?: unknown;
+          } | null;
+          const target = body?.moduleId;
+          if (
+            body === null ||
+            target === undefined ||
+            (target !== null &&
+              (typeof target !== 'string' || !UUID_PATTERN.test(target)))
+          ) {
+            return badRequest('moduleId must be a UUID or null.', 'move');
+          }
+          if (
+            target !== null &&
+            !modules.some((entry) => entry.id === target)
+          ) {
+            return notFound('Module not found.', 'move-module');
+          }
+          const moved: ClassroomMaterialItem = { ...found, moduleId: target };
+          items = items.map((item) => (item.id === found.id ? moved : item));
+          return HttpResponse.json(materialDto(moved));
+        },
+      ),
+      http.get(`${baseUrl}/classrooms/:id/material-modules`, () => {
+        const failed = takeFailure('moduleList');
+        if (failed) return failed;
+        return HttpResponse.json({ items: orderedModules().map(moduleDto) });
+      }),
+      http.post(
+        `${baseUrl}/classrooms/:id/material-modules`,
+        async ({ params, request }) => {
+          const failed = takeFailure('moduleCreate');
+          if (failed) return failed;
+          if (!canWrite) return forbidden('module-create');
+          const body = (await request.json().catch(() => null)) as {
+            name?: unknown;
+            description?: unknown;
+          } | null;
+          const name = typeof body?.name === 'string' ? body.name.trim() : '';
+          const description =
+            typeof body?.description === 'string'
+              ? body.description.trim()
+              : undefined;
+          if (
+            name === '' ||
+            name.length > NAME_MAX ||
+            (description !== undefined && description.length > DESCRIPTION_MAX)
+          ) {
+            return badRequest(
+              'Invalid module name or description.',
+              'module-create',
+            );
+          }
+          if (modules.length >= moduleCap) {
+            return createErrorEnvelopeResponse(409, {
+              code: 'CONFLICT',
+              message: `A classroom can have at most ${moduleCap} modules.`,
+              correlationId: 'req-materials-module-create-409',
+            });
+          }
+          const stamp = new Date(
+            Date.UTC(2026, 10, 18, 4, moduleSeq, 0),
+          ).toISOString();
+          const created: ClassroomMaterialModuleItem = {
+            id: `00000000-0000-4000-8000-${String(2000 + moduleSeq).padStart(12, '0')}`,
+            classroomId: String(params.id ?? classroomId),
+            name,
+            description:
+              description === undefined || description === ''
+                ? null
+                : description,
+            position: modules.length,
+            createdAt: stamp,
+            updatedAt: stamp,
+          };
+          moduleSeq += 1;
+          modules = [...modules, created];
+          return HttpResponse.json(moduleDto(created), { status: 201 });
+        },
+      ),
+      http.put(
+        `${baseUrl}/classrooms/:id/material-modules/order`,
+        async ({ request }) => {
+          const failed = takeFailure('moduleReorder');
+          if (failed) return failed;
+          if (!canWrite) return forbidden('module-order');
+          const body = (await request.json().catch(() => null)) as {
+            moduleIds?: unknown;
+          } | null;
+          const ids = body?.moduleIds;
+          const active = modules.map((entry) => entry.id);
+          if (
+            !Array.isArray(ids) ||
+            ids.length !== active.length ||
+            new Set(ids).size !== ids.length ||
+            !ids.every((id) => active.includes(String(id)))
+          ) {
+            return badRequest(
+              'moduleIds must list every active module exactly once.',
+              'module-order',
+            );
+          }
+          const byId = new Map(modules.map((entry) => [entry.id, entry]));
+          reindex(
+            ids.map(
+              (id) => byId.get(String(id)) as ClassroomMaterialModuleItem,
+            ),
+          );
+          return HttpResponse.json({ items: orderedModules().map(moduleDto) });
+        },
+      ),
+      http.patch(
+        `${baseUrl}/classrooms/:id/material-modules/:moduleId`,
+        async ({ params, request }) => {
+          const failed = takeFailure('moduleUpdate');
+          if (failed) return failed;
+          if (!canWrite) return forbidden('module-update');
+          const found = modules.find((entry) => entry.id === params.moduleId);
+          if (!found) return notFound('Module not found.', 'module-update');
+          const body = (await request.json().catch(() => null)) as {
+            name?: unknown;
+            description?: unknown;
+          } | null;
+          if (
+            body === null ||
+            (body.name === undefined && body.description === undefined)
+          ) {
+            return badRequest(
+              'Provide name or description to update.',
+              'module-update',
+            );
+          }
+          let name = found.name;
+          if (body.name !== undefined) {
+            name = typeof body.name === 'string' ? body.name.trim() : '';
+            if (name === '' || name.length > NAME_MAX) {
+              return badRequest('Invalid module name.', 'module-update');
+            }
+          }
+          let description = found.description;
+          if (body.description !== undefined) {
+            if (body.description === null) {
+              description = null;
+            } else if (
+              typeof body.description === 'string' &&
+              body.description.trim().length <= DESCRIPTION_MAX
+            ) {
+              description = body.description.trim() || null;
+            } else {
+              return badRequest('Invalid module description.', 'module-update');
+            }
+          }
+          const updated: ClassroomMaterialModuleItem = {
+            ...found,
+            name,
+            description,
+            updatedAt: '2026-11-18T05:00:00.000Z',
+          };
+          modules = modules.map((entry) =>
+            entry.id === found.id ? updated : entry,
+          );
+          return HttpResponse.json(moduleDto(updated));
+        },
+      ),
+      http.delete(
+        `${baseUrl}/classrooms/:id/material-modules/:moduleId`,
+        ({ params }) => {
+          const failed = takeFailure('moduleRemove');
+          if (failed) return failed;
+          if (!canWrite) return forbidden('module-remove');
+          const found = modules.find((entry) => entry.id === params.moduleId);
+          if (!found) return notFound('Module not found.', 'module-remove');
+          items = items.map((item) =>
+            item.moduleId === found.id ? { ...item, moduleId: null } : item,
+          );
+          reindex(orderedModules().filter((entry) => entry.id !== found.id));
           return new HttpResponse(null, { status: 204 });
         },
       ),

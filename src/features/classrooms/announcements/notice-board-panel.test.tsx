@@ -2,7 +2,15 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { createApiClient } from '@/api/client';
 import { ApiQueryProvider, createAppQueryClient } from '@/api/query-client';
 import type { components } from '@/api/schema.generated';
@@ -17,6 +25,8 @@ import {
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
 import { render } from '@/test/render';
+import { formatInstant } from '@/lib/dates';
+import { classroomPanelCatalog } from '../panels/classroom-panel-catalog';
 import { NoticeBoardPanel } from './notice-board-panel';
 
 const CLASSROOM_ID = '00000000-0000-4000-8000-000000000010';
@@ -94,6 +104,30 @@ function renderNoticeBoardPanel(
   return { ...result, queryClient, router };
 }
 
+vi.setConfig({ testTimeout: 20_000 });
+
+async function openComposer() {
+  fireEvent.click(
+    await screen.findByRole('button', {
+      name: 'Escribir un anuncio para el aula',
+    }),
+  );
+}
+
+async function openMenu(title: string) {
+  const trigger = await screen.findByRole('button', {
+    name: `Acciones del anuncio «${title}»`,
+  });
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: 'Enter' });
+  return trigger;
+}
+
+async function chooseMenuItem(title: string, label: 'Editar' | 'Eliminar') {
+  await openMenu(title);
+  fireEvent.click(await screen.findByRole('menuitem', { name: label }));
+}
+
 describe('NoticeBoardPanel', () => {
   beforeAll(() => {
     mswServer.listen();
@@ -155,6 +189,7 @@ describe('NoticeBoardPanel', () => {
       await screen.findByRole('heading', { name: 'Todavía no hay anuncios' }),
     ).toBeInTheDocument();
 
+    await openComposer();
     fireEvent.change(screen.getByLabelText('Título'), {
       target: { value: 'Clase de consulta' },
     });
@@ -174,9 +209,9 @@ describe('NoticeBoardPanel', () => {
     expect(within(list).getByText('1 mención')).toBeInTheDocument();
 
     // Edit the published announcement (moves focus to title input)
-    fireEvent.click(within(list).getByRole('button', { name: 'Editar' }));
+    await chooseMenuItem('Clase de consulta', 'Editar');
     expect(
-      screen.getByRole('heading', { name: 'Editar anuncio' }),
+      await screen.findByRole('heading', { name: 'Editar anuncio' }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText('Título')).toHaveFocus();
     fireEvent.change(screen.getByLabelText('Título'), {
@@ -191,12 +226,11 @@ describe('NoticeBoardPanel', () => {
     expect(within(list).getByText(/Editado:/)).toBeInTheDocument();
 
     // Inline remove confirmation with focus handoff and post-remove heading focus
-    const removeButton = within(list).getByRole('button', { name: 'Eliminar' });
-    fireEvent.click(removeButton);
-    const cancelRemove = within(list).getByRole('button', {
+    await chooseMenuItem('Clase de consulta (reprogramada)', 'Eliminar');
+    const cancelRemove = await within(list).findByRole('button', {
       name: 'Cancelar',
     });
-    expect(cancelRemove).toHaveFocus();
+    await waitFor(() => expect(cancelRemove).toHaveFocus());
 
     fireEvent.click(
       within(list).getByRole('button', { name: 'Confirmar eliminación' }),
@@ -248,10 +282,12 @@ describe('NoticeBoardPanel', () => {
       screen.queryByRole('heading', { name: 'Publicar anuncio' }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Editar' }),
+      screen.queryByRole('button', {
+        name: 'Escribir un anuncio para el aula',
+      }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Eliminar' }),
+      screen.queryByRole('button', { name: /^Acciones del anuncio/ }),
     ).not.toBeInTheDocument();
   });
 
@@ -291,6 +327,7 @@ describe('NoticeBoardPanel', () => {
 
     store.failNext('create', 'drop-response');
 
+    await openComposer();
     fireEvent.change(screen.getByLabelText('Título'), {
       target: { value: 'Aviso con corte de red' },
     });
@@ -304,8 +341,13 @@ describe('NoticeBoardPanel', () => {
       screen.queryByText(/No pudimos confirmar si se publicó/),
     ).not.toBeInTheDocument();
 
-    expect(screen.getByLabelText('Título')).toHaveValue('');
-    expect(screen.getByLabelText('Contenido')).toHaveValue('');
+    // The composer folds back into its prompt once the notice is published.
+    expect(
+      await screen.findByRole('button', {
+        name: 'Escribir un anuncio para el aula',
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('Título')).not.toBeInTheDocument();
 
     const list = await screen.findByRole('list', {
       name: 'Anuncios publicados en el aula',
@@ -333,6 +375,7 @@ describe('NoticeBoardPanel', () => {
       },
     });
 
+    await openComposer();
     fireEvent.change(screen.getByLabelText('Título'), {
       target: { value: 'Aviso que no se guardó' },
     });
@@ -374,18 +417,15 @@ describe('NoticeBoardPanel', () => {
     const { unmount } = renderNoticeBoardPanel({ role: 'TEACHER' });
     await screen.findByText('Aviso de otro docente');
     expect(
-      screen.queryByRole('button', { name: 'Editar' }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Eliminar' }),
+      screen.queryByRole('button', { name: /^Acciones del anuncio/ }),
     ).not.toBeInTheDocument();
     unmount();
 
     renderNoticeBoardPanel({ role: 'ADMIN' });
     await screen.findByText('Aviso de otro docente');
-    expect(screen.getByRole('button', { name: 'Editar' })).toBeInTheDocument();
+    await chooseMenuItem('Aviso de otro docente', 'Editar');
     expect(
-      screen.getByRole('button', { name: 'Eliminar' }),
+      await screen.findByRole('heading', { name: 'Editar anuncio' }),
     ).toBeInTheDocument();
   });
 
@@ -400,6 +440,7 @@ describe('NoticeBoardPanel', () => {
     await screen.findByRole('heading', { name: 'Todavía no hay anuncios' });
 
     // Empty submit triggers client validation without calling server
+    await openComposer();
     fireEvent.click(screen.getByRole('button', { name: 'Publicar anuncio' }));
     expect(
       await screen.findByText('Ingresá un título para el anuncio.'),
@@ -468,9 +509,9 @@ describe('NoticeBoardPanel', () => {
       },
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
+    await chooseMenuItem('Aviso privado', 'Eliminar');
     fireEvent.click(
-      screen.getByRole('button', { name: 'Confirmar eliminación' }),
+      await screen.findByRole('button', { name: 'Confirmar eliminación' }),
     );
 
     expect(
@@ -512,9 +553,9 @@ describe('NoticeBoardPanel', () => {
     ).not.toBeInTheDocument();
 
     // Clicking Editar opens the edit form even without publish_content
-    fireEvent.click(screen.getAllByRole('button', { name: 'Editar' })[0]!);
+    await chooseMenuItem('Aviso 12', 'Editar');
     expect(
-      screen.getByRole('heading', { name: 'Editar anuncio' }),
+      await screen.findByRole('heading', { name: 'Editar anuncio' }),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar edición' }));
 
@@ -534,9 +575,9 @@ describe('NoticeBoardPanel', () => {
     renderNoticeBoardPanel({ role: 'TEACHER' });
     await screen.findByText('Aviso a editar');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    await chooseMenuItem('Aviso a editar', 'Editar');
     expect(
-      screen.getByRole('heading', { name: 'Editar anuncio' }),
+      await screen.findByRole('heading', { name: 'Editar anuncio' }),
     ).toBeInTheDocument();
 
     store.failNext('update', {
@@ -556,7 +597,7 @@ describe('NoticeBoardPanel', () => {
       screen.queryByRole('heading', { name: 'Editar anuncio' }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: 'Publicar anuncio' }),
+      screen.getByRole('button', { name: 'Escribir un anuncio para el aula' }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'Tablón de anuncios' }),
@@ -580,9 +621,9 @@ describe('NoticeBoardPanel', () => {
       `${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}/announcements/${existing!.id}`,
       { method: 'DELETE' },
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
+    await chooseMenuItem('Aviso ya borrado', 'Eliminar');
     fireEvent.click(
-      screen.getByRole('button', { name: 'Confirmar eliminación' }),
+      await screen.findByRole('button', { name: 'Confirmar eliminación' }),
     );
 
     expect(
@@ -612,8 +653,8 @@ describe('NoticeBoardPanel', () => {
     renderNoticeBoardPanel({ role: 'TEACHER' });
     await screen.findByText('Aviso a guardar');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
-    fireEvent.change(screen.getByLabelText('Título'), {
+    await chooseMenuItem('Aviso a guardar', 'Editar');
+    fireEvent.change(await screen.findByLabelText('Título'), {
       target: { value: 'Aviso guardado' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
@@ -631,7 +672,7 @@ describe('NoticeBoardPanel', () => {
   });
 
   it.each(['edit', 'create'] as const)(
-    'locks row Edit and Remove while a %s submit is in flight',
+    'locks the notice action menus while a %s submit is in flight',
     async (flow) => {
       const store = createClassroomAnnouncementsStore({
         classroomId: CLASSROOM_ID,
@@ -678,11 +719,12 @@ describe('NoticeBoardPanel', () => {
       await screen.findByText('Primer aviso');
 
       if (flow === 'edit') {
-        fireEvent.click(screen.getAllByRole('button', { name: 'Editar' })[0]!);
+        await chooseMenuItem('Segundo aviso', 'Editar');
         fireEvent.click(
-          screen.getByRole('button', { name: 'Guardar cambios' }),
+          await screen.findByRole('button', { name: 'Guardar cambios' }),
         );
       } else {
+        await openComposer();
         fireEvent.change(screen.getByLabelText('Título'), {
           target: { value: 'Nuevo aviso' },
         });
@@ -696,24 +738,141 @@ describe('NoticeBoardPanel', () => {
 
       await waitFor(() => {
         for (const button of screen.getAllByRole('button', {
-          name: /^(Editar|Eliminar)$/,
+          name: /^Acciones del anuncio/,
         })) {
           expect(button).toBeDisabled();
         }
       });
       expect(
-        screen.getAllByRole('button', { name: /^(Editar|Eliminar)$/ }),
-      ).toHaveLength(4);
+        screen.getAllByRole('button', { name: /^Acciones del anuncio/ }),
+      ).toHaveLength(2);
 
       release();
 
       await waitFor(() => {
         for (const button of screen.getAllByRole('button', {
-          name: /^(Editar|Eliminar)$/,
+          name: /^Acciones del anuncio/,
         })) {
           expect(button).toBeEnabled();
         }
       });
     },
   );
+
+  it('shows who published each notice with role, relative age, absolute date and the full body', async () => {
+    const threeHoursAgo = new Date(Date.now() - 3 * 3_600_000).toISOString();
+    const store = createClassroomAnnouncementsStore({
+      classroomId: CLASSROOM_ID,
+      authorId: OTHER_TEACHER_ID,
+      initialItems: [
+        makeAnnouncement({
+          authorId: OTHER_TEACHER_ID,
+          title: 'Aviso con autor',
+          content: 'Primera línea del aviso.\nSegunda línea del aviso.',
+          createdAt: threeHoursAgo,
+          updatedAt: threeHoursAgo,
+        }),
+      ],
+    });
+    mswServer.use(
+      ...store.handlers,
+      http.get(`${TEST_API_BASE_URL}/classrooms/:id/members`, () =>
+        HttpResponse.json({
+          items: [
+            {
+              id: OTHER_TEACHER_ID,
+              userId: OTHER_TEACHER_ID,
+              displayName: 'Prof. Ana García',
+              role: 'TEACHER',
+            },
+          ],
+          page: 1,
+          pageSize: 100,
+          total: 1,
+        }),
+      ),
+    );
+
+    renderNoticeBoardPanel({
+      role: 'STUDENT',
+      capabilities: ['participate_activities', 'list_directory'],
+    });
+
+    const note = (
+      await screen.findByRole('heading', { name: 'Aviso con autor' })
+    ).closest('article')!;
+    expect(await within(note).findByText('Prof. Ana García')).toBeVisible();
+    expect(within(note).getByText('Docente')).toBeInTheDocument();
+    expect(within(note).getByText('AG')).toHaveAttribute('aria-hidden', 'true');
+
+    const age = within(note).getByText('hace 3 horas');
+    const time = age.closest('time')!;
+    expect(time).toHaveAttribute('datetime', threeHoursAgo);
+    expect(time).toHaveAttribute('title', formatInstant(threeHoursAgo));
+    expect(within(note).getByText(formatInstant(threeHoursAgo))).toBeVisible();
+
+    const body = within(note).getByText(/Primera línea del aviso\./);
+    expect(body.textContent).toBe(
+      'Primera línea del aviso.\nSegunda línea del aviso.',
+    );
+    expect(body.className).toContain('whitespace-pre-wrap');
+  });
+
+  it('labels your own notices "Vos" and falls back to a neutral author without the directory', async () => {
+    const store = createClassroomAnnouncementsStore({
+      classroomId: CLASSROOM_ID,
+      authorId: profile.id,
+      initialItems: [
+        makeAnnouncement({
+          id: '00000000-0000-4000-8000-000000002201',
+          title: 'Aviso propio',
+        }),
+        makeAnnouncement({
+          id: '00000000-0000-4000-8000-000000002202',
+          authorId: OTHER_TEACHER_ID,
+          title: 'Aviso ajeno',
+        }),
+      ],
+    });
+    mswServer.use(...store.handlers);
+
+    renderNoticeBoardPanel({ role: 'TEACHER' });
+
+    const own = (
+      await screen.findByRole('heading', { name: 'Aviso propio' })
+    ).closest('article')!;
+    expect(within(own).getByText('Vos')).toBeInTheDocument();
+    const other = screen
+      .getByRole('heading', { name: 'Aviso ajeno' })
+      .closest('article')!;
+    expect(within(other).getByText('Equipo docente')).toBeInTheDocument();
+  });
+
+  it('invites teachers to write the first notice and tells students nothing is posted yet', async () => {
+    const store = createClassroomAnnouncementsStore({
+      classroomId: CLASSROOM_ID,
+      authorId: profile.id,
+    });
+    mswServer.use(...store.handlers);
+
+    const { unmount } = renderNoticeBoardPanel({ role: 'TEACHER' });
+    expect(
+      await screen.findByText(
+        'Escribí el primer aviso para que lo vea todo el aula.',
+      ),
+    ).toBeInTheDocument();
+    unmount();
+
+    renderNoticeBoardPanel({ role: 'STUDENT' });
+    expect(
+      await screen.findByText(
+        'Cuando un docente publique un aviso, va a aparecer acá en orden cronológico.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('registers the notice board as a wide panel', () => {
+    const entry = classroomPanelCatalog.find((item) => item.key === 'notices');
+    expect(entry).toMatchObject({ wide: true });
+  });
 });

@@ -48,6 +48,9 @@ export const gradesMessages = {
       EXAM: 'Examen',
     },
     scoreLabel: 'Calificación',
+    meterLabel: (score: number, max: number) =>
+      `Calificación: ${score} de ${max}`,
+    reportCardListLabel: 'Calificaciones por actividad',
     feedbackLabel: 'Devolución',
     pointsLabel: 'Puntos ganados',
     lateBadge: 'Entrega tarde',
@@ -104,6 +107,8 @@ export const gradesMessages = {
     staleDescription:
       'Falló la actualización automática; el seguimiento puede no estar al día.',
     tableCaption: 'Seguimiento de participación por alumno',
+    studentCount: (count: number) =>
+      count === 1 ? '1 alumno' : `${count} alumnos`,
     columns: {
       student: 'Alumno',
       connected: 'Tiempo conectado',

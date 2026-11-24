@@ -291,6 +291,45 @@ describe('ChatPanel moderation (#51, S3/S10: teacher-level hide)', () => {
     await expectAccessible(view.container);
   });
 
+  it('keeps the moderation control outside the bubble, still focusable and named, on the free side', async () => {
+    const target = makeMessage({
+      body: 'Mensaje ajeno',
+      createdAt: '2026-11-19T03:25:00.000Z',
+    });
+    const store = createClassroomChatStore({
+      classroomId: CLASSROOM_ID,
+      currentUserId: TEACHER_ID,
+      role: 'TEACHER',
+      initialMessages: [target],
+      members: makeMembers(),
+    });
+    mswServer.use(...store.handlers);
+
+    renderModerationRoute();
+    expect(await screen.findByText('Mensaje ajeno')).toBeVisible();
+
+    const button = screen.getByRole('button', {
+      name: hideButtonName('Sofía Martínez', target.createdAt),
+    });
+    const bubble = screen.getByText('Mensaje ajeno').closest('[data-bubble]');
+    expect(bubble).not.toBeNull();
+    // Out of the bubble: it reserves no space inside it...
+    expect(bubble).not.toContainElement(button);
+    // ...but hides with opacity only, so it stays in the tab order.
+    expect(button.classList.contains('hidden')).toBe(false);
+    expect(button.classList.contains('invisible')).toBe(false);
+    button.focus();
+    expect(button).toHaveFocus();
+    // Others' messages sit on the left with the control as a sibling outside [data-bubble].
+    const row = bubble?.closest('li');
+    expect(row).not.toBeNull();
+    expect(row).toContainElement(button);
+    expect(row?.className).toContain('justify-start');
+    expect(row?.className).not.toContain('flex-row-reverse');
+    expect(button.className).toContain('size-11');
+    expect(button.className).not.toContain('pointer-fine:pointer-events-none');
+  });
+
   it('shows the pending state during the hide request and never presents the row as hidden before the 204', async () => {
     const target = makeMessage({
       body: 'Mensaje con demora',

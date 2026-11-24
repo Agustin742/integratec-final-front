@@ -6,6 +6,8 @@ export const announcementMessages = {
   emptyTitle: 'Todavía no hay anuncios',
   emptyDescription:
     'Cuando un docente publique un aviso, va a aparecer acá en orden cronológico.',
+  emptyTeacherDescription:
+    'Escribí el primer aviso para que lo vea todo el aula.',
   emptyPageTitle: 'No hay más anuncios en esta página',
   emptyPageDescription: 'Volvé a la primera página para ver los avisos.',
   errorTitle: 'No pudimos cargar el tablón de anuncios',
@@ -41,10 +43,20 @@ export const announcementMessages = {
     alreadyRemovedNoticeDescription:
       'Alguien lo eliminó antes. Actualizamos el tablón.',
     removeErrorTitle: 'No pudimos eliminar el anuncio',
+    authorSelf: 'Vos',
+    authorFallback: 'Equipo docente',
+    justNow: 'recién',
+    roleTeacher: 'Docente',
+    roleStudent: 'Estudiante',
+    actionsAriaLabel: (title: string) => `Acciones del anuncio «${title}»`,
     paginationPrevious: 'Anterior',
     paginationNext: 'Siguiente',
     paginationPageOf: (page: number, totalPages: number) =>
       `Página ${page} de ${totalPages}`,
+  },
+  composer: {
+    open: 'Escribir un anuncio para el aula',
+    discard: 'Descartar',
   },
   form: {
     publishHeading: 'Publicar anuncio',

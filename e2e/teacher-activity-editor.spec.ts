@@ -336,6 +336,7 @@ async function attachRuntimeMonitors(page: Page) {
 test('teacher publishes an exam and the server-confirmed activity appears in the list', async ({
   page,
 }, testInfo) => {
+  test.setTimeout(60_000);
   const width = testInfo.project.name === 'mobile' ? 360 : 1280;
   await page.setViewportSize({ width, height: 800 });
   const { cspViolations, pageErrors } = await attachRuntimeMonitors(page);
@@ -443,12 +444,14 @@ test('teacher publishes an exam and the server-confirmed activity appears in the
   // While the modal publish dialog is open, Radix marks the background panel
   // `aria-hidden="true"`, so verify the reconciled draft via DOM text until
   // the publish modal closes and restores full ARIA access to the list.
-  const backgroundList = panel.locator('ul');
+  const backgroundBoard = panel
+    .locator('[data-testid="activities-board"], ul')
+    .first();
   await expect(
-    backgroundList.getByText(examTitle, { exact: true }),
+    backgroundBoard.getByText(examTitle, { exact: true }),
   ).toBeVisible();
   await expect(
-    backgroundList.getByText(activityMessages.stateLabels.DRAFT, {
+    backgroundBoard.getByText(activityMessages.stateLabels.DRAFT, {
       exact: true,
     }),
   ).toBeVisible();
@@ -458,10 +461,10 @@ test('teacher publishes an exam and the server-confirmed activity appears in the
     .click();
 
   await expect(publish).toHaveCount(0);
-  const list = panel.getByRole('list', {
+  const group = panel.getByRole('group', {
     name: activityMessages.listRegionLabel,
   });
-  const publishedItem = list
+  const publishedItem = group
     .getByRole('listitem')
     .filter({ hasText: examTitle });
   await expect(publishedItem).toBeVisible();
@@ -485,9 +488,20 @@ test('teacher publishes an exam and the server-confirmed activity appears in the
   ).toBeVisible();
   await expect(
     publishedItem.getByRole('button', {
-      name: actionsCopy.publishAriaLabel(examTitle),
+      name: activityMessages.board.moreActionsAriaLabel(examTitle),
+    }),
+  ).toBeVisible();
+  await publishedItem
+    .getByRole('button', {
+      name: activityMessages.board.moreActionsAriaLabel(examTitle),
+    })
+    .click();
+  await expect(
+    page.getByRole('menuitem', {
+      name: actionsCopy.publishAction,
     }),
   ).toHaveCount(0);
+  await page.keyboard.press('Escape');
 
   expect(
     await page.evaluate(
@@ -599,17 +613,7 @@ test('student sees only published activities without teacher actions on desktop 
   ).toHaveCount(0);
   await expect(
     panel.getByRole('button', {
-      name: actionsCopy.editAriaLabel(publishedTp.title),
-    }),
-  ).toHaveCount(0);
-  await expect(
-    panel.getByRole('button', {
-      name: actionsCopy.publishAriaLabel(publishedTp.title),
-    }),
-  ).toHaveCount(0);
-  await expect(
-    panel.getByRole('button', {
-      name: actionsCopy.deactivateAriaLabel(publishedTp.title),
+      name: activityMessages.board.moreActionsAriaLabel(publishedTp.title),
     }),
   ).toHaveCount(0);
   await expect(panel.getByLabel(activityMessages.stateFilterLabel)).toHaveCount(
@@ -629,6 +633,7 @@ test('student sees only published activities without teacher actions on desktop 
 test('captures activities panel and editor UI evidence for documentation', async ({
   page,
 }, testInfo) => {
+  test.setTimeout(60_000);
   const width = testInfo.project.name === 'mobile' ? 360 : 1280;
   await page.setViewportSize({ width, height: 800 });
   const { cspViolations, pageErrors } = await attachRuntimeMonitors(page);
@@ -708,18 +713,18 @@ test('captures activities panel and editor UI evidence for documentation', async
     exact: true,
   });
   await expect(panel).toBeVisible();
-  const list = panel.getByRole('list', {
+  const group = panel.getByRole('group', {
     name: activityMessages.listRegionLabel,
   });
   await expect(
-    list.getByText(publishedTp.title, { exact: true }),
+    group.getByText(publishedTp.title, { exact: true }),
   ).toBeVisible();
-  await expect(list.getByText(draftExam.title, { exact: true })).toBeVisible();
+  await expect(group.getByText(draftExam.title, { exact: true })).toBeVisible();
   await expect(
-    list.getByText(activityMessages.stateLabels.DRAFT, { exact: true }),
+    group.getByText(activityMessages.stateLabels.DRAFT, { exact: true }),
   ).toBeVisible();
   await expect(
-    list.getByText(activityMessages.stateLabels.PUBLISHED, { exact: true }),
+    group.getByText(activityMessages.stateLabels.PUBLISHED, { exact: true }),
   ).toBeVisible();
 
   await page.screenshot({

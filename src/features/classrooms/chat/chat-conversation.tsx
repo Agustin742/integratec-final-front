@@ -21,7 +21,6 @@ import {
   createClassroomChatPredicate,
 } from '@/api/query-keys';
 import {
-  EmptyState,
   ErrorState,
   LoadingState,
   StaleDataNotice,
@@ -475,6 +474,23 @@ function ChatConversationView({
     prependAnchorRef.current = null;
   }, [historyItems]);
 
+  // The composer grows and shrinks under the list (auto-growing draft): while
+  // the reader is at the bottom, keep the latest message in view instead of
+  // letting the shrinking list push it out.
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (scroller === null || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      if (stickToBottomRef.current) {
+        scroller.scrollTop = scroller.scrollHeight;
+      }
+    });
+    observer.observe(scroller);
+    return () => {
+      observer.disconnect();
+    };
+  }, [hasHistory]);
+
   // Infinite scroll up: when the top sentinel nears the viewport, request the
   // next (older) page. The observer is re-armed after every fetch so a list
   // still shorter than the viewport keeps loading until it overflows.
@@ -597,11 +613,20 @@ function ChatConversationView({
             }}
           />
         ) : !hasHistory ? (
-          <EmptyState
-            headingLevel="h4"
-            title={chat.states.emptyTitle}
-            description={chat.states.emptyDescription}
-          />
+          // Same frame as the history, so an empty room still looks like a
+          // conversation: a friendly incoming bubble resting at the bottom of
+          // the message area, with the composer ready right below.
+          <div
+            data-testid="chat-empty"
+            className="flex min-h-0 flex-1 flex-col justify-end overflow-y-auto rounded-xl border border-edge bg-muted/40 px-3 py-3"
+          >
+            <div className="min-w-0 max-w-[92%] space-y-1 rounded-2xl rounded-tl-md border border-edge bg-card px-4 py-3 text-card-foreground shadow-panel">
+              <p className="text-sm font-semibold">{chat.states.emptyTitle}</p>
+              <p className="text-sm text-muted-foreground">
+                {chat.states.emptyDescription}
+              </p>
+            </div>
+          </div>
         ) : (
           <div
             ref={scrollRef}
@@ -676,13 +701,19 @@ function ChatConversationView({
                     key={message.id}
                     data-own={isOwn ? 'true' : 'false'}
                     className={cn(
-                      'flex min-w-0',
-                      isOwn ? 'justify-end' : 'justify-start',
+                      'group flex min-w-0 items-start gap-1',
+                      isOwn
+                        ? 'flex-row-reverse justify-start'
+                        : 'justify-start',
                     )}
                   >
+                    {/* Keep the moderation button as a sibling outside [data-bubble]
+                        so teacher and student bubbles share identical height, while
+                        keeping the whole row hoverable without pointer gaps. */}
                     <div
+                      data-bubble=""
                       className={cn(
-                        'group min-w-0 max-w-[88%] space-y-1 rounded-2xl border px-3 py-2 shadow-xs',
+                        'min-w-0 max-w-[min(88%,calc(100%-3rem))] space-y-1 rounded-2xl border px-3 py-2 shadow-xs',
                         isOwn
                           ? 'rounded-br-md border-success-edge bg-success text-success-foreground'
                           : 'rounded-bl-md border-edge bg-card text-foreground',
@@ -709,27 +740,6 @@ function ChatConversationView({
                         )}
                         {isHidden ? (
                           <Badge variant="secondary">{chat.hiddenBadge}</Badge>
-                        ) : null}
-                        {canModerateChat && !isHidden ? (
-                          <button
-                            type="button"
-                            aria-label={chat.moderation.hideAriaLabel(
-                              author.label,
-                              formatInstant(message.createdAt),
-                            )}
-                            aria-expanded={hideTarget?.id === message.id}
-                            disabled={hideTarget !== null}
-                            onClick={(event) => {
-                              hideTriggerRef.current = event.currentTarget;
-                              setHideTarget(message);
-                            }}
-                            // Always visible on touch; on hover-capable
-                            // pointers it appears on row hover or keyboard
-                            // focus, and stays reachable by Tab either way.
-                            className="ml-auto inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-opacity hover:bg-tray hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 pointer-fine:opacity-0 pointer-fine:group-focus-within:opacity-100 pointer-fine:group-hover:opacity-100"
-                          >
-                            <HideIcon />
-                          </button>
                         ) : null}
                       </div>
 
@@ -761,6 +771,30 @@ function ChatConversationView({
                         </time>
                       </div>
                     </div>
+                    {canModerateChat && !isHidden ? (
+                      <button
+                        type="button"
+                        aria-label={chat.moderation.hideAriaLabel(
+                          author.label,
+                          formatInstant(message.createdAt),
+                        )}
+                        aria-expanded={hideTarget?.id === message.id}
+                        disabled={hideTarget !== null}
+                        onClick={(event) => {
+                          hideTriggerRef.current = event.currentTarget;
+                          setHideTarget(message);
+                        }}
+                        className={cn(
+                          'mt-1 inline-flex size-11 pointer-fine:size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-opacity hover:bg-tray hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+                          // Hover-capable pointers: faded until the row is hovered
+                          // or focused (keeps pointer events active so Playwright
+                          // and real clicks never get intercepted by the row).
+                          'pointer-fine:opacity-0 pointer-fine:group-focus-within:opacity-100 pointer-fine:group-hover:opacity-100',
+                        )}
+                      >
+                        <HideIcon />
+                      </button>
+                    ) : null}
                   </li>
                 );
               })}

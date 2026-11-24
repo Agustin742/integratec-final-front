@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useParams } from 'react-router';
+import { useParams } from 'react-router';
 import { ApiError } from '@/api/errors';
 import {
   classroomActivitiesQueryKey,
@@ -18,12 +18,12 @@ import {
 } from '@/components/feedback/states';
 import { PaginationControls } from '@/components/pagination/pagination-controls';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
-import { Button, buttonStyles } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toast';
-import { cn } from '@/lib/utils';
 import { useSessionService } from '@/session/provider';
 import { useClassroomContext } from '../use-classroom-capabilities';
+import { ActivityRow } from './activity-row';
+import { groupActivities } from './activity-board-model';
 import {
   ActivityEditorDialog,
   type ActivityEditorMode,
@@ -38,7 +38,6 @@ import {
   isUncertainWriteError,
   listClassroomActivities,
 } from './activity-service';
-import { formatActivityDeadline } from './format-activity-deadline';
 import { activityMessages } from './messages';
 import {
   PublishActivityDialog,
@@ -104,9 +103,7 @@ function ActivitiesPanelContent({ classroomId }: { classroomId: string }) {
   const createActionRef = useRef<HTMLButtonElement>(null);
   const editorTriggerRef = useRef<HTMLElement | null>(null);
   const publishTriggerRef = useRef<HTMLElement | null>(null);
-  const deactivateButtonRefs = useRef<Map<string, HTMLButtonElement>>(
-    new Map(),
-  );
+  const menuTriggerRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const restoreTriggerActivityIdRef = useRef<string | null>(null);
   const isMountedRef = useRef(true);
   const isDeactivatingRef = useRef(false);
@@ -140,7 +137,7 @@ function ActivitiesPanelContent({ classroomId }: { classroomId: string }) {
     const triggerActivityId = restoreTriggerActivityIdRef.current;
     if (triggerActivityId !== null) {
       restoreTriggerActivityIdRef.current = null;
-      deactivateButtonRefs.current.get(triggerActivityId)?.focus();
+      menuTriggerRefs.current.get(triggerActivityId)?.focus();
     }
   }, [confirmTarget]);
 
@@ -240,26 +237,23 @@ function ActivitiesPanelContent({ classroomId }: { classroomId: string }) {
     setEditorMode({ kind: 'create' });
   };
 
-  const handleOpenEditEditor = (
-    activity: ActivitySummaryDto,
-    trigger: HTMLButtonElement | null,
-  ): void => {
+  const handleOpenEditEditor = (activity: ActivitySummaryDto): void => {
     if (isDeactivatingRef.current) {
       return;
     }
-    editorTriggerRef.current = trigger;
+    editorTriggerRef.current = menuTriggerRefs.current.get(activity.id) ?? null;
     setEditorFormKey((key) => key + 1);
     setEditorMode({ kind: 'edit', activityId: activity.id });
   };
 
   const handleOpenPublishConfirmation = (
     activity: PublishActivityTarget,
-    trigger: HTMLButtonElement | null,
   ): void => {
     if (isDeactivatingRef.current) {
       return;
     }
-    publishTriggerRef.current = trigger;
+    publishTriggerRef.current =
+      menuTriggerRefs.current.get(activity.id) ?? null;
     setPublishTarget(activity);
   };
 
@@ -307,13 +301,13 @@ function ActivitiesPanelContent({ classroomId }: { classroomId: string }) {
     });
   };
 
-  const setDeactivateButtonRef =
+  const registerMenuTrigger =
     (activityId: string) =>
     (node: HTMLButtonElement | null): void => {
       if (node) {
-        deactivateButtonRefs.current.set(activityId, node);
+        menuTriggerRefs.current.set(activityId, node);
       } else {
-        deactivateButtonRefs.current.delete(activityId);
+        menuTriggerRefs.current.delete(activityId);
       }
     };
 
@@ -499,31 +493,47 @@ function ActivitiesPanelContent({ classroomId }: { classroomId: string }) {
     query.data.total === 0 &&
     effectiveState !== undefined;
 
+  // Last confirmed server fetch: a pure, stable instant for phrasing and
+  // grouping deadlines (the server stays the authority on expiry).
+  const now = query.dataUpdatedAt;
+
   return (
     <div className="min-w-0 space-y-4">
-      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0 space-y-0.5">
           <h3
             ref={activitiesHeadingRef}
             tabIndex={-1}
-            className="text-lg font-semibold text-foreground outline-none"
+            className="sr-only outline-none focus:not-sr-only focus:font-display focus:text-lg focus:font-semibold"
           >
             {activityMessages.heading}
           </h3>
           <p className="text-sm text-muted-foreground">
-            {activityMessages.subtitle}
+            {query.data
+              ? activityMessages.board.summary(query.data.total)
+              : activityMessages.subtitle}
           </p>
         </div>
         {isStaff ? (
           <Button
             ref={createActionRef}
             type="button"
-            variant="secondary"
-            size="sm"
+            variant="default"
             disabled={isDeactivating}
             onClick={handleOpenCreateEditor}
-            className="min-h-11 shrink-0"
+            className="shrink-0"
           >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="size-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.4}
+              strokeLinecap="round"
+            >
+              <path d="M12 5v14M5 12h14" />
+            </svg>
             {activityMessages.actions.createAction}
           </Button>
         ) : null}
@@ -531,7 +541,7 @@ function ActivitiesPanelContent({ classroomId }: { classroomId: string }) {
 
       <LiveRegion message={liveAnnouncement} visuallyHidden />
 
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-end gap-3 rounded-2xl bg-tray px-4 py-3">
         <label className="grid gap-1 text-xs font-semibold text-foreground">
           <span>{activityMessages.sortLabel}</span>
           <select
@@ -645,266 +655,153 @@ function ActivitiesPanelContent({ classroomId }: { classroomId: string }) {
                   >
                     {activityMessages.clearFilterLabel}
                   </Button>
+                ) : isStaff ? (
+                  <Button
+                    type="button"
+                    variant="default"
+                    disabled={isDeactivating}
+                    onClick={handleOpenCreateEditor}
+                  >
+                    {activityMessages.board.emptyAction}
+                  </Button>
                 ) : undefined
               }
             />
           ) : (
             <>
-              <ul
+              <div
+                role="group"
                 aria-label={activityMessages.listRegionLabel}
-                className="min-w-0 space-y-3"
+                className="space-y-6"
               >
-                {query.data.items.map((item) => {
-                  const isConfirmingThis = confirmTarget?.id === item.id;
-                  const confirmHeadingId = `${panelId}-confirm-${item.id}`;
-                  const confirmDescId = `${panelId}-desc-${item.id}`;
-
-                  return (
-                    <li
-                      key={item.id}
-                      className="min-w-0 space-y-3 rounded-xl border border-edge bg-card p-4 shadow-xs"
-                    >
-                      <article className="min-w-0 space-y-2">
-                        <div
-                          className={
-                            isStaff
-                              ? 'space-y-3'
-                              : 'flex flex-wrap items-start justify-between gap-3'
-                          }
-                        >
-                          <div
-                            className={
-                              isStaff
-                                ? 'min-w-0 space-y-1.5'
-                                : 'min-w-[12rem] flex-1 space-y-1.5'
-                            }
-                          >
-                            <h4 className="break-words text-base font-semibold text-foreground">
-                              {item.title}
-                            </h4>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge variant="secondary">
-                                {activityMessages.typeLabels[item.type]}
-                              </Badge>
-                              <Badge variant="outline">
-                                {activityMessages.formatLabels[item.format]}
-                              </Badge>
-                              {isStaff ? (
-                                <Badge
-                                  variant={
-                                    item.state === 'PUBLISHED'
-                                      ? 'default'
-                                      : 'outline'
-                                  }
-                                >
-                                  {activityMessages.stateLabels[item.state]}
-                                </Badge>
-                              ) : null}
-                            </div>
-                          </div>
-
-                          <div
-                            className={
-                              isStaff
-                                ? 'flex min-w-0 flex-wrap items-center gap-2'
-                                : 'flex min-w-0 flex-wrap items-center justify-end gap-2'
-                            }
-                          >
-                            <Link
-                              to={`/classrooms/${encodeURIComponent(classroomId)}/activities/${encodeURIComponent(item.id)}`}
-                              aria-label={`${activityMessages.openDetailLabel}: ${item.title}`}
-                              className={cn(
-                                buttonStyles({
-                                  variant: 'outline',
-                                  size: 'sm',
-                                }),
-                                'min-h-11 shrink-0',
-                              )}
-                            >
-                              {activityMessages.openDetailLabel}
-                            </Link>
-
-                            {isStaff ? (
-                              <>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  aria-label={activityMessages.actions.editAriaLabel(
-                                    item.title,
-                                  )}
-                                  disabled={isDeactivating || isConfirmingThis}
-                                  onClick={(event) =>
-                                    handleOpenEditEditor(
-                                      item,
-                                      event.currentTarget,
-                                    )
-                                  }
-                                  className="min-h-11 shrink-0"
-                                >
-                                  {activityMessages.actions.editAction}
-                                </Button>
-                                {item.state === 'DRAFT' ? (
-                                  <Button
-                                    type="button"
-                                    variant="default"
-                                    size="sm"
-                                    aria-label={activityMessages.actions.publishAriaLabel(
-                                      item.title,
-                                    )}
-                                    disabled={
-                                      isDeactivating || isConfirmingThis
-                                    }
-                                    onClick={(event) =>
-                                      handleOpenPublishConfirmation(
-                                        item,
-                                        event.currentTarget,
-                                      )
-                                    }
-                                    className="min-h-11 shrink-0"
-                                  >
-                                    {activityMessages.actions.publishAction}
-                                  </Button>
-                                ) : null}
-                                <Button
-                                  ref={setDeactivateButtonRef(item.id)}
-                                  type="button"
-                                  variant="destructive"
-                                  size="sm"
-                                  aria-label={activityMessages.actions.deactivateAriaLabel(
-                                    item.title,
-                                  )}
-                                  aria-expanded={isConfirmingThis}
-                                  disabled={isDeactivating || isConfirmingThis}
-                                  onClick={() => handleOpenConfirmation(item)}
-                                  className="min-h-11 shrink-0"
-                                >
-                                  {activityMessages.actions.deactivateAction}
-                                </Button>
-                              </>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        {item.description ? (
-                          <p className="line-clamp-2 break-words text-sm text-muted-foreground">
-                            {item.description}
-                          </p>
-                        ) : null}
-
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                          <span>
-                            {activityMessages.dueAtLabel}{' '}
-                            <time dateTime={item.dueAt}>
-                              {formatActivityDeadline(
-                                item.dueAt,
-                                item.timeZone,
-                              )}
-                            </time>
-                          </span>
-                          {item.opensAt !== null ? (
-                            <span>
-                              {activityMessages.opensAtLabel}{' '}
-                              <time dateTime={item.opensAt}>
-                                {formatActivityDeadline(
-                                  item.opensAt,
-                                  item.timeZone,
-                                )}
-                              </time>
-                            </span>
-                          ) : null}
-                          <span>
-                            {activityMessages.maxScoreLabel(item.maxScore)}
-                          </span>
-                          <span>
-                            {activityMessages.weightLabel(
-                              item.weightMultiplier,
-                            )}
-                          </span>
-                          <span>
-                            {item.allowLate
-                              ? activityMessages.lateAllowedLabel
-                              : activityMessages.lateDisallowedLabel}
-                          </span>
-                          {item.format === 'MULTIPLE_CHOICE' ? (
-                            <span>
-                              {activityMessages.questionCountLabel(
-                                item.questionCount,
-                              )}
-                            </span>
-                          ) : null}
-                        </div>
-                      </article>
-
-                      {isConfirmingThis ? (
-                        <section
-                          aria-labelledby={confirmHeadingId}
-                          aria-describedby={confirmDescId}
-                          className="min-w-0 space-y-3 rounded-2xl border-2 border-destructive/40 bg-destructive/5 p-3.5"
-                        >
+                {groupActivities(query.data.items, { isStaff, now }).map(
+                  (group) => {
+                    const headingId = `${panelId}-group-${group.key}`;
+                    return (
+                      <section
+                        key={group.key}
+                        aria-labelledby={headingId}
+                        className="min-w-0 space-y-2"
+                      >
+                        <div className="flex flex-wrap items-baseline gap-x-2 px-1">
                           <h4
-                            id={confirmHeadingId}
-                            ref={confirmHeadingRef}
-                            tabIndex={-1}
-                            className="font-display text-base font-semibold text-foreground outline-none wrap-anywhere"
+                            id={headingId}
+                            className="font-display text-base font-semibold text-foreground"
                           >
-                            {activityMessages.actions.deactivateConfirmTitle(
-                              item.title,
-                            )}
+                            {activityMessages.board.groupLabels[group.key]}
                           </h4>
-                          <p
-                            id={confirmDescId}
-                            className="text-sm text-pretty text-muted-foreground"
-                          >
-                            {
-                              activityMessages.actions
-                                .deactivateConfirmDescription
-                            }
+                          <span className="text-sm text-muted-foreground">
+                            {group.items.length}
+                          </span>
+                          <p className="basis-full text-xs text-muted-foreground sm:basis-auto sm:before:mr-2 sm:before:content-['·']">
+                            {activityMessages.board.groupHints[group.key]}
                           </p>
+                        </div>
+                        <ul className="min-w-0 divide-y divide-edge overflow-hidden rounded-2xl border border-edge bg-card shadow-xs">
+                          {group.items.map((item) => {
+                            const isConfirmingThis =
+                              confirmTarget?.id === item.id;
+                            const confirmHeadingId = `${panelId}-confirm-${item.id}`;
+                            const confirmDescId = `${panelId}-desc-${item.id}`;
+                            return (
+                              <ActivityRow
+                                key={item.id}
+                                item={item}
+                                classroomId={classroomId}
+                                isStaff={isStaff}
+                                now={now}
+                                menuDisabled={
+                                  isDeactivating || isConfirmingThis
+                                }
+                                registerMenuTrigger={registerMenuTrigger(
+                                  item.id,
+                                )}
+                                onEdit={handleOpenEditEditor}
+                                onPublish={handleOpenPublishConfirmation}
+                                onDeactivate={handleOpenConfirmation}
+                              >
+                                {isConfirmingThis ? (
+                                  <section
+                                    aria-labelledby={confirmHeadingId}
+                                    aria-describedby={confirmDescId}
+                                    className="min-w-0 space-y-3 rounded-2xl border-2 border-destructive/40 bg-destructive/5 p-3.5"
+                                  >
+                                    <h4
+                                      id={confirmHeadingId}
+                                      ref={confirmHeadingRef}
+                                      tabIndex={-1}
+                                      className="font-display text-base font-semibold text-foreground outline-none wrap-anywhere"
+                                    >
+                                      {activityMessages.actions.deactivateConfirmTitle(
+                                        item.title,
+                                      )}
+                                    </h4>
+                                    <p
+                                      id={confirmDescId}
+                                      className="text-sm text-pretty text-muted-foreground"
+                                    >
+                                      {
+                                        activityMessages.actions
+                                          .deactivateConfirmDescription
+                                      }
+                                    </p>
 
-                          {deactivateError !== null ? (
-                            <Alert variant="destructive" role="alert">
-                              <AlertTitle>
-                                {activityMessages.actions.deactivateErrorTitle}
-                              </AlertTitle>
-                              <AlertDescription>
-                                {deactivateError}
-                              </AlertDescription>
-                            </Alert>
-                          ) : null}
+                                    {deactivateError !== null ? (
+                                      <Alert variant="destructive" role="alert">
+                                        <AlertTitle>
+                                          {
+                                            activityMessages.actions
+                                              .deactivateErrorTitle
+                                          }
+                                        </AlertTitle>
+                                        <AlertDescription>
+                                          {deactivateError}
+                                        </AlertDescription>
+                                      </Alert>
+                                    ) : null}
 
-                          <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={isDeactivating}
-                              onClick={handleCancelConfirmation}
-                              className="min-h-11"
-                            >
-                              {activityMessages.actions.deactivateConfirmCancel}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="sm"
-                              busy={isDeactivating}
-                              onClick={() => void handleConfirmDeactivation()}
-                              className="min-h-11"
-                            >
-                              {isDeactivating
-                                ? activityMessages.actions
-                                    .deactivateConfirmPending
-                                : activityMessages.actions
-                                    .deactivateConfirmSubmit}
-                            </Button>
-                          </div>
-                        </section>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
+                                    <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={isDeactivating}
+                                        onClick={handleCancelConfirmation}
+                                        className="min-h-11"
+                                      >
+                                        {
+                                          activityMessages.actions
+                                            .deactivateConfirmCancel
+                                        }
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="destructive"
+                                        size="sm"
+                                        busy={isDeactivating}
+                                        onClick={() =>
+                                          void handleConfirmDeactivation()
+                                        }
+                                        className="min-h-11"
+                                      >
+                                        {isDeactivating
+                                          ? activityMessages.actions
+                                              .deactivateConfirmPending
+                                          : activityMessages.actions
+                                              .deactivateConfirmSubmit}
+                                      </Button>
+                                    </div>
+                                  </section>
+                                ) : null}
+                              </ActivityRow>
+                            );
+                          })}
+                        </ul>
+                      </section>
+                    );
+                  },
+                )}
+              </div>
 
               {query.data.total > query.data.pageSize ? (
                 <PaginationControls

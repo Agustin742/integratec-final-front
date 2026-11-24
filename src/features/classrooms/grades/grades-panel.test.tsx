@@ -656,4 +656,40 @@ describe('GradesPanel (#46, HU-ACT-005)', () => {
       await screen.findByText('Fracciones: guía de ejercicios'),
     ).toBeVisible();
   });
+  test('student report card shows each grade as a score tile with a labeled meter', async () => {
+    useStudentHandlers();
+    renderGradesPanel();
+
+    expect(await screen.findByText('82 / 100')).toBeVisible();
+    const meters = screen.getAllByRole('meter');
+    expect(meters).toHaveLength(3);
+    expect(meters[0]).toHaveAttribute('aria-valuenow', '82');
+    expect(meters[0]).toHaveAttribute('aria-valuemax', '100');
+    expect(meters[0]).toHaveAccessibleName(student.meterLabel(82, 100));
+    expect(meters[2]).toHaveAttribute('aria-valuemax', '50');
+    expect(
+      screen.getByRole('list', { name: student.reportCardListLabel }),
+    ).toBeVisible();
+  });
+
+  test('teacher gradebook table scrolls in a focusable region with sticky header and sticky student column', async () => {
+    mswServer.use(createClassroomMetricsHandler(CLASSROOM_ID));
+    renderGradesPanel({ role: 'TEACHER' });
+
+    const region = await screen.findByRole('region', {
+      name: teacher.tableCaption,
+    });
+    expect(region).toHaveAttribute('tabindex', '0');
+    expect(
+      within(region).getByRole('columnheader', {
+        name: teacher.columns.student,
+      }),
+    ).toHaveClass('sticky');
+    const anaRow = rowOf('Ana Sánchez');
+    const rowHeader = within(anaRow).getByRole('rowheader');
+    expect(rowHeader).toHaveClass('sticky');
+    // Decorative initials disc next to the name.
+    expect(rowHeader).toHaveTextContent('AS');
+    expect(screen.getByText(teacher.studentCount(3))).toBeVisible();
+  });
 });

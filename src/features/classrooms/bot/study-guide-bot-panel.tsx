@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import { ApiError } from '@/api/errors';
@@ -107,17 +107,26 @@ function StudyGuideBotConversation({
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [sendNotice, setSendNotice] = useState<BotNotice | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
+  const logEndRef = useRef<HTMLDivElement>(null);
 
   const sendingRef = useRef(false);
   const activeAbortRef = useRef<AbortController | null>(null);
   const terminalReconciledRef = useRef(false);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
+      isMountedRef.current = false;
       activeAbortRef.current?.abort();
       activeAbortRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    logEndRef.current?.scrollIntoView?.({ block: 'end' });
+  }, [turns.length, pendingQuestion]);
 
   const statusQuery = useQuery({
     queryKey: classroomBotStatusQueryKey(userId, classroomId),
@@ -137,6 +146,9 @@ function StudyGuideBotConversation({
     statusQuery.data !== undefined &&
     !statusQuery.data.available &&
     statusQuery.data.reason === 'exam_in_progress';
+
+  const composerId = useId();
+  const fieldErrorId = useId();
 
   useEffect(() => {
     if (isExamLocked || isTerminalStatusError) {
@@ -230,6 +242,7 @@ function StudyGuideBotConversation({
     setSendNotice(null);
     sendingRef.current = true;
     setIsSending(true);
+    setPendingQuestion(parsed.data.question);
 
     const controller = new AbortController();
     activeAbortRef.current = controller;
@@ -323,15 +336,31 @@ function StudyGuideBotConversation({
       if (activeAbortRef.current === controller) {
         activeAbortRef.current = null;
       }
-      if (!controller.signal.aborted) {
+      if (isMountedRef.current) {
+        setPendingQuestion(null);
         setIsSending(false);
       }
     }
   }
 
   return (
-    <div className="min-w-0 space-y-5">
-      <p className="text-sm text-muted-foreground">{botMessages.subtitle}</p>
+    <div className="flex min-w-0 flex-col gap-4">
+      <header className="flex min-w-0 flex-wrap items-center gap-3 rounded-2xl border border-edge bg-tray/60 px-4 py-3 shadow-inset">
+        <BotAvatar />
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <h3 className="font-display text-lg font-semibold text-foreground">
+            {botMessages.headerTitle}
+          </h3>
+          <p className="text-sm text-pretty text-muted-foreground">
+            {botMessages.subtitle}
+          </p>
+        </div>
+        <Badge variant={isUnavailable ? 'secondary' : 'success'}>
+          {isUnavailable
+            ? botMessages.statusUnavailable
+            : botMessages.statusAvailable}
+        </Badge>
+      </header>
 
       {statusQuery.isError && (
         <StaleDataNotice
@@ -364,30 +393,48 @@ function StudyGuideBotConversation({
         </Alert>
       )}
 
-      {!isExamLocked && (
-        <section aria-label={botMessages.conversationRegionLabel}>
-          {turns.length === 0 ? (
+      {!isExamLocked &&
+        (turns.length === 0 && pendingQuestion === null ? (
+          <div className="min-w-0 space-y-4">
             <EmptyState
               title={botMessages.emptyHistoryTitle}
               description={botMessages.emptyHistoryDescription}
             />
-          ) : (
-            <ul className="space-y-4">
-              {turns.map((turn) => (
-                <li
-                  key={turn.id}
-                  className="min-w-0 space-y-3 rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-sm"
+            <div
+              role="group"
+              aria-label={botMessages.suggestionsLabel}
+              className="flex flex-wrap justify-center gap-2"
+            >
+              {botMessages.suggestions.map((suggestion) => (
+                <Button
+                  key={suggestion}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isUnavailable || effectiveIsSending}
+                  onClick={() => {
+                    setQuestion(suggestion);
+                    setFieldError(null);
+                  }}
+                  className="h-auto min-h-11 text-left whitespace-normal"
                 >
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">
-                      {botMessages.userAuthorLabel}
-                    </p>
-                    <p className="text-sm text-foreground wrap-anywhere">
-                      {turn.question}
-                    </p>
-                  </div>
-
-                  <div className="space-y-2 border-t border-border/60 pt-3">
+                  {suggestion}
+                </Button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div
+            role="log"
+            aria-label={botMessages.conversationRegionLabel}
+            className="max-h-[50vh] min-h-48 min-w-0 space-y-5 overflow-y-auto rounded-2xl border border-edge bg-tray/40 p-3 sm:p-4"
+          >
+            {turns.map((turn) => (
+              <div key={turn.id} className="min-w-0 space-y-4">
+                <UserBubble text={turn.question} />
+                <div className="flex min-w-0 items-start gap-2.5">
+                  <BotAvatar size="sm" />
+                  <div className="min-w-0 max-w-[92%] space-y-2 rounded-2xl rounded-tl-md border border-edge bg-card px-4 py-3 text-card-foreground shadow-panel">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-xs font-semibold text-primary">
                         {botMessages.botAuthorLabel}
@@ -404,22 +451,22 @@ function StudyGuideBotConversation({
                       )}
                     </div>
 
-                    <p className="whitespace-pre-line text-sm text-foreground wrap-anywhere">
+                    <p className="text-sm whitespace-pre-line text-foreground wrap-anywhere">
                       {turn.reply.answer}
                     </p>
 
                     {turn.reply.citations.length > 0 && (
-                      <div className="space-y-1.5 rounded-xl bg-muted/50 p-3">
+                      <div className="space-y-1.5 border-t border-edge/60 pt-2">
                         <p className="text-xs font-semibold text-muted-foreground">
                           {botMessages.citationsLabel}
                         </p>
-                        <ul className="space-y-1">
+                        <ul className="space-y-1.5">
                           {turn.reply.citations.map((citation, index) => (
                             <li
                               key={`${turn.id}-${citation.materialId}-${index}`}
-                              className="text-xs text-foreground wrap-anywhere"
+                              className="rounded-xl bg-tray/60 px-3 py-2 text-xs text-foreground wrap-anywhere"
                             >
-                              <span className="font-medium">
+                              <span className="font-semibold">
                                 {citation.filename}
                               </span>
                               {typeof citation.excerpt === 'string' &&
@@ -435,64 +482,113 @@ function StudyGuideBotConversation({
                       </div>
                     )}
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
+                </div>
+              </div>
+            ))}
+            {pendingQuestion !== null && (
+              <div className="min-w-0 space-y-4">
+                <UserBubble text={pendingQuestion} />
+                <div className="flex items-start gap-2.5">
+                  <BotAvatar size="sm" />
+                  <div
+                    role="status"
+                    className="rounded-2xl rounded-tl-md border border-edge bg-card px-4 py-3 text-sm text-muted-foreground shadow-panel motion-safe:animate-pulse"
+                  >
+                    {botMessages.thinking}
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={logEndRef} />
+          </div>
+        ))}
 
       <form
         onSubmit={(event) => void handleSubmit(event)}
         noValidate
-        className="space-y-3 rounded-2xl border border-border bg-card/70 p-4"
+        className="space-y-1.5 rounded-2xl border border-edge bg-card p-2 shadow-panel"
       >
-        <div className="space-y-1.5">
-          <label
-            htmlFor="study-guide-bot-question"
-            className="text-sm font-medium text-foreground"
-          >
-            {botMessages.composerLabel}
-          </label>
+        <label htmlFor={composerId} className="sr-only">
+          {botMessages.composerLabel}
+        </label>
+        <div className="flex min-w-0 items-end gap-2">
           <textarea
-            id="study-guide-bot-question"
-            rows={3}
+            id={composerId}
+            rows={2}
             value={question}
             disabled={isUnavailable || effectiveIsSending}
             aria-invalid={fieldError !== null || undefined}
-            aria-describedby={
-              fieldError !== null ? 'study-guide-bot-field-error' : undefined
-            }
+            aria-describedby={fieldError !== null ? fieldErrorId : undefined}
             placeholder={botMessages.composerPlaceholder}
             onChange={(event) => {
               setQuestion(event.target.value);
               if (fieldError !== null) setFieldError(null);
             }}
-            className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+            onKeyDown={(event) => {
+              if (
+                event.key === 'Enter' &&
+                !event.shiftKey &&
+                !event.nativeEvent.isComposing
+              ) {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
+              }
+            }}
+            className="min-w-0 flex-1 resize-none rounded-xl bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
           />
-          {fieldError !== null && (
-            <p
-              id="study-guide-bot-field-error"
-              role="alert"
-              className="text-xs text-destructive"
-            >
-              {fieldError}
-            </p>
-          )}
-        </div>
-
-        <div className="flex justify-end">
           <Button
             type="submit"
             disabled={isUnavailable}
             busy={effectiveIsSending}
+            className="shrink-0"
           >
             {effectiveIsSending
               ? botMessages.sendingAction
               : botMessages.sendAction}
           </Button>
         </div>
+        {fieldError !== null && (
+          <p
+            id={fieldErrorId}
+            role="alert"
+            className="px-3 text-xs text-destructive"
+          >
+            {fieldError}
+          </p>
+        )}
       </form>
+    </div>
+  );
+}
+
+function BotAvatar({ size = 'md' }: { readonly size?: 'sm' | 'md' }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-inset ${
+        size === 'sm' ? 'size-8' : 'size-11'
+      }`}
+    >
+      <svg
+        viewBox="0 0 24 24"
+        className={size === 'sm' ? 'size-4' : 'size-6'}
+        fill="currentColor"
+      >
+        <path d="M12 2l2.2 6.3L20.5 10l-6.3 2.2L12 18.5l-2.2-6.3L3.5 10l6.3-1.7L12 2zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z" />
+      </svg>
+    </span>
+  );
+}
+
+function UserBubble({ text }: { readonly text: string }) {
+  return (
+    <div className="flex min-w-0 flex-col items-end gap-1">
+      <p className="text-xs font-semibold text-muted-foreground">
+        {botMessages.userAuthorLabel}
+      </p>
+      <p className="max-w-[88%] rounded-2xl rounded-tr-md bg-primary px-4 py-2.5 text-sm whitespace-pre-line text-primary-foreground wrap-anywhere">
+        {text}
+      </p>
     </div>
   );
 }

@@ -552,6 +552,13 @@ describe('ChatPanel (#51, read side)', () => {
     expect(
       screen.queryByText('Cargando el chat del aula…'),
     ).not.toBeInTheDocument();
+    // The empty room still reads as a conversation: a framed message area
+    // holding a friendly bubble (the dock test covers the composer below).
+    const empty = screen.getByTestId('chat-empty');
+    expect(empty).toHaveTextContent('Todavía no hay mensajes en el chat');
+    expect(empty).toHaveTextContent(
+      'Cuando alguien del aula escriba, vas a ver el mensaje acá.',
+    );
   });
 
   it('shows a retryable load error distinct from empty, and retry recovers the history', async () => {

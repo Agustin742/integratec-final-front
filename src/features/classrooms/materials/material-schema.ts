@@ -26,6 +26,7 @@ export const materialDtoSchema: z.ZodType<MaterialDto> = z.object({
   filename: z.string().trim().min(1).max(255),
   contentType: materialContentTypeSchema,
   sizeBytes: z.number().int().nonnegative().max(MATERIAL_MAX_SIZE_BYTES),
+  moduleId: z.string().uuid().nullable(),
   createdAt: z.string().datetime({ offset: true }),
 });
 

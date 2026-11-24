@@ -788,35 +788,15 @@ export interface paths {
         };
         /**
          * List active study materials
-         * @description Staff and current students only. Offset pagination; sort is createdAt or -createdAt (default), with ID in the same direction as tiebreaker. Parents have no material permission.
+         * @description Staff and current students only. Offset pagination; sort is createdAt or -createdAt (default), with ID in the same direction as tiebreaker. Optional `moduleId` filter: a module UUID of this classroom (404 if absent or removed) or `unassigned`. Parents have no material permission.
          */
         get: operations["MaterialsController_list"];
         put?: never;
         /**
          * Upload one private study material
-         * @description Teacher-level staff only. One nonempty PDF/PNG/JPEG, at most 10 MiB. Leading byte signature, declared MIME and filename extension must agree; no scanning or complete content parsing. Filename: 1–120 ASCII letters, digits, spaces, dots, underscores, parentheses or hyphens, starting with a letter or digit. No other multipart fields.
+         * @description Teacher-level staff only. One nonempty PDF/PNG/JPEG, at most 10 MiB. Leading byte signature, declared MIME and filename extension must agree; no scanning or complete content parsing. Filename: 1–120 ASCII letters, digits, spaces, dots, underscores, parentheses or hyphens, starting with a letter or digit. The only other multipart field is the optional `moduleId` (an active module of this classroom; omitted means unassigned).
          */
         post: operations["MaterialsController_upload"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/classrooms/{id}/materials/{materialId}/download": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Issue a short-lived signed download URL
-         * @description Current staff or student membership required. Uses the existing configured storage URL TTL. Already issued links remain usable until expiry even after logical removal or membership revocation. Treat the URL as a secret bearer capability.
-         */
-        get: operations["MaterialsController_download"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -840,7 +820,99 @@ export interface paths {
         delete: operations["MaterialsController_remove"];
         options?: never;
         head?: never;
+        /**
+         * Move a material to a module or to unassigned
+         * @description Teacher-level staff only. Body `moduleId` is an active module of the same classroom, or null to unassign. A module of another classroom is a 404.
+         */
+        patch: operations["MaterialsController_move"];
+        trace?: never;
+    };
+    "/classrooms/{id}/materials/{materialId}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Issue a short-lived signed download URL
+         * @description Current staff or student membership required. Uses the existing configured storage URL TTL. Already issued links remain usable until expiry even after logical removal or membership revocation. Treat the URL as a secret bearer capability.
+         */
+        get: operations["MaterialsController_download"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/material-modules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the classroom material modules in order
+         * @description Staff and current students only (same visibility as materials). Active modules ordered by position, with the count of active materials in each. Materials with no module are "unassigned": list them with `GET /classrooms/:id/materials?moduleId=unassigned`.
+         */
+        get: operations["MaterialModulesController_list"];
+        put?: never;
+        /**
+         * Create a module
+         * @description Teacher-level staff only. The module is appended after the last one.
+         */
+        post: operations["MaterialModulesController_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/material-modules/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Reorder the modules
+         * @description Teacher-level staff only. `moduleIds` must list every active module of the classroom exactly once; positions are rewritten to 0..n-1. Returns the new ordered list.
+         */
+        put: operations["MaterialModulesController_reorder"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/material-modules/{moduleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a module
+         * @description Teacher-level staff only. Logical removal. The module never blocks on content: its materials are NOT deleted, they return to unassigned (`moduleId: null`) in the same transaction. Repeated removal returns 404.
+         */
+        delete: operations["MaterialModulesController_remove"];
+        options?: never;
+        head?: never;
+        /**
+         * Rename a module or change its description
+         * @description Teacher-level staff only. At least one field is required; `description: null` clears it.
+         */
+        patch: operations["MaterialModulesController_update"];
         trace?: never;
     };
     "/classrooms/{id}/me/equipment": {
@@ -942,6 +1014,86 @@ export interface paths {
          * @description Teacher-level staff only; every other actor receives 404. The material is excluded from bot retrieval immediately and its indexed chunks are removed; re-enabling indexes from scratch. Repeated disable returns 404.
          */
         delete: operations["BotMaterialsController_disable"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/bot/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get server-decided Study Guide Bot availability for this classroom
+         * @description Returns whether the Study Guide Bot is available, locked during an active exam (students only), or missing indexed approved materials.
+         */
+        get: operations["BotAskController_getStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/bot/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask the classroom Study Guide Bot a study question
+         * @description Answers strictly from teacher-approved classroom material using pgvector RAG and returns server-verified citations. Rejects students while an exam is in progress (including in-flight queries) with 409 Conflict.
+         */
+        post: operations["BotAskController_ask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/me/daily-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Daily review state for the authenticated user
+         * @description Server-decided state for the local day (America/Argentina/Buenos_Aires, server clock). `not_due` covers every non-delivery cause (already delivered today, another tab, parent, no classroom access, exam in progress); the client does not distinguish causes. The first authenticated access of the day delivers once under a unique constraint, so reloads and concurrent tabs cannot re-deliver.
+         */
+        get: operations["DailyReviewController_getDailyReview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/me/daily-review/daily-question": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer the daily review question
+         * @description Validates the chosen option against the server-only answer key and credits the study streak at most once per local day. The answer key never leaves the server. Wrong answers are retryable inside a per-user attempt budget for the local day; a correct answer closes the question and further attempts answer 409.
+         */
+        post: operations["DailyReviewController_answerDailyQuestion"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2447,8 +2599,20 @@ export interface components {
             /** @enum {string} */
             contentType: "application/pdf" | "image/png" | "image/jpeg";
             sizeBytes: number;
+            /**
+             * Format: uuid
+             * @description Module the material belongs to; null means unassigned.
+             */
+            moduleId: string | null;
             /** Format: date-time */
             createdAt: string;
+        };
+        MoveMaterialDto: {
+            /**
+             * Format: uuid
+             * @description Target module of this classroom, or null to unassign the material.
+             */
+            moduleId: string | null;
         };
         MaterialDownloadDto: {
             /**
@@ -2458,6 +2622,40 @@ export interface components {
             url: string;
             /** @description Configured URL lifetime. */
             expiresInSeconds: number;
+        };
+        MaterialModuleDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            classroomId: string;
+            /** @example Unit 1 */
+            name: string;
+            description: string | null;
+            /** @description Zero-based order within the classroom. */
+            position: number;
+            /** @description Active materials in this module. */
+            materialCount: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        MaterialModuleListDto: {
+            /** @description Active modules ordered by position. */
+            items: components["schemas"]["MaterialModuleDto"][];
+        };
+        CreateMaterialModuleDto: {
+            name: string;
+            description?: string;
+        };
+        ReorderMaterialModulesDto: {
+            /** @description Every active module of the classroom exactly once, in the desired order. Anything else is rejected. */
+            moduleIds: string[];
+        };
+        UpdateMaterialModuleDto: {
+            name?: string;
+            /** @description Send null to clear the description. */
+            description?: string | null;
         };
         /** @enum {string} */
         EquippedSlotName: "head" | "face" | "back" | "desk_decor";
@@ -2550,6 +2748,131 @@ export interface components {
             failureReason?: Record<string, never> | null;
             /** Format: date-time */
             createdAt: string;
+        };
+        BotStatusDto: {
+            /** @description Whether the Study Guide Bot is currently available to the caller. */
+            available: boolean;
+            /**
+             * @description Server-decided reason when `available` is `false`; otherwise `null`.
+             * @enum {string|null}
+             */
+            reason: "exam_in_progress" | "no_materials" | "disabled" | null;
+            /** @description User-facing explanation when unavailable; otherwise `null`. */
+            message: string | null;
+        };
+        AskStudyGuideBotDto: {
+            /** @description Plain-text study question for the classroom Study Guide Bot. */
+            question: string;
+        };
+        BotCitationDto: {
+            /** Format: uuid */
+            materialId: string;
+            /** @example guia-unidad-1.pdf */
+            filename: string;
+            excerpt: string | null;
+        };
+        BotAnswerDto: {
+            /** Format: uuid */
+            id: string;
+            /** @description Plain-text study guidance answer from the server. */
+            answer: string;
+            /** @enum {string} */
+            outcome: "answered" | "out_of_scope" | "guided_only";
+            citations: components["schemas"]["BotCitationDto"][];
+            /** Format: date-time */
+            createdAt: string;
+        };
+        DailyReviewItemDto: {
+            /**
+             * @description Row kind; the frontend renders each kind with its own layout.
+             * @enum {string}
+             */
+            kind: "pending_activity" | "recent_grade" | "announcement" | "teacher_review";
+            /** @example Trabajo práctico de fotosíntesis */
+            title: string;
+            /** @example Biología 3°B */
+            classroomName: string;
+            /**
+             * Format: date-time
+             * @description ISO 8601 UTC instant; the frontend displays it in the school time zone.
+             */
+            dueAt: Record<string, never> | null;
+            /** @description Kind-specific detail, for example a grade rendered as "9/10". */
+            detail: Record<string, never> | null;
+        };
+        DailyReviewSectionDto: {
+            /** @enum {string} */
+            kind: "pending" | "news";
+            items: components["schemas"]["DailyReviewItemDto"][];
+        };
+        DailyQuestionDto: {
+            /**
+             * Format: uuid
+             * @description Question id to submit with the chosen answer.
+             */
+            id: string;
+            /** @example ¿Qué organelo realiza la fotosíntesis? */
+            prompt: string;
+            /** @description Answer options; the submission sends the chosen option text. */
+            options: string[];
+            /** @description Source material title the question was built from, when known. */
+            materialTitle: Record<string, never> | null;
+        };
+        DailyReviewResponseDto: {
+            /** @enum {string} */
+            status: "not_due" | "due";
+            /**
+             * @description Present when status is `due`: students get review + question, teachers review only.
+             * @enum {string}
+             */
+            audience?: "STUDENT" | "TEACHER";
+            /**
+             * @description Present when status is `due`. `structured` is the fallback built only from PostgreSQL data with `summary: null`; the frontend labels it non-generated.
+             * @enum {string}
+             */
+            contentKind?: "generated" | "structured";
+            /** @description Model wording when contentKind is `generated`; null on the structured fallback. */
+            summary?: Record<string, never> | null;
+            sections?: components["schemas"]["DailyReviewSectionDto"][];
+            /** @description Present for students when the server has a question for the day; null on the structured fallback. */
+            dailyQuestion?: components["schemas"]["DailyQuestionDto"] | null;
+        };
+        AnswerDailyQuestionDto: {
+            /**
+             * @description Id of the daily question delivered to this user today.
+             * @example 00000000-0000-4000-8000-000000000000
+             */
+            questionId: string;
+            /** @example Cloroplasto */
+            answer: string;
+        };
+        DailyQuestionStreakDto: {
+            /**
+             * @description Chain alive as of today.
+             * @example 5
+             */
+            currentStreak: number;
+            /** @example 9 */
+            bestStreak: number;
+            /**
+             * @description Local day (YYYY-MM-DD, America/Argentina/Buenos_Aires) of the last qualifying activity.
+             * @example 2026-11-19
+             */
+            lastQualifiedDate: Record<string, never> | null;
+        };
+        DailyQuestionAnswerResponseDto: {
+            /**
+             * @description Exact trimmed-text match against the stored answer key.
+             * @example true
+             */
+            correct: boolean;
+            /**
+             * @description Server-authored feedback in the product language; never model output.
+             * @example ¡Muy bien! Respuesta correcta y día de racha ganado.
+             */
+            feedback: string;
+            /** @description Live streak after this answer. */
+            streak: components["schemas"]["DailyQuestionStreakDto"];
         };
         RosterGuardianDto: {
             /** Format: uuid */
@@ -5610,6 +5933,8 @@ export interface operations {
                 pageSize?: number;
                 /** @description Field to order by; prefix with "-" for descending. Allowed fields and the default order are listed per endpoint. */
                 sort?: string;
+                /** @description Only materials of this module (UUID), or "unassigned" for materials in no module. Omit for all active materials. */
+                moduleId?: string;
             };
             header?: never;
             path: {
@@ -5692,6 +6017,8 @@ export interface operations {
                 "multipart/form-data": {
                     /** Format: binary */
                     file: string;
+                    /** Format: uuid */
+                    moduleId?: string;
                 };
             };
         };
@@ -5759,6 +6086,117 @@ export interface operations {
             };
         };
     };
+    MaterialsController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Material UUID */
+                materialId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom, insufficient role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, absent, removed or out-of-scope resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    MaterialsController_move: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Material UUID */
+                materialId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveMaterialDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaterialDto"];
+                };
+            };
+            /** @description moduleId is not a UUID or null. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom, insufficient role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, absent, removed or out-of-scope resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
     MaterialsController_download: {
         parameters: {
             query?: never;
@@ -5817,15 +6255,194 @@ export interface operations {
             };
         };
     };
-    MaterialsController_remove: {
+    MaterialModulesController_list: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 /** @description Classroom UUID */
                 id: string;
-                /** @description Material UUID */
-                materialId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaterialModuleListDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom, insufficient role (students write, parents read). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, absent, removed or out-of-scope classroom or module. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    MaterialModulesController_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMaterialModuleDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaterialModuleDto"];
+                };
+            };
+            /** @description Validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom, insufficient role (students write, parents read). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, absent, removed or out-of-scope classroom or module. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Module limit reached (100). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    MaterialModulesController_reorder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReorderMaterialModulesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaterialModuleListDto"];
+                };
+            };
+            /** @description The list misses, repeats or invents modules. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom, insufficient role (students write, parents read). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, absent, removed or out-of-scope classroom or module. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    MaterialModulesController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Module UUID */
+                moduleId: string;
             };
             cookie?: never;
         };
@@ -5845,7 +6462,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Visible classroom, insufficient role. */
+            /** @description Visible classroom, insufficient role (students write, parents read). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5854,7 +6471,70 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Invalid, absent, removed or out-of-scope resource. */
+            /** @description Invalid, absent, removed or out-of-scope classroom or module. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    MaterialModulesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description Module UUID */
+                moduleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMaterialModuleDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MaterialModuleDto"];
+                };
+            };
+            /** @description Validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Visible classroom, insufficient role (students write, parents read). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, absent, removed or out-of-scope classroom or module. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -6185,6 +6865,240 @@ export interface operations {
             };
             /** @description The material is excluded but its index partition cleanup is pending. */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    BotAskController_getStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BotStatusDto"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Parents cannot use the Study Guide Bot. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, absent, or inaccessible classroom. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    BotAskController_ask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AskStudyGuideBotDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BotAnswerDto"];
+                };
+            };
+            /** @description Invalid question payload. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Parents cannot use the Study Guide Bot. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Invalid, absent, or inaccessible classroom. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Blocked because the student has an exam in progress. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Rate limit exceeded. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description External AI provider is temporarily unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    DailyReviewController_getDailyReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description `not_due`, or the full review payload with `status: due`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyReviewResponseDto"];
+                };
+            };
+            /** @description Missing, malformed, expired or revoked session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    DailyReviewController_answerDailyQuestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnswerDailyQuestionDto"];
+            };
+        };
+        responses: {
+            /** @description Answer evaluation with the live streak summary. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyQuestionAnswerResponseDto"];
+                };
+            };
+            /** @description Invalid body: missing `questionId`/`answer`, non-string values, empty answer, or over 120 characters. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing, malformed, expired or revoked session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description No question for this user (foreign or malformed `questionId`, no question delivered today, teacher or parent). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description The question belongs to another local day, was already answered today, a concurrent correct answer won, or the student has an exam in progress. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description The per-user attempt budget for the local day is exhausted. */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
