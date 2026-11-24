@@ -7,13 +7,17 @@ import {
   useRef,
   type ReactNode,
 } from 'react';
-import { AnimationClip, AnimationMixer } from 'three';
+import { AnimationClip, AnimationMixer, type AnimationAction } from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Avatar } from '@/features/profile/avatar-options';
 import { evictRejectedGlbAsset, readCachedGlbAsset } from '../asset-cache';
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion';
+import { resolveClip } from '../classroom/local-avatar-frame';
 import { resolveAvatarParts } from './avatar-parts';
 import { composeAvatar, type AvatarPartKind } from './compose-avatar';
+
+/** Blend time between two body clips; short so starting to move feels instant. */
+export const AVATAR_CROSSFADE_SECONDS = 0.2;
 
 export interface AvatarModelProps {
   readonly avatar: Avatar;
@@ -156,33 +160,74 @@ function LoadedAvatar({
   const reducedMotion = usePrefersReducedMotion();
   const invalidate = useThree((state) => state.invalidate);
   const frameloop = useThree((state) => state.frameloop);
+  // One mixer lives as long as the composed avatar, so a clip change blends
+  // from the running action instead of hard-switching. Hair and top share the
+  // body's bones, so this single mixer animates the whole avatar.
   const mixerRef = useRef<AnimationMixer | null>(null);
+  const actionRef = useRef<AnimationAction | null>(null);
+  /** True while a clip is playing and may advance (never under reduced motion). */
+  const advancingRef = useRef(false);
   useEffect(() => {
-    if (!animation) return;
-    const clip = AnimationClip.findByName(bodyGltf.animations, animation);
-    if (!clip) return;
     const mixer = new AnimationMixer(composed.root);
-    mixer.clipAction(clip).play();
-    // Pose the first frame instead of the bind pose (a T-pose); only motion
-    // that is allowed keeps advancing it.
-    mixer.update(0);
-    mixerRef.current = reducedMotion ? null : mixer;
-    invalidate();
+    mixerRef.current = mixer;
     return () => {
       mixer.stopAllAction();
       mixer.uncacheRoot(composed.root);
       mixerRef.current = null;
+      actionRef.current = null;
+      advancingRef.current = false;
     };
-  }, [animation, reducedMotion, bodyGltf, composed, invalidate]);
+  }, [composed]);
+  const clipNames = useMemo(
+    () => bodyGltf.animations.map((clip) => clip.name),
+    [bodyGltf],
+  );
+  useEffect(() => {
+    const mixer = mixerRef.current;
+    if (!mixer) return;
+    const name = resolveClip(animation, clipNames);
+    const clip = name
+      ? AnimationClip.findByName(bodyGltf.animations, name)
+      : null;
+    const previous = actionRef.current;
+    if (!clip) {
+      mixer.stopAllAction();
+      actionRef.current = null;
+      advancingRef.current = false;
+      return;
+    }
+    const next = mixer.clipAction(clip);
+    if (next === previous) {
+      advancingRef.current = !reducedMotion;
+      return;
+    }
+    if (previous && !reducedMotion) {
+      next.enabled = true;
+      next.setEffectiveTimeScale(1);
+      next.setEffectiveWeight(1);
+      next.time = 0;
+      previous.crossFadeTo(next, AVATAR_CROSSFADE_SECONDS, false);
+      next.play();
+    } else {
+      previous?.stop();
+      next.reset().play();
+    }
+    actionRef.current = next;
+    // Pose the first frame instead of the bind pose (a T-pose); only motion
+    // that is allowed keeps advancing it.
+    mixer.update(0);
+    advancingRef.current = !reducedMotion;
+    invalidate();
+  }, [animation, reducedMotion, bodyGltf, clipNames, composed, invalidate]);
   // A `demand` loop stops once nothing invalidates it (hidden tab, offscreen
   // host), so an active clip asks for its next frame and for the first frame
   // after the loop resumes.
   useEffect(() => {
-    if (mixerRef.current && frameloop === 'demand') invalidate();
+    if (advancingRef.current && frameloop === 'demand') invalidate();
   }, [frameloop, invalidate]);
   useFrame((state, delta) => {
     const mixer = mixerRef.current;
-    if (!mixer) return;
+    if (!mixer || !advancingRef.current) return;
     mixer.update(delta);
     state.invalidate();
   });

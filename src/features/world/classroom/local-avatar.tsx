@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Group, type Object3D } from 'three';
 import type { Avatar } from '@/features/profile/avatar-options';
 import { AvatarModel } from '../avatar/avatar-model';
+import { usePrefersReducedMotion } from '../use-prefers-reduced-motion';
 import type { Pose } from '../movement';
 import {
   advanceLocalAvatar,
@@ -39,7 +40,7 @@ function PlaceholderBody() {
 
 /**
  * The user's own avatar. Position and heading are written to a three group in
- * `useFrame`; React re-renders only when the Idle/Walk clip flips.
+ * `useFrame`; React re-renders only when the Idle/Run clip flips.
  */
 export function LocalAvatar({
   controller,
@@ -56,6 +57,7 @@ export function LocalAvatar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const invalidate = useThree((state) => state.invalidate);
+  const reducedMotion = usePrefersReducedMotion();
   const [moving, setMoving] = useState(false);
   const movingRef = useRef(false);
 
@@ -66,6 +68,7 @@ export function LocalAvatar({
       marker,
       dt,
       invalidate,
+      reducedMotion,
     });
     if (nowMoving !== movingRef.current) {
       movingRef.current = nowMoving;

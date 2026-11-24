@@ -1,5 +1,6 @@
 import { act, render, screen } from '@testing-library/react';
 import {
+  AnimationAction,
   AnimationClip,
   AnimationMixer,
   Bone,
@@ -19,7 +20,7 @@ import {
   setGlbLoaderForTests,
 } from '../asset-cache';
 import type { ComposedAvatar } from './compose-avatar';
-import { AvatarModel } from './avatar-model';
+import { AVATAR_CROSSFADE_SECONDS, AvatarModel } from './avatar-model';
 
 const frame = vi.hoisted(() => ({
   callback: null as null | ((state: unknown, delta: number) => void),
@@ -275,5 +276,79 @@ describe('AvatarModel', () => {
     act(() => tick(0.1));
     expect(update).toHaveBeenCalledTimes(1);
     expect(frame.invalidate).not.toHaveBeenCalled();
+  });
+  describe('clip changes', () => {
+    it('keeps one mixer and crossfades between Idle and Run', async () => {
+      useLoader([], ['Idle', 'Walk', 'Run']);
+      mockReducedMotion(false);
+      const uncacheRoot = vi.spyOn(AnimationMixer.prototype, 'uncacheRoot');
+      const crossFade = vi.spyOn(AnimationAction.prototype, 'crossFadeTo');
+      const view = await mount(
+        <AvatarModel avatar={avatar} animation="Idle" />,
+      );
+      expect(crossFade).not.toHaveBeenCalled();
+
+      await act(async () => {
+        view.rerender(<AvatarModel avatar={avatar} animation="Run" />);
+      });
+      expect(crossFade).toHaveBeenCalledTimes(1);
+      expect(crossFade.mock.calls[0]?.[1]).toBe(AVATAR_CROSSFADE_SECONDS);
+      expect(crossFade.mock.calls[0]?.[2]).toBe(false);
+      expect(uncacheRoot).not.toHaveBeenCalled();
+
+      await act(async () => {
+        view.rerender(<AvatarModel avatar={avatar} animation="Idle" />);
+      });
+      expect(crossFade).toHaveBeenCalledTimes(2);
+      expect(uncacheRoot).not.toHaveBeenCalled();
+
+      view.unmount();
+      expect(uncacheRoot).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the demand loop alive while a crossfade runs', async () => {
+      useLoader([], ['Idle', 'Run']);
+      mockReducedMotion(false);
+      const view = await mount(
+        <AvatarModel avatar={avatar} animation="Idle" />,
+      );
+      await act(async () => {
+        view.rerender(<AvatarModel avatar={avatar} animation="Run" />);
+      });
+      frame.invalidate.mockClear();
+      act(() => tick(0.1));
+      expect(frame.invalidate).toHaveBeenCalledTimes(1);
+    });
+
+    it('plays Walk when the body has no Run, and Idle when it has neither', async () => {
+      useLoader([], ['Idle', 'Walk']);
+      mockReducedMotion(false);
+      const crossFade = vi.spyOn(AnimationAction.prototype, 'crossFadeTo');
+      const view = await mount(<AvatarModel avatar={avatar} animation="Run" />);
+      const update = vi.spyOn(AnimationMixer.prototype, 'update');
+      act(() => tick(0.1));
+      expect(update).toHaveBeenCalledWith(0.1);
+      expect(crossFade).not.toHaveBeenCalled();
+      view.unmount();
+    });
+
+    it('switches without blending under prefers-reduced-motion', async () => {
+      useLoader([], ['Idle', 'Run']);
+      mockReducedMotion(true);
+      const crossFade = vi.spyOn(AnimationAction.prototype, 'crossFadeTo');
+      const update = vi.spyOn(AnimationMixer.prototype, 'update');
+      const view = await mount(
+        <AvatarModel avatar={avatar} animation="Idle" />,
+      );
+      await act(async () => {
+        view.rerender(<AvatarModel avatar={avatar} animation="Run" />);
+      });
+      expect(crossFade).not.toHaveBeenCalled();
+      update.mockClear();
+      frame.invalidate.mockClear();
+      act(() => tick(0.1));
+      expect(update).not.toHaveBeenCalled();
+      expect(frame.invalidate).not.toHaveBeenCalled();
+    });
   });
 });
