@@ -18,14 +18,14 @@
 
 ## Previews (Male and Female)
 
-| Style | Male 1280px | Male 360px | Female 1280px | Female 360px |
-| --- | --- | --- | --- | --- |
-| Buzz cut | [Male 1280](../assets/hair-buzz-cut/male-1280.png) | [Male 360](../assets/hair-buzz-cut/male-360.png) | [Female 1280](../assets/hair-buzz-cut/female-1280.png) | [Female 360](../assets/hair-buzz-cut/female-360.png) |
-| Classic short | [Male 1280](../assets/hair-classic-short/male-1280.png) | [Male 360](../assets/hair-classic-short/male-360.png) | [Female 1280](../assets/hair-classic-short/female-1280.png) | [Female 360](../assets/hair-classic-short/female-360.png) |
-| Fringe | [Male 1280](../assets/hair-fringe/male-1280.png) | [Male 360](../assets/hair-fringe/male-360.png) | [Female 1280](../assets/hair-fringe/female-1280.png) | [Female 360](../assets/hair-fringe/female-360.png) |
-| Short curls | [Male 1280](../assets/hair-short-curls/male-1280.png) | [Male 360](../assets/hair-short-curls/male-360.png) | [Female 1280](../assets/hair-short-curls/female-1280.png) | [Female 360](../assets/hair-short-curls/female-360.png) |
-| Soft mohawk | [Male 1280](../assets/hair-soft-mohawk/male-1280.png) | [Male 360](../assets/hair-soft-mohawk/male-360.png) | [Female 1280](../assets/hair-soft-mohawk/female-1280.png) | [Female 360](../assets/hair-soft-mohawk/female-360.png) |
-| Side part | [Male 1280](../assets/hair-side-part/male-1280.png) | [Male 360](../assets/hair-side-part/male-360.png) | [Female 1280](../assets/hair-side-part/female-1280.png) | [Female 360](../assets/hair-side-part/female-360.png) |
+| Style | Male 1280px | Female 1280px |
+| --- | --- | --- |
+| Buzz cut | [Male 1280](../assets/hair-buzz-cut/male-1280.png) | [Female 1280](../assets/hair-buzz-cut/female-1280.png) |
+| Classic short | [Male 1280](../assets/hair-classic-short/male-1280.png) | [Female 1280](../assets/hair-classic-short/female-1280.png) |
+| Fringe | [Male 1280](../assets/hair-fringe/male-1280.png) | [Female 1280](../assets/hair-fringe/female-1280.png) |
+| Short curls | [Male 1280](../assets/hair-short-curls/male-1280.png) | [Female 1280](../assets/hair-short-curls/female-1280.png) |
+| Soft mohawk | [Male 1280](../assets/hair-soft-mohawk/male-1280.png) | [Female 1280](../assets/hair-soft-mohawk/female-1280.png) |
+| Side part | [Male 1280](../assets/hair-side-part/male-1280.png) | [Female 1280](../assets/hair-side-part/female-1280.png) |
 
 ## Design and shared fit
 

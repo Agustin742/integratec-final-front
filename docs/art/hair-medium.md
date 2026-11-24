@@ -16,12 +16,12 @@
 
 ## Previews (Male and Female)
 
-| Style | Male 1280px | Male 360px | Female 1280px | Female 360px |
-| --- | --- | --- | --- | --- |
-| Bob | [Male 1280](../assets/hair-bob/male-1280.png) | [Male 360](../assets/hair-bob/male-360.png) | [Female 1280](../assets/hair-bob/female-1280.png) | [Female 360](../assets/hair-bob/female-360.png) |
-| Wavy | [Male 1280](../assets/hair-wavy/male-1280.png) | [Male 360](../assets/hair-wavy/male-360.png) | [Female 1280](../assets/hair-wavy/female-1280.png) | [Female 360](../assets/hair-wavy/female-360.png) |
-| Messy | [Male 1280](../assets/hair-messy/male-1280.png) | [Male 360](../assets/hair-messy/male-360.png) | [Female 1280](../assets/hair-messy/female-1280.png) | [Female 360](../assets/hair-messy/female-360.png) |
-| Middle part | [Male 1280](../assets/hair-middle-part/male-1280.png) | [Male 360](../assets/hair-middle-part/male-360.png) | [Female 1280](../assets/hair-middle-part/female-1280.png) | [Female 360](../assets/hair-middle-part/female-360.png) |
+| Style | Male 1280px | Female 1280px |
+| --- | --- | --- |
+| Bob | [Male 1280](../assets/hair-bob/male-1280.png) | [Female 1280](../assets/hair-bob/female-1280.png) |
+| Wavy | [Male 1280](../assets/hair-wavy/male-1280.png) | [Female 1280](../assets/hair-wavy/female-1280.png) |
+| Messy | [Male 1280](../assets/hair-messy/male-1280.png) | [Female 1280](../assets/hair-messy/female-1280.png) |
+| Middle part | [Male 1280](../assets/hair-middle-part/male-1280.png) | [Female 1280](../assets/hair-middle-part/female-1280.png) |
 
 ## Design and shared fit
 

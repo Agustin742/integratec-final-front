@@ -31,10 +31,10 @@ Twenty-four final-decoded garment pose renders cover start/mid/end of Idle (1/25
 
 Separate ignored viewer: `odd/previews/basic-tshirt-review.blend`. Select `REVIEW_BasicTShirt_Male` or `REVIEW_BasicTShirt_Female`; scrub frames 1–231 or press Space. Existing body animations are retained. Final decoded garments bind by canonical bone names to independent copies of the animated body rigs in this preview only (female retains her legacy41 body rig). Exported garments remain canonical34. All skin and existing pants/boots remain present; legacy upper garments are not copied into this viewer. Rig overlays are hidden. This viewer is not approval.
 
-| Variant | 1280px Blender render | 360px Blender render |
-| --- | --- | --- |
-| Male | [Preview](../assets/basic-tshirt/male-1280.png) | [Preview](../assets/basic-tshirt/male-360.png) |
-| Female | [Preview](../assets/basic-tshirt/female-1280.png) | [Preview](../assets/basic-tshirt/female-360.png) |
+| Variant | 1280px Blender render |
+| --- | --- |
+| Male | [Preview](../assets/basic-tshirt/male-1280.png) |
+| Female | [Preview](../assets/basic-tshirt/female-1280.png) |
 
 Local pose images: `odd/previews/basic-tshirt-{male,female}-{Idle,Walk,Sit,Wave}-<frame>.png`. These are orthographic Blender renders, not responsive UI screenshots. Inspected frontal three-quarter torso, sleeve openings, hem and female Wave / male Sit samples. Remaining concerns: the large head obscures much of the neckline; rear neckline/shoulder clearance and all pose samples require parent/independent inspection. Visible faceting and underarm/hem fit need that visual disposition; no body modification or relaxed check was used to conceal concerns.
 

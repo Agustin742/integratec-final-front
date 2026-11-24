@@ -18,14 +18,14 @@
 
 ## Previews (Male and Female)
 
-| Style | Male 1280px | Male 360px | Female 1280px | Female 360px |
-| --- | --- | --- | --- | --- |
-| Ponytail | [Male 1280](../assets/hair-ponytail/male-1280.png) | [Male 360](../assets/hair-ponytail/male-360.png) | [Female 1280](../assets/hair-ponytail/female-1280.png) | [Female 360](../assets/hair-ponytail/female-360.png) |
-| Two pigtails | [Male 1280](../assets/hair-two-pigtails/male-1280.png) | [Male 360](../assets/hair-two-pigtails/male-360.png) | [Female 1280](../assets/hair-two-pigtails/female-1280.png) | [Female 360](../assets/hair-two-pigtails/female-360.png) |
-| Bun | [Male 1280](../assets/hair-bun/male-1280.png) | [Male 360](../assets/hair-bun/male-360.png) | [Female 1280](../assets/hair-bun/female-1280.png) | [Female 360](../assets/hair-bun/female-360.png) |
-| Braid | [Male 1280](../assets/hair-braid/male-1280.png) | [Male 360](../assets/hair-braid/male-360.png) | [Female 1280](../assets/hair-braid/female-1280.png) | [Female 360](../assets/hair-braid/female-360.png) |
-| Two braids | [Male 1280](../assets/hair-two-braids/male-1280.png) | [Male 360](../assets/hair-two-braids/male-360.png) | [Female 1280](../assets/hair-two-braids/female-1280.png) | [Female 360](../assets/hair-two-braids/female-360.png) |
-| Half-up | [Male 1280](../assets/hair-half-up/male-1280.png) | [Male 360](../assets/hair-half-up/male-360.png) | [Female 1280](../assets/hair-half-up/female-1280.png) | [Female 360](../assets/hair-half-up/female-360.png) |
+| Style | Male 1280px | Female 1280px |
+| --- | --- | --- |
+| Ponytail | [Male 1280](../assets/hair-ponytail/male-1280.png) | [Female 1280](../assets/hair-ponytail/female-1280.png) |
+| Two pigtails | [Male 1280](../assets/hair-two-pigtails/male-1280.png) | [Female 1280](../assets/hair-two-pigtails/female-1280.png) |
+| Bun | [Male 1280](../assets/hair-bun/male-1280.png) | [Female 1280](../assets/hair-bun/female-1280.png) |
+| Braid | [Male 1280](../assets/hair-braid/male-1280.png) | [Female 1280](../assets/hair-braid/female-1280.png) |
+| Two braids | [Male 1280](../assets/hair-two-braids/male-1280.png) | [Female 1280](../assets/hair-two-braids/female-1280.png) |
+| Half-up | [Male 1280](../assets/hair-half-up/male-1280.png) | [Female 1280](../assets/hair-half-up/female-1280.png) |
 
 ## Design and shared fit
 

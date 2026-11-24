@@ -16,12 +16,12 @@
 
 ## Previews (Male and Female)
 
-| Style | Male 1280px | Male 360px | Female 1280px | Female 360px |
-| --- | --- | --- | --- | --- |
-| Afro | [Male 1280](../assets/hair-afro/male-1280.png) | [Male 360](../assets/hair-afro/male-360.png) | [Female 1280](../assets/hair-afro/female-1280.png) | [Female 360](../assets/hair-afro/female-360.png) |
-| Dreads | [Male 1280](../assets/hair-dreads/male-1280.png) | [Male 360](../assets/hair-dreads/male-360.png) | [Female 1280](../assets/hair-dreads/female-1280.png) | [Female 360](../assets/hair-dreads/female-360.png) |
-| Box braids | [Male 1280](../assets/hair-box-braids/male-1280.png) | [Male 360](../assets/hair-box-braids/male-360.png) | [Female 1280](../assets/hair-box-braids/female-1280.png) | [Female 360](../assets/hair-box-braids/female-360.png) |
-| Afro with headband | [Male 1280](../assets/hair-afro-with-headband/male-1280.png) | [Male 360](../assets/hair-afro-with-headband/male-360.png) | [Female 1280](../assets/hair-afro-with-headband/female-1280.png) | [Female 360](../assets/hair-afro-with-headband/female-360.png) |
+| Style | Male 1280px | Female 1280px |
+| --- | --- | --- |
+| Afro | [Male 1280](../assets/hair-afro/male-1280.png) | [Female 1280](../assets/hair-afro/female-1280.png) |
+| Dreads | [Male 1280](../assets/hair-dreads/male-1280.png) | [Female 1280](../assets/hair-dreads/female-1280.png) |
+| Box braids | [Male 1280](../assets/hair-box-braids/male-1280.png) | [Female 1280](../assets/hair-box-braids/female-1280.png) |
+| Afro with headband | [Male 1280](../assets/hair-afro-with-headband/male-1280.png) | [Female 1280](../assets/hair-afro-with-headband/female-1280.png) |
 
 ## Design and shared fit
 

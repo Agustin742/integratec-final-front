@@ -1,18 +1,19 @@
 # Tracker — Alejo
 
-## 2026-11-24 — Sync `feat/91-modular-avatar-assets` with `develop`, compress preview PNGs, update wishlist, and open PR (#91)
+## 2026-11-24 — Sync `feat/91-modular-avatar-assets` with `develop`, compress & deduplicate preview PNGs, update wishlist, and open PR #132 (#91)
 
-- **Status:** in review (`feat/91-modular-avatar-assets` synced with `origin/develop`, ready for PR to `develop`)
-- **Area / files:** `docs/assets/{back,face,hair,head,*-*}/*.png` (`236` preview PNGs), `docs/art/asset-wishlist.md`, `docs/ai-usage.md`, `changelogs/tracker-alejo.md`.
-- **Change:** Merged `origin/develop` (`9bdf184`), resolving the `docs/ai-usage.md` merge conflict while preserving both `#91` and `#37` entries; quantized and re-encoded all `236` modular avatar preview `.png` files (`197.37 MB -> 38.74 MB`, `-80.4%`) at full `1280×1280` and `360×360` resolution; and checked off (`[x]`) the `59` delivered modular customization items (`23` hair, `15` tops, `9` head, `6` face, `6` back) in `docs/art/asset-wishlist.md`, leaving undelivered categories (`Hand items`, `Neck and ears`, `Bottoms`, `Shoes`, base bodies, animations, environment objects) unchecked.
-- **Reason:** Prepare a clean, lightweight, up-to-date pull request against `develop` so teammates can access all `79` modular `.glb` assets (`5.15 MB` total) and `59` `.blend` sources (`66.35 MB`) while the remaining categories continue in follow-up work.
-- **Coordination:** Existing Alejo Project item `PVTI_lAHOCevXNc4BoRd2zhK9fEI`, issue `#91`.
+- **Status:** in review ([PR #132](https://github.com/Agustin742/integratec-final-front/pull/132) on `feat/91-modular-avatar-assets` targeting `develop`)
+- **Area / files:** `docs/assets/{back,face,hair,head,*-*}/*-1280.png` (`118` kept, `118` duplicate `*-360.png` deleted), `docs/art/*.md` (`24` guides + `asset-wishlist.md`), `docs/ai-usage.md`, `changelogs/tracker-alejo.md`.
+- **Change:** Merged `origin/develop` (`9bdf184`), resolving the `docs/ai-usage.md` merge conflict while preserving both `#91` and `#37` entries; quantized and re-encoded preview `.png` files, removed all `118` duplicate `*-360.png` preview copies (retaining the `118` compressed `1280×1280` previews = `34.82 MB`, `-82.4%` vs original `197.37 MB`) and dropped the `360px` preview table columns across all `24` `docs/art/*.md` guides; checked off (`[x]`) the `59` delivered modular customization items (`23` hair, `15` tops, `9` head, `6` face, `6` back) in `docs/art/asset-wishlist.md`; and updated PR #132 with a full English description.
+- **Reason:** Keep the PR focused, lightweight, and compliant with repository English documentation rules while giving teammates clear asset paths, legacy coexistence notes, and Three.js integration links before starting Environment objects.
+- **Coordination:** Existing Alejo Project item `PVTI_lAHOCevXNc4BoRd2zhK9fEI`, issue `#91`, [PR #132](https://github.com/Agustin742/integratec-final-front/pull/132).
 - **Evidence:**
   - `node scripts/assets/check-asset-budget.mjs` passed (all `79` new `.glb` exports `<= 1 MB`; only the `3` pre-existing tracked `#91` exceptions remain).
   - All `24 / 24` structural asset checks (`scripts/assets/test-*.mjs`) passed.
+  - All `26` `docs/art/*.md` files verified (`0` `360.png` links, `0` broken relative links, `0` Markdown table column mismatches).
   - `prettier --check`, `eslint`, `tsc --noEmit`, `vite build` (`VITE_APP_ENV=test`), `node scripts/security/check-security-build.mjs`, and `git diff --check origin/develop..HEAD --` passed.
   - `python3` / `py` Windows Store aliases are unavailable in this local environment, so `scripts/ci/check_docs.py` and `scripts/ci` unit tests run in GitHub Actions CI on PR push.
-- **Next step:** Push `feat/91-modular-avatar-assets` and open the pull request into `develop` with folder layout, legacy-file coexistence notes, and Three.js integration links (`docs/3d-assets.md`, `docs/art/{head-accessories-everyday,head-accessories-special,back-accessories,face-accessories}.md`).
+- **Next step:** Push the updated commit to `feat/91-modular-avatar-assets`, confirm green GitHub Actions CI on [PR #132](https://github.com/Agustin742/integratec-final-front/pull/132), obtain teammate review/approval, and merge into `develop`.
 
 ## 2026-11-24 — Author & export 6 modular back accessories and `BackTuck` hair morph target (#91)
 

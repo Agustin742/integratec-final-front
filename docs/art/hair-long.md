@@ -15,11 +15,11 @@
 
 ## Previews (Male and Female)
 
-| Style | Male 1280px | Male 360px | Female 1280px | Female 360px |
-| --- | --- | --- | --- | --- |
-| Long straight | [Male 1280](../assets/hair-long-straight/male-1280.png) | [Male 360](../assets/hair-long-straight/male-360.png) | [Female 1280](../assets/hair-long-straight/female-1280.png) | [Female 360](../assets/hair-long-straight/female-360.png) |
-| Long wavy | [Male 1280](../assets/hair-long-wavy/male-1280.png) | [Male 360](../assets/hair-long-wavy/male-360.png) | [Female 1280](../assets/hair-long-wavy/female-1280.png) | [Female 360](../assets/hair-long-wavy/female-360.png) |
-| Long curls | [Male 1280](../assets/hair-long-curls/male-1280.png) | [Male 360](../assets/hair-long-curls/male-360.png) | [Female 1280](../assets/hair-long-curls/female-1280.png) | [Female 360](../assets/hair-long-curls/female-360.png) |
+| Style | Male 1280px | Female 1280px |
+| --- | --- | --- |
+| Long straight | [Male 1280](../assets/hair-long-straight/male-1280.png) | [Female 1280](../assets/hair-long-straight/female-1280.png) |
+| Long wavy | [Male 1280](../assets/hair-long-wavy/male-1280.png) | [Female 1280](../assets/hair-long-wavy/female-1280.png) |
+| Long curls | [Male 1280](../assets/hair-long-curls/male-1280.png) | [Female 1280](../assets/hair-long-curls/female-1280.png) |
 
 ## Design and shared fit
 

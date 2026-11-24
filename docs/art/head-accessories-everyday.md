@@ -18,13 +18,13 @@
 
 ## Previews (Male and Female)
 
-| Item | Male 1280px | Male 360px | Female 1280px | Female 360px |
-| --- | --- | --- | --- | --- |
-| Cap | [Male 1280](../assets/head-cap/male-1280.png) | [Male 360](../assets/head-cap/male-360.png) | [Female 1280](../assets/head-cap/female-1280.png) | [Female 360](../assets/head-cap/female-360.png) |
-| Backwards cap | [Male 1280](../assets/head-backwards-cap/male-1280.png) | [Male 360](../assets/head-backwards-cap/male-360.png) | [Female 1280](../assets/head-backwards-cap/female-1280.png) | [Female 360](../assets/head-backwards-cap/female-360.png) |
-| Beanie | [Male 1280](../assets/head-beanie/male-1280.png) | [Male 360](../assets/head-beanie/male-360.png) | [Female 1280](../assets/head-beanie/female-1280.png) | [Female 360](../assets/head-beanie/female-360.png) |
-| Headband | [Male 1280](../assets/head-headband/male-1280.png) | [Male 360](../assets/head-headband/male-360.png) | [Female 1280](../assets/head-headband/female-1280.png) | [Female 360](../assets/head-headband/female-360.png) |
-| Headphones | [Male 1280](../assets/head-headphones/male-1280.png) | [Male 360](../assets/head-headphones/male-360.png) | [Female 1280](../assets/head-headphones/female-1280.png) | [Female 360](../assets/head-headphones/female-360.png) |
+| Item | Male 1280px | Female 1280px |
+| --- | --- | --- |
+| Cap | [Male 1280](../assets/head-cap/male-1280.png) | [Female 1280](../assets/head-cap/female-1280.png) |
+| Backwards cap | [Male 1280](../assets/head-backwards-cap/male-1280.png) | [Female 1280](../assets/head-backwards-cap/female-1280.png) |
+| Beanie | [Male 1280](../assets/head-beanie/male-1280.png) | [Female 1280](../assets/head-beanie/female-1280.png) |
+| Headband | [Male 1280](../assets/head-headband/male-1280.png) | [Female 1280](../assets/head-headband/female-1280.png) |
+| Headphones | [Male 1280](../assets/head-headphones/male-1280.png) | [Female 1280](../assets/head-headphones/female-1280.png) |
 
 ## Design and shared fit
 

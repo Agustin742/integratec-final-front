@@ -29,10 +29,10 @@ The initial sleeve/back-volume trimming and nearest-surface fitting produced una
 - The following are Blender orthographic rest renders, not browser screenshots or proof of responsive UI/runtime integration. Pose previews and inspection reports remain local under ignored `odd/`.
 - No application code, API, catalog, dependency, or CI configuration changes. Full lint/typecheck/application tests/build/security/format/E2E and mobile GPU performance were not run for this asset-only change. Human visual approval and browser integration remain pending. The parent inspected the 24-sample contact sheet: the previous severe chest puckering, underarm web and long seated flap are absent in these views; the earlier slight waist-skin exposure prompted the minimal hem adjustment; frontal exported-GLB walking/seated samples and rear review views were checked again after the change. No all-poses clearance or final acceptance is claimed.
 
-| Reference | 1280px render | 360px render |
-| --- | --- | --- |
-| Male | [Preview](../assets/school-polo/male-1280.png) | [Preview](../assets/school-polo/male-360.png) |
-| Female | [Preview](../assets/school-polo/female-1280.png) | [Preview](../assets/school-polo/female-360.png) |
+| Reference | 1280px render |
+| --- | --- |
+| Male | [Preview](../assets/school-polo/male-1280.png) |
+| Female | [Preview](../assets/school-polo/female-1280.png) |
 
 ## Local human-review viewer
 

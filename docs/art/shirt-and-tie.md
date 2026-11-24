@@ -11,10 +11,10 @@
 - [Sleeve outward-normals regression test](../../scripts/assets/test-shirt-and-tie-sleeve-normals.py).
 - Ignored animated viewer: `odd/previews/shirt-and-tie-review.blend`, scenes `REVIEW_ShirtAndTie_Female` and `REVIEW_ShirtAndTie_Male` (scrub Idle `1–49`, Walk `50–74`, Sit `75–171`, Wave `172–231`).
 
-| Variant | 1280px Blender render | 360px Blender render |
-| --- | --- | --- |
-| Male | [Preview](../assets/shirt-and-tie/male-1280.png) | [Preview](../assets/shirt-and-tie/male-360.png) |
-| Female | [Preview](../assets/shirt-and-tie/female-1280.png) | [Preview](../assets/shirt-and-tie/female-360.png) |
+| Variant | 1280px Blender render |
+| --- | --- |
+| Male | [Preview](../assets/shirt-and-tie/male-1280.png) |
+| Female | [Preview](../assets/shirt-and-tie/female-1280.png) |
 
 ## Design and reuse
 

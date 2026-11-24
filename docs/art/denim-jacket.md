@@ -11,10 +11,10 @@
 - [Sleeve outward-normals regression test](../../scripts/assets/test-jackets-sleeve-normals.py).
 - Ignored animated viewer: `odd/previews/jackets-review.blend`, scenes `REVIEW_DenimJacket_Female` and `REVIEW_DenimJacket_Male` (scrub Idle `1–49`, Walk `50–74`, Sit `75–171`, Wave `172–231`).
 
-| Variant | 1280px Blender render | 360px Blender render |
-| --- | --- | --- |
-| Male | [Preview](../assets/denim-jacket/male-1280.png) | [Preview](../assets/denim-jacket/male-360.png) |
-| Female | [Preview](../assets/denim-jacket/female-1280.png) | [Preview](../assets/denim-jacket/female-360.png) |
+| Variant | 1280px Blender render |
+| --- | --- |
+| Male | [Preview](../assets/denim-jacket/male-1280.png) |
+| Female | [Preview](../assets/denim-jacket/female-1280.png) |
 
 ## Design and reuse
 

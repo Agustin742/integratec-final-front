@@ -20,14 +20,14 @@ Because chest geometry differs between Male (`y â‰ˆ -0.150 m`) and Female (`y â‰
 
 ## Previews (Male and Female)
 
-| Item | Male 1280px | Male 360px | Female 1280px | Female 360px |
-| --- | --- | --- | --- | --- |
-| Backpack | [Male 1280](../assets/back-backpack/male-1280.png) | [Male 360](../assets/back-backpack/male-360.png) | [Female 1280](../assets/back-backpack/female-1280.png) | [Female 360](../assets/back-backpack/female-360.png) |
-| Rolling backpack | [Male 1280](../assets/back-rolling-backpack/male-1280.png) | [Male 360](../assets/back-rolling-backpack/male-360.png) | [Female 1280](../assets/back-rolling-backpack/female-1280.png) | [Female 360](../assets/back-rolling-backpack/female-360.png) |
-| Superhero cape | [Male 1280](../assets/back-superhero-cape/male-1280.png) | [Male 360](../assets/back-superhero-cape/male-360.png) | [Female 1280](../assets/back-superhero-cape/female-1280.png) | [Female 360](../assets/back-superhero-cape/female-360.png) |
-| Wings | [Male 1280](../assets/back-wings/male-1280.png) | [Male 360](../assets/back-wings/male-360.png) | [Female 1280](../assets/back-wings/female-1280.png) | [Female 360](../assets/back-wings/female-360.png) |
-| Guitar | [Male 1280](../assets/back-guitar/male-1280.png) | [Male 360](../assets/back-guitar/male-360.png) | [Female 1280](../assets/back-guitar/female-1280.png) | [Female 360](../assets/back-guitar/female-360.png) |
-| Racket | [Male 1280](../assets/back-racket/male-1280.png) | [Male 360](../assets/back-racket/male-360.png) | [Female 1280](../assets/back-racket/female-1280.png) | [Female 360](../assets/back-racket/female-360.png) |
+| Item | Male 1280px | Female 1280px |
+| --- | --- | --- |
+| Backpack | [Male 1280](../assets/back-backpack/male-1280.png) | [Female 1280](../assets/back-backpack/female-1280.png) |
+| Rolling backpack | [Male 1280](../assets/back-rolling-backpack/male-1280.png) | [Female 1280](../assets/back-rolling-backpack/female-1280.png) |
+| Superhero cape | [Male 1280](../assets/back-superhero-cape/male-1280.png) | [Female 1280](../assets/back-superhero-cape/female-1280.png) |
+| Wings | [Male 1280](../assets/back-wings/male-1280.png) | [Female 1280](../assets/back-wings/female-1280.png) |
+| Guitar | [Male 1280](../assets/back-guitar/male-1280.png) | [Female 1280](../assets/back-guitar/female-1280.png) |
+| Racket | [Male 1280](../assets/back-racket/male-1280.png) | [Female 1280](../assets/back-racket/female-1280.png) |
 
 ## Design, materials, and strap routing
 

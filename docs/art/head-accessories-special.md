@@ -17,12 +17,12 @@
 
 ## Previews (Male and Female)
 
-| Item | Male 1280px | Male 360px | Female 1280px | Female 360px |
-| --- | --- | --- | --- | --- |
-| Astronaut helmet | [Male 1280](../assets/head-astronaut-helmet/male-1280.png) | [Male 360](../assets/head-astronaut-helmet/male-360.png) | [Female 1280](../assets/head-astronaut-helmet/female-1280.png) | [Female 360](../assets/head-astronaut-helmet/female-360.png) |
-| Top hat | [Male 1280](../assets/head-top-hat/male-1280.png) | [Male 360](../assets/head-top-hat/male-360.png) | [Female 1280](../assets/head-top-hat/female-1280.png) | [Female 360](../assets/head-top-hat/female-360.png) |
-| Crown | [Male 1280](../assets/head-crown/male-1280.png) | [Male 360](../assets/head-crown/male-360.png) | [Female 1280](../assets/head-crown/female-1280.png) | [Female 360](../assets/head-crown/female-360.png) |
-| Graduation cap | [Male 1280](../assets/head-graduation-cap/male-1280.png) | [Male 360](../assets/head-graduation-cap/male-360.png) | [Female 1280](../assets/head-graduation-cap/female-1280.png) | [Female 360](../assets/head-graduation-cap/female-360.png) |
+| Item | Male 1280px | Female 1280px |
+| --- | --- | --- |
+| Astronaut helmet | [Male 1280](../assets/head-astronaut-helmet/male-1280.png) | [Female 1280](../assets/head-astronaut-helmet/female-1280.png) |
+| Top hat | [Male 1280](../assets/head-top-hat/male-1280.png) | [Female 1280](../assets/head-top-hat/female-1280.png) |
+| Crown | [Male 1280](../assets/head-crown/male-1280.png) | [Female 1280](../assets/head-crown/female-1280.png) |
+| Graduation cap | [Male 1280](../assets/head-graduation-cap/male-1280.png) | [Female 1280](../assets/head-graduation-cap/female-1280.png) |
 
 ## Design and shared fit
 

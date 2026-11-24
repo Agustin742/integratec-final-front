@@ -11,10 +11,10 @@
 - [Sleeve outward-normals regression test](../../scripts/assets/test-school-smock-sleeve-normals.py).
 - Ignored animated viewer: `odd/previews/school-smock-elbow-fixed-review.blend`, scenes `ELBOW_FIXED_SchoolSmock_Female` and `ELBOW_FIXED_SchoolSmock_Male` (scrub Idle `1–49`, Walk `50–74`, Sit `75–171`, Wave `172–231`).
 
-| Variant | 1280px Blender render | 360px Blender render |
-| --- | --- | --- |
-| Male | [Preview](../assets/school-smock/male-1280.png) | [Preview](../assets/school-smock/male-360.png) |
-| Female | [Preview](../assets/school-smock/female-1280.png) | [Preview](../assets/school-smock/female-360.png) |
+| Variant | 1280px Blender render |
+| --- | --- |
+| Male | [Preview](../assets/school-smock/male-1280.png) |
+| Female | [Preview](../assets/school-smock/female-1280.png) |
 
 ## Seated elbow root cause and concentric ball-joint cap repair
 

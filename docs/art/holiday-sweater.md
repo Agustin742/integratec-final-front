@@ -11,10 +11,10 @@
 - [Sleeve outward-normals regression test](../../scripts/assets/test-seasonal-tops-sleeve-normals.py).
 - Ignored animated viewer: `odd/previews/seasonal-tops-review.blend`, scenes `REVIEW_HolidaySweater_Female` and `REVIEW_HolidaySweater_Male` (scrub Idle `1–49`, Walk `50–74`, Sit `75–171`, Wave `172–231`).
 
-| Variant | 1280px Blender render | 360px Blender render |
-| --- | --- | --- |
-| Male | [Preview](../assets/holiday-sweater/male-1280.png) | [Preview](../assets/holiday-sweater/male-360.png) |
-| Female | [Preview](../assets/holiday-sweater/female-1280.png) | [Preview](../assets/holiday-sweater/female-360.png) |
+| Variant | 1280px Blender render |
+| --- | --- |
+| Male | [Preview](../assets/holiday-sweater/male-1280.png) |
+| Female | [Preview](../assets/holiday-sweater/female-1280.png) |
 
 ## Design and reuse
 

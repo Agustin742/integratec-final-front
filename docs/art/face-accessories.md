@@ -19,14 +19,14 @@
 
 ## Previews (Male and Female)
 
-| Item | Male 1280px | Male 360px | Female 1280px | Female 360px |
-| --- | --- | --- | --- | --- |
-| Round glasses | [Male 1280](../assets/face-round-glasses/male-1280.png) | [Male 360](../assets/face-round-glasses/male-360.png) | [Female 1280](../assets/face-round-glasses/female-1280.png) | [Female 360](../assets/face-round-glasses/female-360.png) |
-| Square glasses | [Male 1280](../assets/face-square-glasses/male-1280.png) | [Male 360](../assets/face-square-glasses/male-360.png) | [Female 1280](../assets/face-square-glasses/female-1280.png) | [Female 360](../assets/face-square-glasses/female-360.png) |
-| Sunglasses | [Male 1280](../assets/face-sunglasses/male-1280.png) | [Male 360](../assets/face-sunglasses/male-360.png) | [Female 1280](../assets/face-sunglasses/female-1280.png) | [Female 360](../assets/face-sunglasses/female-360.png) |
-| Mask (masquerade) | [Male 1280](../assets/face-masquerade-mask/male-1280.png) | [Male 360](../assets/face-masquerade-mask/male-360.png) | [Female 1280](../assets/face-masquerade-mask/female-1280.png) | [Female 360](../assets/face-masquerade-mask/female-360.png) |
-| Face mask | [Male 1280](../assets/face-face-mask/male-1280.png) | [Male 360](../assets/face-face-mask/male-360.png) | [Female 1280](../assets/face-face-mask/female-1280.png) | [Female 360](../assets/face-face-mask/female-360.png) |
-| Face paint | [Male 1280](../assets/face-face-paint/male-1280.png) | [Male 360](../assets/face-face-paint/male-360.png) | [Female 1280](../assets/face-face-paint/female-1280.png) | [Female 360](../assets/face-face-paint/female-360.png) |
+| Item | Male 1280px | Female 1280px |
+| --- | --- | --- |
+| Round glasses | [Male 1280](../assets/face-round-glasses/male-1280.png) | [Female 1280](../assets/face-round-glasses/female-1280.png) |
+| Square glasses | [Male 1280](../assets/face-square-glasses/male-1280.png) | [Female 1280](../assets/face-square-glasses/female-1280.png) |
+| Sunglasses | [Male 1280](../assets/face-sunglasses/male-1280.png) | [Female 1280](../assets/face-sunglasses/female-1280.png) |
+| Mask (masquerade) | [Male 1280](../assets/face-masquerade-mask/male-1280.png) | [Female 1280](../assets/face-masquerade-mask/female-1280.png) |
+| Face mask | [Male 1280](../assets/face-face-mask/male-1280.png) | [Female 1280](../assets/face-face-mask/female-1280.png) |
+| Face paint | [Male 1280](../assets/face-face-paint/male-1280.png) | [Female 1280](../assets/face-face-paint/female-1280.png) |
 
 ## Design and shared fit
 
