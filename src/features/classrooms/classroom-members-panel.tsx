@@ -1,5 +1,10 @@
 import { useParams } from 'react-router';
+import { LoadingState } from '@/components/feedback/states';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  ClassroomDirectoryPanel,
+  ClassroomTeachersSection,
+} from './classroom-directory';
 import { ClassroomInvitationsPanel } from './classroom-invitations-panel';
 import { ClassroomRosterPanel } from './classroom-roster-panel';
 import { classroomMessages } from './messages';
@@ -11,8 +16,12 @@ export interface ClassroomMembersPanelProps {
 
 /**
  * Container panel for the `members` workspace tab (`HU-AUL-002` + `HU-AUL-003`).
- * Renders tabbed navigation (`Nómina` and `Invitaciones y código`) only when the
- * server grants `invite_members`; otherwise renders `ClassroomRosterPanel` directly.
+ * - Staff with `invite_members` get tabs (roster and invitations); the roster
+ *   tab shows the teaching team above the managed student roster.
+ * - Students (and other directory readers) get the public member directory
+ *   grouped into teachers and students.
+ * - Everyone else falls back to `ClassroomRosterPanel`, which renders the
+ *   server's refusal honestly.
  */
 export function ClassroomMembersPanel({
   classroomId: propClassroomId,
@@ -20,11 +29,22 @@ export function ClassroomMembersPanel({
   const params = useParams<{ classroomId: string }>();
   const resolvedClassroomId = propClassroomId ?? params.classroomId ?? '';
   const capabilities = useClassroomCapabilities(resolvedClassroomId);
+
+  if (capabilities.status === 'pending') {
+    return <LoadingState label={classroomMessages.members.directoryLoading} />;
+  }
+
   const canInviteMembers =
     capabilities.status === 'ready' && capabilities.can('invite_members');
+  const canListDirectory =
+    capabilities.status === 'ready' && capabilities.can('list_directory');
 
   if (!canInviteMembers) {
-    return <ClassroomRosterPanel classroomId={resolvedClassroomId} />;
+    return canListDirectory ? (
+      <ClassroomDirectoryPanel classroomId={resolvedClassroomId} />
+    ) : (
+      <ClassroomRosterPanel classroomId={resolvedClassroomId} />
+    );
   }
 
   return (
@@ -38,7 +58,10 @@ export function ClassroomMembersPanel({
         </TabsTrigger>
       </TabsList>
 
-      <TabsContent value="roster">
+      <TabsContent value="roster" className="min-w-0 space-y-2">
+        {canListDirectory ? (
+          <ClassroomTeachersSection classroomId={resolvedClassroomId} />
+        ) : null}
         <ClassroomRosterPanel classroomId={resolvedClassroomId} />
       </TabsContent>
       <TabsContent value="invitations">

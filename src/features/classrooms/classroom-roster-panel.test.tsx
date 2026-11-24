@@ -127,6 +127,24 @@ function renderRosterPanel(
   return { queryClient, session, ...view };
 }
 
+async function openActionsMenu(name: string) {
+  const trigger = await screen.findByRole('button', {
+    name: copy.actionsAriaLabel(name),
+  });
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: 'Enter' });
+  return trigger;
+}
+
+async function chooseRemoval(name: string) {
+  const trigger = await openActionsMenu(name);
+  fireEvent.click(
+    await screen.findByRole('menuitem', { name: copy.removeAction }),
+  );
+  await screen.findByRole('region', { name: copy.confirmTitle(name) });
+  return trigger;
+}
+
 describe('ClassroomRosterPanel (#33)', () => {
   test('renders roster states, guardians, formatted deletedAt, and passes accessibility checks', async () => {
     const store = createClassroomRosterStore({
@@ -151,13 +169,18 @@ describe('ClassroomRosterPanel (#33)', () => {
     expect(screen.getByText(copy.guardianStates.INACTIVE)).toBeVisible();
 
     expect(
-      screen.getByRole('button', { name: copy.removeAriaLabel('Ana Álvarez') }),
+      screen.getByRole('button', {
+        name: copy.actionsAriaLabel('Ana Álvarez'),
+      }),
     ).toBeEnabled();
     expect(
       screen.queryByRole('button', {
-        name: copy.removeAriaLabel('Carla Castro'),
+        name: copy.actionsAriaLabel('Carla Castro'),
       }),
     ).not.toBeInTheDocument();
+    // Identity and counts: initials disc and a student count next to the heading.
+    expect(screen.getByText(copy.studentCount(3))).toBeVisible();
+    expect(screen.getByText('AÁ')).toBeInTheDocument();
 
     await expectAccessible(container);
   });
@@ -348,10 +371,7 @@ describe('ClassroomRosterPanel (#33)', () => {
 
     renderRosterPanel();
 
-    const trigger = await screen.findByRole('button', {
-      name: copy.removeAriaLabel('Ana Álvarez'),
-    });
-    fireEvent.click(trigger);
+    const trigger = await chooseRemoval('Ana Álvarez');
 
     const confirmRegion = await screen.findByRole('region', {
       name: copy.confirmTitle('Ana Álvarez'),
@@ -373,7 +393,7 @@ describe('ClassroomRosterPanel (#33)', () => {
     });
     expect(trigger).toHaveFocus();
 
-    fireEvent.click(trigger);
+    await chooseRemoval('Ana Álvarez');
     const activeConfirmRegion = await screen.findByRole('region', {
       name: copy.confirmTitle('Ana Álvarez'),
     });
@@ -417,11 +437,7 @@ describe('ClassroomRosterPanel (#33)', () => {
 
     renderRosterPanel();
 
-    fireEvent.click(
-      await screen.findByRole('button', {
-        name: copy.removeAriaLabel('Ana Álvarez'),
-      }),
-    );
+    await chooseRemoval('Ana Álvarez');
 
     store.failNextDelete({
       status: 403,
@@ -476,11 +492,7 @@ describe('ClassroomRosterPanel (#33)', () => {
     );
 
     const view = renderRosterPanel();
-    fireEvent.click(
-      await screen.findByRole('button', {
-        name: copy.removeAriaLabel('Ana Álvarez'),
-      }),
-    );
+    await chooseRemoval('Ana Álvarez');
     fireEvent.click(screen.getByRole('button', { name: copy.confirmSubmit }));
 
     await waitFor(() => {
