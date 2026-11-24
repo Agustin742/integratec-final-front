@@ -185,12 +185,12 @@ Seasonal:
 
 ### Classroom shell
 
-- [ ] Walls
-- [ ] Floor
-- [ ] Ceiling
-- [ ] Windows with curtains
-- [ ] Baseboards
-- [ ] Ceiling lights
+- [x] Walls
+- [x] Floor
+- [ ] Ceiling _(omitted for isometric avatar visibility; walls use finished wood coping and crown molding)_
+- [x] Windows with curtains
+- [x] Baseboards
+- [x] Ceiling lights
 
 ### Furniture
 
