@@ -318,8 +318,8 @@ export function createOwnProfileHandler(
       displayName: 'Ana López',
       avatar: {
         bodyId: 'female',
-        hairId: 'original',
-        topId: 'tshirt',
+        hairId: 'classic-short',
+        topId: 'basic-tshirt',
         hairColor: '#6C4D48',
         clothingColor: '#5B4F96',
       },
@@ -707,8 +707,48 @@ const AVATAR_KEYS = [
 /** Option sets and combination rules published in the `AvatarDto` contract. */
 const AVATAR_CONTRACT = {
   bodyId: ['male', 'female'],
-  hairId: ['afro', 'dreads', 'original'],
-  topId: ['hoodie', 'tank', 'tshirt'],
+  hairId: [
+    'buzz-cut',
+    'classic-short',
+    'short-curls',
+    'bob',
+    'middle-part',
+    'long-straight',
+    'ponytail',
+    'bun',
+    'afro',
+    'afro-with-headband',
+    'box-braids',
+    'braid',
+    'dreads',
+    'fringe',
+    'half-up',
+    'long-curls',
+    'long-wavy',
+    'messy',
+    'side-part',
+    'soft-mohawk',
+    'two-braids',
+    'two-pigtails',
+    'wavy',
+  ],
+  topId: [
+    'school-smock',
+    'school-sweatshirt',
+    'basic-tshirt',
+    'tank-top',
+    'denim-jacket',
+    'flannel-shirt',
+    'holiday-sweater',
+    'hoodie',
+    'national-team-jersey',
+    'school-polo',
+    'shirt-and-tie',
+    'sweater',
+    'track-jacket',
+    'vest',
+    'winter-coat',
+  ],
   hairColor: ['#6C4D48', '#AF6D63', '#E5AD58', '#353849', '#C77DAA'],
   clothingColor: [
     '#5B4F96',
@@ -718,11 +758,6 @@ const AVATAR_CONTRACT = {
     '#7EBA8B',
     '#F4E6D2',
   ],
-  hairByBody: { male: ['afro', 'dreads'], female: ['afro', 'original'] },
-  topByBody: {
-    male: ['hoodie', 'tank'],
-    female: ['hoodie', 'tank', 'tshirt'],
-  },
 } as const;
 
 export const DEFAULT_OWN_AVATAR: AvatarPayload = {
@@ -812,20 +847,6 @@ function validateAvatar(
   const hairColor = read('hairColor') as AvatarPayload['hairColor'] | undefined;
   const clothingColor = read('clothingColor') as
     AvatarPayload['clothingColor'] | undefined;
-  if (
-    bodyId &&
-    hairId &&
-    !AVATAR_CONTRACT.hairByBody[bodyId].some((v) => v === hairId)
-  ) {
-    details.push({ field: 'hairId', messages: ['hairId is incompatible'] });
-  }
-  if (
-    bodyId &&
-    topId &&
-    !AVATAR_CONTRACT.topByBody[bodyId].some((v) => v === topId)
-  ) {
-    details.push({ field: 'topId', messages: ['topId is incompatible'] });
-  }
   if (
     details.length > 0 ||
     !bodyId ||

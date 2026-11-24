@@ -158,8 +158,8 @@ function setupPresenceWorkspace(
               role: 'TEACHER',
               avatar: {
                 bodyId: 'female',
-                hairId: 'original',
-                topId: 'tshirt',
+                hairId: 'classic-short',
+                topId: 'basic-tshirt',
                 hairColor: '#6C4D48',
                 clothingColor: '#5B4F96',
               },
@@ -305,8 +305,8 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
       );
       expect(teacherRemote?.avatar).toEqual({
         bodyId: 'female',
-        hairId: 'original',
-        topId: 'tshirt',
+        hairId: 'classic-short',
+        topId: 'basic-tshirt',
         hairColor: '#6C4D48',
         clothingColor: '#5B4F96',
       });
@@ -1036,8 +1036,8 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
               role: 'SCHOOL_ADMIN',
               avatar: {
                 bodyId: 'female',
-                hairId: 'original',
-                topId: 'tshirt',
+                hairId: 'classic-short',
+                topId: 'basic-tshirt',
                 hairColor: '#6C4D48',
                 clothingColor: '#5B4F96',
               },
@@ -1057,8 +1057,8 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
             role: 'SCHOOL_ADMIN',
             avatar: {
               bodyId: 'female',
-              hairId: 'original',
-              topId: 'tshirt',
+              hairId: 'classic-short',
+              topId: 'basic-tshirt',
               hairColor: '#6C4D48',
               clothingColor: '#5B4F96',
             },

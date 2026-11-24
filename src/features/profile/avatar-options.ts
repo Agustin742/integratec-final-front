@@ -36,18 +36,42 @@ export const CLOTHING_COLOR_OPTIONS = toOptions<Avatar['clothingColor']>(
   optionLabels.clothingColor,
 );
 
+type HairId = Avatar['hairId'];
+type TopId = Avatar['topId'];
+
+/** Styles every account owns from the start; the rest are shop unlocks. */
+export const FREE_HAIR_IDS: ReadonlySet<HairId> = new Set<HairId>([
+  'buzz-cut',
+  'classic-short',
+  'short-curls',
+  'bob',
+  'middle-part',
+  'long-straight',
+  'ponytail',
+  'bun',
+  'afro',
+]);
+export const FREE_TOP_IDS: ReadonlySet<TopId> = new Set<TopId>([
+  'school-smock',
+  'school-sweatshirt',
+  'basic-tshirt',
+  'tank-top',
+]);
+
 /**
- * Combination rules published in the contract (`AvatarDto` field
- * descriptions). The server is the validation boundary; these only keep the
- * controls from offering a combination it would reject.
+ * The catalog is the same for both bodies (`AvatarDto` descriptions). The
+ * label maps are `Record`s over the contract unions, so their keys are the
+ * complete catalog and a new contract id fails to compile until labelled.
  */
-const HAIR_BY_BODY: Record<Avatar['bodyId'], readonly Avatar['hairId'][]> = {
-  male: ['afro', 'dreads'],
-  female: ['afro', 'original'],
+const ALL_HAIR_IDS = Object.keys(optionLabels.hairId) as HairId[];
+const ALL_TOP_IDS = Object.keys(optionLabels.topId) as TopId[];
+const HAIR_BY_BODY: Record<Avatar['bodyId'], readonly HairId[]> = {
+  male: ALL_HAIR_IDS,
+  female: ALL_HAIR_IDS,
 };
-const TOP_BY_BODY: Record<Avatar['bodyId'], readonly Avatar['topId'][]> = {
-  male: ['hoodie', 'tank'],
-  female: ['hoodie', 'tank', 'tshirt'],
+const TOP_BY_BODY: Record<Avatar['bodyId'], readonly TopId[]> = {
+  male: ALL_TOP_IDS,
+  female: ALL_TOP_IDS,
 };
 
 export function hairOptionsFor(

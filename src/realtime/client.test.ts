@@ -728,8 +728,8 @@ describe('createClassroomRealtimeClient (#23)', () => {
     };
     avatarWithLook.appearance = {
       bodyId: 'female',
-      hairId: 'original',
-      topId: 'tshirt',
+      hairId: 'classic-short',
+      topId: 'basic-tshirt',
       hairColor: '#6C4D48',
       clothingColor: '#75B7DA',
     };
@@ -757,8 +757,8 @@ describe('createClassroomRealtimeClient (#23)', () => {
     });
     expect(snapshot.participants.get('user-with-look')?.avatar).toEqual({
       bodyId: 'female',
-      hairId: 'original',
-      topId: 'tshirt',
+      hairId: 'classic-short',
+      topId: 'basic-tshirt',
       hairColor: '#6C4D48',
       clothingColor: '#75B7DA',
     });

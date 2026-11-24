@@ -26,18 +26,21 @@ export function safeHexColor(value: unknown, fallback: string): string {
   return typeof value === 'string' && HEX_COLOR.test(value) ? value : fallback;
 }
 
+/** Hair fits both bodies, so every style lives in the shared folder. */
+export function resolveHairUrl(hairId: string): string {
+  return `${AVATAR_MODELS_PATH}/shared/hair-${hairId}.glb`;
+}
+
 /**
  * Maps an avatar configuration to the modular GLB files that draw it.
- * Allowed combinations are reused from the profile rules so a disallowed
- * hair/top never points at a file that does not exist.
+ * Ids outside the profile catalog resolve to `null` instead of pointing at a
+ * file that does not exist.
  */
 export function resolveAvatarParts(avatar: Avatar): AvatarParts {
   const folder = `${AVATAR_MODELS_PATH}/${avatar.bodyId}`;
   return {
     bodyUrl: `${folder}/body.glb`,
-    hairUrl: isHairAllowed(avatar)
-      ? `${folder}/hair-${avatar.hairId}.glb`
-      : null,
+    hairUrl: isHairAllowed(avatar) ? resolveHairUrl(avatar.hairId) : null,
     topUrl: isTopAllowed(avatar) ? `${folder}/top-${avatar.topId}.glb` : null,
     hairColor: safeHexColor(avatar.hairColor, DEFAULT_HAIR_COLOR),
     clothingColor: safeHexColor(avatar.clothingColor, DEFAULT_CLOTHING_COLOR),

@@ -6,7 +6,7 @@ import {
   type AccessorySlot,
   type AccessorySpec,
 } from './accessory-catalog';
-import { AVATAR_MODELS_PATH, resolveAvatarParts } from './avatar-parts';
+import { resolveAvatarParts, resolveHairUrl } from './avatar-parts';
 import {
   ACCESSORY_TINT_MATERIAL,
   HAIR_TINT_MATERIAL,
@@ -66,11 +66,7 @@ export function planAvatarParts(
     const morphs = resolveHairMorphs(hiding.hairId, back?.assetId ?? null);
     parts.push({
       key: 'hair',
-      // The fitted afro only exists as a shared (body-independent) asset.
-      url:
-        hiding.hairId === avatar.hairId
-          ? base.hairUrl
-          : `${AVATAR_MODELS_PATH}/shared/hair-${hiding.hairId}.glb`,
+      url: resolveHairUrl(hiding.hairId),
       tints: { [HAIR_TINT_MATERIAL]: base.hairColor },
       ...(hiding.hairHidden.length > 0
         ? { hiddenMeshes: hiding.hairHidden }

@@ -134,8 +134,8 @@ describe('Profile page (/profile)', () => {
         email: 'sofia@ejemplo.com',
         avatar: {
           bodyId: 'female',
-          hairId: 'original',
-          topId: 'tshirt',
+          hairId: 'classic-short',
+          topId: 'basic-tshirt',
           hairColor: '#E5AD58',
           clothingColor: '#75B7DA',
         },
@@ -149,13 +149,13 @@ describe('Profile page (/profile)', () => {
     expect(nameInput()).toHaveValue('Sofía Martínez');
     expect(screen.getByText('sofia@ejemplo.com')).toBeInTheDocument();
     expect(radio(copy.avatar.groups.bodyId, 'Femenino')).toBeChecked();
-    expect(radio(copy.avatar.groups.hairId, 'Clásico')).toBeChecked();
-    expect(radio(copy.avatar.groups.topId, 'Remera')).toBeChecked();
+    expect(radio(copy.avatar.groups.hairId, 'Corto clásico')).toBeChecked();
+    expect(radio(copy.avatar.groups.topId, 'Remera básica')).toBeChecked();
     expect(radio(copy.avatar.groups.hairColor, 'Rubio')).toBeChecked();
     expect(radio(copy.avatar.groups.clothingColor, 'Celeste')).toBeChecked();
     expect(
       screen.getByRole('img', {
-        name: /Femenino, Clásico, Rubio, Remera, Celeste/,
+        name: /Femenino, Corto clásico, Rubio, Remera básica, Celeste/,
       }),
     ).toBeInTheDocument();
     expect(saveStatus(nameSection())).toBe('saved');
@@ -168,20 +168,18 @@ describe('Profile page (/profile)', () => {
     await renderProfile(createOwnProfileStore());
     await waitForProfile();
 
-    // male: afro/dreads and hoodie/tank
-    expect(within(group('Peinado')).getAllByRole('radio')).toHaveLength(2);
+    // Hair and tops fit both bodies: the whole catalog is offered.
+    expect(within(group('Peinado')).getAllByRole('radio')).toHaveLength(23);
     expect(within(group('Prenda superior')).getAllByRole('radio')).toHaveLength(
-      2,
+      15,
     );
     selectChoice('Cuerpo', 'Femenino');
+    expect(within(group('Peinado')).getAllByRole('radio')).toHaveLength(23);
     expect(
-      within(group('Peinado')).getByRole('radio', { name: 'Clásico' }),
+      within(group('Peinado')).getByRole('radio', { name: 'Rastas' }),
     ).toBeInTheDocument();
-    expect(
-      within(group('Peinado')).queryByRole('radio', { name: 'Rastas' }),
-    ).not.toBeInTheDocument();
     expect(within(group('Prenda superior')).getAllByRole('radio')).toHaveLength(
-      3,
+      15,
     );
   });
 
@@ -285,16 +283,16 @@ describe('Profile page (/profile)', () => {
     await waitForProfile();
 
     selectChoice('Cuerpo', 'Femenino');
-    selectChoice('Peinado', 'Clásico');
+    selectChoice('Peinado', 'Corto clásico');
     selectChoice('Color de pelo', 'Rosa');
-    selectChoice('Prenda superior', 'Remera');
+    selectChoice('Prenda superior', 'Remera básica');
     selectChoice('Color de la prenda', 'Verde');
 
     expect(saveStatus(avatarSection())).toBe('unsaved');
     expect(screen.getByText(copy.avatar.previewDraft)).toBeInTheDocument();
     expect(
       screen.getByRole('img', {
-        name: /Femenino, Clásico, Rosa, Remera, Verde/,
+        name: /Femenino, Corto clásico, Rosa, Remera básica, Verde/,
       }),
     ).toBeInTheDocument();
 
@@ -304,8 +302,8 @@ describe('Profile page (/profile)', () => {
     expect(requests).toEqual([
       {
         bodyId: 'female',
-        hairId: 'original',
-        topId: 'tshirt',
+        hairId: 'classic-short',
+        topId: 'basic-tshirt',
         hairColor: '#C77DAA',
         clothingColor: '#7EBA8B',
       },
@@ -315,15 +313,15 @@ describe('Profile page (/profile)', () => {
     expect(avatarSection()).toHaveTextContent(copy.avatar.confirmed);
   });
 
-  test('adjusts hair and top when the body makes them unavailable and says so', async () => {
+  test('keeps hair and top when the body changes, since every style fits both bodies', async () => {
     await renderProfile(createOwnProfileStore());
     await waitForProfile();
 
     selectChoice('Peinado', 'Rastas');
     selectChoice('Cuerpo', 'Femenino');
 
-    expect(radio('Peinado', 'Afro')).toBeChecked();
-    expect(screen.getByText(copy.avatar.adjusted)).toBeVisible();
+    expect(radio('Peinado', 'Rastas')).toBeChecked();
+    expect(screen.queryByText(copy.avatar.adjusted)).not.toBeInTheDocument();
   });
 
   test('discarding a draft restores the saved avatar without reporting a failure', async () => {

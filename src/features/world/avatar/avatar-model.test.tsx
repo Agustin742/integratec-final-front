@@ -60,13 +60,13 @@ vi.mock('./compose-avatar', async (original) => {
 const avatar: Avatar = {
   bodyId: 'female',
   hairId: 'afro',
-  topId: 'tshirt',
+  topId: 'basic-tshirt',
   hairColor: '#AF6D63',
   clothingColor: '#75B7DA',
 };
 const BODY = '/models/avatars/female/body.glb';
-const HAIR = '/models/avatars/female/hair-afro.glb';
-const TOP = '/models/avatars/female/top-tshirt.glb';
+const HAIR = '/models/avatars/shared/hair-afro.glb';
+const TOP = '/models/avatars/female/top-basic-tshirt.glb';
 
 function makeGltf(clips: readonly string[] = []): GLTF {
   const scene = new Group();

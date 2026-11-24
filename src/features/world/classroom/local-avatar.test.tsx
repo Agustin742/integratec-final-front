@@ -41,7 +41,7 @@ vi.mock('../avatar/avatar-model', () => ({
 const avatar: Avatar = {
   bodyId: 'female',
   hairId: 'afro',
-  topId: 'tshirt',
+  topId: 'basic-tshirt',
   hairColor: '#AF6D63',
   clothingColor: '#75B7DA',
 };
