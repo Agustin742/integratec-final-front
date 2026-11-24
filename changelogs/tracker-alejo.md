@@ -1,5 +1,18 @@
 # Tracker — Alejo
 
+## 2026-11-23 — Author 6 modular face accessories (`shared/`) on both avatars (#91)
+
+- **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
+- **Area / files:** `assets/blender/avatars/shared/face/{round-glasses,square-glasses,sunglasses,masquerade-mask,face-mask,face-paint}.blend`, `public/models/avatars/shared/face-{round-glasses,square-glasses,sunglasses,masquerade-mask,face-mask,face-paint}.glb`, `docs/art/face-accessories.md`, `docs/3d-assets.md`, `docs/ai-usage.md`, `docs/assets/face-{round-glasses,square-glasses,sunglasses,masquerade-mask,face-mask,face-paint}/{male,female}-{1280,360}.png`, `scripts/assets/test-face-accessories.mjs`, `changelogs/tracker-alejo.md`.
+- **Change:** Authored and exported all 6 Face accessories from `docs/art/asset-wishlist.md` (`Round glasses` `27,676 B` / `2,542` verts / `min Z 0.8602 m`, `Square glasses` `26,524 B` / `2,346` verts / `min Z 0.8787 m`, `Sunglasses` `27,224 B` / `2,470` verts / `min Z 0.8762 m` with `AvatarGlass` `alphaMode: "BLEND"` lenses, `Mask (masquerade)` `28,788 B` / `2,760` verts / `min Z 0.8938 m`, `Face mask` `30,552 B` / `3,622` verts / `min Z 0.7722 m`, `Face paint` `15,908 B` / `404` verts / `min Z 0.8558 m`) as shared wearables under `shared/` rigid-weighted `100%` (`1` influence) to canonical `DEF-spine.006` (`AvatarAccessoryTint` `#FFFFFF` + semantic `AvatarDetail`), verified across all `23` hairstyles (`0` rear-hair overlaps), and kept base bodies and all existing hair/top/head assets untouched under `rules/modular-avatar-assets.md` and `rules/art-direction.md`.
+- **Reason:** Complete all `6/6` Face accessories from `docs/art/asset-wishlist.md` for issue `#91` after human visual approval in Blender `PROBADOR_Face_{Female,Male}`.
+- **Coordination:** Existing Alejo Project item `PVTI_lAHOCevXNc4BoRd2zhK9fEI`, issue `#91`.
+- **Evidence:**
+  - Authoring clearance (`1, 25, 62, 123, 201`) and decoded GLB roundtrips (`1, 62, 123, 201`) passed with `0` head penetrations (`min_head_dist >= 0.0052 m` on glasses/masks; `0.0018..0.0046 m` conformal cheek relief on `FacePaint`), `0` eye, `0` female eyelash, `0` smile, `0` ear, and `0` body hits (`p.z > 0.42`), plus exact 34-bone canonical rest matrices across all `6` items on both Male and Female (`odd/artifacts/face-accessories-author-report.json`, `odd/artifacts/face-accessories-export.json`).
+  - `6 × 23 = 138` hairstyle pairing audit (`odd/artifacts/face-accessories-hair-audit.json`): `0` rear hair overlaps (`y > 0.08`); `face-paint` `23/23` zero-touch; `face-mask` `19/23` zero-touch (`4` side curtain touches).
+  - `node scripts/assets/test-face-accessories.mjs`, `node scripts/assets/test-head-accessories-batch2.mjs`, `node scripts/assets/check-asset-budget.mjs`, `python scripts/ci/check_docs.py`, and `git diff --check` passed.
+- **Next step:** Human reviewed and approved all `6/6` Face accessories; committed locally on `feat/91-modular-avatar-assets` without pushing (wishlist remains unchecked until merge). Next wearable batch: **Back accessories (6)** (`Backpack`, `Rolling backpack`, `Superhero cape`, `Wings`, `Guitar on the back`, `Racket`) or Hand items / Neck and ears.
+
 ## 2026-11-23 — Author 4 remaining head accessories Batch 2 (`shared/`) & extend hair-compatibility contract
 
 - **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
