@@ -85,6 +85,24 @@ describe('FollowCamera', () => {
     expect(frame.invalidate).not.toHaveBeenCalled();
   });
 
+  test.each([
+    [-8, -6],
+    [8, -6],
+    [-8, 6],
+    [8, 6],
+    [0, -6],
+    [8, 0],
+  ])('keeps the avatar at the screen center near the edge (%s, %s)', (x, z) => {
+    const pose = { current: { x: 0, z: 0, rotation: 0 } };
+    render(<FollowCamera poseRef={pose} />);
+    const camera = frame.camera as OrthographicCamera;
+    pose.current = { x, z, rotation: 0 };
+    for (let i = 0; i < 600; i += 1) tick();
+    const point = screenOf(camera, x, z);
+    expect(Math.abs(point.x)).toBeLessThan(1e-3);
+    expect(Math.abs(point.y)).toBeLessThan(1e-3);
+  });
+
   test('follows instantly under reduced motion', () => {
     mockReducedMotion(true);
     const pose = { current: { x: 0, z: 0, rotation: 0 } };

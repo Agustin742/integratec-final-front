@@ -5,8 +5,6 @@ import {
   advanceFollowTarget,
   applyFollowCamera,
   CLASSROOM_BOUNDS,
-  clampFollowTarget,
-  followFrustum,
   frameCamera,
   type FollowPoint,
 } from '../camera';
@@ -23,7 +21,8 @@ const isFinitePose = (pose: Pose | undefined): pose is Pose =>
 
 /**
  * Keeps the fixed isometric camera centered on the local avatar at the closer
- * follow zoom, clamped to the room. The camera is mutated in the frame loop
+ * follow zoom, always on the avatar (the backdrop may show near the room
+ * edges). The camera is mutated in the frame loop
  * (no React state) and frames are requested only until the damped target
  * settles. Without an avatar it frames the whole classroom.
  */
@@ -44,13 +43,8 @@ export function FollowCamera({ poseRef }: FollowCameraProps) {
       invalidate();
       return;
     }
-    // Mount snaps onto the avatar; a resize keeps the current target, only
-    // re-clamped to the new frustum.
-    const frustum = followFrustum(width, height);
-    target.current = clampFollowTarget(
-      target.current ?? { x: pose.x, z: pose.z },
-      frustum,
-    );
+    // Mount snaps onto the avatar; a resize keeps the current damped target.
+    target.current ??= { x: pose.x, z: pose.z };
     applyFollowCamera(camera, width, height, target.current);
     invalidate();
   }, [camera, width, height, poseRef, invalidate]);
@@ -64,8 +58,12 @@ export function FollowCamera({ poseRef }: FollowCameraProps) {
       !(camera instanceof OrthographicCamera)
     )
       return;
-    const desired = clampFollowTarget(pose, followFrustum(width, height));
-    const next = advanceFollowTarget(current, desired, dt, reducedMotion);
+    const next = advanceFollowTarget(
+      current,
+      { x: pose.x, z: pose.z },
+      dt,
+      reducedMotion,
+    );
     target.current = { x: next.x, z: next.z };
     applyFollowCamera(camera, width, height, target.current);
     if (!next.settled) invalidate();

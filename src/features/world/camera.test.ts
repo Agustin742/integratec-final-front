@@ -5,7 +5,6 @@ import {
   applyFollowCamera,
   AVATAR_FRAME,
   CAMERA_ELEVATION,
-  clampFollowTarget,
   FOLLOW_MIN_VISIBLE_WIDTH,
   FOLLOW_TARGET_HEIGHT,
   FOLLOW_VISIBLE_HEIGHT,
@@ -153,20 +152,6 @@ describe('avatar preview framing', () => {
 });
 
 describe('follow camera', () => {
-  const sizes = [
-    [1280, 720],
-    [360, 640],
-    [1920, 400],
-  ] as const;
-  const corners = (bounds: typeof CLASSROOM_BOUNDS) => {
-    const out: Vector3[] = [];
-    for (const x of [bounds.min[0], bounds.max[0]])
-      for (const y of [bounds.min[1], bounds.max[1]])
-        for (const z of [bounds.min[2], bounds.max[2]])
-          out.push(new Vector3(x, y, z));
-    return out;
-  };
-
   test('shows a fixed fraction of the room, with a minimum visible width', () => {
     const wide = followFrustum(1280, 720);
     expect(wide.halfHeight * 2).toBeCloseTo(FOLLOW_VISIBLE_HEIGHT);
@@ -196,72 +181,27 @@ describe('follow camera', () => {
     expect(Math.abs(middle.y)).toBeLessThan(1e-6);
   });
 
+  test.each([
+    { x: -8, z: -6 },
+    { x: 8, z: 6 },
+    { x: 8, z: -6 },
+    { x: -8, z: 6 },
+  ])('centers the avatar on screen at the room edge %j', (avatar) => {
+    const camera = new OrthographicCamera();
+    applyFollowCamera(camera, 360, 640, avatar);
+    const point = new Vector3(avatar.x, FOLLOW_TARGET_HEIGHT, avatar.z).project(
+      camera,
+    );
+    expect(Math.abs(point.x)).toBeLessThan(1e-6);
+    expect(Math.abs(point.y)).toBeLessThan(1e-6);
+  });
+
   test('ignores a collapsed host without corrupting the projection', () => {
     const camera = new OrthographicCamera();
     applyFollowCamera(camera, 1280, 720, { x: 0, z: 0 });
     const before = camera.projectionMatrix.clone();
     applyFollowCamera(camera, 0, 0, { x: 4, z: 4 });
     expect(camera.projectionMatrix.equals(before)).toBe(true);
-  });
-
-  test('follows the avatar when it is away from every edge', () => {
-    const frustum = followFrustum(1280, 720);
-    const target = clampFollowTarget({ x: 0.5, z: 0.25 }, frustum);
-    expect(target.x).toBeCloseTo(0.5);
-    expect(target.z).toBeCloseTo(0.25);
-  });
-
-  test.each(sizes)(
-    'never shows outside the room at any edge or corner (%sx%s)',
-    (width, height) => {
-      const frustum = followFrustum(width, height);
-      const { bounds } = CLASSROOM_LAYOUT;
-      const edges = [
-        { x: bounds.minX, z: bounds.minZ },
-        { x: bounds.maxX, z: bounds.minZ },
-        { x: bounds.minX, z: bounds.maxZ },
-        { x: bounds.maxX, z: bounds.maxZ },
-        { x: 0, z: bounds.minZ },
-        { x: 0, z: bounds.maxZ },
-        { x: bounds.minX, z: 0 },
-        { x: bounds.maxX, z: 0 },
-      ];
-      for (const avatar of edges) {
-        const camera = new OrthographicCamera();
-        const target = clampFollowTarget(avatar, frustum);
-        applyFollowCamera(camera, width, height, target);
-        const projected = corners(CLASSROOM_BOUNDS).map((p) =>
-          p.project(camera),
-        );
-        const xs = projected.map((p) => p.x);
-        const ys = projected.map((p) => p.y);
-        // Axes the room fills must have the viewport inside the room's extent.
-        const roomWiderThanView = Math.max(...xs) - Math.min(...xs) >= 2;
-        const roomTallerThanView = Math.max(...ys) - Math.min(...ys) >= 2;
-        if (roomWiderThanView) {
-          expect(Math.min(...xs)).toBeLessThanOrEqual(-1 + 1e-6);
-          expect(Math.max(...xs)).toBeGreaterThanOrEqual(1 - 1e-6);
-        }
-        if (roomTallerThanView) {
-          expect(Math.min(...ys)).toBeLessThanOrEqual(-1 + 1e-6);
-          expect(Math.max(...ys)).toBeGreaterThanOrEqual(1 - 1e-6);
-        }
-        // The avatar stays on screen even when the camera is clamped.
-        const feet = new Vector3(avatar.x, 0, avatar.z).project(camera);
-        expect(Math.abs(feet.x)).toBeLessThanOrEqual(1 + 1e-6);
-        expect(Math.abs(feet.y)).toBeLessThanOrEqual(1 + 1e-6);
-      }
-    },
-  );
-
-  test('centers on an axis when the viewport is larger than the room', () => {
-    const huge = { halfWidth: 40, halfHeight: 40 };
-    const a = clampFollowTarget({ x: 7, z: 5 }, huge);
-    const b = clampFollowTarget({ x: -7, z: -5 }, huge);
-    expect(a.x).toBeCloseTo(b.x);
-    expect(a.z).toBeCloseTo(b.z);
-    // Centered on the room's view (x equals z: no sideways shift).
-    expect(a.x).toBeCloseTo(a.z);
   });
 
   test('damps toward the target and reports when it has settled', () => {

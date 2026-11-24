@@ -157,59 +157,6 @@ const ELEVATION_RAD = (CAMERA_ELEVATION * Math.PI) / 180;
 const SIN_ELEVATION = Math.sin(ELEVATION_RAD);
 const COS_ELEVATION = Math.cos(ELEVATION_RAD);
 
-// Camera-space (right, up) of a world point for the fixed isometric camera,
-// relative to any common origin.
-const viewX = (x: number, z: number) => (x - z) / Math.SQRT2;
-const viewY = (x: number, y: number, z: number) =>
-  (-SIN_ELEVATION * (x + z)) / Math.SQRT2 + COS_ELEVATION * y;
-
-function clampAxis(value: number, min: number, max: number, half: number) {
-  const low = min + half;
-  const high = max - half;
-  if (low > high) return (min + max) / 2;
-  return Math.min(Math.max(value, low), high);
-}
-
-/**
- * Moves a follow target so the visible area never leaves the projected bounds
- * of the room. An axis the viewport covers entirely is centered instead.
- */
-export function clampFollowTarget(
-  target: FollowPoint,
-  frustum: FollowFrustum,
-  bounds: FramingBounds = CLASSROOM_BOUNDS,
-): FollowPoint {
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minY = Infinity;
-  let maxY = -Infinity;
-  for (const x of [bounds.min[0], bounds.max[0]])
-    for (const y of [bounds.min[1], bounds.max[1]])
-      for (const z of [bounds.min[2], bounds.max[2]]) {
-        minX = Math.min(minX, viewX(x, z));
-        maxX = Math.max(maxX, viewX(x, z));
-        minY = Math.min(minY, viewY(x, y, z));
-        maxY = Math.max(maxY, viewY(x, y, z));
-      }
-  const vx = clampAxis(
-    viewX(target.x, target.z),
-    minX,
-    maxX,
-    frustum.halfWidth,
-  );
-  const vy = clampAxis(
-    viewY(target.x, FOLLOW_TARGET_HEIGHT, target.z),
-    minY,
-    maxY,
-    frustum.halfHeight,
-  );
-  // Invert the two view coordinates back to world x/z at the target height.
-  const sum =
-    ((COS_ELEVATION * FOLLOW_TARGET_HEIGHT - vy) * Math.SQRT2) / SIN_ELEVATION;
-  const difference = vx * Math.SQRT2;
-  return { x: (sum + difference) / 2, z: (sum - difference) / 2 };
-}
-
 export interface FollowStep extends FollowPoint {
   /** True when the target reached its destination; no more frames are needed. */
   readonly settled: boolean;
