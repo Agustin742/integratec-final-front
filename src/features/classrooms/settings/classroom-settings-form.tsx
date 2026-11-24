@@ -24,6 +24,10 @@ import {
   CLASSROOM_SUBJECT_MAX_LENGTH,
 } from '../classroom-schema';
 import { isAbortError, updateClassroom } from '../classroom-service';
+import {
+  clearOwnClassroomChange,
+  markOwnClassroomChange,
+} from '../own-classroom-change';
 import { classroomMessages } from '../messages';
 import { settingsMessages } from './messages';
 import {
@@ -108,6 +112,9 @@ export function ClassroomSettingsForm({
       abortRef.current?.abort();
       abortRef.current = controller;
       const detailKey = classroomDetailQueryKey(userId, classroomId);
+      // The server echoes this write as a context hint; mark it so the open
+      // panel is not torn down by it (see own-classroom-change.ts).
+      markOwnClassroomChange(queryClient, classroomId);
       try {
         const saved = await updateClassroom(
           client,
@@ -150,6 +157,9 @@ export function ClassroomSettingsForm({
           description: settingsMessages.toastSavedDescription(saved.name),
         });
       } catch (error) {
+        if (error instanceof ApiError && error.kind === 'validation') {
+          clearOwnClassroomChange(queryClient, classroomId);
+        }
         if (isAbortError(error) || controller.signal.aborted) {
           return;
         }

@@ -5,6 +5,7 @@ import { ApiError } from '@/api/errors';
 import { classroomDetailQueryKey } from '@/api/query-keys';
 import { useSessionService, useSessionSnapshot } from '@/session/provider';
 import { readContextEvents } from './context-events';
+import { consumeOwnClassroomChange } from './own-classroom-change';
 
 /**
  * Client-side connection renewal. It must stay below the backend
@@ -33,6 +34,13 @@ export function useClassroomContextEvents(
     let delay = 1_000;
     const resetContext = () => {
       if (stopped) return;
+      // The echo of this user's own settings save only needs a refetch: the
+      // open panel (and its unsaved state) must survive it. The refetch stays
+      // authoritative, so a real revocation still hides private content.
+      if (consumeOwnClassroomChange(queryClient, classroomId)) {
+        void queryClient.invalidateQueries({ queryKey, exact: true });
+        return;
+      }
       // Reset cancels obsolete REST, removes private data for ALL observers,
       // then fetches the same authoritative query. No parallel context store.
       void queryClient.resetQueries({ queryKey, exact: true });
