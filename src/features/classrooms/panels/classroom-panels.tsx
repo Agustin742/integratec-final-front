@@ -29,6 +29,11 @@ export type ClassroomPanelsProps = {
   availability?: PanelAvailability;
   description: string;
   fallbackFocus: () => HTMLElement | null;
+  /**
+   * True while a 3D scene fills the screen behind the panels: the dialog
+   * overlay then only dims and blurs lightly so the world stays visible.
+   */
+  immersive?: boolean;
   children: ReactNode;
 };
 export type ClassroomPanelsController = {
@@ -150,6 +155,9 @@ function ScopedPanels(props: ClassroomPanelsProps) {
           <DialogContent
             key={descriptor.key}
             className="max-h-[calc(100%-2rem)] [overflow-wrap:anywhere]"
+            overlayClassName={
+              props.immersive ? 'bg-foreground/15 backdrop-blur-xs' : undefined
+            }
             onCloseAutoFocus={(event) => {
               event.preventDefault();
               if (!focusIfUsable(active.invoker))

@@ -27,6 +27,7 @@ import {
 import { useSessionCleanup, useSessionSnapshot } from '@/session/provider';
 import { Classroom2DLayout } from './classroom-2d-layout';
 import { Classroom3DStage, clearLoadedWorldAssets } from './classroom-3d-stage';
+import { Classroom3DTopBar } from './classroom-3d-top-bar';
 import { useClassroomViewMode } from './classroom-mode-store';
 import { ClassroomPresenceBar } from './classroom-presence-bar';
 import { joinMessages } from './join-messages';
@@ -298,6 +299,33 @@ function WorkspaceContext({
     Array.isArray(keys) && keys.every((key) => typeof key === 'string')
       ? { confirmed: true as const, keys }
       : { confirmed: false as const };
+  const immersive = !isParent && mode === '3d';
+  const joinAlert = joinOutcome && (
+    <Alert
+      variant={joinOutcome.alreadyMember ? 'info' : 'success'}
+      role="status"
+      aria-live="polite"
+      data-testid="classroom-join-outcome"
+    >
+      <AlertTitle as="h3">
+        {joinOutcome.alreadyMember
+          ? joinMessages.outcome.alreadyMemberTitle
+          : joinMessages.outcome.joinedTitle}
+      </AlertTitle>
+      <AlertDescription>
+        {joinOutcome.role === 'TEACHER'
+          ? joinOutcome.alreadyMember
+            ? joinMessages.outcome.teacherAlreadyMemberBody
+            : joinMessages.outcome.teacherJoinedBody
+          : joinOutcome.alreadyMember
+            ? joinMessages.outcome.alreadyMemberBody
+            : joinMessages.outcome.joinedBody}{' '}
+        {joinOutcome.desk
+          ? joinMessages.outcome.formatAssignedDesk(joinOutcome.desk.deskIndex)
+          : joinMessages.outcome.noDeskAssigned}
+      </AlertDescription>
+    </Alert>
+  );
   return (
     <section key={`${userId}:${classroomId}`} className="min-w-0 space-y-6">
       <ClassroomPanelsProvider
@@ -308,136 +336,144 @@ function WorkspaceContext({
         availability={availability}
         description={messages.panelDescription}
         fallbackFocus={() => heading.current ?? safeFocus.current}
+        immersive={immersive}
       >
-        <header className="min-w-0 space-y-3">
-          <div className="flex min-w-0 flex-wrap items-start justify-between gap-4">
-            <div className="flex min-w-0 items-start gap-3">
-              <Link
-                to="/"
-                aria-label={messages.backToList}
-                title={messages.backToList}
-                className={buttonStyles({ variant: 'outline', size: 'icon' })}
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="size-6"
-                  aria-hidden="true"
-                  focusable="false"
-                >
-                  <path d="M19 12H5M12 19l-7-7 7-7" />
-                </svg>
-              </Link>
-              <div className="min-w-0 space-y-1.5">
-                <h2
-                  ref={heading}
-                  tabIndex={-1}
-                  className="font-display text-2xl font-semibold text-foreground wrap-anywhere"
-                >
-                  {classroom.name}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {messages.role}: {messages.roles[classroom.myRole]}
-                </p>
+        {immersive ? (
+          <Classroom3DStage
+            headingRef={activeViewHeadingRef}
+            scopeKey={classroomId}
+            classroomId={classroomId}
+            petName={classroom.pet?.name ?? null}
+            selfPose={presence.selfPose}
+            connectionKey={presence.connectionKey}
+            frozen={presence.frozen}
+            remoteParticipants={presence.remoteParticipants}
+            onIntentChange={presence.sendIntent}
+            onSustainedLowFps={beginPerformanceOffer}
+            topSlot={
+              <>
+                <Classroom3DTopBar
+                  classroomName={classroom.name}
+                  roleLabel={messages.roles[classroom.myRole]}
+                  headingRef={heading}
+                  modeToggleLabel={messages.viewMode.switchTo2d}
+                  onToggleMode={handleModeToggle}
+                  wallet={
+                    classroom.myRole === 'STUDENT' ? (
+                      <WalletIndicator classroomId={classroomId} />
+                    ) : null
+                  }
+                  presence={
+                    <ClassroomPresenceBar
+                      presence={presence}
+                      currentUserId={userId}
+                      classroom={classroom}
+                    />
+                  }
+                />
+                {joinAlert && (
+                  <div className="pointer-events-auto w-full max-w-3xl">
+                    {joinAlert}
+                  </div>
+                )}
+                {/* Sustained low fps shows a non-blocking offer (#56); the
+                    app never switches modes without the user's choice. */}
+                <div className="pointer-events-auto w-full max-w-3xl empty:hidden">
+                  <PerformanceOfferBanner
+                    onAccept={() => {
+                      pendingFocusSwitchRef.current = true;
+                      setMode('2d');
+                    }}
+                    onDecline={() => activeViewHeadingRef.current?.focus()}
+                  />
+                </div>
+              </>
+            }
+          />
+        ) : (
+          <>
+            <header className="min-w-0 space-y-3">
+              <div className="flex min-w-0 flex-wrap items-start justify-between gap-4">
+                <div className="flex min-w-0 items-start gap-3">
+                  <Link
+                    to="/"
+                    aria-label={messages.backToList}
+                    title={messages.backToList}
+                    className={buttonStyles({
+                      variant: 'outline',
+                      size: 'icon',
+                    })}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="size-6"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path d="M19 12H5M12 19l-7-7 7-7" />
+                    </svg>
+                  </Link>
+                  <div className="min-w-0 space-y-1.5">
+                    <h2
+                      ref={heading}
+                      tabIndex={-1}
+                      className="font-display text-2xl font-semibold text-foreground wrap-anywhere"
+                    >
+                      {classroom.name}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {messages.role}: {messages.roles[classroom.myRole]}
+                    </p>
+                  </div>
+                </div>
+                {!isParent && (
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {/* Visual cue only: aria-keyshortcuts on the button already announces Alt+M. */}
+                    <span
+                      aria-hidden="true"
+                      className="hidden text-xs text-muted-foreground sm:inline"
+                    >
+                      {messages.viewMode.shortcutHint}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-keyshortcuts="Alt+M"
+                      onClick={handleModeToggle}
+                    >
+                      {mode === '3d'
+                        ? messages.viewMode.switchTo2d
+                        : messages.viewMode.switchTo3d}
+                    </Button>
+                  </div>
+                )}
               </div>
-            </div>
+              {classroom.myRole === 'STUDENT' && (
+                <WalletIndicator classroomId={classroomId} />
+              )}
+              {!isParent && (
+                <ClassroomPresenceBar
+                  presence={presence}
+                  currentUserId={userId}
+                  classroom={classroom}
+                />
+              )}
+            </header>
+            {joinAlert}
             {!isParent && (
-              <div className="flex flex-wrap items-center gap-2.5">
-                {/* Visual cue only: aria-keyshortcuts on the button already announces Alt+M. */}
-                <span
-                  aria-hidden="true"
-                  className="hidden text-xs text-muted-foreground sm:inline"
-                >
-                  {messages.viewMode.shortcutHint}
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  aria-keyshortcuts="Alt+M"
-                  onClick={handleModeToggle}
-                >
-                  {mode === '3d'
-                    ? messages.viewMode.switchTo2d
-                    : messages.viewMode.switchTo3d}
-                </Button>
-              </div>
-            )}
-          </div>
-          {classroom.myRole === 'STUDENT' && (
-            <WalletIndicator classroomId={classroomId} />
-          )}
-          {!isParent && (
-            <ClassroomPresenceBar
-              presence={presence}
-              currentUserId={userId}
-              classroom={classroom}
-            />
-          )}
-        </header>
-        {joinOutcome && (
-          <Alert
-            variant={joinOutcome.alreadyMember ? 'info' : 'success'}
-            role="status"
-            aria-live="polite"
-            data-testid="classroom-join-outcome"
-          >
-            <AlertTitle as="h3">
-              {joinOutcome.alreadyMember
-                ? joinMessages.outcome.alreadyMemberTitle
-                : joinMessages.outcome.joinedTitle}
-            </AlertTitle>
-            <AlertDescription>
-              {joinOutcome.role === 'TEACHER'
-                ? joinOutcome.alreadyMember
-                  ? joinMessages.outcome.teacherAlreadyMemberBody
-                  : joinMessages.outcome.teacherJoinedBody
-                : joinOutcome.alreadyMember
-                  ? joinMessages.outcome.alreadyMemberBody
-                  : joinMessages.outcome.joinedBody}{' '}
-              {joinOutcome.desk
-                ? joinMessages.outcome.formatAssignedDesk(
-                    joinOutcome.desk.deskIndex,
-                  )
-                : joinMessages.outcome.noDeskAssigned}
-            </AlertDescription>
-          </Alert>
-        )}
-        {!isParent &&
-          (mode === '2d' ? (
-            <Classroom2DLayout
-              panels={panels}
-              headingRef={activeViewHeadingRef}
-            />
-          ) : (
-            <>
-              {/* Sustained low fps shows a non-blocking offer (#56); the
-                  app never switches modes without the user's choice. */}
-              <PerformanceOfferBanner
-                onAccept={() => {
-                  pendingFocusSwitchRef.current = true;
-                  setMode('2d');
-                }}
-                onDecline={() => activeViewHeadingRef.current?.focus()}
-              />
-              <Classroom3DStage
+              <Classroom2DLayout
+                panels={panels}
                 headingRef={activeViewHeadingRef}
-                scopeKey={classroomId}
-                classroomId={classroomId}
-                petName={classroom.pet?.name ?? null}
-                selfPose={presence.selfPose}
-                connectionKey={presence.connectionKey}
-                frozen={presence.frozen}
-                remoteParticipants={presence.remoteParticipants}
-                onIntentChange={presence.sendIntent}
-                onSustainedLowFps={beginPerformanceOffer}
               />
-            </>
-          ))}
+            )}
+          </>
+        )}
         <Outlet
           key={location.key}
           context={{ ...classroom, claimPanelRoute, closePanelRoute }}

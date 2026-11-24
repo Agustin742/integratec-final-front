@@ -44,7 +44,9 @@ vi.mock('./classroom-3d-stage', () => ({
         data-connection-key={props.connectionKey}
         data-frozen={String(Boolean(props.frozen))}
         data-remote-count={String(props.remoteParticipants?.length ?? 0)}
-      />
+      >
+        {props.topSlot}
+      </div>
     );
   },
 }));

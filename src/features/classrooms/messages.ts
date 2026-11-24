@@ -41,6 +41,11 @@ export const classroomMessages = {
     mode2dDescription:
       'Accedé por teclado o pantalla táctil a todas las herramientas disponibles de esta aula con las mismas validaciones del servidor.',
     mode2dNavLabel: 'Paneles del aula en Modo 2D Clásico',
+    immersive: {
+      topBarLabel: 'Barra del aula',
+      workPanelsLabel: 'Paneles de trabajo del aula',
+      communityPanelsLabel: 'Paneles de comunidad y apoyo del aula',
+    },
     openPanelAction: 'Abrir panel',
     mode2dEmptyTitle: 'No hay paneles disponibles',
     mode2dEmptyDescription:

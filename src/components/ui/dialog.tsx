@@ -14,12 +14,21 @@ export const DialogClose = DialogPrimitive.Close;
 
 export function DialogContent({
   className,
+  overlayClassName,
   children,
   ...props
-}: ComponentProps<typeof DialogPrimitive.Content>): ReactElement {
+}: ComponentProps<typeof DialogPrimitive.Content> & {
+  /** Overrides the default dim overlay, for example to keep a scene visible. */
+  overlayClassName?: string;
+}): ReactElement {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-foreground/45 data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in" />
+      <DialogPrimitive.Overlay
+        className={cn(
+          'fixed inset-0 z-50 bg-foreground/45 data-[state=closed]:animate-fade-out data-[state=open]:animate-fade-in',
+          overlayClassName,
+        )}
+      />
       <DialogPrimitive.Content
         className={cn(
           'fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex flex-col overflow-hidden rounded-3xl border border-edge bg-popover text-popover-foreground shadow-float data-[state=closed]:animate-dialog-out data-[state=open]:animate-dialog-in',

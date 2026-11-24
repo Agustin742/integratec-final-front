@@ -3,6 +3,7 @@ import {
   lazy,
   Suspense,
   useCallback,
+  useEffect,
   useState,
   type ReactNode,
   type RefObject,
@@ -16,9 +17,9 @@ import { PerformanceProbeRuntime } from '../world/performance-monitor';
 import { PerformanceStatsOverlay } from '../world/performance-stats-overlay';
 import { WorldFallback } from '../world/world-fallback';
 import {
-  ClassroomInteractablesBar,
+  ClassroomWorldHud,
   type InteractableFeedback,
-} from './classroom-interactables-bar';
+} from './classroom-3d-hud';
 import { useClassroomDesks } from './desks/classroom-desks-api';
 import { classroomMessages } from './messages';
 import { useOptionalClassroomPanels } from './panels/classroom-panels';
@@ -36,6 +37,11 @@ export interface Classroom3DStageProps {
   readonly onIntentChange?: ((intent: AvatarInput) => void) | undefined;
   /** Fired when the canvas measures sustained low fps (#56). */
   readonly onSustainedLowFps?: () => void;
+  /**
+   * Floating content pinned to the top of the world (navbar, alerts, offers).
+   * The host wraps each card in `pointer-events-auto`.
+   */
+  readonly topSlot?: ReactNode;
 }
 
 type ClearAssetCacheFn = (options?: {
@@ -103,6 +109,7 @@ export function Classroom3DStage({
   remoteParticipants,
   onIntentChange,
   onSustainedLowFps,
+  topSlot,
 }: Classroom3DStageProps) {
   const resolvedClassroomId = classroomId ?? scopeKey ?? '';
   return (
@@ -118,8 +125,24 @@ export function Classroom3DStage({
       remoteParticipants={remoteParticipants}
       onIntentChange={onIntentChange}
       onSustainedLowFps={onSustainedLowFps}
+      topSlot={topSlot}
     />
   );
+}
+
+/**
+ * The stage is a full-screen layer, so the page behind it must not scroll.
+ * Restores the previous value on unmount (2D switch, route change).
+ */
+function useLockPageScroll() {
+  useEffect(() => {
+    const root = document.documentElement;
+    const previous = root.style.overflow;
+    root.style.overflow = 'hidden';
+    return () => {
+      root.style.overflow = previous;
+    };
+  }, []);
 }
 
 function Classroom3DStageContent({
@@ -133,6 +156,7 @@ function Classroom3DStageContent({
   remoteParticipants,
   onIntentChange,
   onSustainedLowFps,
+  topSlot,
 }: {
   readonly headingRef?: RefObject<HTMLHeadingElement | null>;
   readonly scopeKey?: string;
@@ -145,7 +169,9 @@ function Classroom3DStageContent({
     readonly RemoteClassroomParticipant[] | undefined;
   readonly onIntentChange?: ((intent: AvatarInput) => void) | undefined;
   readonly onSustainedLowFps?: () => void;
+  readonly topSlot?: ReactNode;
 }) {
+  useLockPageScroll();
   const [LazyClassroomWorld] = useState(() => lazy(loadClassroomWorld));
   const [LazyWorldProbe] = useState(() => lazy(loadWorldProbe));
   const supportsBrowserObservers = typeof ResizeObserver !== 'undefined';
@@ -280,6 +306,24 @@ function Classroom3DStageContent({
     ],
   );
 
+  const handleOpenPanel = useCallback(
+    (key: string, invoker: HTMLElement) => {
+      if (interactionLocked) return;
+      const copy = classroomMessages.interactables;
+      if (
+        !panels ||
+        !panels.canOpenPanel(key) ||
+        !panels.openPanel(key, invoker)
+      ) {
+        setFeedback({ kind: 'denied', text: copy.panelDenied });
+        return;
+      }
+      setHighlightedId(undefined);
+      setFeedback(null);
+    },
+    [interactionLocked, panels],
+  );
+
   const handleHoverInteractable = useCallback((id: string | undefined) => {
     setHighlightedId(id);
   }, []);
@@ -298,38 +342,26 @@ function Classroom3DStageContent({
   return (
     <section
       aria-labelledby="classroom-3d-heading"
-      className="min-w-0 space-y-3 rounded-2xl border border-edge bg-card p-5 text-card-foreground shadow-panel"
+      className="fixed inset-0 z-30 overflow-hidden bg-background text-foreground"
     >
-      <div className="min-w-0 space-y-1">
-        <h3
-          id="classroom-3d-heading"
-          ref={headingRef}
-          tabIndex={-1}
-          className="font-display text-lg font-semibold text-foreground outline-none"
-        >
-          {classroomMessages.viewMode.stage3dHeading}
-        </h3>
-        <p className="max-w-prose text-sm text-pretty text-muted-foreground">
-          {classroomMessages.viewMode.stage3dDescription}
-        </p>
-      </div>
-
-      <ClassroomInteractablesBar
-        highlightedId={effectiveHighlightedId}
-        myDeskIndex={desks.myDeskIndex}
-        desksStatus={desks.status}
-        petName={petName}
-        feedback={effectiveFeedback}
-        canOpenPanel={canOpenPanel}
-        onFocusInteractable={handleHoverInteractable}
-        onActivateInteractable={handleActivateInteractable}
-      />
-
       {supportsBrowserObservers ? (
         <StageBoundary>
-          <div onPointerLeave={() => setHighlightedId(undefined)}>
-            <Suspense fallback={<p role="status">{worldMessages.loading}</p>}>
+          <div
+            className="absolute inset-0"
+            onPointerLeave={() => setHighlightedId(undefined)}
+          >
+            <Suspense
+              fallback={
+                <p
+                  role="status"
+                  className="absolute inset-x-0 top-1/2 text-center text-sm text-foreground"
+                >
+                  {worldMessages.loading}
+                </p>
+              }
+            >
               <LazyClassroomWorld
+                fill
                 label={classroomMessages.viewMode.canvasLabel}
                 scopeKey={scopeKey}
                 selfPose={selfPose}
@@ -358,11 +390,41 @@ function Classroom3DStageContent({
         <div
           role="region"
           aria-label={classroomMessages.viewMode.canvasLabel}
-          className="min-w-0 rounded-xl border border-edge bg-tray/50 p-4"
+          className="absolute inset-0 bg-tray/50 p-4"
         >
-          <canvas aria-hidden="true" className="block h-48 w-full rounded-lg" />
+          <canvas aria-hidden="true" className="block size-full" />
         </div>
       )}
+
+      {/* Click-through overlay: only the floating cards take pointer events. */}
+      <div className="pointer-events-none absolute inset-0 z-10">
+        <div className="absolute inset-x-0 top-0 flex flex-col items-center gap-2 p-3 sm:p-4">
+          {topSlot}
+        </div>
+        <ClassroomWorldHud
+          highlightedId={effectiveHighlightedId}
+          myDeskIndex={desks.myDeskIndex}
+          petName={petName}
+          feedback={effectiveFeedback}
+          canOpenPanel={canOpenPanel}
+          onFocusInteractable={handleHoverInteractable}
+          onActivateInteractable={handleActivateInteractable}
+          onOpenPanel={handleOpenPanel}
+        />
+      </div>
+      {/* Kept after the floating bar so heading levels stay in order, for screen readers and as the Alt+M focus target. */}
+      <div className="sr-only">
+        <h3
+          id="classroom-3d-heading"
+          ref={headingRef}
+          tabIndex={-1}
+          className="outline-none"
+        >
+          {classroomMessages.viewMode.stage3dHeading}
+        </h3>
+        <p>{classroomMessages.viewMode.stage3dDescription}</p>
+      </div>
+
       <PerformanceStatsOverlay runtime={performanceRuntime} />
     </section>
   );

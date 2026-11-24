@@ -29,6 +29,11 @@ export interface ClassroomWorldProps extends Pick<
   onHoverInteractable?: ((id: string | undefined) => void) | undefined;
   onSelectInteractable?:
     ((interactable: ClassroomInteractable) => void) | undefined;
+  /**
+   * Fills the positioned parent instead of using the fixed card height, for
+   * a full-screen world (#128). The parent must have a definite size.
+   */
+  fill?: boolean;
   /** Extra in-canvas nodes, such as the performance probe (#56). */
   children?: ReactNode;
 }
@@ -52,6 +57,7 @@ export function ClassroomWorld({
   interactionLocked,
   onHoverInteractable,
   onSelectInteractable,
+  fill = false,
   children,
 }: ClassroomWorldProps) {
   const { query } = useOwnProfile();
@@ -61,6 +67,18 @@ export function ClassroomWorld({
       scopeKey={scopeKey}
       framing="classroom"
       description={worldMessages.classroomControls}
+      {...(fill && {
+        canvasClassName: 'h-full w-full',
+        hostClassName: 'h-full',
+        loading: (
+          <p
+            role="status"
+            className="absolute inset-x-0 top-1/2 text-center text-sm text-foreground"
+          >
+            {worldMessages.loading}
+          </p>
+        ),
+      })}
     >
       <ClassroomScene
         avatar={query.data?.avatar}

@@ -15,6 +15,7 @@ import {
   SRGBColorSpace,
   WebGLRenderer,
 } from 'three';
+import { cn } from '@/lib/utils';
 import { CLASSROOM_BOUNDS, frameAvatarCamera, frameCamera } from './camera';
 import {
   DEFAULT_SCOPE,
@@ -40,6 +41,8 @@ export interface WorldCanvasProps {
   role?: 'region' | 'img';
   /** Sizing classes for the canvas box; defaults to the classroom height. */
   canvasClassName?: string;
+  /** Extra classes for the landmark host that wraps the canvas box. */
+  hostClassName?: string;
   /** Visually hidden text that describes the canvas (for example its controls). */
   description?: string;
   /** Replaces the loading announcement; `null` hides it. */
@@ -92,6 +95,7 @@ export function WorldCanvas({
   framing = 'classroom',
   role = 'region',
   canvasClassName,
+  hostClassName,
   description,
   loading,
   onUnavailable,
@@ -210,7 +214,7 @@ export function WorldCanvas({
         aria-label={label}
         aria-describedby={description ? descriptionId : undefined}
         aria-busy={!failed && !canvas}
-        className="min-w-0"
+        className={cn('min-w-0', hostClassName)}
       >
         {description && (
           <p id={descriptionId} className="sr-only">

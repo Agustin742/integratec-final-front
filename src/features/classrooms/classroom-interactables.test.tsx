@@ -77,6 +77,7 @@ const syntheticPanels = [
     title: 'Material',
     component: () => <p>Contenido material</p>,
   },
+  { key: 'chat', title: 'Chat', component: () => <p>Contenido chat</p> },
   { key: 'notices', title: 'Avisos', component: () => <p>Contenido avisos</p> },
   { key: 'shop', title: 'Tienda', component: () => <p>Contenido tienda</p> },
   {
@@ -256,7 +257,7 @@ describe('Classroom interactables HUD and 3D intent wiring (#38)', () => {
   test('opens a panel from 3D object selection, locks world interaction, and restores focus to stage heading on close', async () => {
     const { container } = setup();
     await screen.findByTestId('world-mock');
-    await screen.findByRole('button', { name: 'Mi pupitre #2' });
+    await screen.findByRole('button', { name: 'Calificaciones' });
 
     const stageHeading = screen.getByRole('heading', {
       level: 3,
@@ -292,7 +293,7 @@ describe('Classroom interactables HUD and 3D intent wiring (#38)', () => {
     expect(worldMock.latestProps?.interactionLocked).toBe(false);
   });
 
-  test('highlights the 3D target when focusing a quick chip and restores focus to that chip on dialog close', async () => {
+  test('highlights the 3D target when focusing a floating panel button and restores focus to that button on dialog close', async () => {
     setup();
     await screen.findByTestId('world-mock');
 
@@ -315,7 +316,7 @@ describe('Classroom interactables HUD and 3D intent wiring (#38)', () => {
     expect(shopChip).toHaveFocus();
   });
 
-  test('filters unavailable panel chips from the bar while 3D picking denies them honestly', async () => {
+  test('hides unavailable panel buttons from the floating groups while 3D picking denies them honestly', async () => {
     setup({ availablePanels: ['activities'] });
     await screen.findByTestId('world-mock');
 
@@ -323,14 +324,13 @@ describe('Classroom interactables HUD and 3D intent wiring (#38)', () => {
     expect(status).toHaveAttribute('role', 'status');
     expect(status).toBeEmptyDOMElement();
 
-    expect(screen.getByRole('button', { name: 'Pizarra' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Actividades' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Michi' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Puerta' })).toBeVisible();
     expect(
       screen.queryByRole('button', { name: 'Tienda' }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Cartelera' }),
+      screen.queryByRole('button', { name: 'Avisos' }),
     ).not.toBeInTheDocument();
 
     act(() => {
@@ -344,7 +344,7 @@ describe('Classroom interactables HUD and 3D intent wiring (#38)', () => {
     );
   });
 
-  test('omits the desk chip for teachers without an assigned desk while refusing 3D student desk clicks', async () => {
+  test('lets teachers without an assigned desk open grades from the floating button while refusing 3D student desk clicks', async () => {
     setup({
       myRole: 'TEACHER',
       assignedDeskIndex: null,
@@ -354,10 +354,8 @@ describe('Classroom interactables HUD and 3D intent wiring (#38)', () => {
 
     await waitFor(() => expect(worldMock.latestProps?.ownDeskIndex).toBeNull());
     expect(
-      screen.queryByRole('button', {
-        name: classroomMessages.interactables.desksTitle,
-      }),
-    ).not.toBeInTheDocument();
+      screen.getByRole('button', { name: 'Calificaciones' }),
+    ).toBeVisible();
 
     act(() => {
       worldMock.latestProps?.onSelectInteractable?.(
@@ -368,6 +366,11 @@ describe('Classroom interactables HUD and 3D intent wiring (#38)', () => {
     expect(
       screen.getByTestId('classroom-interactable-status'),
     ).toHaveTextContent(classroomMessages.interactables.noAssignedDesk);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Calificaciones' }));
+    expect(
+      await screen.findByRole('dialog', { name: 'Calificaciones' }),
+    ).toBeVisible();
   });
 
   test('offers a retry button when the desk map fails to load and recovers assigned desk on retry', async () => {
@@ -375,14 +378,15 @@ describe('Classroom interactables HUD and 3D intent wiring (#38)', () => {
     setup({ assignedDeskIndex: 3, shouldFailDesks: () => failDesks });
     await screen.findByTestId('world-mock');
 
-    const desksChip = await screen.findByRole('button', {
-      name: classroomMessages.interactables.desksTitle,
-    });
-    const status = screen.getByTestId('classroom-interactable-status');
+    const status = await screen.findByTestId('classroom-interactable-status');
 
-    // Wait until the failed /desks query moves out of pending before clicking.
+    // Wait until the failed /desks query moves out of pending before picking.
     await waitFor(() => {
-      fireEvent.click(desksChip);
+      act(() => {
+        worldMock.latestProps?.onSelectInteractable?.(
+          interactablesById.get('student-desk:3')!,
+        );
+      });
       expect(status).toHaveTextContent(
         classroomMessages.interactables.desksUnavailable,
       );
@@ -394,9 +398,7 @@ describe('Classroom interactables HUD and 3D intent wiring (#38)', () => {
     failDesks = false;
     fireEvent.click(retryBtn);
 
-    expect(
-      await screen.findByRole('button', { name: 'Mi pupitre #3' }),
-    ).toBeVisible();
+    await waitFor(() => expect(worldMock.latestProps?.ownDeskIndex).toBe(3));
     await waitFor(() => expect(status).toBeEmptyDOMElement());
   });
 
@@ -404,7 +406,7 @@ describe('Classroom interactables HUD and 3D intent wiring (#38)', () => {
     setup({ assignedDeskIndex: 2 });
     await screen.findByTestId('world-mock');
     const ownChip = await screen.findByRole('button', {
-      name: 'Mi pupitre #2',
+      name: 'Calificaciones',
     });
     expect(worldMock.latestProps?.ownDeskIndex).toBe(2);
 
@@ -454,14 +456,219 @@ describe('Classroom interactables HUD and 3D intent wiring (#38)', () => {
     expect(worldMock.latestProps?.petReactionNonce).toBe(initialNonce + 1);
   });
 
-  test('navigates cleanly to Mis aulas when entrance is activated', async () => {
+  test('navigates cleanly to Mis aulas from the floating back link', async () => {
     const { router } = setup();
     await screen.findByTestId('world-mock');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Puerta' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Volver a mis aulas' }));
     expect(
       await screen.findByRole('heading', { name: 'Mis aulas' }),
     ).toBeVisible();
     expect(router.state.location.pathname).toBe('/');
+  });
+});
+
+describe('Immersive 3D classroom layout (#128)', () => {
+  const allPanels: components['schemas']['ClassroomPanelKey'][] = [
+    'activities',
+    'material',
+    'grades',
+    'notices',
+    'chat',
+    'members',
+    'bot',
+    'shop',
+  ];
+
+  function buttonNames(group: HTMLElement) {
+    return within(group)
+      .getAllByRole('button')
+      .map((button) => button.getAttribute('aria-label') ?? button.textContent);
+  }
+
+  test('renders the work panels on the left and the community panels on the right, in order', async () => {
+    setup({ availablePanels: allPanels });
+    await screen.findByTestId('world-mock');
+
+    const left = screen.getByRole('navigation', {
+      name: classroomMessages.viewMode.immersive.workPanelsLabel,
+    });
+    const right = screen.getByRole('navigation', {
+      name: classroomMessages.viewMode.immersive.communityPanelsLabel,
+    });
+    expect(buttonNames(left)).toEqual([
+      'Actividades',
+      'Material',
+      'Calificaciones',
+      'Avisos',
+    ]);
+    expect(buttonNames(right)).toEqual([
+      'Chat',
+      'Integrantes',
+      'Asistente de estudio',
+      'Tienda',
+    ]);
+  });
+
+  test('opens a panel from a floating button and restores focus to that button', async () => {
+    setup({ availablePanels: allPanels });
+    await screen.findByTestId('world-mock');
+
+    const members = screen.getByRole('button', { name: 'Integrantes' });
+    members.focus();
+    fireEvent.click(members);
+    const dialog = await screen.findByRole('dialog', { name: 'Integrantes' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cerrar' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+    expect(members).toHaveFocus();
+  });
+
+  test('hides panels the server did not make available instead of disabling them', async () => {
+    setup({ availablePanels: ['activities', 'shop'] });
+    await screen.findByTestId('world-mock');
+
+    const left = screen.getByRole('navigation', {
+      name: classroomMessages.viewMode.immersive.workPanelsLabel,
+    });
+    expect(buttonNames(left)).toEqual(['Actividades']);
+    expect(
+      screen.queryByRole('button', { name: 'Chat' }),
+    ).not.toBeInTheDocument();
+  });
+
+  test('gives each floating panel button a touch-sized target', async () => {
+    setup({ availablePanels: allPanels });
+    await screen.findByTestId('world-mock');
+
+    for (const name of ['Actividades', 'Tienda']) {
+      expect(screen.getByRole('button', { name })).toHaveClass('min-h-11');
+      expect(screen.getByRole('button', { name })).toHaveClass('min-w-11');
+    }
+  });
+
+  test('floats the back link, name, role, wallet and mode toggle in a top bar over the world', async () => {
+    setup();
+    await screen.findByTestId('world-mock');
+
+    const bar = screen.getByTestId('classroom-3d-top-bar');
+    expect(
+      within(bar).getByRole('link', { name: 'Volver a mis aulas' }),
+    ).toBeVisible();
+    expect(
+      within(bar).getByRole('heading', { level: 2, name: 'Aula aula-1' }),
+    ).toBeVisible();
+    expect(within(bar).getByText(/Estudiante/)).toBeVisible();
+    expect(
+      await within(bar).findByRole('button', { name: /puntos/ }),
+    ).toBeVisible();
+    expect(
+      within(bar).getByRole('button', {
+        name: classroomMessages.viewMode.switchTo2d,
+      }),
+    ).toHaveAttribute('aria-keyshortcuts', 'Alt+M');
+  });
+
+  test('keeps Alt+M toggling and lands focus on the 3D heading when returning from 2D', async () => {
+    setup();
+    await screen.findByTestId('world-mock');
+
+    fireEvent.keyDown(window, { key: 'm', code: 'KeyM', altKey: true });
+    expect(
+      await screen.findByRole('heading', {
+        name: classroomMessages.viewMode.mode2dHeading,
+      }),
+    ).toHaveFocus();
+    expect(
+      screen.queryByTestId('classroom-3d-top-bar'),
+    ).not.toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'm', code: 'KeyM', altKey: true });
+    expect(
+      await screen.findByRole('heading', {
+        level: 3,
+        name: classroomMessages.viewMode.stage3dHeading,
+      }),
+    ).toHaveFocus();
+  });
+
+  test('renders no floating groups in 2D Classic Mode', async () => {
+    setup({ availablePanels: allPanels });
+    await screen.findByTestId('world-mock');
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: classroomMessages.viewMode.switchTo2d,
+      }),
+    );
+    await screen.findByRole('heading', {
+      name: classroomMessages.viewMode.mode2dHeading,
+    });
+    expect(
+      screen.queryByRole('navigation', {
+        name: classroomMessages.viewMode.immersive.workPanelsLabel,
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('navigation', {
+        name: classroomMessages.viewMode.mode2dNavLabel,
+      }),
+    ).toBeVisible();
+  });
+
+  test('keeps the world visible behind panels in 3D only, with a translucent overlay', async () => {
+    setup({ availablePanels: allPanels });
+    await screen.findByTestId('world-mock');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Tienda' }));
+    await screen.findByRole('dialog', { name: 'Tienda' });
+    const overlay3d = document.querySelector('[data-state="open"].inset-0');
+    expect(overlay3d).toHaveClass('backdrop-blur-xs');
+    expect(overlay3d).not.toHaveClass('bg-foreground/45');
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: classroomMessages.viewMode.switchTo2d,
+      }),
+    );
+    const nav = await screen.findByRole('navigation', {
+      name: classroomMessages.viewMode.mode2dNavLabel,
+    });
+    fireEvent.click(within(nav).getByRole('button', { name: /Tienda/ }));
+    await screen.findByRole('dialog', { name: 'Tienda' });
+    const overlay2d = document.querySelector('[data-state="open"].inset-0');
+    expect(overlay2d).toHaveClass('bg-foreground/45');
+    expect(overlay2d).not.toHaveClass('backdrop-blur-xs');
+  });
+
+  test('locks page scrolling while the immersive world is shown and releases it in 2D and on unmount', async () => {
+    const { unmount } = setup();
+    await screen.findByTestId('world-mock');
+    expect(document.documentElement.style.overflow).toBe('hidden');
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: classroomMessages.viewMode.switchTo2d,
+      }),
+    );
+    await screen.findByRole('heading', {
+      name: classroomMessages.viewMode.mode2dHeading,
+    });
+    expect(document.documentElement.style.overflow).toBe('');
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: classroomMessages.viewMode.switchTo3d,
+      }),
+    );
+    await screen.findByTestId('world-mock');
+    expect(document.documentElement.style.overflow).toBe('hidden');
+    unmount();
+    expect(document.documentElement.style.overflow).toBe('');
   });
 });

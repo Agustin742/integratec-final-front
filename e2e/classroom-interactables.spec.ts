@@ -222,7 +222,7 @@ test.beforeEach(async ({ page, baseURL }) => {
   });
 });
 
-test('picks 3D objects on canvas, handles pet and keyboard chips, and captures responsive evidence', async ({
+test('picks 3D objects on canvas, handles pet and floating panel buttons, and captures responsive evidence', async ({
   page,
 }, testInfo) => {
   const isMobile = testInfo.project.name === 'mobile';
@@ -243,7 +243,7 @@ test('picks 3D objects on canvas, handles pet and keyboard chips, and captures r
   const { stageHeading, canvas } = await openReadyClassroomStage(page);
 
   await expect(
-    page.getByRole('button', { name: 'Mi pupitre #1' }),
+    page.getByRole('button', { name: 'Calificaciones' }),
   ).toBeVisible();
 
   const declineLowFps = page.getByRole('button', {
@@ -287,7 +287,7 @@ test('picks 3D objects on canvas, handles pet and keyboard chips, and captures r
       'Michi te saluda desde su rincón.',
     );
 
-    // Keyboard navigation on the quick-select strip opens a panel and restores focus to that chip.
+    // Keyboard navigation on the floating panel groups opens a panel and restores focus to that button.
     const shopChip = page.getByRole('button', { name: 'Tienda' });
     await shopChip.focus();
     await expect(shopChip).toBeFocused();

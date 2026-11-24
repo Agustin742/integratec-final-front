@@ -94,7 +94,7 @@ function renderStage(
   );
 }
 
-test('mounts the lazy classroom world with the stage label, scope, presence props, and interactables bar', async () => {
+test('mounts the lazy classroom world with the stage label, scope, presence props, and floating panel groups', async () => {
   vi.stubGlobal(
     'ResizeObserver',
     class {
@@ -137,11 +137,11 @@ test('mounts the lazy classroom world with the stage label, scope, presence prop
   });
   expect(
     screen.getByRole('navigation', {
-      name: classroomMessages.interactables.navLabel,
+      name: classroomMessages.viewMode.immersive.workPanelsLabel,
     }),
   ).toBeVisible();
   expect(
-    await screen.findByRole('button', { name: 'Mi pupitre #1' }),
+    await screen.findByRole('button', { name: 'Calificaciones' }),
   ).toBeVisible();
   expect(screen.getByRole('button', { name: 'Michi' })).toBeVisible();
 });
