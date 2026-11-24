@@ -474,6 +474,23 @@ function ChatConversationView({
     prependAnchorRef.current = null;
   }, [historyItems]);
 
+  // The composer grows and shrinks under the list (auto-growing draft): while
+  // the reader is at the bottom, keep the latest message in view instead of
+  // letting the shrinking list push it out.
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (scroller === null || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      if (stickToBottomRef.current) {
+        scroller.scrollTop = scroller.scrollHeight;
+      }
+    });
+    observer.observe(scroller);
+    return () => {
+      observer.disconnect();
+    };
+  }, [hasHistory]);
+
   // Infinite scroll up: when the top sentinel nears the viewport, request the
   // next (older) page. The observer is re-armed after every fetch so a list
   // still shorter than the viewport keeps loading until it overflows.
