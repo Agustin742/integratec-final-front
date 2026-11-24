@@ -275,18 +275,18 @@ Seasonal:
 
 ## 5. The bot
 
-- [ ] Tutor bot 3D model (friendly robot in the classroom palette)
-- [ ] Bot station / fixed corner in the classroom
-- [ ] Animation: idle hover
-- [ ] Animation: wave
-- [ ] Animation: talk
-- [ ] Animation: think
-- [ ] Animation: celebrate a right answer
-- [ ] Animation: encourage after a mistake
-- [ ] Face / screen: happy
-- [ ] Face / screen: thinking
-- [ ] Face / screen: talking
-- [ ] Face / screen: surprised
-- [ ] Face / screen: sleeping
-- [ ] 2D bot icon for the study panel and the daily review
+- [x] Tutor bot 3D model (friendly robot in the classroom palette)
+- [x] Bot station / fixed corner in the classroom
+- [x] Animation: idle hover
+- [x] Animation: wave
+- [x] Animation: talk
+- [x] Animation: think
+- [x] Animation: celebrate a right answer
+- [x] Animation: encourage after a mistake
+- [x] Face / screen: happy
+- [x] Face / screen: thinking
+- [x] Face / screen: talking
+- [x] Face / screen: surprised
+- [x] Face / screen: sleeping
+- [x] 2D bot icon for the study panel and the daily review
 - [ ] Color or accessory variants (future shop items)
