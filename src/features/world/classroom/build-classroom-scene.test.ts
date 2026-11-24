@@ -72,60 +72,22 @@ describe('floor', () => {
   });
 });
 
-describe('cutaway walls', () => {
-  test('far sides are full height, near sides never exceed a low skirting', () => {
+describe('shell ownership', () => {
+  test('floor, walls and skirting come from the modular kit, not primitives', () => {
     const { root } = build();
-    const far = ['wall-far-z', 'wall-far-x'].map((name) =>
-      worldBox(named(root, name)),
-    );
-    far.forEach((box) => expect(box.max.y).toBeGreaterThan(2));
-    expect(far[0]!.max.z).toBeLessThanOrEqual(layout.bounds.minZ + 1e-6);
-    expect(far[1]!.max.x).toBeLessThanOrEqual(layout.bounds.minX + 1e-6);
-    const nearSkirting = meshes(named(root, 'skirting-near'));
-    expect(nearSkirting.length).toBeGreaterThan(0);
-    for (const mesh of nearSkirting) {
-      expect(worldBox(mesh).max.y).toBeLessThanOrEqual(0.15 + 1e-6);
+    for (const name of ['wall-far-z', 'wall-far-x', 'skirting-near']) {
+      expect(root.getObjectByName(name)).toBeUndefined();
     }
   });
 
-  test('walls stay outside the layout bounds so they never overlap the floor', () => {
+  test('walkable floor and entrance are invisible but raycastable planes', () => {
     const { root } = build();
-    const { bounds } = layout;
-    for (const name of ['wall-far-z', 'wall-far-x']) {
-      for (const mesh of meshes(named(root, name))) {
-        const box = worldBox(mesh);
-        const outside =
-          box.max.z <= bounds.minZ + 1e-6 || box.max.x <= bounds.minX + 1e-6;
-        expect(outside).toBe(true);
-      }
+    for (const name of ['walkable-floor', 'entrance']) {
+      const mesh = named(root, name) as Mesh;
+      expect((mesh.material as Material).visible).toBe(false);
     }
-    for (const mesh of meshes(named(root, 'skirting-near'))) {
-      const box = worldBox(mesh);
-      const outside =
-        box.min.z >= bounds.maxZ - 1e-6 || box.min.x >= bounds.maxX - 1e-6;
-      expect(outside).toBe(true);
-    }
-  });
-
-  test('leaves a coral entrance gap in the back skirting', () => {
-    const { root } = build();
     const entrance = named(root, 'entrance');
     expect(entrance.userData.placeholder).toBe('entrance');
-    const gap = worldBox(entrance);
-    const back = meshes(named(root, 'skirting-near')).filter(
-      (mesh) => worldBox(mesh).min.z >= layout.bounds.maxZ - 1e-6,
-    );
-    expect(back.length).toBe(2);
-    for (const segment of back) {
-      const box = worldBox(segment);
-      expect(
-        box.max.x <= gap.min.x + 1e-6 || box.min.x >= gap.max.x - 1e-6,
-      ).toBe(true);
-    }
-    const colour = (entrance as Mesh).material as unknown as {
-      color: { getHex(): number };
-    };
-    expect(colour.color.getHex()).toBe(0xe66861);
   });
 
   test('keeps the entrance raycastable while decorative floor zones let floor rays pass', () => {

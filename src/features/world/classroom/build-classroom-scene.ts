@@ -14,12 +14,8 @@ import {
   type BufferGeometry,
 } from 'three';
 import type { ClassroomLayout } from '@/realtime';
-import { CLASSROOM_WALL_HEIGHT } from '../camera';
 import { DESK_HEIGHT, deriveDesks } from './classroom-desks';
-import {
-  ENTRANCE_WIDTH,
-  deriveClassroomPropSpecs,
-} from './classroom-interactables';
+import { deriveClassroomPropSpecs } from './classroom-interactables';
 
 /** Art-direction palette (`rules/art-direction.md`). */
 export const CLASSROOM_COLORS = {
@@ -53,9 +49,6 @@ export interface ClassroomScene {
   dispose(): void;
 }
 
-const WALL_THICKNESS = 0.2;
-const SKIRTING_HEIGHT = 0.15;
-const SKIRTING_THICKNESS = 0.1;
 const DESK_TOP_THICKNESS = 0.06;
 const LEG_SIZE = 0.06;
 const LEG_INSET = 0.05;
@@ -67,7 +60,9 @@ type Vec3 = readonly [number, number, number];
  * shared geometries and one matte material per colour. Desks come from the
  * layout obstacles, so what is drawn is exactly what collides. Front of the
  * room = negative z (board, shelf, shop, pet); the entrance is at the back.
- * The camera sits at +x,+z, so full-height walls exist only on the far sides.
+ * The shell (floor, walls, skirting, lights) is the modular kit rendered by
+ * `<ClassroomKit>`; this scene keeps the invisible walkable-floor and entrance
+ * raycast planes, the teaching zone, desks and the prop placeholders.
  */
 export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   const { bounds } = layout;
@@ -111,7 +106,14 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
     position: Vec3,
     interactive = false,
   ) => {
-    const mesh = new Mesh(plane, material(color));
+    // Interactive flats are raycast targets whose look comes from the modular
+    // kit (floor tiles, threshold): invisible material, still hit by rays.
+    const mesh = new Mesh(
+      plane,
+      interactive
+        ? new MeshStandardMaterial({ color, visible: false })
+        : material(color),
+    );
     mesh.scale.set(width, depth, 1);
     mesh.position.set(...position);
     mesh.rotation.x = -Math.PI / 2;
@@ -158,60 +160,6 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   entrance.name = 'entrance';
   entrance.userData.placeholder = 'entrance' satisfies PlaceholderKind;
   root.add(entrance);
-
-  // Far walls (x = minX and z = minZ) are full height; the corner belongs to
-  // the z wall. Both sit outside the layout bounds.
-  const farZ = block(
-    root,
-    CLASSROOM_COLORS.wall,
-    [width + WALL_THICKNESS, CLASSROOM_WALL_HEIGHT, WALL_THICKNESS],
-    [
-      centerX - WALL_THICKNESS / 2,
-      CLASSROOM_WALL_HEIGHT / 2,
-      bounds.minZ - WALL_THICKNESS / 2,
-    ],
-  );
-  farZ.name = 'wall-far-z';
-  const farX = block(
-    root,
-    CLASSROOM_COLORS.wall,
-    [WALL_THICKNESS, CLASSROOM_WALL_HEIGHT, depth],
-    [bounds.minX - WALL_THICKNESS / 2, CLASSROOM_WALL_HEIGHT / 2, centerZ],
-  );
-  farX.name = 'wall-far-x';
-
-  // Near sides (x = maxX and z = maxZ) are a low skirting so avatars stay
-  // visible; the back one leaves the entrance gap.
-  const skirting = new Group();
-  skirting.name = 'skirting-near';
-  const gapMin = -ENTRANCE_WIDTH / 2;
-  const gapMax = ENTRANCE_WIDTH / 2;
-  block(
-    skirting,
-    CLASSROOM_COLORS.wood,
-    [SKIRTING_THICKNESS, SKIRTING_HEIGHT, depth + SKIRTING_THICKNESS],
-    [
-      bounds.maxX + SKIRTING_THICKNESS / 2,
-      SKIRTING_HEIGHT / 2,
-      centerZ + SKIRTING_THICKNESS / 2,
-    ],
-  );
-  for (const [from, to] of [
-    [bounds.minX, gapMin],
-    [gapMax, bounds.maxX],
-  ] as const) {
-    block(
-      skirting,
-      CLASSROOM_COLORS.wood,
-      [to - from, SKIRTING_HEIGHT, SKIRTING_THICKNESS],
-      [
-        (from + to) / 2,
-        SKIRTING_HEIGHT / 2,
-        bounds.maxZ + SKIRTING_THICKNESS / 2,
-      ],
-    );
-  }
-  root.add(skirting);
 
   // Desks: one footprint per layout obstacle.
   const desks = deriveDesks(layout);
