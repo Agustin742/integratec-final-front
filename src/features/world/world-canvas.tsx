@@ -44,6 +44,11 @@ export interface WorldCanvasProps {
   canvasClassName?: string;
   /** Extra classes for the landmark host that wraps the canvas box. */
   hostClassName?: string;
+  /**
+   * Centers the fallback below a floating top bar when filling a full-screen
+   * host (#128).
+   */
+  fill?: boolean;
   /** Visually hidden text that describes the canvas (for example its controls). */
   description?: string;
   /** Replaces the loading announcement; `null` hides it. */
@@ -98,6 +103,7 @@ export function WorldCanvas({
   role = 'region',
   canvasClassName,
   hostClassName,
+  fill = false,
   description,
   loading,
   onUnavailable,
@@ -224,7 +230,13 @@ export function WorldCanvas({
           </p>
         )}
         {failed ? (
-          <WorldFallback />
+          fill ? (
+            <div className="flex h-full items-center justify-center p-4 pt-28">
+              <WorldFallback />
+            </div>
+          ) : (
+            <WorldFallback />
+          )
         ) : (
           <SceneBoundary onError={() => setFailed(true)}>
             <div

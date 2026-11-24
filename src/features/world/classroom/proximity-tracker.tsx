@@ -39,6 +39,7 @@ export function ProximityTracker({
 }: ProximityTrackerProps) {
   const invalidate = useThree((state) => state.invalidate);
   const currentRef = useRef<string | undefined>(undefined);
+  const lastAnchorRef = useRef<{ x: number; y: number } | null>(null);
   const callbacks = useRef({ onChange, onAnchor });
   useEffect(() => {
     callbacks.current = { onChange, onAnchor };
@@ -55,6 +56,7 @@ export function ProximityTracker({
 
   useEffect(
     () => () => {
+      lastAnchorRef.current = null;
       if (currentRef.current !== undefined) {
         currentRef.current = undefined;
         callbacks.current.onChange?.(undefined);
@@ -71,18 +73,23 @@ export function ProximityTracker({
     });
     if (next !== currentRef.current) {
       currentRef.current = next;
+      lastAnchorRef.current = null;
       callbacks.current.onChange?.(next);
     }
     const target = next === undefined ? undefined : byId.get(next);
     if (!target) return;
-    const [x, , z] = target.worldPosition;
+    const [worldX, , worldZ] = target.worldPosition;
     camera.updateMatrixWorld();
-    SCRATCH.set(x, target.beaconHeight, z).project(camera);
+    SCRATCH.set(worldX, target.beaconHeight, worldZ).project(camera);
     if (!Number.isFinite(SCRATCH.x) || !Number.isFinite(SCRATCH.y)) return;
-    callbacks.current.onAnchor?.({
-      x: SCRATCH.x / 2 + 0.5,
-      y: 0.5 - SCRATCH.y / 2,
-    });
+    const x = SCRATCH.x / 2 + 0.5;
+    const y = 0.5 - SCRATCH.y / 2;
+    const last = lastAnchorRef.current;
+    if (last && Math.abs(x - last.x) < 1e-4 && Math.abs(y - last.y) < 1e-4) {
+      return;
+    }
+    lastAnchorRef.current = { x, y };
+    callbacks.current.onAnchor?.({ x, y });
   });
 
   return null;

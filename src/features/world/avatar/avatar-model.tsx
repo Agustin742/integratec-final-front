@@ -194,11 +194,21 @@ function LoadedAvatar({
       mixer.stopAllAction();
       actionRef.current = null;
       advancingRef.current = false;
+      invalidate();
       return;
     }
     const next = mixer.clipAction(clip);
     if (next === previous) {
+      const wasAdvancing = advancingRef.current;
       advancingRef.current = !reducedMotion;
+      if (wasAdvancing && reducedMotion) {
+        mixer.stopAllAction();
+        next.reset().play();
+        mixer.update(0);
+        invalidate();
+      } else if (!wasAdvancing && !reducedMotion) {
+        invalidate();
+      }
       return;
     }
     if (previous && !reducedMotion) {

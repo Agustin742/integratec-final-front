@@ -90,6 +90,23 @@ describe('ProximityTracker', () => {
     expect(anchor.y).toBeLessThan(1);
   });
 
+  test('skips repeated onAnchor calls while projected screen coordinates stay unchanged', () => {
+    const { onAnchor } = setup({ x: 4.8, z: -4.5, rotation: 0 });
+    tick();
+    tick();
+    tick();
+    expect(onAnchor).toHaveBeenCalledTimes(1);
+
+    applyFollowCamera(frame.camera as OrthographicCamera, 1280, 720, {
+      x: 3.5,
+      z: -4,
+    });
+    tick();
+    expect(onAnchor).toHaveBeenCalledTimes(2);
+    tick();
+    expect(onAnchor).toHaveBeenCalledTimes(2);
+  });
+
   test('re-evaluates when the candidates change and clears on unmount', () => {
     const { poseRef, onChange, view } = setup({ x: 4.8, z: -4.5, rotation: 0 });
     tick();

@@ -11,6 +11,7 @@ import type { ClassroomInteractable } from '../world/classroom/classroom-interac
 import { Classroom3DStage } from './classroom-3d-stage';
 import { classroomMessages } from './messages';
 import { ClassroomPanelsProvider } from './panels/classroom-panels';
+import { anchorProximityPrompt } from './proximity-prompt';
 
 interface WorldProps {
   highlightedInteractableId?: string;
@@ -146,10 +147,43 @@ describe('proximity prompt', () => {
     await nearTo('shop');
     const prompt = screen.getByRole('button', { name: /Abrir tienda/ });
     expect(prompt.className).toContain('min-h-11');
+    expect(prompt.className).toContain('max-w-[calc(100vw-2rem)]');
+    expect(prompt.querySelector('span')).toHaveClass('truncate');
     fireEvent.click(prompt);
     expect(
       await screen.findByRole('dialog', { name: 'Panel shop' }),
     ).toBeInTheDocument();
+  });
+
+  test('clamps the prompt within 360px viewport bounds and below the top bar when layout dimensions are measured', () => {
+    const parent = document.createElement('div');
+    const element = document.createElement('div');
+    parent.append(element);
+    Object.defineProperty(parent, 'clientWidth', { value: 360 });
+    Object.defineProperty(parent, 'clientHeight', { value: 800 });
+    Object.defineProperty(element, 'offsetWidth', {
+      configurable: true,
+      value: 200,
+    });
+    Object.defineProperty(element, 'offsetHeight', {
+      configurable: true,
+      value: 56,
+    });
+
+    anchorProximityPrompt(element, { x: 0, y: 0 });
+    expect(element.style.left).toBe('112px');
+    expect(element.style.top).toBe('88px');
+
+    anchorProximityPrompt(element, { x: 1, y: 1 });
+    expect(element.style.left).toBe('248px');
+    expect(element.style.top).toBe('788px');
+
+    Object.defineProperty(element, 'offsetWidth', {
+      configurable: true,
+      value: 350,
+    });
+    anchorProximityPrompt(element, { x: 0.1, y: 0.5 });
+    expect(element.style.left).toBe('180px');
   });
 });
 

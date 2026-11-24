@@ -63,26 +63,25 @@ export function selectProximityTarget({
     return undefined;
   }
 
-  let nearest: { id: string; distance: number } | undefined;
-  let current: { id: string; distance: number } | undefined;
+  let nearestId: string | undefined;
+  let nearestDist = Infinity;
+  let currentDist = Infinity;
   for (const candidate of candidates) {
     const distance = distanceToFootprint(position, candidate);
-    if (candidate.id === currentId) current = { id: candidate.id, distance };
-    if (
-      distance <= PROXIMITY_ENTER_RADIUS &&
-      (!nearest || distance < nearest.distance)
-    ) {
-      nearest = { id: candidate.id, distance };
+    if (candidate.id === currentId) currentDist = distance;
+    if (distance <= PROXIMITY_ENTER_RADIUS && distance < nearestDist) {
+      nearestId = candidate.id;
+      nearestDist = distance;
     }
   }
 
-  if (current && current.distance <= PROXIMITY_EXIT_RADIUS) {
+  if (currentId !== undefined && currentDist <= PROXIMITY_EXIT_RADIUS) {
     if (
-      !nearest ||
-      nearest.distance >= current.distance - PROXIMITY_SWITCH_MARGIN
+      nearestId === undefined ||
+      nearestDist >= currentDist - PROXIMITY_SWITCH_MARGIN
     ) {
-      return current.id;
+      return currentId;
     }
   }
-  return nearest?.id;
+  return nearestId;
 }

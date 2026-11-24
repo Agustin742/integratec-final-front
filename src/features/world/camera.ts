@@ -132,8 +132,12 @@ export const FOLLOW_TARGET_HEIGHT = 0.9;
 /** Follow smoothing rate (1/s) for `MathUtils.damp`; higher is snappier. */
 export const FOLLOW_DAMPING = 6;
 
+/** Maximum frame delta (seconds) accepted by follow damping so tab stalls never overshoot. */
+export const MAX_FOLLOW_DT = 0.1;
+
 /** Distance (meters) under which the damped target counts as settled. */
-export const FOLLOW_SETTLE_DISTANCE = 0.001;
+export const FOLLOW_EPSILON = 0.001;
+export const FOLLOW_SETTLE_DISTANCE = FOLLOW_EPSILON;
 
 export interface FollowPoint {
   readonly x: number;
@@ -147,6 +151,12 @@ export interface FollowFrustum {
 
 /** Half extents of the visible area for a viewport, in camera-space units. */
 export function followFrustum(width: number, height: number): FollowFrustum {
+  if (!(width > 0 && height > 0)) {
+    return {
+      halfWidth: FOLLOW_MIN_VISIBLE_WIDTH / 2,
+      halfHeight: FOLLOW_VISIBLE_HEIGHT / 2,
+    };
+  }
   const aspect = width / height;
   const halfHeight =
     Math.max(FOLLOW_VISIBLE_HEIGHT, FOLLOW_MIN_VISIBLE_WIDTH / aspect) / 2;
@@ -173,9 +183,19 @@ export function advanceFollowTarget(
   reducedMotion: boolean,
 ): FollowStep {
   if (reducedMotion) return { x: desired.x, z: desired.z, settled: true };
-  const x = MathUtils.damp(current.x, desired.x, FOLLOW_DAMPING, dt);
-  const z = MathUtils.damp(current.z, desired.z, FOLLOW_DAMPING, dt);
-  if (Math.hypot(desired.x - x, desired.z - z) < FOLLOW_SETTLE_DISTANCE)
+  if (!Number.isFinite(dt) || dt <= 0) {
+    return {
+      x: current.x,
+      z: current.z,
+      settled:
+        Math.abs(desired.x - current.x) <= FOLLOW_EPSILON &&
+        Math.abs(desired.z - current.z) <= FOLLOW_EPSILON,
+    };
+  }
+  const clampedDt = Math.min(dt, MAX_FOLLOW_DT);
+  const x = MathUtils.damp(current.x, desired.x, FOLLOW_DAMPING, clampedDt);
+  const z = MathUtils.damp(current.z, desired.z, FOLLOW_DAMPING, clampedDt);
+  if (Math.hypot(desired.x - x, desired.z - z) < FOLLOW_EPSILON)
     return { x: desired.x, z: desired.z, settled: true };
   return { x, z, settled: false };
 }
@@ -190,7 +210,7 @@ export function applyFollowCamera(
   height: number,
   target: FollowPoint,
 ): void {
-  if (width <= 0 || height <= 0) return;
+  if (!(width > 0 && height > 0)) return;
   const horizontal = (CAMERA_DISTANCE * COS_ELEVATION) / Math.SQRT2;
   camera.position.set(
     target.x + horizontal,

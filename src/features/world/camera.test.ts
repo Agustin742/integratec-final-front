@@ -5,6 +5,7 @@ import {
   applyFollowCamera,
   AVATAR_FRAME,
   CAMERA_ELEVATION,
+  FOLLOW_EPSILON,
   FOLLOW_MIN_VISIBLE_WIDTH,
   FOLLOW_TARGET_HEIGHT,
   FOLLOW_VISIBLE_HEIGHT,
@@ -14,6 +15,7 @@ import {
   CLASSROOM_BOUNDS,
   CLASSROOM_WALL_HEIGHT,
   frameCamera,
+  MAX_FOLLOW_DT,
   WORLD_BOUNDS,
 } from './camera';
 import { CLASSROOM_LAYOUT } from '@/realtime';
@@ -242,4 +244,61 @@ describe('follow camera', () => {
     );
     expect(next).toEqual({ x: 4, z: -2, settled: true });
   });
+
+  test.each([0, -0.5, Number.NaN, Number.POSITIVE_INFINITY])(
+    'ignores non-positive or non-finite dt (%s) without corrupting coordinates',
+    (dt) => {
+      const unsettled = advanceFollowTarget(
+        { x: 1, z: -1 },
+        { x: 4, z: -2 },
+        dt,
+        false,
+      );
+      expect(unsettled).toEqual({ x: 1, z: -1, settled: false });
+
+      const settled = advanceFollowTarget(
+        { x: 4, z: -2 + FOLLOW_EPSILON * 0.5 },
+        { x: 4, z: -2 },
+        dt,
+        false,
+      );
+      expect(settled).toEqual({
+        x: 4,
+        z: -2 + FOLLOW_EPSILON * 0.5,
+        settled: true,
+      });
+    },
+  );
+
+  test('clamps large frame deltas to MAX_FOLLOW_DT', () => {
+    const clamped = advanceFollowTarget(
+      { x: 0, z: 0 },
+      { x: 10, z: 0 },
+      5,
+      false,
+    );
+    const exact = advanceFollowTarget(
+      { x: 0, z: 0 },
+      { x: 10, z: 0 },
+      MAX_FOLLOW_DT,
+      false,
+    );
+    expect(clamped).toEqual(exact);
+  });
+
+  test.each([
+    [0, 720],
+    [1280, 0],
+    [-10, 720],
+    [Number.NaN, 720],
+  ])(
+    'returns a finite fallback frustum when viewport (%s, %s) is invalid',
+    (width, height) => {
+      const frustum = followFrustum(width, height);
+      expect(Number.isFinite(frustum.halfWidth)).toBe(true);
+      expect(Number.isFinite(frustum.halfHeight)).toBe(true);
+      expect(frustum.halfWidth).toBeGreaterThan(0);
+      expect(frustum.halfHeight).toBeGreaterThan(0);
+    },
+  );
 });

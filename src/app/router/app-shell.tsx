@@ -12,6 +12,7 @@ import { DailyReviewDialog } from '@/features/daily-review/daily-review-dialog';
 import {
   NotificationHostProvider,
   ShellNotificationCenter,
+  useNotificationHostClaimed,
 } from '@/features/notifications/notification-host';
 import { ProfileNavLink } from '@/features/profile/profile-nav-link';
 import {
@@ -32,10 +33,19 @@ export const SHOWCASE_PATH = '/dev/ui';
  * features that need it, and an empty aside would only take space.
  */
 export function AppShell() {
+  return (
+    <NotificationHostProvider>
+      <AppShellContent />
+    </NotificationHostProvider>
+  );
+}
+
+function AppShellContent() {
   const snapshot = useSessionSnapshot();
   const { controller } = useSessionService();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const isLoggingOutRef = useRef(false);
+  const headerCovered = useNotificationHostClaimed();
   // The shell outlives every protected route, so logout from any page clears
   // the per-user classroom view preference and the session 2D offer decision
   // (rules/state-management.md).
@@ -73,9 +83,10 @@ export function AppShell() {
   };
 
   return (
-    <NotificationHostProvider>
+    <>
       <BaseLayout
         mainId={MAIN_CONTENT_ID}
+        headerInert={headerCovered}
         header={
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-2xl font-bold text-primary">
@@ -118,7 +129,7 @@ export function AppShell() {
           bottom-left and never sit on a conversation or its composer. */}
       <ChatDock />
       <Toast position="bottom-left" />
-    </NotificationHostProvider>
+    </>
   );
 }
 

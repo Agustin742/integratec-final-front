@@ -121,14 +121,30 @@ async function mount(ui: React.ReactElement) {
 }
 
 function mockReducedMotion(matches: boolean) {
+  let current = matches;
+  const listeners = new Set<() => void>();
   vi.stubGlobal(
     'matchMedia',
     vi.fn(() => ({
-      matches,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
+      get matches() {
+        return current;
+      },
+      addEventListener: (_event: string, listener: () => void) => {
+        listeners.add(listener);
+      },
+      removeEventListener: (_event: string, listener: () => void) => {
+        listeners.delete(listener);
+      },
     })),
   );
+  return {
+    set(next: boolean) {
+      current = next;
+      act(() => {
+        for (const listener of listeners) listener();
+      });
+    },
+  };
 }
 
 describe('AvatarModel', () => {
@@ -349,6 +365,67 @@ describe('AvatarModel', () => {
       act(() => tick(0.1));
       expect(update).not.toHaveBeenCalled();
       expect(frame.invalidate).not.toHaveBeenCalled();
+    });
+
+    it('falls back to Idle when the body only provides Idle across Idle/Walk/Run changes', async () => {
+      useLoader([], ['Idle']);
+      mockReducedMotion(false);
+      const crossFade = vi.spyOn(AnimationAction.prototype, 'crossFadeTo');
+      const stopAllAction = vi.spyOn(AnimationMixer.prototype, 'stopAllAction');
+      const update = vi.spyOn(AnimationMixer.prototype, 'update');
+      const view = await mount(
+        <AvatarModel avatar={avatar} animation="Idle" />,
+      );
+      stopAllAction.mockClear();
+
+      await act(async () => {
+        view.rerender(<AvatarModel avatar={avatar} animation="Run" />);
+      });
+      await act(async () => {
+        view.rerender(<AvatarModel avatar={avatar} animation="Walk" />);
+      });
+
+      expect(crossFade).not.toHaveBeenCalled();
+      expect(stopAllAction).not.toHaveBeenCalled();
+      frame.invalidate.mockClear();
+      act(() => tick(0.1));
+      expect(update).toHaveBeenCalledWith(0.1);
+      expect(frame.invalidate).toHaveBeenCalledTimes(1);
+    });
+
+    it('handles live reducedMotion toggling by snapping on enable and invalidating on disable', async () => {
+      useLoader([], ['Idle']);
+      const motion = mockReducedMotion(false);
+      const stopAllAction = vi.spyOn(AnimationMixer.prototype, 'stopAllAction');
+      const update = vi.spyOn(AnimationMixer.prototype, 'update');
+      const reset = vi.spyOn(AnimationAction.prototype, 'reset');
+      const play = vi.spyOn(AnimationAction.prototype, 'play');
+
+      await mount(<AvatarModel avatar={avatar} animation="Idle" />);
+      stopAllAction.mockClear();
+      update.mockClear();
+      reset.mockClear();
+      play.mockClear();
+      frame.invalidate.mockClear();
+
+      motion.set(true);
+      expect(stopAllAction).toHaveBeenCalledTimes(1);
+      expect(reset).toHaveBeenCalled();
+      expect(play).toHaveBeenCalledTimes(1);
+      expect(update).toHaveBeenCalledWith(0);
+      expect(frame.invalidate).toHaveBeenCalledTimes(1);
+
+      update.mockClear();
+      frame.invalidate.mockClear();
+      act(() => tick(0.1));
+      expect(update).not.toHaveBeenCalled();
+      expect(frame.invalidate).not.toHaveBeenCalled();
+
+      motion.set(false);
+      expect(frame.invalidate).toHaveBeenCalledTimes(1);
+      act(() => tick(0.1));
+      expect(update).toHaveBeenCalledWith(0.1);
+      expect(frame.invalidate).toHaveBeenCalledTimes(2);
     });
   });
 });

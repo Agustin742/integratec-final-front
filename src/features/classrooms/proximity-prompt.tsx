@@ -14,8 +14,12 @@ export interface ProximityPromptProps {
   readonly onActivate: (invoker: HTMLElement) => void;
 }
 
-/** Screen fraction kept free at every edge so the prompt never leaves the view. */
+/** Screen fraction kept free at every edge when DOM layout sizes are zero. */
 const EDGE_MARGIN = 0.08;
+/** Pixel padding from viewport edges when layout dimensions are measured. */
+const EDGE_PADDING_PX = 12;
+/** Minimum top clearance in pixels so the floating top bar never covers the prompt. */
+const SAFE_TOP_PX = 88;
 
 /** Moves the prompt wrapper to a normalized screen point (0..1, y down). */
 export function anchorProximityPrompt(
@@ -23,6 +27,31 @@ export function anchorProximityPrompt(
   anchor: { readonly x: number; readonly y: number } | null,
 ): void {
   if (!element || !anchor) return;
+  const parent = element.parentElement;
+  const parentWidth = parent?.clientWidth ?? 0;
+  const parentHeight = parent?.clientHeight ?? 0;
+  const width = element.offsetWidth;
+  if (parentWidth > 0 && parentHeight > 0 && width > 0) {
+    const halfW = width / 2;
+    const minLeft = halfW + EDGE_PADDING_PX;
+    const maxLeft = parentWidth - halfW - EDGE_PADDING_PX;
+    const left =
+      minLeft > maxLeft
+        ? parentWidth / 2
+        : Math.min(Math.max(anchor.x * parentWidth, minLeft), maxLeft);
+    const minTop = Math.max(
+      element.offsetHeight + EDGE_PADDING_PX,
+      SAFE_TOP_PX,
+    );
+    const maxTop = parentHeight - EDGE_PADDING_PX;
+    const top =
+      minTop > maxTop
+        ? maxTop
+        : Math.min(Math.max(anchor.y * parentHeight, minTop), maxTop);
+    element.style.left = `${left}px`;
+    element.style.top = `${top}px`;
+    return;
+  }
   const clamp = (value: number) =>
     Math.min(Math.max(value, EDGE_MARGIN), 1 - EDGE_MARGIN);
   element.style.left = `${clamp(anchor.x) * 100}%`;
@@ -75,16 +104,16 @@ export function ProximityPrompt({
             data-testid="classroom-proximity-prompt"
             onClick={(event) => onActivate(event.currentTarget)}
             className={cn(
-              'pointer-events-auto flex min-h-11 min-w-11 items-center gap-2 rounded-2xl border border-edge bg-card/95 px-3 font-display text-sm font-semibold whitespace-nowrap text-card-foreground shadow-panel backdrop-blur-md',
+              'pointer-events-auto flex min-h-11 max-w-[calc(100vw-2rem)] min-w-11 items-center gap-2 rounded-2xl border border-edge bg-card/95 px-3 font-display text-sm font-semibold whitespace-nowrap text-card-foreground shadow-panel backdrop-blur-md',
               'motion-press hover:bg-card focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring',
             )}
           >
             {!coarse && (
-              <kbd className="grid size-7 place-items-center rounded-lg border border-edge bg-primary font-display text-sm font-bold text-primary-foreground shadow-[0_2px_0_var(--key-primary)]">
+              <kbd className="grid size-7 shrink-0 place-items-center rounded-lg border border-edge bg-primary font-display text-sm font-bold text-primary-foreground shadow-[0_2px_0_var(--key-primary)]">
                 {copy.keyLabel}
               </kbd>
             )}
-            <span>{action}</span>
+            <span className="truncate">{action}</span>
           </button>
         )}
       </div>

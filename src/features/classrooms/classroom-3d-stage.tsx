@@ -102,7 +102,13 @@ class StageBoundary extends Component<
     return { failed: true };
   }
   render() {
-    return this.state.failed ? <WorldFallback /> : this.props.children;
+    return this.state.failed ? (
+      <div className="flex h-full items-center justify-center p-4 pt-28">
+        <WorldFallback />
+      </div>
+    ) : (
+      this.props.children
+    );
   }
 }
 
