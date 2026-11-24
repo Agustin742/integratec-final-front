@@ -1,9 +1,17 @@
+import { StrictMode } from 'react';
 import { waitFor } from '@testing-library/react';
-import { BoxGeometry, Group, Mesh, MeshStandardMaterial } from 'three';
+import {
+  BoxGeometry,
+  Group,
+  InstancedMesh,
+  Mesh,
+  MeshStandardMaterial,
+} from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from '@/test/render';
 import { clearAssetCache, setGlbLoaderForTests } from '../../asset-cache';
+import * as builder from './build-instanced-kit-module';
 import { ClassroomKit } from './classroom-kit';
 import type { KitPlacement } from './kit-placement';
 
@@ -26,6 +34,7 @@ const placements: KitPlacement[] = [
 
 describe('ClassroomKit', () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     clearAssetCache({ disposeDecoders: true });
     setGlbLoaderForTests(null);
     vi.restoreAllMocks();
@@ -50,5 +59,37 @@ describe('ClassroomKit', () => {
     expect(loadAsync).toHaveBeenCalledWith(
       '/models/scenes/classroom/furniture/board.glb',
     );
+  });
+
+  it('builds the surviving module and keeps its instances across StrictMode remounts', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const disposeSpy = vi.spyOn(InstancedMesh.prototype, 'dispose');
+    const spy = vi.spyOn(builder, 'buildInstancedKitModule');
+    setGlbLoaderForTests({
+      loadAsync: (url: string) =>
+        url.endsWith('cabinet.glb')
+          ? Promise.reject(new Error('boom'))
+          : Promise.resolve(gltf()),
+    });
+
+    render(
+      <StrictMode>
+        <ClassroomKit placements={placements} />
+      </StrictMode>,
+    );
+
+    await waitFor(() => expect(spy).toHaveBeenCalled());
+    const results = spy.mock.results.map(
+      (r) => r.value as builder.InstancedKitModule,
+    );
+    expect(spy.mock.calls.every(([id]) => id === 'board')).toBe(true);
+    // Effect cleanup ran (StrictMode) yet every built group keeps its meshes.
+    await waitFor(() => expect(disposeSpy).toHaveBeenCalled());
+    await waitFor(() => {
+      for (const built of results) {
+        expect(built.group.name).toBe('kit:board');
+        expect(built.group.children).toHaveLength(1);
+      }
+    });
   });
 });

@@ -113,7 +113,8 @@ describe('buildInstancedKitModule', () => {
     expect(meshSpy).toHaveBeenCalledOnce();
     expect(geometrySpy).not.toHaveBeenCalled();
     expect(materialSpy).not.toHaveBeenCalled();
-    expect(built.group.children).toHaveLength(0);
+    // Stays attached so a StrictMode remount still renders the instances.
+    expect(built.group.children).toHaveLength(2);
   });
 });
 

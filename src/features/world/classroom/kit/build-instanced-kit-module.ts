@@ -86,7 +86,6 @@ export function buildInstancedKitModule(
     dispose: () => {
       for (const mesh of meshes) {
         mesh.dispose();
-        mesh.removeFromParent();
       }
     },
   };
