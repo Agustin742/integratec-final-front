@@ -249,17 +249,17 @@ Seasonal:
 
 ## 4. Interactive objects
 
-- [ ] Own student desk: Pending activities
-- [ ] Teacher desk: Classroom controls
-- [ ] Board: Collaborative tool / announcements
-- [ ] Door: Move to another classroom
-- [ ] Shop kiosk: Shop
-- [ ] Bulletin board: Forum and notices
-- [ ] Report card: Grades
-- [ ] Mailbox or computer: Chat
-- [ ] Game console / arcade: Minigames
-- [ ] Pet bed / corner: Pet interaction
-- [ ] Trophy shelf / chest: Achievements and streaks
+- [x] Own student desk: Pending activities
+- [x] Teacher desk: Classroom controls
+- [x] Board: Collaborative tool / announcements
+- [x] Door: Move to another classroom
+- [x] Shop kiosk: Shop
+- [x] Bulletin board: Forum and notices
+- [x] Report card: Grades
+- [x] Mailbox or computer: Chat
+- [x] Game console / arcade: Minigames
+- [x] Pet bed / corner: Pet interaction
+- [x] Trophy shelf / chest: Achievements and streaks
 
 ### Classroom pet (Michi, cat)
 
