@@ -6,6 +6,7 @@ import type { Pose } from '../movement';
 import { WorldCanvas, type WorldCanvasProps } from '../world-canvas';
 import type { ClassroomInteractable } from './classroom-interactables';
 import { ClassroomScene } from './classroom-scene';
+import type { ProximityAnchor } from './proximity-tracker';
 import type { RemoteClassroomParticipant } from './remote-avatar';
 
 export interface ClassroomWorldProps extends Pick<
@@ -29,6 +30,10 @@ export interface ClassroomWorldProps extends Pick<
   onHoverInteractable?: ((id: string | undefined) => void) | undefined;
   onSelectInteractable?:
     ((interactable: ClassroomInteractable) => void) | undefined;
+  isProximityTarget?:
+    ((interactable: ClassroomInteractable) => boolean) | undefined;
+  onProximityChange?: ((id: string | undefined) => void) | undefined;
+  onProximityAnchor?: ((anchor: ProximityAnchor) => void) | undefined;
   /**
    * Fills the positioned parent instead of using the fixed card height, for
    * a full-screen world (#128). The parent must have a definite size.
@@ -57,6 +62,9 @@ export function ClassroomWorld({
   interactionLocked,
   onHoverInteractable,
   onSelectInteractable,
+  isProximityTarget,
+  onProximityChange,
+  onProximityAnchor,
   fill = false,
   children,
 }: ClassroomWorldProps) {
@@ -94,6 +102,9 @@ export function ClassroomWorld({
         interactionLocked={interactionLocked}
         onHoverInteractable={onHoverInteractable}
         onSelectInteractable={onSelectInteractable}
+        isProximityTarget={isProximityTarget}
+        onProximityChange={onProximityChange}
+        onProximityAnchor={onProximityAnchor}
       />
       {children}
     </WorldCanvas>

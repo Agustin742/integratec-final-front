@@ -4,14 +4,20 @@ import {
   Suspense,
   useCallback,
   useEffect,
+  useMemo,
+  useRef,
   useState,
   type ReactNode,
   type RefObject,
 } from 'react';
 import { useNavigate } from 'react-router';
-import type { AvatarInput } from '@/realtime';
+import { CLASSROOM_LAYOUT, type AvatarInput } from '@/realtime';
 import type { Pose, RemoteClassroomParticipant } from '../world';
-import type { ClassroomInteractable } from '../world/classroom/classroom-interactables';
+import {
+  deriveClassroomInteractables,
+  indexClassroomInteractables,
+  type ClassroomInteractable,
+} from '../world/classroom/classroom-interactables';
 import { worldMessages } from '../world/messages';
 import { PerformanceProbeRuntime } from '../world/performance-monitor';
 import { PerformanceStatsOverlay } from '../world/performance-stats-overlay';
@@ -20,9 +26,15 @@ import {
   ClassroomWorldHud,
   type InteractableFeedback,
 } from './classroom-3d-hud';
+import {
+  canTargetByProximity,
+  proximityActionLabel,
+} from './classroom-proximity';
 import { useClassroomDesks } from './desks/classroom-desks-api';
 import { classroomMessages } from './messages';
 import { useOptionalClassroomPanels } from './panels/classroom-panels';
+import { anchorProximityPrompt, ProximityPrompt } from './proximity-prompt';
+import { useInteractKey } from './use-interact-key';
 
 export interface Classroom3DStageProps {
   readonly headingRef?: RefObject<HTMLHeadingElement | null>;
@@ -138,6 +150,9 @@ export function Classroom3DStage({
  * The stage is a full-screen layer, so the page behind it must not scroll.
  * Restores the previous value on unmount (2D switch, route change).
  */
+const ALL_INTERACTABLES = deriveClassroomInteractables(CLASSROOM_LAYOUT);
+const INTERACTABLES_BY_ID = indexClassroomInteractables(ALL_INTERACTABLES);
+
 /** Pet greetings fade on their own; errors with a retry never do. */
 const PET_FEEDBACK_MS = 3500;
 
@@ -193,17 +208,50 @@ function Classroom3DStageContent({
   const [highlightedId, setHighlightedId] = useState<string | undefined>(
     undefined,
   );
+  // Object the local avatar stands next to (set by the world, id changes only).
+  const [proximityId, setProximityId] = useState<string | undefined>(undefined);
+  const promptAnchorRef = useRef<HTMLDivElement | null>(null);
   const [petReactionNonce, setPetReactionNonce] = useState(0);
   const [feedback, setFeedback] = useState<InteractableFeedback | null>(null);
 
   const interactionLocked = panels?.hasActivePanel ?? false;
-  const effectiveHighlightedId = interactionLocked ? undefined : highlightedId;
 
   const trimmedPetName = petName?.trim() ?? '';
   const resolvedPetName =
     trimmedPetName.length > 0
       ? trimmedPetName
       : classroomMessages.interactables.petDefaultName;
+
+  // Ids a click could act on right now; only these can be proximity targets.
+  const availableKey = ALL_INTERACTABLES.filter((item) =>
+    canTargetByProximity(item, {
+      canOpenPanel: (key) => panels?.canOpenPanel(key) ?? false,
+      myDeskIndex: desks.myDeskIndex,
+    }),
+  )
+    .map((item) => item.id)
+    .join('|');
+  const proximityTargetIds = useMemo(
+    () => new Set(availableKey.split('|')),
+    [availableKey],
+  );
+  const isProximityTarget = useCallback(
+    (item: ClassroomInteractable) => proximityTargetIds.has(item.id),
+    [proximityTargetIds],
+  );
+  const proximityTarget =
+    !interactionLocked && proximityId && proximityTargetIds.has(proximityId)
+      ? INTERACTABLES_BY_ID.get(proximityId)
+      : undefined;
+
+  /**
+   * Highlight precedence: while a panel is open nothing is highlighted;
+   * otherwise the HUD hover/focus (or world hover) wins, and the object the
+   * avatar stands next to is highlighted when none of those is active.
+   */
+  const effectiveHighlightedId = interactionLocked
+    ? undefined
+    : (highlightedId ?? proximityTarget?.id);
 
   const restoreStageHeadingFocus = useCallback(() => {
     if (headingRef?.current?.isConnected) {
@@ -339,6 +387,12 @@ function Classroom3DStageContent({
     [interactionLocked, panels],
   );
 
+  useInteractKey(true, () => {
+    if (!proximityTarget) return false;
+    handleActivateInteractable(proximityTarget);
+    return true;
+  });
+
   const handleHoverInteractable = useCallback((id: string | undefined) => {
     setHighlightedId(id);
   }, []);
@@ -392,6 +446,11 @@ function Classroom3DStageContent({
                 onSelectInteractable={(item) =>
                   handleActivateInteractable(item)
                 }
+                isProximityTarget={isProximityTarget}
+                onProximityChange={setProximityId}
+                onProximityAnchor={(anchor) =>
+                  anchorProximityPrompt(promptAnchorRef.current, anchor)
+                }
               >
                 <LazyWorldProbe
                   runtime={performanceRuntime}
@@ -419,6 +478,19 @@ function Classroom3DStageContent({
         <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4">
           {presenceSlot}
         </div>
+        <ProximityPrompt
+          anchorRef={promptAnchorRef}
+          action={
+            proximityTarget
+              ? proximityActionLabel(proximityTarget, resolvedPetName)
+              : undefined
+          }
+          onActivate={(invoker) => {
+            if (proximityTarget) {
+              handleActivateInteractable(proximityTarget, invoker);
+            }
+          }}
+        />
         <ClassroomWorldHud
           highlightedId={effectiveHighlightedId}
           myDeskIndex={desks.myDeskIndex}

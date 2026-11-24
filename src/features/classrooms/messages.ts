@@ -93,6 +93,21 @@ export const classroomMessages = {
       'No pudimos verificar tu pupitre asignado en este momento.',
     retryDesksAction: 'Reintentar',
   },
+  proximity: {
+    keyLabel: 'E',
+    actions: {
+      board: 'Abrir actividades',
+      shelf: 'Abrir material',
+      'bulletin-board': 'Abrir avisos',
+      shop: 'Abrir tienda',
+      'tutor-bot': 'Abrir asistente de estudio',
+      'teacher-desk': 'Ver integrantes',
+      'student-desk': 'Abrir calificaciones',
+      entrance: 'Salir del aula',
+    },
+    petAction: (petName: string) => `Saludar a ${petName}`,
+    announce: (action: string) => `Objeto cercano: ${action}.`,
+  },
   performanceOffer: {
     title: 'La vista 3D está lenta en este dispositivo',
     body: 'El Modo 2D Clásico muestra los paneles del aula en una vista más liviana, sin 3D. Tus herramientas y tu contexto no cambian. Para volver a la vista 3D, usá el botón "Cambiar a Vista 3D" en la parte superior del aula o el atajo Alt+M.',

@@ -14,6 +14,11 @@ const nav = vi.hoisted(() => ({
   remoteMounts: 0,
   remoteUnmounts: 0,
   highlightProps: null as unknown,
+  trackerProps: null as unknown as {
+    interactables: { id: string }[];
+    onChange?: unknown;
+    onAnchor?: unknown;
+  } | null,
 }));
 
 vi.mock('./use-classroom-navigation', () => ({
@@ -34,6 +39,12 @@ vi.mock('./local-avatar', () => ({
   },
 }));
 vi.mock('./follow-camera', () => ({ FollowCamera: () => null }));
+vi.mock('./proximity-tracker', () => ({
+  ProximityTracker: (props: never) => {
+    nav.trackerProps = props;
+    return null;
+  },
+}));
 vi.mock('./remote-avatar', () => ({
   RemoteAvatar: (props: unknown) => {
     nav.remoteAvatars.push(props);
@@ -68,6 +79,7 @@ beforeEach(() => {
   nav.remoteUnmounts = 0;
   nav.clearDestination.mockClear();
   nav.highlightProps = null;
+  nav.trackerProps = null;
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
@@ -153,6 +165,29 @@ describe('ClassroomScene', () => {
       avatar,
       scopeKey: 'room-1',
     });
+  });
+
+  test('tracks proximity only for interactables the host accepts', () => {
+    const onProximityChange = vi.fn();
+    const onProximityAnchor = vi.fn();
+    render(
+      <ClassroomScene
+        isProximityTarget={(item) => item.id === 'shop' || item.id === 'pet'}
+        onProximityChange={onProximityChange}
+        onProximityAnchor={onProximityAnchor}
+      />,
+    );
+    expect(nav.trackerProps?.interactables.map((item) => item.id)).toEqual([
+      'shop',
+      'pet',
+    ]);
+    expect(nav.trackerProps?.onChange).toBe(onProximityChange);
+    expect(nav.trackerProps?.onAnchor).toBe(onProximityAnchor);
+  });
+
+  test('has no proximity candidates unless the host opts in', () => {
+    render(<ClassroomScene />);
+    expect(nav.trackerProps?.interactables).toEqual([]);
   });
 
   test('forwards highlight props when unlocked', () => {
