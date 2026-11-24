@@ -1,6 +1,9 @@
 import type { ReactNode, RefObject } from 'react';
 import { Link } from 'react-router';
 import { Button, buttonStyles } from '@/components/ui/button';
+import { ChatsNavLink } from '@/features/chat-page/chats-nav-link';
+import { ClaimedNotificationCenter } from '@/features/notifications/notification-host';
+import { ProfileNavLink } from '@/features/profile/profile-nav-link';
 import { classroomMessages as messages } from './messages';
 
 export interface Classroom3DTopBarProps {
@@ -16,7 +19,7 @@ export interface Classroom3DTopBarProps {
 
 /**
  * Floating rounded navbar over the full-screen 3D world (`#128`): back link,
- * classroom name and role, wallet and the 2D / 3D switch. It is a
+ * classroom name and role, wallet, the 2D / 3D switch and the account shortcuts (profile, messages, notifications). It is a
  * semi-opaque blurred card so the text keeps its contrast over the scene; the
  * overlay that hosts it is click-through, only this card takes pointer events.
  */
@@ -87,6 +90,13 @@ export function Classroom3DTopBar({
           >
             {modeToggleLabel}
           </Button>
+          {/* Same components as the covered global header; the bell is
+              claimed so only one instance polls and announces. */}
+          <div className="flex items-center gap-2">
+            <ProfileNavLink />
+            <ChatsNavLink />
+            <ClaimedNotificationCenter />
+          </div>
         </div>
       </div>
     </header>

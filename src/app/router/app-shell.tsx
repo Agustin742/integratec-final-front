@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { NavLink, Outlet } from 'react-router';
+import { Outlet } from 'react-router';
 import { LoadingState } from '@/components/feedback/states';
 import { BaseLayout } from '@/components/layout/base-layout';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,11 @@ import { ChatsNavLink } from '@/features/chat-page/chats-nav-link';
 import { resetClassroomModeStore } from '@/features/classrooms/classroom-mode-store';
 import { resetPerformanceOfferStore } from '@/features/classrooms/performance-offer-store';
 import { DailyReviewDialog } from '@/features/daily-review/daily-review-dialog';
-import { NotificationCenter } from '@/features/notifications/notification-center';
+import {
+  NotificationHostProvider,
+  ShellNotificationCenter,
+} from '@/features/notifications/notification-host';
+import { ProfileNavLink } from '@/features/profile/profile-nav-link';
 import {
   useSessionCleanup,
   useSessionService,
@@ -69,7 +73,7 @@ export function AppShell() {
   };
 
   return (
-    <>
+    <NotificationHostProvider>
       <BaseLayout
         mainId={MAIN_CONTENT_ID}
         header={
@@ -87,14 +91,9 @@ export function AppShell() {
                     {snapshot.user.displayName}
                   </span>
                 </p>
-                <NavLink
-                  to="/profile"
-                  className="inline-flex min-h-11 items-center rounded-sm px-1 text-sm font-semibold text-primary underline underline-offset-4 focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
-                >
-                  {messages.shell.profileLink}
-                </NavLink>
+                <ProfileNavLink />
                 <ChatsNavLink />
-                <NotificationCenter />
+                <ShellNotificationCenter />
                 <DailyReviewDialog />
                 <Button
                   type="button"
@@ -119,7 +118,7 @@ export function AppShell() {
           bottom-left and never sit on a conversation or its composer. */}
       <ChatDock />
       <Toast position="bottom-left" />
-    </>
+    </NotificationHostProvider>
   );
 }
 

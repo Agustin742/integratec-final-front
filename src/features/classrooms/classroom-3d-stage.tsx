@@ -138,6 +138,9 @@ export function Classroom3DStage({
  * The stage is a full-screen layer, so the page behind it must not scroll.
  * Restores the previous value on unmount (2D switch, route change).
  */
+/** Pet greetings fade on their own; errors with a retry never do. */
+const PET_FEEDBACK_MS = 3500;
+
 function useLockPageScroll() {
   useEffect(() => {
     const root = document.documentElement;
@@ -207,6 +210,12 @@ function Classroom3DStageContent({
       headingRef.current.focus();
     }
   }, [headingRef]);
+
+  useEffect(() => {
+    if (feedback?.kind !== 'pet') return;
+    const timer = window.setTimeout(() => setFeedback(null), PET_FEEDBACK_MS);
+    return () => window.clearTimeout(timer);
+  }, [feedback]);
 
   const handleRetryDesks = useCallback(() => {
     setFeedback({

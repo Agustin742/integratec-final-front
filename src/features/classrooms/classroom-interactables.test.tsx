@@ -613,6 +613,25 @@ describe('Immersive 3D classroom layout (#128)', () => {
     ).toHaveAttribute('aria-keyshortcuts', 'Alt+M');
   });
 
+  test('puts the profile icon link and a single notification bell at the right end of the top bar', async () => {
+    setup();
+    await screen.findByTestId('world-mock');
+
+    const bar = screen.getByTestId('classroom-3d-top-bar');
+    const profileLink = within(bar).getByRole('link', { name: 'Mi perfil' });
+    expect(profileLink).toHaveAttribute('href', '/profile');
+    expect(profileLink).toHaveClass('min-h-11', 'min-w-11');
+    expect(
+      await within(bar).findByRole('button', { name: /^Notificaciones/ }),
+    ).toBeVisible();
+    expect(
+      screen.getAllByRole('button', { name: /^Notificaciones/ }),
+    ).toHaveLength(1);
+    expect(
+      within(bar).queryByRole('button', { name: /reseña|Cerrar sesión/i }),
+    ).not.toBeInTheDocument();
+  });
+
   test('keeps Alt+M toggling and lands focus on the 3D heading when returning from 2D', async () => {
     setup();
     await screen.findByTestId('world-mock');
@@ -716,5 +735,116 @@ describe('Immersive 3D classroom layout (#128)', () => {
     expect(document.documentElement.style.overflow).toBe('hidden');
     unmount();
     expect(document.documentElement.style.overflow).toBe('');
+  });
+});
+
+describe('Pet greeting auto-dismiss (#128)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function pickPet() {
+    act(() => {
+      worldMock.latestProps?.onSelectInteractable?.(
+        interactablesById.get('pet')!,
+      );
+    });
+  }
+
+  test('dismisses the greeting after a few seconds', async () => {
+    setup({ petName: 'Michi' });
+    await screen.findByTestId('world-mock');
+    const status = screen.getByTestId('classroom-interactable-status');
+
+    vi.useFakeTimers();
+    pickPet();
+    expect(status).toHaveTextContent('Michi te saluda desde su rincón.');
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(status).toHaveTextContent('Michi te saluda');
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(status).toBeEmptyDOMElement();
+  });
+
+  test('restarts the timer when the pet is greeted again', async () => {
+    setup({ petName: 'Michi' });
+    await screen.findByTestId('world-mock');
+    const status = screen.getByTestId('classroom-interactable-status');
+
+    vi.useFakeTimers();
+    pickPet();
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    pickPet();
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(status).toHaveTextContent('Michi te saluda');
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(status).toBeEmptyDOMElement();
+  });
+
+  test('clears the greeting as soon as another panel is opened', async () => {
+    setup({ petName: 'Michi' });
+    await screen.findByTestId('world-mock');
+    const status = screen.getByTestId('classroom-interactable-status');
+
+    pickPet();
+    expect(status).toHaveTextContent('Michi te saluda');
+    fireEvent.click(screen.getByRole('button', { name: 'Tienda' }));
+    expect(status).toBeEmptyDOMElement();
+  });
+
+  test('never auto-dismisses error feedback that offers a retry', async () => {
+    setup({ assignedDeskIndex: 3, shouldFailDesks: () => true });
+    await screen.findByTestId('world-mock');
+    const status = screen.getByTestId('classroom-interactable-status');
+
+    await waitFor(() => {
+      act(() => {
+        worldMock.latestProps?.onSelectInteractable?.(
+          interactablesById.get('student-desk:3')!,
+        );
+      });
+      expect(status).toHaveTextContent(
+        classroomMessages.interactables.desksUnavailable,
+      );
+    });
+
+    vi.useFakeTimers();
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(status).toHaveTextContent(
+      classroomMessages.interactables.desksUnavailable,
+    );
+    expect(
+      within(status).getByRole('button', {
+        name: classroomMessages.interactables.retryDesksAction,
+      }),
+    ).toBeVisible();
+  });
+
+  test('leaves no pending dismissal behind when the stage unmounts', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { unmount } = setup({ petName: 'Michi' });
+    await screen.findByTestId('world-mock');
+
+    vi.useFakeTimers();
+    pickPet();
+    unmount();
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+    expect(errors).not.toHaveBeenCalled();
+    errors.mockRestore();
   });
 });
