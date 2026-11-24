@@ -44,6 +44,8 @@ export interface AnnouncementFormProps {
     readonly content: string;
   }) => Promise<boolean>;
   readonly onCancelEdit?: () => void;
+  /** Closes the composer without publishing (create mode only). */
+  readonly onCancelCreate?: () => void;
 }
 
 export function AnnouncementForm({
@@ -56,6 +58,7 @@ export function AnnouncementForm({
   onReconcileRequired,
   onUncertainCreate,
   onCancelEdit,
+  onCancelCreate,
 }: AnnouncementFormProps) {
   const { client } = useSessionService();
   const headingId = useId();
@@ -73,10 +76,8 @@ export function AnnouncementForm({
   }, []);
 
   useEffect(() => {
-    if (isEdit) {
-      titleInputRef.current?.focus();
-    }
-  }, [isEdit, mode]);
+    titleInputRef.current?.focus();
+  }, []);
 
   const form = useZodForm<AnnouncementFormInput, AnnouncementFormValues>({
     schema: announcementFormSchema,
@@ -162,7 +163,12 @@ export function AnnouncementForm({
   return (
     <section
       aria-labelledby={headingId}
-      className="rounded-lg border border-border bg-card p-4 shadow-xs"
+      className={cn(
+        'min-w-0',
+        isEdit
+          ? 'rounded-xl border-2 border-dashed border-edge bg-tray/40 p-4'
+          : 'rounded-2xl border border-edge bg-card p-4 shadow-ambient sm:p-5',
+      )}
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 id={headingId} className="text-base font-semibold text-foreground">
@@ -228,6 +234,16 @@ export function AnnouncementForm({
         </FormField>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
+          {!isEdit && onCancelCreate ? (
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={isSubmitting}
+              onClick={onCancelCreate}
+            >
+              {announcementMessages.composer.discard}
+            </Button>
+          ) : null}
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting
               ? isEdit

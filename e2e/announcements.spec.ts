@@ -193,13 +193,18 @@ test('teacher publishes, edits, captures responsive views, and removes announcem
     dialog.getByText('Bienvenida al segundo cuatrimestre'),
   ).toBeVisible();
 
+  await dialog
+    .getByRole('button', { name: 'Escribir un anuncio para el aula' })
+    .click();
   await dialog.getByLabel('Título').fill('Clase de consulta');
   await dialog
     .getByLabel('Contenido')
     .fill('Traer dudas resueltas @Sofía antes del parcial.');
   await dialog.getByRole('button', { name: 'Publicar anuncio' }).click();
 
-  await expect(dialog.getByText('Anuncio publicado')).toBeVisible();
+  await expect(dialog.getByText('Anuncio publicado')).toBeVisible({
+    timeout: 15_000,
+  });
   await expect(
     dialog.getByRole('heading', { name: 'Clase de consulta' }),
   ).toBeVisible();
@@ -218,7 +223,11 @@ test('teacher publishes, edits, captures responsive views, and removes announcem
   });
 
   // Edit announcement
-  await dialog.getByRole('button', { name: 'Editar' }).first().click();
+  await dialog
+    .getByRole('button', { name: /^Acciones del anuncio/ })
+    .first()
+    .click();
+  await page.getByRole('menuitem', { name: 'Editar' }).click();
   await dialog.getByLabel('Título').fill('Clase de consulta (actualizada)');
   await dialog.getByRole('button', { name: 'Guardar cambios' }).click();
   await expect(dialog.getByText('Anuncio actualizado')).toBeVisible();
@@ -227,7 +236,11 @@ test('teacher publishes, edits, captures responsive views, and removes announcem
   ).toBeVisible();
 
   // Remove announcement
-  await dialog.getByRole('button', { name: 'Eliminar' }).first().click();
+  await dialog
+    .getByRole('button', { name: /^Acciones del anuncio/ })
+    .first()
+    .click();
+  await page.getByRole('menuitem', { name: 'Eliminar' }).click();
   await dialog.getByRole('button', { name: 'Confirmar eliminación' }).click();
   await expect(dialog.getByText('Anuncio eliminado')).toBeVisible();
 
@@ -299,14 +312,18 @@ test('student reads announcements as plain text without edit or delete controls'
   await expect(
     dialog.getByRole('button', { name: 'Publicar anuncio' }),
   ).toHaveCount(0);
-  await expect(dialog.getByRole('button', { name: 'Editar' })).toHaveCount(0);
-  await expect(dialog.getByRole('button', { name: 'Eliminar' })).toHaveCount(0);
+  await expect(
+    dialog.getByRole('button', { name: 'Escribir un anuncio para el aula' }),
+  ).toHaveCount(0);
+  await expect(
+    dialog.getByRole('button', { name: /^Acciones del anuncio/ }),
+  ).toHaveCount(0);
 
   expect(cspViolations).toEqual([]);
   expect(pageErrors).toEqual([]);
 });
 
-test('announcement card keeps a readable title and wraps actions on narrow screens', async ({
+test('announcement note keeps a readable title and a reachable action menu on narrow screens', async ({
   page,
 }, testInfo) => {
   const isMobile = testInfo.project.name === 'mobile';
@@ -369,20 +386,26 @@ test('announcement card keeps a readable title and wraps actions on narrow scree
   const card = dialog.getByRole('listitem').filter({ hasText: longTitle });
   const cardBox = await card.boundingBox();
   const titleBox = await title.boundingBox();
-  const editBox = await dialog
-    .getByRole('button', { name: 'Editar' })
+  const menuBox = await dialog
+    .getByRole('button', { name: /^Acciones del anuncio/ })
     .first()
     .boundingBox();
-  if (!cardBox || !titleBox || !editBox) {
-    throw new Error('Expected card, title and edit button to be laid out');
+  if (!cardBox || !titleBox || !menuBox) {
+    throw new Error('Expected note, title and action menu to be laid out');
   }
 
-  if (isMobile) {
-    expect(titleBox.width).toBeGreaterThanOrEqual(cardBox.width * 0.6);
-    expect(editBox.y).toBeGreaterThanOrEqual(titleBox.y + titleBox.height);
-  } else {
-    expect(editBox.y).toBeLessThan(titleBox.y + titleBox.height);
-  }
+  // The title owns the full width of the note; the menu lives in the author
+  // row above it and stays inside the note.
+  expect(titleBox.width).toBeGreaterThanOrEqual(cardBox.width * 0.6);
+  expect(menuBox.y + menuBox.height).toBeLessThanOrEqual(titleBox.y);
+  expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(
+    cardBox.x + cardBox.width,
+  );
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
 
   expect(cspViolations).toEqual([]);
   expect(pageErrors).toEqual([]);

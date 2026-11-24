@@ -65,6 +65,7 @@ export const classroomPanelCatalog = [
     key: 'notices',
     title: messages.panels.notices,
     component: NoticeBoardPanel,
+    wide: true,
   },
   {
     key: 'shop',
