@@ -55,6 +55,7 @@ export const classroomPanelCatalog = [
     key: 'grades',
     title: messages.panels.grades,
     component: ClassroomGradesPanel,
+    wide: true,
   },
   {
     key: 'chat',
@@ -71,16 +72,19 @@ export const classroomPanelCatalog = [
     key: 'shop',
     title: messages.panels.shop,
     component: ShopPanel,
+    wide: true,
   },
   {
     key: 'bot',
     title: messages.panels.bot,
     component: StudyGuideBotPanel,
+    wide: true,
   },
   {
     key: 'members',
     title: messages.panels.members,
     component: ClassroomMembersPanel,
+    wide: true,
   },
   entry('settings'),
 ] as const;
