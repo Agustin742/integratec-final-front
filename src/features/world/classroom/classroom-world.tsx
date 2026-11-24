@@ -76,6 +76,7 @@ export function ClassroomWorld({
       framing="follow"
       description={worldMessages.classroomControls}
       {...(fill && {
+        fill: true,
         canvasClassName: 'h-full w-full',
         hostClassName: 'h-full',
         loading: (

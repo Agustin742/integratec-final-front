@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import {
   act,
   fireEvent,
@@ -32,6 +33,7 @@ import {
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
 import { render } from '@/test/render';
+import { ClaimedNotificationCenter } from '@/features/notifications/notification-host';
 import { toast } from '@/components/ui/toast';
 import { messages } from '../messages';
 import { fakeSession } from './fake-session';
@@ -511,4 +513,64 @@ describe('AppShell logout control (#28)', () => {
       }),
     ).not.toBeInTheDocument();
   });
+});
+
+test('marks the shell header inert and aria-hidden while ClaimedNotificationCenter is mounted and restores it on unmount', async () => {
+  function ClaimingPage() {
+    const [covering, setCovering] = useState(false);
+    return (
+      <div>
+        <h2>Covering route</h2>
+        <button type="button" onClick={() => setCovering((v) => !v)}>
+          toggle-cover
+        </button>
+        {covering && (
+          <nav aria-label="Floating bar">
+            <ClaimedNotificationCenter />
+          </nav>
+        )}
+      </div>
+    );
+  }
+  const session = fakeSession(
+    { status: 'authenticated', user: profile },
+    createApiClient({
+      baseUrl: 'https://api.example.invalid',
+      fetch: async (input) => {
+        const url = (input as Request).url;
+        if (url.includes('/notifications')) {
+          return Response.json({ items: [], page: 1, pageSize: 20, total: 0 });
+        }
+        if (url.endsWith('/chats')) {
+          return Response.json({ items: [] });
+        }
+        if (url.includes('/users/me/daily-review')) {
+          return Response.json({ status: 'not_due' });
+        }
+        return Response.json({});
+      },
+    }),
+  );
+  renderAt('/claim-test', {
+    session,
+    protectedRoutes: [{ path: 'claim-test', Component: ClaimingPage }],
+  });
+
+  await heading('Covering route');
+  const shellHeader = screen.getByRole('banner');
+  expect(shellHeader).not.toHaveAttribute('inert');
+  expect(shellHeader).not.toHaveAttribute('aria-hidden');
+
+  fireEvent.click(screen.getByRole('button', { name: 'toggle-cover' }));
+  await waitFor(() => {
+    expect(shellHeader).toHaveAttribute('inert');
+    expect(shellHeader).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  fireEvent.click(screen.getByRole('button', { name: 'toggle-cover' }));
+  await waitFor(() => {
+    expect(shellHeader).not.toHaveAttribute('inert');
+    expect(shellHeader).not.toHaveAttribute('aria-hidden');
+  });
+  expect(screen.getByRole('banner')).toBe(shellHeader);
 });

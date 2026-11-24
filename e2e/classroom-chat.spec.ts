@@ -289,6 +289,7 @@ test.afterEach(async ({ page }) => {
 test('student reads paginated history, mentions a classmate, sends a server-confirmed message and hits the rate limit', async ({
   page,
 }, testInfo) => {
+  test.setTimeout(45_000);
   const width = testInfo.project.name === 'mobile' ? 360 : 1280;
   await page.setViewportSize({ width, height: 800 });
 
@@ -401,14 +402,21 @@ test('student reads paginated history, mentions a classmate, sends a server-conf
     name: 'Mensaje del chat',
   });
   await composer.pressSequentially('@Bru');
-  const suggestions = dialog.getByRole('list', {
+  const suggestions = dialog.getByRole('listbox', {
     name: 'Integrantes sugeridos para mencionar',
   });
   await expect(suggestions).toBeVisible();
-  const brunoOption = suggestions.getByRole('button', { name: /Bruno Díaz/ });
+  const brunoOption = suggestions.getByRole('option', { name: /Bruno Díaz/ });
   await expect(brunoOption).toBeVisible();
   await page.keyboard.press('ArrowDown');
-  await expect(brunoOption).toBeFocused();
+  await expect(composer).toBeFocused();
+  await expect(brunoOption).toHaveAttribute('aria-selected', 'true');
+  const brunoOptionId = await brunoOption.getAttribute('id');
+  expect(brunoOptionId).toBeTruthy();
+  await expect(composer).toHaveAttribute(
+    'aria-activedescendant',
+    brunoOptionId!,
+  );
   await page.keyboard.press('Enter');
   await expect(composer).toHaveValue('@Bruno Díaz ');
   await composer.pressSequentially('¿ya terminaste la guía de fracciones?');

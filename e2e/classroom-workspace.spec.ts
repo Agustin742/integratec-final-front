@@ -429,6 +429,30 @@ test('switches 3D to accessible 2D Classic Mode via button and Alt+M, opens pane
     page.getByRole('region', { name: classroomMessages.viewMode.canvasLabel }),
   ).toBeVisible();
 
+  // While the full-screen 3D stage covers the global header, the shell header
+  // stays inert and real Tab navigation never lands on its covered controls.
+  const shellHeader = page.locator('header').first();
+  await expect(shellHeader).toHaveAttribute('inert', '');
+  await expect(shellHeader).toHaveAttribute('aria-hidden', 'true');
+  await page.evaluate(() => {
+    (document.activeElement as HTMLElement | null)?.blur();
+  });
+  for (let step = 0; step < 5; step += 1) {
+    await page.keyboard.press('Tab');
+    const focusedInsideShellHeader = await page.evaluate(() => {
+      const header = document.querySelector('header');
+      return header !== null && header.contains(document.activeElement);
+    });
+    expect(focusedInsideShellHeader).toBe(false);
+    const focusedLabel = await page.evaluate(() => {
+      const active = document.activeElement as HTMLElement | null;
+      return (
+        active?.getAttribute('aria-label') ?? active?.textContent?.trim() ?? ''
+      );
+    });
+    expect(focusedLabel).not.toBe('Cerrar sesión');
+  }
+
   await page
     .getByRole('button', { name: classroomMessages.viewMode.switchTo2d })
     .click();
@@ -440,6 +464,12 @@ test('switches 3D to accessible 2D Classic Mode via button and Alt+M, opens pane
   await expect(mode2dHeading).toBeVisible();
   await expect(mode2dHeading).toBeFocused();
   await expect(page.locator('canvas')).toHaveCount(0);
+  await expect(shellHeader).not.toHaveAttribute('inert');
+  await expect(shellHeader).not.toHaveAttribute('aria-hidden');
+  const logoutButton = page.getByRole('button', { name: 'Cerrar sesión' });
+  await expect(logoutButton).toBeVisible();
+  await logoutButton.focus();
+  await expect(logoutButton).toBeFocused();
 
   const nav = page.getByRole('navigation', {
     name: classroomMessages.viewMode.mode2dNavLabel,

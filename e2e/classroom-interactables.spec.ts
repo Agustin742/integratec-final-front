@@ -111,6 +111,42 @@ async function openReadyClassroomStage(page: Page) {
   return { stageHeading, region, canvas };
 }
 
+async function dismissLowFpsOfferIfPresent(page: Page) {
+  const declineLowFps = page.getByRole('button', {
+    name: classroomMessages.performanceOffer.decline,
+  });
+  const offerAppeared = await declineLowFps
+    .waitFor({ state: 'visible', timeout: 2500 })
+    .then(() => true)
+    .catch(() => false);
+  if (offerAppeared) {
+    await declineLowFps.click();
+    await expect(declineLowFps).toHaveCount(0);
+  }
+}
+
+async function waitSimulatedSeconds(page: Page, targetSeconds: number) {
+  await page.evaluate(
+    (seconds) =>
+      new Promise<void>((resolve) => {
+        let accumulated = 0;
+        let last = performance.now();
+        function step(now: number) {
+          const dt = Math.min(Math.max((now - last) / 1000, 0), 0.05);
+          last = now;
+          accumulated += dt;
+          if (accumulated >= seconds) {
+            resolve();
+            return;
+          }
+          requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      }),
+    targetSeconds,
+  );
+}
+
 test.beforeEach(async ({ page, baseURL }) => {
   expect(baseURL).toBeTruthy();
   const appOrigin = new URL(baseURL!).origin;
@@ -177,6 +213,14 @@ test.beforeEach(async ({ page, baseURL }) => {
       });
     }
     if (
+      url.pathname === `/classrooms/${classroomId}/announcements` &&
+      request.method() === 'GET'
+    ) {
+      return route.fulfill({
+        json: { items: [], page: 1, pageSize: 20, total: 0 },
+      });
+    }
+    if (
       url.pathname === `/classrooms/${classroomId}/shop/items` &&
       request.method() === 'GET'
     ) {
@@ -208,9 +252,10 @@ test.beforeEach(async ({ page, baseURL }) => {
   });
 });
 
-test('opens panels from the floating HUD buttons, and captures responsive evidence', async ({
+test('opens panels from the floating HUD buttons, triggers proximity prompt with KeyE, and captures responsive evidence', async ({
   page,
 }, testInfo) => {
+  test.setTimeout(30_000);
   const isMobile = testInfo.project.name === 'mobile';
   const width = isMobile ? 360 : 1280;
   const cspViolations: string[] = [];
@@ -226,23 +271,13 @@ test('opens panels from the floating HUD buttons, and captures responsive eviden
   });
 
   await page.setViewportSize({ width, height: 800 });
-  const { canvas } = await openReadyClassroomStage(page);
+  const { stageHeading, canvas } = await openReadyClassroomStage(page);
 
   await expect(
     page.getByRole('button', { name: 'Calificaciones' }),
   ).toBeVisible();
 
-  const declineLowFps = page.getByRole('button', {
-    name: classroomMessages.performanceOffer.decline,
-  });
-  const offerAppeared = await declineLowFps
-    .waitFor({ state: 'visible', timeout: 2500 })
-    .then(() => true)
-    .catch(() => false);
-  if (offerAppeared) {
-    await declineLowFps.click();
-    await expect(declineLowFps).toHaveCount(0);
-  }
+  await dismissLowFpsOfferIfPresent(page);
   await canvas.scrollIntoViewIfNeeded();
 
   // The follow camera keeps only a third of the room in view, so panels open
@@ -278,6 +313,36 @@ test('opens panels from the floating HUD buttons, and captures responsive eviden
   await expect(shopDialog).toHaveCount(0);
   await expect(shopChip).toBeFocused();
 
+  // Walk slightly left from spawn (-6, 5) toward the bulletin board (-7.84, 4.2)
+  // to reveal the #128 proximity prompt, open it with KeyE, and restore focus on Escape.
+  await page.keyboard.down('KeyA');
+  await page.keyboard.down('KeyW');
+  const proximityPrompt = page.getByTestId('classroom-proximity-prompt');
+  try {
+    await expect(proximityPrompt).toBeVisible();
+  } finally {
+    await page.keyboard.up('KeyA');
+    await page.keyboard.up('KeyW');
+  }
+  await expect(proximityPrompt).toContainText('Abrir avisos');
+  await expect(page.getByTestId('classroom-proximity-status')).toHaveText(
+    classroomMessages.proximity.announce('Abrir avisos'),
+  );
+  const promptBox = await proximityPrompt.boundingBox();
+  expect(promptBox).not.toBeNull();
+  expect(promptBox!.x).toBeGreaterThanOrEqual(0);
+  expect(promptBox!.x + promptBox!.width).toBeLessThanOrEqual(width);
+
+  await page.keyboard.press('KeyE');
+  const noticesDialog = page.getByRole('dialog', {
+    name: classroomMessages.panels.notices,
+    exact: true,
+  });
+  await expect(noticesDialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(noticesDialog).toHaveCount(0);
+  await expect(stageHeading).toBeFocused();
+
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -291,6 +356,9 @@ test('opens panels from the floating HUD buttons, and captures responsive eviden
     });
   }
 
+  const declineLowFps = page.getByRole('button', {
+    name: classroomMessages.performanceOffer.decline,
+  });
   if (await declineLowFps.isVisible().catch(() => false)) {
     await declineLowFps.click();
     await expect(declineLowFps).toHaveCount(0);
@@ -300,6 +368,62 @@ test('opens panels from the floating HUD buttons, and captures responsive eviden
     path: `docs/assets/classroom-workspace/interactables-${width}.png`,
     fullPage: true,
   });
+
+  expect(cspViolations).toEqual([]);
+  expect(pageErrors).toEqual([]);
+});
+
+test('greets the decorative pet Michi via proximity KeyE without opening a dialog and auto-dismisses the greeting', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(60_000);
+  const width = testInfo.project.name === 'mobile' ? 360 : 1280;
+  const cspViolations: string[] = [];
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('console', (msg) => {
+    if (
+      msg.type() === 'error' &&
+      /Content Security Policy|CSP/i.test(msg.text())
+    ) {
+      cspViolations.push(msg.text());
+    }
+  });
+
+  await page.setViewportSize({ width, height: 800 });
+  const { canvas } = await openReadyClassroomStage(page);
+  await dismissLowFpsOfferIfPresent(page);
+  await canvas.scrollIntoViewIfNeeded();
+
+  // Walk along the clear back aisle (+x) to the right wall, then straight up (-z) to Michi at (7, -5.86).
+  await page.keyboard.down('KeyD');
+  await page.keyboard.down('KeyS');
+  try {
+    await waitSimulatedSeconds(page, 4.7);
+  } finally {
+    await page.keyboard.up('KeyD');
+    await page.keyboard.up('KeyS');
+  }
+
+  const petPrompt = page.getByRole('button', { name: /Saludar a Michi/ });
+  await page.keyboard.down('KeyW');
+  await page.keyboard.down('KeyD');
+  try {
+    await expect(petPrompt).toBeVisible({ timeout: 15_000 });
+  } finally {
+    await page.keyboard.up('KeyW');
+    await page.keyboard.up('KeyD');
+  }
+
+  await expect(petPrompt).toBeVisible();
+  await expect(page.getByTestId('classroom-proximity-status')).toHaveText(
+    classroomMessages.proximity.announce('Saludar a Michi'),
+  );
+  await page.keyboard.press('KeyE');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const status = page.getByTestId('classroom-interactable-status');
+  await expect(status).toHaveText('Michi te saluda desde su rincón.');
+  await expect(status).toBeEmpty({ timeout: 6_000 });
 
   expect(cspViolations).toEqual([]);
   expect(pageErrors).toEqual([]);

@@ -108,6 +108,16 @@ interface SetupOptions {
   readonly assignedDeskIndex?: number | null;
   readonly petName?: string | null;
   readonly shouldFailDesks?: () => boolean;
+  readonly chatInbox?:
+    | {
+        readonly items: readonly {
+          readonly classroomId: string;
+          readonly classroomName: string;
+          readonly lastMessage: null;
+          readonly unreadCount: number;
+        }[];
+      }
+    | 'error';
 }
 
 function setup(options: SetupOptions = {}) {
@@ -125,6 +135,16 @@ function setup(options: SetupOptions = {}) {
     assignedDeskIndex = 2,
     petName = 'Michi',
     shouldFailDesks,
+    chatInbox = {
+      items: [
+        {
+          classroomId: 'aula-1',
+          classroomName: 'Aula aula-1',
+          lastMessage: null,
+          unreadCount: 0,
+        },
+      ],
+    },
   } = options;
 
   const session = fakeSession(
@@ -138,6 +158,21 @@ function setup(options: SetupOptions = {}) {
           return new Response(new ReadableStream(), {
             headers: { 'content-type': 'text/event-stream' },
           });
+        }
+        if (url.pathname === '/chats') {
+          if (chatInbox === 'error') {
+            return new Response(
+              JSON.stringify({
+                error: {
+                  code: 'UNAVAILABLE',
+                  message: 'Unavailable',
+                  correlationId: 'corr-chats-err',
+                },
+              }),
+              { status: 503, headers: { 'content-type': 'application/json' } },
+            );
+          }
+          return Response.json(chatInbox);
         }
         if (url.pathname.endsWith('/desks')) {
           if (shouldFailDesks?.()) {
@@ -703,11 +738,36 @@ describe('Immersive 3D classroom layout (#128)', () => {
       name: classroomMessages.viewMode.mode2dNavLabel,
     });
     expect(nav2d).toBeVisible();
-    expect(
-      within(nav2d).queryByRole('button', { name: /Chat/ }),
-    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        within(nav2d).queryByRole('button', { name: /Chat/ }),
+      ).not.toBeInTheDocument(),
+    );
     expect(within(nav2d).getByRole('button', { name: /Tienda/ })).toBeVisible();
   });
+
+  test.each([
+    ['fails', 'error' as const],
+    ['omits the classroom', { items: [] }],
+  ])(
+    'shows Chat in 2D Classic Mode fallback when the live chat inbox %s',
+    async (_label, chatInbox) => {
+      setup({ availablePanels: allPanels, chatInbox });
+      await screen.findByTestId('world-mock');
+
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: classroomMessages.viewMode.switchTo2d,
+        }),
+      );
+      const nav2d = await screen.findByRole('navigation', {
+        name: classroomMessages.viewMode.mode2dNavLabel,
+      });
+      expect(
+        await within(nav2d).findByRole('button', { name: 'Chat' }),
+      ).toBeVisible();
+    },
+  );
 
   test('keeps the world visible behind panels in 3D only, with a translucent overlay', async () => {
     setup({ availablePanels: allPanels });

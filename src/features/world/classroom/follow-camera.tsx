@@ -5,6 +5,7 @@ import {
   advanceFollowTarget,
   applyFollowCamera,
   CLASSROOM_BOUNDS,
+  FOLLOW_EPSILON,
   frameCamera,
   type FollowPoint,
 } from '../camera';
@@ -33,12 +34,14 @@ export function FollowCamera({ poseRef }: FollowCameraProps) {
   const invalidate = useThree((state) => state.invalidate);
   const reducedMotion = usePrefersReducedMotion();
   const target = useRef<FollowPoint | null>(null);
+  const lastViewport = useRef<{ width: number; height: number } | null>(null);
 
   useLayoutEffect(() => {
     if (!(camera instanceof OrthographicCamera)) return;
     const pose = poseRef?.current;
     if (!isFinitePose(pose)) {
       target.current = null;
+      lastViewport.current = null;
       frameCamera(camera, width, height, CLASSROOM_BOUNDS);
       invalidate();
       return;
@@ -46,18 +49,30 @@ export function FollowCamera({ poseRef }: FollowCameraProps) {
     // Mount snaps onto the avatar; a resize keeps the current damped target.
     target.current ??= { x: pose.x, z: pose.z };
     applyFollowCamera(camera, width, height, target.current);
+    lastViewport.current = { width, height };
     invalidate();
   }, [camera, width, height, poseRef, invalidate]);
 
   useFrame((_state, dt) => {
-    const current = target.current;
     const pose = poseRef?.current;
-    if (
-      !current ||
-      !isFinitePose(pose) ||
-      !(camera instanceof OrthographicCamera)
-    )
+    if (!isFinitePose(pose) || !(camera instanceof OrthographicCamera)) return;
+    if (target.current === null) {
+      target.current = { x: pose.x, z: pose.z };
+      applyFollowCamera(camera, width, height, target.current);
+      lastViewport.current = { width, height };
+      invalidate();
       return;
+    }
+    const current = target.current;
+    const settledAtPose =
+      Math.abs(pose.x - current.x) <= FOLLOW_EPSILON &&
+      Math.abs(pose.z - current.z) <= FOLLOW_EPSILON;
+    const viewportUnchanged =
+      lastViewport.current !== null &&
+      lastViewport.current.width === width &&
+      lastViewport.current.height === height;
+    if (settledAtPose && viewportUnchanged) return;
+
     const next = advanceFollowTarget(
       current,
       { x: pose.x, z: pose.z },
@@ -66,6 +81,7 @@ export function FollowCamera({ poseRef }: FollowCameraProps) {
     );
     target.current = { x: next.x, z: next.z };
     applyFollowCamera(camera, width, height, target.current);
+    lastViewport.current = { width, height };
     if (!next.settled) invalidate();
   });
 

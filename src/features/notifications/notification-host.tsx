@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -13,7 +14,7 @@ interface NotificationHost {
   readonly claim: () => () => void;
 }
 
-const HostContext = createContext<NotificationHost | null>(null);
+export const HostContext = createContext<NotificationHost | null>(null);
 
 /**
  * Lets exactly one `NotificationCenter` exist at a time. The app shell owns it
@@ -28,17 +29,23 @@ export function NotificationHostProvider({
   readonly children: ReactNode;
 }) {
   const [claims, setClaims] = useState(0);
+  const claim = useCallback(() => {
+    setClaims((c) => c + 1);
+    return () => setClaims((c) => c - 1);
+  }, []);
   const value = useMemo<NotificationHost>(
     () => ({
       claimed: claims > 0,
-      claim: () => {
-        setClaims((count) => count + 1);
-        return () => setClaims((count) => count - 1);
-      },
+      claim,
     }),
-    [claims],
+    [claims, claim],
   );
   return <HostContext.Provider value={value}>{children}</HostContext.Provider>;
+}
+
+/** Whether a covering surface has claimed the notification host. */
+export function useNotificationHostClaimed(): boolean {
+  return useContext(HostContext)?.claimed ?? false;
 }
 
 /** The shell header's bell: yields to a claimant while one is mounted. */

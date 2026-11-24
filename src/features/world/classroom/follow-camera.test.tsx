@@ -144,4 +144,37 @@ describe('FollowCamera', () => {
     );
     expect(camera.position.equals(expected.position)).toBe(true);
   });
+
+  test('snaps when poseRef starts non-finite and later becomes finite', () => {
+    const pose = { current: { x: Number.NaN, z: Number.NaN, rotation: 0 } };
+    render(<FollowCamera poseRef={pose} />);
+    const camera = frame.camera as OrthographicCamera;
+    const expectedWhole = new OrthographicCamera();
+    frameCamera(expectedWhole, 1280, 720, CLASSROOM_BOUNDS);
+    expect(camera.position.equals(expectedWhole.position)).toBe(true);
+
+    frame.invalidate.mockClear();
+    pose.current = { x: 3, z: -2, rotation: 0 };
+    tick();
+    const point = screenOf(camera, 3, -2);
+    expect(Math.abs(point.x)).toBeLessThan(1e-6);
+    expect(Math.abs(point.y)).toBeLessThan(1e-6);
+    expect(frame.invalidate).toHaveBeenCalledTimes(1);
+
+    frame.invalidate.mockClear();
+    tick();
+    expect(frame.invalidate).not.toHaveBeenCalled();
+  });
+
+  test('skips applyFollowCamera in useFrame while settled and viewport size is unchanged', () => {
+    const pose = { current: { x: 1, z: -1, rotation: 0 } };
+    render(<FollowCamera poseRef={pose} />);
+    const camera = frame.camera as OrthographicCamera;
+    const updateProjection = vi.spyOn(camera, 'updateProjectionMatrix');
+    frame.invalidate.mockClear();
+
+    tick();
+    expect(updateProjection).not.toHaveBeenCalled();
+    expect(frame.invalidate).not.toHaveBeenCalled();
+  });
 });

@@ -465,6 +465,7 @@ function WorkspaceContext({
             {joinAlert}
             {!isParent && (
               <Classroom2DLayout
+                classroomId={classroomId}
                 panels={panels}
                 headingRef={activeViewHeadingRef}
               />

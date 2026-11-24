@@ -434,3 +434,18 @@ test('adds no description when none is given', () => {
   const region = screen.getByRole('region', { name: 'Technical world' });
   expect(region).not.toHaveAttribute('aria-describedby');
 });
+
+test('centers the fallback below the floating top bar when fill is true', () => {
+  renderer.fail = true;
+  render(<WorldCanvas label="Full world" fill />);
+  const fallback = screen.getByRole('status');
+  expect(fallback).toHaveTextContent('La vista 3D no está disponible');
+  expect(fallback.parentElement).toHaveClass(
+    'flex',
+    'h-full',
+    'items-center',
+    'justify-center',
+    'p-4',
+    'pt-28',
+  );
+});

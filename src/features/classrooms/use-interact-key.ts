@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import {
   isEditableTarget,
   isInteractionBlocked,
@@ -16,7 +16,7 @@ export function useInteractKey(
   onInteract: () => boolean,
 ): void {
   const latest = useRef(onInteract);
-  useEffect(() => {
+  useLayoutEffect(() => {
     latest.current = onInteract;
   });
 
