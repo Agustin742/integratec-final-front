@@ -204,7 +204,7 @@ describe('ActivitiesPanel and ActivityDetailPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
 
-    const list = await screen.findByRole('list', {
+    const list = await screen.findByRole('group', {
       name: 'Actividades del aula',
     });
     expect(within(list).getByText('TP 1: Funciones')).toBeInTheDocument();
