@@ -1,6 +1,7 @@
-import { Component, Suspense, useEffect, useMemo, type ReactNode } from 'react';
-import { evictRejectedGlbAsset, readCachedGlbAsset } from '../../asset-cache';
-import { buildInstancedKitModule } from './build-instanced-kit-module';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Object3D } from 'three';
+import { evictRejectedGlbAsset, loadGlbAsset } from '../../asset-cache';
+import { buildBatchedKit } from './build-batched-kit';
 import {
   getKitModuleUrl,
   type ClassroomKitModuleId,
@@ -16,85 +17,81 @@ export interface ClassroomKitProps {
   ) => void;
 }
 
-class KitModuleBoundary extends Component<
-  {
-    readonly moduleId: ClassroomKitModuleId;
-    readonly scopeKey?: string | undefined;
-    readonly onModuleError?: ClassroomKitProps['onModuleError'];
-    readonly children: ReactNode;
-  },
-  { readonly failed: boolean }
-> {
-  state = { failed: false };
+type LoadedModules = ReadonlyMap<ClassroomKitModuleId, Object3D>;
 
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
+/**
+ * Loads every module through the shared asset cache. Each module has its own
+ * error capture: a failed module is reported, evicted from the cache so a
+ * remount retries, and simply left out of the batch (honest per-module
+ * fallback). Returns `null` until the first load settles.
+ */
+function useKitModules(
+  moduleIds: readonly ClassroomKitModuleId[],
+  scopeKey: string | undefined,
+  onModuleError: ClassroomKitProps['onModuleError'],
+): LoadedModules | null {
+  const [modules, setModules] = useState<LoadedModules | null>(null);
+  const onErrorRef = useRef(onModuleError);
+  useEffect(() => {
+    onErrorRef.current = onModuleError;
+  }, [onModuleError]);
 
-  componentDidCatch(error: unknown) {
-    evictRejectedGlbAsset(
-      getKitModuleUrl(this.props.moduleId),
-      this.props.scopeKey,
-    );
-    this.props.onModuleError?.(this.props.moduleId, error);
-  }
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all(
+      moduleIds.map((moduleId) =>
+        loadGlbAsset(getKitModuleUrl(moduleId), { scopeKey }).then(
+          (gltf) => [moduleId, gltf.scene] as const,
+          (error: unknown) => {
+            if (!cancelled) {
+              evictRejectedGlbAsset(getKitModuleUrl(moduleId), scopeKey);
+              onErrorRef.current?.(moduleId, error);
+            }
+            return null;
+          },
+        ),
+      ),
+    ).then((results) => {
+      if (cancelled) return;
+      const loaded = new Map<ClassroomKitModuleId, Object3D>();
+      for (const entry of results) {
+        if (entry) loaded.set(entry[0], entry[1]);
+      }
+      setModules(loaded);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [moduleIds, scopeKey]);
 
-  render() {
-    // Honest fallback: a failed module is skipped; the rest of the kit stays.
-    return this.state.failed ? null : this.props.children;
-  }
-}
-
-function KitModuleInstances({
-  moduleId,
-  placements,
-  scopeKey,
-}: {
-  readonly moduleId: ClassroomKitModuleId;
-  readonly placements: readonly KitPlacement[];
-  readonly scopeKey?: string | undefined;
-}) {
-  const gltf = readCachedGlbAsset(getKitModuleUrl(moduleId), { scopeKey });
-  const built = useMemo(
-    () => buildInstancedKitModule(moduleId, gltf.scene, placements),
-    [moduleId, gltf, placements],
-  );
-  useEffect(() => built.dispose, [built]);
-  return <primitive object={built.group} />;
+  return modules;
 }
 
 /**
  * Reads the GLBs needed by a placement list through the shared asset cache and
- * renders one instanced group per module. Each module has its own Suspense and
- * error boundary so one failing asset never breaks the scene.
+ * renders the whole kit as one static batch (one draw call per material). The
+ * batch is built once every module settled; modules that failed are skipped.
  */
 export function ClassroomKit({
   placements,
   scopeKey,
   onModuleError,
 }: ClassroomKitProps) {
-  const grouped = useMemo(
-    () => groupPlacementsByModule(placements),
+  const idsKey = useMemo(
+    () => [...groupPlacementsByModule(placements).keys()].join('|'),
     [placements],
   );
-  return (
-    <>
-      {[...grouped.entries()].map(([moduleId, modulePlacements]) => (
-        <KitModuleBoundary
-          key={`${scopeKey ?? ''}:${moduleId}`}
-          moduleId={moduleId}
-          scopeKey={scopeKey}
-          onModuleError={onModuleError}
-        >
-          <Suspense fallback={null}>
-            <KitModuleInstances
-              moduleId={moduleId}
-              placements={modulePlacements}
-              scopeKey={scopeKey}
-            />
-          </Suspense>
-        </KitModuleBoundary>
-      ))}
-    </>
+  const moduleIds = useMemo(
+    () => (idsKey ? (idsKey.split('|') as ClassroomKitModuleId[]) : []),
+    [idsKey],
   );
+  const modules = useKitModules(moduleIds, scopeKey, onModuleError);
+  const built = useMemo(
+    () => (modules ? buildBatchedKit(modules, placements) : null),
+    [modules, placements],
+  );
+  // Disposing releases GPU buffers only; the group stays attached and the
+  // geometry data stays in memory, so a StrictMode remount re-uploads it.
+  useEffect(() => built?.dispose, [built]);
+  return built ? <primitive object={built.group} /> : null;
 }

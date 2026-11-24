@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { Mesh } from 'three';
 import { describe, expect, it } from 'vitest';
 import { CLASSROOM_LAYOUT } from '@/realtime';
@@ -9,6 +7,7 @@ import { deriveFurniturePlacements } from './classroom-furniture-placements';
 import { deriveShellPlacements } from './classroom-shell-placements';
 import { getKitModuleUrl } from './kit/classroom-kit-manifest';
 import { estimateKitDrawCalls } from './kit/kit-draw-calls';
+import { glbMaterialNames } from './kit/glb-materials.test-utils';
 import { groupPlacementsByModule } from './kit/kit-placement';
 
 const layout = CLASSROOM_LAYOUT;
@@ -16,16 +15,6 @@ const { bounds } = layout;
 const furniture = deriveFurniturePlacements(layout);
 const byModule = groupPlacementsByModule(furniture);
 const of = (id: Parameters<typeof byModule.get>[0]) => byModule.get(id) ?? [];
-
-/** Primitive count of a GLB = draw calls of its instanced module. */
-function glbPrimitiveCount(url: string): number {
-  const buffer = readFileSync(resolve(process.cwd(), 'public', url.slice(1)));
-  const jsonLength = buffer.readUInt32LE(12);
-  const json = JSON.parse(buffer.toString('utf8', 20, 20 + jsonLength)) as {
-    meshes: { primitives: unknown[] }[];
-  };
-  return json.meshes.reduce((sum, mesh) => sum + mesh.primitives.length, 0);
-}
 
 describe('deriveFurniturePlacements', () => {
   it('places the documented count of every furniture module', () => {
@@ -103,12 +92,12 @@ describe('deriveFurniturePlacements', () => {
     ]);
   });
 
-  it('keeps the kit (shell + furniture) within the FD8 draw-call ceiling', () => {
+  it('keeps the kit (shell + furniture) batched by material within the FD8 draw-call ceiling', () => {
     const all = [...deriveShellPlacements(layout), ...furniture];
     const meshCounts = Object.fromEntries(
       [...groupPlacementsByModule(all).keys()].map((id) => [
         id,
-        glbPrimitiveCount(getKitModuleUrl(id)),
+        glbMaterialNames(getKitModuleUrl(id)),
       ]),
     );
     const kit = estimateKitDrawCalls(all, meshCounts);
@@ -120,14 +109,10 @@ describe('deriveFurniturePlacements', () => {
       primitive += 1;
     });
     scene.dispose();
-    // Furniture is 50 primitives on top of the 35 of the shell; avatars come
-    // on top of this. Merging singleton modules by material is needed to get
-    // the whole scene under 80.
-    expect(kit).toBe(85);
-    expect(kit + primitive).toBeLessThanOrEqual(110);
+    // Batched by material: one draw call per distinct material name across
+    // every placed module (11 shell + 10 furniture, read from the GLB JSON).
+    // Avatars come on top of this.
+    expect(kit).toBe(21);
+    expect(kit + primitive).toBeLessThanOrEqual(60);
   });
-
-  it.todo(
-    'whole classroom (kit + primitives) under 80 draw calls once singleton modules merge by material',
-  );
 });

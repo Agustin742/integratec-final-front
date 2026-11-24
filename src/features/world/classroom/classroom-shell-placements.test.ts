@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { Mesh } from 'three';
 import { describe, expect, it } from 'vitest';
 import { CLASSROOM_LAYOUT } from '@/realtime';
@@ -8,6 +6,7 @@ import { deriveClassroomPropSpecs } from './classroom-interactables';
 import { deriveShellPlacements } from './classroom-shell-placements';
 import { getKitModuleUrl } from './kit/classroom-kit-manifest';
 import { estimateKitDrawCalls } from './kit/kit-draw-calls';
+import { glbMaterialNames } from './kit/glb-materials.test-utils';
 import { groupPlacementsByModule } from './kit/kit-placement';
 
 const layout = CLASSROOM_LAYOUT;
@@ -15,16 +14,6 @@ const { bounds } = layout;
 const placements = deriveShellPlacements(layout);
 const byModule = groupPlacementsByModule(placements);
 const of = (id: Parameters<typeof byModule.get>[0]) => byModule.get(id) ?? [];
-
-/** Primitive count of a shell GLB = draw calls of its instanced module. */
-function glbPrimitiveCount(url: string): number {
-  const buffer = readFileSync(resolve(process.cwd(), 'public', url.slice(1)));
-  const jsonLength = buffer.readUInt32LE(12);
-  const json = JSON.parse(buffer.toString('utf8', 20, 20 + jsonLength)) as {
-    meshes: { primitives: unknown[] }[];
-  };
-  return json.meshes.reduce((sum, mesh) => sum + mesh.primitives.length, 0);
-}
 
 describe('deriveShellPlacements', () => {
   it('places the documented count of every shell module', () => {
@@ -155,11 +144,11 @@ describe('deriveShellPlacements', () => {
     );
   });
 
-  it('keeps the shell plus the primitive scene well under 100 draw calls', () => {
+  it('keeps the shell plus the primitive scene batched by material well under 100 draw calls', () => {
     const meshCounts = Object.fromEntries(
       [...byModule.keys()].map((id) => [
         id,
-        glbPrimitiveCount(getKitModuleUrl(id)),
+        glbMaterialNames(getKitModuleUrl(id)),
       ]),
     );
     const shell = estimateKitDrawCalls(placements, meshCounts);
@@ -171,7 +160,7 @@ describe('deriveShellPlacements', () => {
       primitive += 1;
     });
     scene.dispose();
-    expect(shell).toBeLessThanOrEqual(40);
-    expect(shell + primitive).toBeLessThan(80);
+    expect(shell).toBe(11);
+    expect(shell + primitive).toBeLessThanOrEqual(60);
   });
 });

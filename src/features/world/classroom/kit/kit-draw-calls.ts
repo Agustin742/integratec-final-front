@@ -2,26 +2,26 @@ import type { Object3D } from 'three';
 import { groupPlacementsByModule, type KitPlacement } from './kit-placement';
 
 /**
- * Estimated draw calls for a placement set: one per `InstancedMesh`, i.e. per
- * source mesh of each distinct module in use. `meshCounts` maps module id to
- * its source mesh count.
+ * Estimated draw calls for a placement set once the kit is batched by
+ * material: one per distinct material name across the modules in use.
+ * `materialNames` maps a module id to the material names its GLB references.
  */
 export function estimateKitDrawCalls(
   placements: readonly KitPlacement[],
-  meshCounts: Readonly<Record<string, number>>,
+  materialNames: Readonly<Record<string, readonly string[]>>,
 ): number {
-  let total = 0;
+  const distinct = new Set<string>();
   for (const moduleId of groupPlacementsByModule(placements).keys()) {
-    total += meshCounts[moduleId] ?? 1;
+    for (const name of materialNames[moduleId] ?? []) distinct.add(name);
   }
-  return total;
+  return distinct.size;
 }
 
-/** Counts the `InstancedMesh` objects (draw calls) under built kit groups. */
-export function countInstancedDrawCalls(root: Object3D): number {
+/** Counts the batched meshes (draw calls) under a built kit group. */
+export function countBatchedDrawCalls(root: Object3D): number {
   let count = 0;
   root.traverse((node) => {
-    if ((node as { isInstancedMesh?: boolean }).isInstancedMesh) count += 1;
+    if ((node as { isMesh?: boolean }).isMesh) count += 1;
   });
   return count;
 }

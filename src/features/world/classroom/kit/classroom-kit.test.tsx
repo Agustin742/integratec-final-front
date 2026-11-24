@@ -2,8 +2,8 @@ import { StrictMode } from 'react';
 import { waitFor } from '@testing-library/react';
 import {
   BoxGeometry,
+  BufferGeometry,
   Group,
-  InstancedMesh,
   Mesh,
   MeshStandardMaterial,
 } from 'three';
@@ -11,7 +11,7 @@ import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from '@/test/render';
 import { clearAssetCache, setGlbLoaderForTests } from '../../asset-cache';
-import * as builder from './build-instanced-kit-module';
+import * as builder from './build-batched-kit';
 import { ClassroomKit } from './classroom-kit';
 import type { KitPlacement } from './kit-placement';
 
@@ -61,10 +61,10 @@ describe('ClassroomKit', () => {
     );
   });
 
-  it('builds the surviving module and keeps its instances across StrictMode remounts', async () => {
+  it('renders one batched group from the modules that loaded and survives StrictMode remounts', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const disposeSpy = vi.spyOn(InstancedMesh.prototype, 'dispose');
-    const spy = vi.spyOn(builder, 'buildInstancedKitModule');
+    const disposeSpy = vi.spyOn(BufferGeometry.prototype, 'dispose');
+    const spy = vi.spyOn(builder, 'buildBatchedKit');
     setGlbLoaderForTests({
       loadAsync: (url: string) =>
         url.endsWith('cabinet.glb')
@@ -80,16 +80,31 @@ describe('ClassroomKit', () => {
 
     await waitFor(() => expect(spy).toHaveBeenCalled());
     const results = spy.mock.results.map(
-      (r) => r.value as builder.InstancedKitModule,
+      (r) => r.value as builder.BatchedKit,
     );
-    expect(spy.mock.calls.every(([id]) => id === 'board')).toBe(true);
+    // Only the surviving module is in the batch.
+    for (const [modules] of spy.mock.calls) {
+      expect([...modules.keys()]).toEqual(['board']);
+    }
     // Effect cleanup ran (StrictMode) yet every built group keeps its meshes.
     await waitFor(() => expect(disposeSpy).toHaveBeenCalled());
-    await waitFor(() => {
-      for (const built of results) {
-        expect(built.group.name).toBe('kit:board');
-        expect(built.group.children).toHaveLength(1);
-      }
-    });
+    for (const built of results) {
+      expect(built.group.name).toBe('kit:batch');
+      expect(built.group.children).toHaveLength(1);
+      expect(built.group.userData).toEqual({ kitModuleIds: ['board'] });
+    }
+  });
+
+  it('builds a single batch for all modules, not one per module', async () => {
+    const spy = vi.spyOn(builder, 'buildBatchedKit');
+    setGlbLoaderForTests({ loadAsync: () => Promise.resolve(gltf()) });
+
+    render(<ClassroomKit placements={placements} />);
+
+    await waitFor(() => expect(spy).toHaveBeenCalled());
+    // Every build (React may repeat one in dev) carries both modules at once.
+    for (const [modules] of spy.mock.calls) {
+      expect([...modules.keys()].sort()).toEqual(['board', 'cabinet']);
+    }
   });
 });
