@@ -206,7 +206,7 @@ Seasonal:
 ### Decoration
 
 - [ ] Wall clock
-- [ ] Flag
+- [x] Flag
 - [ ] Map
 - [ ] Globe
 - [ ] Wall posters
