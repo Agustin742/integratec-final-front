@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import type { Avatar } from '@/features/profile/avatar-options';
 import { CLASSROOM_LAYOUT, type AvatarInput } from '@/realtime';
+import type { Pose } from '../movement';
 import { WarmLighting } from '../world-lighting';
 import { buildClassroomScene } from './build-classroom-scene';
 import {
@@ -13,6 +14,7 @@ import {
 import type { FloorClickEvent } from './floor-click';
 import { InteractableHighlight } from './interactable-highlight';
 import { LocalAvatar } from './local-avatar';
+import { RemoteAvatar, type RemoteClassroomParticipant } from './remote-avatar';
 import { useClassroomNavigation } from './use-classroom-navigation';
 
 export interface ClassroomSceneProps {
@@ -20,6 +22,14 @@ export interface ClassroomSceneProps {
   avatar?: Avatar | undefined;
   /** Classroom id: scopes avatar assets and resets the local avatar. */
   scopeKey?: string | undefined;
+  /** Authoritative pose from the room for the local participant (#37). */
+  selfPose?: Pose | undefined;
+  /** Connection epoch key that changes on join/reconnect/drop (#37). */
+  connectionKey?: string | undefined;
+  /** True while the classroom freeze lock is active (#37). */
+  frozen?: boolean | undefined;
+  /** Connected remote participants from authoritative room state (#37). */
+  remoteParticipants?: readonly RemoteClassroomParticipant[] | undefined;
   onIntentChange?: ((intent: AvatarInput) => void) | undefined;
   /** Highlighted interactable id (from 3D hover or DOM focus). */
   highlightedInteractableId?: string | undefined;
@@ -37,16 +47,21 @@ export interface ClassroomSceneProps {
 type ScenePointerEvent = FloorClickEvent & InteractablePointerEvent;
 
 /**
- * Placeholder classroom (floor, cutaway walls, desks from the layout and the
+ * Classroom (floor, cutaway walls, desks from the layout and the
  * named prop placeholders) with the shared warm lighting and cream backdrop,
- * plus the user's own avatar. Shadowless; the object graph is built once per
- * layout and disposed on unmount because `<primitive>` objects are not owned
- * by R3F. Only the scene root takes pointer events: interactables emit intent
- * while the walkable floor turns a click or tap into a walk destination.
+ * plus the user's own avatar and live remote participants. Shadowless; the
+ * object graph is built once per layout and disposed on unmount because
+ * `<primitive>` objects are not owned by R3F. Only the scene root takes pointer
+ * events: interactables emit intent while the walkable floor turns a click or
+ * tap into a walk destination.
  */
 export function ClassroomScene({
   avatar,
   scopeKey,
+  selfPose,
+  connectionKey,
+  frozen = false,
+  remoteParticipants = [],
   onIntentChange,
   highlightedInteractableId,
   ownDeskIndex,
@@ -57,7 +72,6 @@ export function ClassroomScene({
 }: ClassroomSceneProps) {
   const scene = useMemo(() => buildClassroomScene(CLASSROOM_LAYOUT), []);
   useEffect(() => () => scene.dispose(), [scene]);
-
   const interactablesById = useMemo(
     () =>
       indexClassroomInteractables(
@@ -69,6 +83,9 @@ export function ClassroomScene({
   const { controller, marker, onFloorClick, clearDestination } =
     useClassroomNavigation({
       scopeKey,
+      serverPose: selfPose,
+      connectionKey,
+      frozen,
       onIntentChange,
       interactionLocked,
     });
@@ -130,7 +147,6 @@ export function ClassroomScene({
       onFloorClick,
     ],
   );
-
   return (
     <>
       <color attach="background" args={['#FFF9EB']} />
@@ -156,6 +172,20 @@ export function ClassroomScene({
         avatar={avatar}
         scopeKey={scopeKey}
       />
+      {remoteParticipants.map((participant) => (
+        <RemoteAvatar
+          key={`${scopeKey ?? ''}:${participant.userId}`}
+          userId={participant.userId}
+          status={participant.status}
+          targetPose={{
+            x: participant.x,
+            z: participant.z,
+            rotation: participant.rotation,
+          }}
+          avatar={participant.avatar}
+          scopeKey={scopeKey}
+        />
+      ))}
     </>
   );
 }

@@ -25,7 +25,10 @@ import {
   createErrorEnvelopeResponse,
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
-import { useClassroomCapabilities } from './use-classroom-capabilities';
+import {
+  useClassroomCapabilities,
+  useClassroomContext,
+} from './use-classroom-capabilities';
 
 const CLASSROOM_A = '11111111-1111-4111-8111-111111111111';
 const CLASSROOM_B = '22222222-2222-4222-8222-222222222222';
@@ -243,5 +246,33 @@ describe('useClassroomCapabilities', () => {
     if (result.current.status !== 'error') throw new Error('unreachable');
     expect(result.current.error).toBeInstanceOf(ApiError);
     expect(result.current.error.kind).toBe('unexpected');
+  });
+
+  test('useClassroomContext skips fetching and returns pending when enabled is false', async () => {
+    const fetchSpy = vi.fn(() => new Promise<Response>(() => {}));
+    const client = createApiClient({
+      baseUrl: TEST_API_BASE_URL,
+      fetch: fetchSpy,
+    });
+    const session = fakeSession(authenticated, client);
+    const queryClient = createAppQueryClient();
+    const { result } = renderHook(
+      () => useClassroomContext(CLASSROOM_A, { enabled: false }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <StrictMode>
+            <ApiQueryProvider client={queryClient}>
+              <SessionProvider service={session.service}>
+                {children}
+              </SessionProvider>
+            </ApiQueryProvider>
+          </StrictMode>
+        ),
+      },
+    );
+
+    expect(result.current.status).toBe('pending');
+    await Promise.resolve();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

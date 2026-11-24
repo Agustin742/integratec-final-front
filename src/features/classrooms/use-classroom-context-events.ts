@@ -15,13 +15,16 @@ import { readContextEvents } from './context-events';
 export const CONTEXT_RENEWAL_MS = 50_000;
 
 /** One workspace owner, not one subscription per capability consumer. */
-export function useClassroomContextEvents(classroomId: string): void {
+export function useClassroomContextEvents(
+  classroomId: string,
+  enabled = true,
+): void {
   const { client, controller } = useSessionService();
   const snapshot = useSessionSnapshot();
   const userId = snapshot.status === 'authenticated' ? snapshot.user.id : null;
   const queryClient = useQueryClient();
   useEffect(() => {
-    if (userId === null) return;
+    if (userId === null || !enabled) return;
     const queryKey = classroomDetailQueryKey(userId, classroomId);
     let stopped = false;
     let connection: AbortController | undefined;
@@ -125,5 +128,5 @@ export function useClassroomContextEvents(classroomId: string): void {
       stop();
       unregister();
     };
-  }, [classroomId, client, controller, queryClient, userId]);
+  }, [classroomId, client, controller, enabled, queryClient, userId]);
 }

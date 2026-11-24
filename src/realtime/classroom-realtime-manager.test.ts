@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  CLOSE_CODE_ACCESS_REVOKED,
+  CLOSE_CODE_TOO_MANY_CONNECTIONS,
+  CLOSE_REASON_ACCESS_REVOKED,
+  CLOSE_REASON_TOO_MANY_CONNECTIONS,
+} from './contracts.generated';
+import {
   createFakeRealtimeAuth,
   createFakeRealtimeSdk,
 } from '@/test/realtime/fake-realtime-sdk';
@@ -122,5 +128,68 @@ describe('classroom realtime manager', () => {
     expect(sdk.roomFor(CLASSROOM_A)?.leave).toHaveBeenCalledTimes(1);
     expect(sdk.roomFor(CLASSROOM_B)?.leave).toHaveBeenCalledTimes(1);
     expect(manager.acquire(CLASSROOM_A)).toBeNull();
+  });
+
+  it('clears a pending retryTimer when the connection recovers manually before backoff expires', async () => {
+    const { sdk, manager } = setup();
+    sdk.failNextJoinWith(new Error('transient offline'));
+
+    const lease = manager.acquire(CLASSROOM_A);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(lease?.client.getSnapshot().status).toBe('disconnected');
+
+    // Recover manually before the 2s backoff timer fires.
+    await vi.advanceTimersByTimeAsync(500);
+    await lease?.client.connect(CLASSROOM_A);
+    expect(lease?.client.getSnapshot().status).toBe('connected');
+    expect(sdk.joinedClassrooms).toEqual([CLASSROOM_A]);
+
+    // Disconnect cleanly before the old 2s mark; stale retry timer must NOT fire.
+    await lease?.client.disconnect();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(sdk.joinedClassrooms).toEqual([CLASSROOM_A]);
+
+    manager.dispose();
+  });
+
+  it('replaces a zero-lease terminal entry (lost-access or rejected) on fresh acquire within the grace window', async () => {
+    const { sdk, manager } = setup();
+
+    // 1. lost-access entry released into grace window
+    const firstLease = manager.acquire(CLASSROOM_A);
+    await vi.advanceTimersByTimeAsync(0);
+    const firstRoom = sdk.roomFor(CLASSROOM_A)!;
+    firstRoom.emitLeave(CLOSE_CODE_ACCESS_REVOKED, CLOSE_REASON_ACCESS_REVOKED);
+    expect(firstLease?.client.getSnapshot().status).toBe('lost-access');
+    firstLease?.release();
+
+    // Re-acquiring inside the grace window closes the stale lost-access client and opens a fresh one.
+    const freshAfterRevoke = manager.acquire(CLASSROOM_A);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(freshAfterRevoke).not.toBeNull();
+    expect(freshAfterRevoke?.client).not.toBe(firstLease?.client);
+    expect(freshAfterRevoke?.client.getSnapshot().status).toBe('connected');
+    expect(sdk.joinedClassrooms).toEqual([CLASSROOM_A, CLASSROOM_A]);
+    freshAfterRevoke?.release();
+    await vi.advanceTimersByTimeAsync(500);
+
+    // 2. rejected entry released into grace window
+    sdk.failNextJoinWith(
+      Object.assign(new Error(CLOSE_REASON_TOO_MANY_CONNECTIONS), {
+        code: CLOSE_CODE_TOO_MANY_CONNECTIONS,
+      }),
+    );
+    const rejectedLease = manager.acquire(CLASSROOM_B);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(rejectedLease?.client.getSnapshot().status).toBe('rejected');
+    rejectedLease?.release();
+
+    const freshAfterReject = manager.acquire(CLASSROOM_B);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(freshAfterReject).not.toBeNull();
+    expect(freshAfterReject?.client).not.toBe(rejectedLease?.client);
+    expect(freshAfterReject?.client.getSnapshot().status).toBe('connected');
+
+    manager.dispose();
   });
 });

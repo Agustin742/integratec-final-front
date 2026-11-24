@@ -173,6 +173,12 @@ test.beforeEach(async ({ page, baseURL }) => {
       expect(request.headers().authorization).toBe('Bearer synthetic-access');
       return route.fulfill({ json: desksPayload });
     }
+    if (
+      url.origin === 'https://realtime.example.invalid' ||
+      url.pathname.startsWith('/matchmake/')
+    ) {
+      return route.abort();
+    }
     if (request.url() === `${classroomURL}/context-events`) {
       expect(request.method()).toBe('GET');
       expect(request.headers().authorization).toBe('Bearer synthetic-access');
@@ -498,9 +504,83 @@ test('switches 3D to accessible 2D Classic Mode via button and Alt+M, opens pane
   expect(pageErrors).toEqual([]);
 });
 
-test('never offers 3D stage or 2D Classic Mode switch to PARENT accounts', async ({
+test('renders honest disconnected presence bar with working retry when realtime matchmaking is unavailable', async ({
   page,
 }) => {
+  const cspViolations: string[] = [];
+  const pageErrors: string[] = [];
+  let matchmakeRequests = 0;
+
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('console', (msg) => {
+    if (
+      msg.type() === 'error' &&
+      /Content Security Policy|CSP/i.test(msg.text())
+    ) {
+      cspViolations.push(msg.text());
+    }
+  });
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (
+      url.origin === 'https://realtime.example.invalid' ||
+      url.pathname.startsWith('/matchmake/')
+    ) {
+      matchmakeRequests += 1;
+    }
+  });
+
+  await page.route(classroomURL, (route) => route.fulfill({ json: classroom }));
+
+  await page.goto(entry);
+  await expect(heading(page, classroom.name)).toBeVisible();
+
+  const presenceBar = page.getByTestId('classroom-presence-bar');
+  await expect(presenceBar).toBeVisible();
+  await expect(
+    presenceBar.getByText(classroomMessages.presence.disconnectedBadge, {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    presenceBar.getByText(classroomMessages.presence.uncertainBadge, {
+      exact: false,
+    }),
+  ).toBeVisible();
+
+  const retryButton = presenceBar.getByRole('button', {
+    name: classroomMessages.presence.retryAction,
+    exact: true,
+  });
+  await expect(retryButton).toBeVisible();
+
+  const requestsBeforeRetry = matchmakeRequests;
+  expect(requestsBeforeRetry).toBeGreaterThan(0);
+
+  await retryButton.click();
+  await expect
+    .poll(() => matchmakeRequests)
+    .toBeGreaterThan(requestsBeforeRetry);
+  await expect(retryButton).toBeVisible();
+
+  expect(cspViolations).toEqual([]);
+  expect(pageErrors).toEqual([]);
+});
+
+test('never offers 3D stage, 2D Classic Mode switch, or realtime presence to PARENT accounts', async ({
+  page,
+}) => {
+  const realtimeRequests: string[] = [];
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (
+      url.origin === 'https://realtime.example.invalid' ||
+      url.pathname.startsWith('/matchmake/')
+    ) {
+      realtimeRequests.push(request.url());
+    }
+  });
+
   await page.route(classroomURL, (route) =>
     route.fulfill({
       json: {
@@ -521,6 +601,8 @@ test('never offers 3D stage or 2D Classic Mode switch to PARENT accounts', async
     ),
   ).toBeVisible();
   await expect(page.locator('canvas')).toHaveCount(0);
+  await expect(page.getByTestId('classroom-presence-bar')).toHaveCount(0);
+  await expect(page.getByTestId('classroom-realtime-rejected')).toHaveCount(0);
   await expect(
     page.getByRole('button', { name: classroomMessages.viewMode.switchTo2d }),
   ).toHaveCount(0);
@@ -537,4 +619,5 @@ test('never offers 3D stage or 2D Classic Mode switch to PARENT accounts', async
       name: classroomMessages.viewMode.mode2dHeading,
     }),
   ).toHaveCount(0);
+  expect(realtimeRequests).toEqual([]);
 });

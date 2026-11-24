@@ -8,10 +8,12 @@ import {
   type RefObject,
 } from 'react';
 import { useNavigate } from 'react-router';
+import type { AvatarInput } from '@/realtime';
+import type { Pose, RemoteClassroomParticipant } from '../world';
 import type { ClassroomInteractable } from '../world/classroom/classroom-interactables';
+import { worldMessages } from '../world/messages';
 import { PerformanceProbeRuntime } from '../world/performance-monitor';
 import { PerformanceStatsOverlay } from '../world/performance-stats-overlay';
-import { worldMessages } from '../world/messages';
 import { WorldFallback } from '../world/world-fallback';
 import {
   ClassroomInteractablesBar,
@@ -26,6 +28,12 @@ export interface Classroom3DStageProps {
   readonly scopeKey?: string;
   readonly classroomId?: string;
   readonly petName?: string | null;
+  readonly selfPose?: Pose | undefined;
+  readonly connectionKey?: string | undefined;
+  readonly frozen?: boolean | undefined;
+  readonly remoteParticipants?:
+    readonly RemoteClassroomParticipant[] | undefined;
+  readonly onIntentChange?: ((intent: AvatarInput) => void) | undefined;
   /** Fired when the canvas measures sustained low fps (#56). */
   readonly onSustainedLowFps?: () => void;
 }
@@ -89,6 +97,11 @@ export function Classroom3DStage({
   scopeKey,
   classroomId,
   petName,
+  selfPose,
+  connectionKey,
+  frozen,
+  remoteParticipants,
+  onIntentChange,
   onSustainedLowFps,
 }: Classroom3DStageProps) {
   const resolvedClassroomId = classroomId ?? scopeKey ?? '';
@@ -99,6 +112,11 @@ export function Classroom3DStage({
       scopeKey={scopeKey}
       classroomId={resolvedClassroomId}
       petName={petName}
+      selfPose={selfPose}
+      connectionKey={connectionKey}
+      frozen={frozen}
+      remoteParticipants={remoteParticipants}
+      onIntentChange={onIntentChange}
       onSustainedLowFps={onSustainedLowFps}
     />
   );
@@ -109,12 +127,23 @@ function Classroom3DStageContent({
   scopeKey,
   classroomId,
   petName,
+  selfPose,
+  connectionKey,
+  frozen,
+  remoteParticipants,
+  onIntentChange,
   onSustainedLowFps,
 }: {
   readonly headingRef?: RefObject<HTMLHeadingElement | null>;
   readonly scopeKey?: string;
   readonly classroomId: string;
   readonly petName?: string | null;
+  readonly selfPose?: Pose | undefined;
+  readonly connectionKey?: string | undefined;
+  readonly frozen?: boolean | undefined;
+  readonly remoteParticipants?:
+    readonly RemoteClassroomParticipant[] | undefined;
+  readonly onIntentChange?: ((intent: AvatarInput) => void) | undefined;
   readonly onSustainedLowFps?: () => void;
 }) {
   const [LazyClassroomWorld] = useState(() => lazy(loadClassroomWorld));
@@ -303,6 +332,11 @@ function Classroom3DStageContent({
               <LazyClassroomWorld
                 label={classroomMessages.viewMode.canvasLabel}
                 scopeKey={scopeKey}
+                selfPose={selfPose}
+                connectionKey={connectionKey}
+                frozen={frozen}
+                remoteParticipants={remoteParticipants}
+                onIntentChange={onIntentChange}
                 highlightedInteractableId={effectiveHighlightedId}
                 ownDeskIndex={desks.myDeskIndex}
                 petReactionNonce={petReactionNonce}

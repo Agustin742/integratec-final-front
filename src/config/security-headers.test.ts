@@ -66,6 +66,7 @@ describe('buildContentSecurityPolicy', () => {
       "'self'",
       'https://api.example.invalid',
       'wss://realtime.example.invalid',
+      'https://realtime.example.invalid',
     ]);
     expect(directives.get('worker-src')).toEqual(["'self'", 'blob:']);
     expect(directives.get('manifest-src')).toEqual(["'self'"]);
@@ -305,7 +306,7 @@ describe('validateBuiltHtmlAndHeaders', () => {
           'Content-Security-Policy': validHeaders[
             'Content-Security-Policy'
           ].replace(
-            "connect-src 'self' https://api.example.invalid wss://realtime.example.invalid",
+            "connect-src 'self' https://api.example.invalid wss://realtime.example.invalid https://realtime.example.invalid",
             "connect-src 'self' https:",
           ),
         },
@@ -419,7 +420,7 @@ describe('Amplify customHttp.yml environment handoff (syncCustomHttpFiles + runS
       );
 
       expect(cspHeader?.value).toContain(
-        "connect-src 'self' https://api.prod.integratec.edu.ar wss://rt.prod.integratec.edu.ar",
+        "connect-src 'self' https://api.prod.integratec.edu.ar wss://rt.prod.integratec.edu.ar https://rt.prod.integratec.edu.ar",
       );
       expect(cspHeader?.value).not.toContain('api.example.invalid');
 

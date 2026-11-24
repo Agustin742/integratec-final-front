@@ -10,6 +10,11 @@ export {
   type ClassroomWorldProps,
 } from './classroom/classroom-world';
 export {
+  RemoteAvatar,
+  type RemoteAvatarProps,
+  type RemoteClassroomParticipant,
+} from './classroom/remote-avatar';
+export {
   deriveClassroomInteractables,
   indexClassroomInteractables,
   resolveInteractableHit,
