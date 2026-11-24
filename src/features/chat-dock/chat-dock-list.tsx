@@ -40,6 +40,10 @@ export interface ChatDockListProps {
   readonly activeId: string | null;
   /** `true` hides the sheet on small screens while a conversation covers it. */
   readonly covered: boolean;
+  /** Plays the enter animation, or the exit one while it closes. */
+  readonly animated?: boolean;
+  readonly closing?: boolean;
+  readonly onAnimationEnd?: () => void;
   readonly onSelect: (classroomId: string) => void;
   readonly onClose: () => void;
   readonly registerItem: (
@@ -59,6 +63,9 @@ export function ChatDockList({
   items,
   activeId,
   covered,
+  animated = false,
+  closing = false,
+  onAnimationEnd,
   onSelect,
   onClose,
   registerItem,
@@ -78,10 +85,18 @@ export function ChatDockList({
       id={id}
       aria-label={messages.listLabel}
       onKeyDown={handleKeyDown}
+      data-state={closing ? 'closed' : 'open'}
+      onAnimationEnd={(event) => {
+        if (event.target === event.currentTarget) onAnimationEnd?.();
+      }}
+      // The list is the body of the dock surface (the launcher is its header):
+      // above `sm` it has no border or radius of its own.
       className={cn(
-        'pointer-events-auto flex max-h-[min(24rem,60vh)] flex-col overflow-hidden rounded-t-2xl border border-b-0 border-edge bg-card text-card-foreground shadow-float',
-        'max-sm:fixed max-sm:inset-x-0 max-sm:top-0 max-sm:z-40 max-sm:h-dvh max-sm:max-h-none max-sm:rounded-none max-sm:border-0 max-sm:pb-[env(safe-area-inset-bottom)]',
+        'pointer-events-auto flex max-h-[min(24rem,60vh)] origin-top flex-col overflow-hidden bg-card text-card-foreground',
+        'max-sm:fixed max-sm:inset-x-0 max-sm:top-0 max-sm:z-40 max-sm:h-dvh max-sm:max-h-none max-sm:pb-[env(safe-area-inset-bottom)]',
         covered && 'max-sm:hidden',
+        closing && 'pointer-events-none',
+        animated && (closing ? 'animate-dock-out' : 'animate-dock-in'),
       )}
     >
       <div className="flex items-center justify-between gap-2 border-b border-edge px-3 py-1 sm:hidden">

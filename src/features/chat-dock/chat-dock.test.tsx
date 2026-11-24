@@ -60,6 +60,8 @@ const B1 = message(
   'Examen de lengua',
 );
 
+const CLASSROOM_C = '00000000-0000-4000-8000-000000000053';
+
 const ROOMS: Record<string, readonly ChatInboxStoreMessage[]> = {
   [CLASSROOM_A]: [A1, A2],
   [CLASSROOM_B]: [B1],
@@ -90,7 +92,11 @@ const historyHandler = http.get(
 );
 
 function setup(
-  options: { parent?: boolean; empty?: boolean } = {},
+  options: {
+    parent?: boolean;
+    empty?: boolean;
+    silentRoom?: boolean;
+  } = {},
   existing?: { queryClient?: ReturnType<typeof createAppQueryClient> },
 ) {
   const store = createChatInboxStore({
@@ -110,6 +116,15 @@ function setup(
               classroomName: 'Lengua',
               messages: ROOMS[CLASSROOM_B],
             },
+            ...(options.silentRoom === true
+              ? [
+                  {
+                    classroomId: CLASSROOM_C,
+                    classroomName: 'Ciencias',
+                    messages: [],
+                  },
+                ]
+              : []),
           ],
   });
   mswServer.use(
@@ -117,6 +132,11 @@ function setup(
     historyHandler,
     createClassroomDetailHandler(CLASSROOM_A, {
       name: 'Matemática',
+      myRole: 'STUDENT',
+      capabilities: ['chat_classmates'],
+    }),
+    createClassroomDetailHandler(CLASSROOM_C, {
+      name: 'Ciencias',
       myRole: 'STUDENT',
       capabilities: ['chat_classmates'],
     }),
@@ -226,6 +246,111 @@ describe('ChatDock', () => {
     expect(
       screen.queryByRole('list', { name: 'Chats de tus aulas' }),
     ).toBeNull();
+  });
+
+  describe('open/close motion', () => {
+    const original = Object.getOwnPropertyDescriptor(window, 'matchMedia');
+    function stubReducedMotion(reduce: boolean) {
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        writable: true,
+        value: (query: string) => ({
+          matches: query.includes('prefers-reduced-motion') && reduce,
+          media: query,
+          addEventListener: () => undefined,
+          removeEventListener: () => undefined,
+        }),
+      });
+    }
+    afterEach(() => {
+      if (original === undefined) {
+        Reflect.deleteProperty(window, 'matchMedia');
+      } else {
+        Object.defineProperty(window, 'matchMedia', original);
+      }
+    });
+
+    it('animates the list in and out, unmounting after the exit animation', async () => {
+      stubReducedMotion(false);
+      setup();
+      const launcher = await openList();
+      const list = await screen.findByRole('list', {
+        name: 'Chats de tus aulas',
+      });
+      const panel = list.closest('section');
+      expect(panel).toHaveAttribute('data-state', 'open');
+      expect(panel?.className).toContain('animate-dock-in');
+
+      fireEvent.click(launcher);
+      expect(launcher).toHaveAttribute('aria-expanded', 'false');
+      expect(panel).toHaveAttribute('data-state', 'closed');
+      expect(panel?.className).toContain('animate-dock-out');
+      expect(panel).toBeInTheDocument();
+
+      // jsdom does not register `animationend` for React: the unmount safety
+      // net fires instead, which is the same path as the real event.
+      await waitFor(() => {
+        expect(
+          screen.queryByRole('list', { name: 'Chats de tus aulas' }),
+        ).toBeNull();
+      });
+    });
+
+    it('closes instantly and without animation classes under reduced motion', async () => {
+      stubReducedMotion(true);
+      setup();
+      const launcher = await openList();
+      const list = await screen.findByRole('list', {
+        name: 'Chats de tus aulas',
+      });
+      expect(list.closest('section')?.className).not.toContain('animate-dock');
+
+      fireEvent.click(launcher);
+      expect(launcher).toHaveAttribute('aria-expanded', 'false');
+      expect(
+        screen.queryByRole('list', { name: 'Chats de tus aulas' }),
+      ).toBeNull();
+    });
+
+    it('returns focus to the toggle when Escape closes the animated list', async () => {
+      stubReducedMotion(false);
+      setup();
+      const launcher = await openList();
+      const list = await screen.findByRole('list', {
+        name: 'Chats de tus aulas',
+      });
+      fireEvent.keyDown(within(list).getAllByRole('button')[0], {
+        key: 'Escape',
+      });
+      expect(launcher).toHaveAttribute('aria-expanded', 'false');
+      expect(launcher).toHaveFocus();
+    });
+
+    it('keeps the full chat frame in an empty room: bubble plus a ready composer', async () => {
+      setup({ silentRoom: true });
+      await openConversation(/Ciencias/);
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Chat de Ciencias',
+      });
+      const empty = await within(dialog).findByTestId('chat-empty');
+      expect(empty).toHaveTextContent('Todavía no hay mensajes en el chat');
+      expect(within(dialog).getByRole('textbox')).toBeVisible();
+      expect(
+        within(dialog).getByRole('button', { name: 'Enviar' }),
+      ).toBeVisible();
+    });
+
+    it('renders the toggle as the header of the same surface as the list', async () => {
+      setup();
+      const launcher = await openList();
+      const list = await screen.findByRole('list', {
+        name: 'Chats de tus aulas',
+      });
+      const surface = launcher.closest('[data-chat-dock-surface]');
+      expect(surface).not.toBeNull();
+      expect(surface).toContainElement(list);
+      expect(surface?.firstElementChild?.contains(launcher)).toBe(true);
+    });
   });
 
   it('opens a conversation with its history and a focused composer, one at a time', async () => {

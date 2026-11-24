@@ -64,7 +64,7 @@ export function ChatDockWindow({
       aria-label={messages.windowLabel(classroomName)}
       onKeyDown={handleKeyDown}
       className={cn(
-        'pointer-events-auto flex w-[22rem] max-w-full flex-col overflow-hidden rounded-t-2xl border border-b-0 border-edge bg-card text-card-foreground shadow-float',
+        'pointer-events-auto flex origin-bottom motion-safe:animate-dock-in w-[22rem] max-w-full flex-col overflow-hidden rounded-t-2xl border border-b-0 border-edge bg-card text-card-foreground shadow-float',
         minimized
           ? 'max-sm:w-64'
           : 'h-[min(36rem,calc(100dvh-6rem))] max-sm:fixed max-sm:inset-x-0 max-sm:top-0 max-sm:z-40 max-sm:h-dvh max-sm:w-auto max-sm:rounded-none max-sm:border-0 max-sm:pb-[env(safe-area-inset-bottom)]',

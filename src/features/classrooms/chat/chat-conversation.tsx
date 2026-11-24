@@ -21,7 +21,6 @@ import {
   createClassroomChatPredicate,
 } from '@/api/query-keys';
 import {
-  EmptyState,
   ErrorState,
   LoadingState,
   StaleDataNotice,
@@ -597,11 +596,20 @@ function ChatConversationView({
             }}
           />
         ) : !hasHistory ? (
-          <EmptyState
-            headingLevel="h4"
-            title={chat.states.emptyTitle}
-            description={chat.states.emptyDescription}
-          />
+          // Same frame as the history, so an empty room still looks like a
+          // conversation: a friendly incoming bubble resting at the bottom of
+          // the message area, with the composer ready right below.
+          <div
+            data-testid="chat-empty"
+            className="flex min-h-0 flex-1 flex-col justify-end overflow-y-auto rounded-xl border border-edge bg-muted/40 px-3 py-3"
+          >
+            <div className="min-w-0 max-w-[92%] space-y-1 rounded-2xl rounded-tl-md border border-edge bg-card px-4 py-3 text-card-foreground shadow-panel">
+              <p className="text-sm font-semibold">{chat.states.emptyTitle}</p>
+              <p className="text-sm text-muted-foreground">
+                {chat.states.emptyDescription}
+              </p>
+            </div>
+          </div>
         ) : (
           <div
             ref={scrollRef}
