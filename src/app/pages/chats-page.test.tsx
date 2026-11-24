@@ -159,6 +159,15 @@ describe('ChatsPage', () => {
   afterEach(() => mswServer.resetHandlers());
   afterAll(() => mswServer.close());
 
+  it('starts with a back link to the classrooms list', async () => {
+    setup('/chats');
+    const back = await screen.findByRole('link', {
+      name: 'Volver a mis aulas',
+    });
+    expect(back).toHaveAttribute('href', '/');
+    expect(back).toHaveClass('min-h-11');
+  });
+
   it('lists the chats of every classroom, latest first, with previews and unread', async () => {
     const { router } = setup('/chats');
     expect(

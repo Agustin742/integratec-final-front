@@ -25,6 +25,7 @@ import {
   isInteractionBlocked,
 } from '@/lib/input-arbitration';
 import { useSessionCleanup, useSessionSnapshot } from '@/session/provider';
+import { BackToListLink } from './back-to-list-link';
 import { Classroom2DLayout } from './classroom-2d-layout';
 import { Classroom3DStage, clearLoadedWorldAssets } from './classroom-3d-stage';
 import { Classroom3DTopBar } from './classroom-3d-top-bar';
@@ -262,12 +263,7 @@ function WorkspaceContext({
           </AlertTitle>
           <AlertDescription className="space-y-3">
             <p>{presence.lostAccessMessage}</p>
-            <Link
-              to="/"
-              className={buttonStyles({ variant: 'outline', size: 'sm' })}
-            >
-              {messages.backToList}
-            </Link>
+            <BackToListLink />
           </AlertDescription>
         </Alert>
       </section>
