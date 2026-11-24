@@ -13,13 +13,92 @@ export const materialMessages = {
     'Mostrando el último material confirmado. Falló la actualización en segundo plano.',
   emptyTitle: 'Todavía no hay material publicado',
   emptyTeacherDescription:
-    'Subí un PDF o imagen para que el grupo pueda descargarlo desde el aula.',
+    'Armá el material por módulos (una unidad, un tema, una semana) y subí ahí los archivos para que el grupo los encuentre ordenados.',
   emptyStudentDescription:
     'Cuando tu docente suba bibliografía o guías de estudio, van a aparecer acá.',
   emptyPageTitle: 'No hay material en esta página',
   emptyPageDescription:
     'Volvé a una página anterior para ver los archivos publicados.',
   goToFirstPageAction: 'Volver a la primera página',
+  modules: {
+    createAction: 'Nuevo módulo',
+    createFirstAction: 'Crear el primer módulo',
+    regionLabel: 'Módulos de material',
+    unassignedTitle: 'Sin módulo',
+    unassignedDescription: 'Archivos que todavía no están en ningún módulo.',
+    fileCount: (count: number) =>
+      count === 1 ? '1 archivo' : `${count} archivos`,
+    emptyModule: 'Este módulo todavía no tiene archivos',
+    emptyModuleTeacher:
+      'Agregá un archivo desde el botón de este módulo, o movelo desde otro con el menú de cada archivo.',
+    emptyModuleStudent:
+      'Cuando tu docente suba archivos a este módulo, van a aparecer acá.',
+    filesErrorTitle: 'No pudimos cargar los archivos',
+    filesErrorDescription: 'Revisá tu conexión e intentá de nuevo.',
+    capReachedMessage:
+      'Llegaste al máximo de 100 módulos por aula. Eliminá alguno para crear otro.',
+    moreActionsAriaLabel: (name: string) => `Más acciones de «${name}»`,
+    editAction: 'Editar módulo',
+    deleteAction: 'Eliminar módulo',
+    addFileAction: 'Agregar archivo',
+    addFileAriaLabel: (name: string) => `Agregar archivo a «${name}»`,
+    moveUpAriaLabel: (name: string) => `Mover «${name}» hacia arriba`,
+    moveDownAriaLabel: (name: string) => `Mover «${name}» hacia abajo`,
+    movedNotice: (name: string, position: number, total: number) =>
+      `«${name}» ahora está en la posición ${position} de ${total}.`,
+    reorderedTitle: 'Orden actualizado',
+    reorderErrorTitle: 'No pudimos reordenar los módulos',
+    createdTitle: 'Módulo creado',
+    createdDescription: (name: string) => `Creamos el módulo «${name}».`,
+    updatedTitle: 'Módulo actualizado',
+    updatedDescription: (name: string) => `Guardamos los cambios de «${name}».`,
+    deletedTitle: 'Módulo eliminado',
+    deletedDescription: (name: string) =>
+      `Eliminamos «${name}». Sus archivos quedaron en «Sin módulo».`,
+    deleteErrorTitle: 'No pudimos eliminar el módulo',
+    unexpected: 'Ocurrió un error inesperado. Intentá de nuevo.',
+    form: {
+      createTitle: 'Nuevo módulo',
+      editTitle: 'Editar módulo',
+      description:
+        'Los módulos ordenan el material del aula: una unidad, un tema o una semana.',
+      nameLabel: 'Nombre del módulo',
+      descriptionLabel: 'Descripción (opcional)',
+      nameRequired: 'Escribí un nombre para el módulo.',
+      nameTooLong: 'El nombre puede tener hasta 80 caracteres.',
+      descriptionTooLong: 'La descripción puede tener hasta 500 caracteres.',
+      createSubmit: 'Crear módulo',
+      editSubmit: 'Guardar cambios',
+      submitting: 'Guardando…',
+      cancel: 'Cancelar',
+    },
+    deleteDialog: {
+      title: (name: string) => `¿Eliminar el módulo «${name}»?`,
+      description: (count: number) =>
+        count === 0
+          ? 'El módulo está vacío. Podés crear otro cuando quieras.'
+          : count === 1
+            ? 'El archivo no se borra: pasa a «Sin módulo».'
+            : `Los ${count} archivos no se borran: pasan a «Sin módulo».`,
+      submit: 'Sí, eliminar módulo',
+      submitting: 'Eliminando…',
+      cancel: 'Cancelar',
+    },
+    uploadDialog: {
+      title: (name: string) => `Subir material a «${name}»`,
+    },
+    moveDialog: {
+      title: (filename: string) => `Mover «${filename}»`,
+      description: 'Elegí a qué módulo va este archivo.',
+      targetLabel: 'Módulo de destino',
+      submit: 'Mover archivo',
+      submitting: 'Moviendo…',
+      cancel: 'Cancelar',
+      movedTitle: 'Archivo movido',
+      movedDescription: (filename: string, target: string) =>
+        `Movimos «${filename}» a «${target}».`,
+    },
+  },
   upload: {
     sectionTitle: 'Subir material',
     sectionDescription:
@@ -70,6 +149,8 @@ export const materialMessages = {
     uploadedAtPrefix: 'Publicado el',
     downloadAction: 'Descargar',
     downloadingAction: 'Preparando enlace…',
+    moreActionsAriaLabel: (filename: string) => `Más acciones de «${filename}»`,
+    moveAction: 'Mover a otro módulo',
     removeAction: 'Quitar',
     removingAction: 'Quitando…',
     confirmRemoveTitle: (filename: string) =>

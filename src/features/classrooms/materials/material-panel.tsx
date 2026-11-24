@@ -5,6 +5,7 @@ import { ApiError } from '@/api/errors';
 import {
   classroomBotMaterialsQueryKey,
   classroomDetailQueryKey,
+  classroomMaterialModulesQueryKey,
   classroomMaterialsQueryKey,
   createClassroomBotMaterialsPredicate,
   createClassroomMaterialsPredicate,
@@ -15,8 +16,6 @@ import {
   LoadingState,
   StaleDataNotice,
 } from '@/components/feedback/states';
-import { getPaginationMeta } from '@/components/pagination/pagination';
-import { PaginationControls } from '@/components/pagination/pagination-controls';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useSessionService } from '@/session/provider';
@@ -34,21 +33,66 @@ import {
   setClassroomBotMaterialEnabled,
 } from './material-bot-service';
 import { MaterialBotToggleSlot } from './material-bot-toggle';
-import { MaterialList } from './material-list';
+import {
+  MaterialModuleSection,
+  type FocusRequest,
+  type ModuleSectionTarget,
+} from './material-module-section';
+import type { MaterialFileActions } from './material-row';
 import type { MaterialDto } from './material-schema';
 import {
   listClassroomMaterials,
+  moveClassroomMaterial,
   removeClassroomMaterial,
   requestMaterialDownload,
 } from './material-service';
 import { MaterialUploadSection } from './material-upload';
+import {
+  DeleteModuleDialog,
+  ModuleFormDialog,
+  MoveMaterialDialog,
+  UploadDialog,
+} from './module-dialogs';
+import { MODULE_CAP, type MaterialModuleDto } from './module-schema';
+import {
+  createMaterialModule,
+  listMaterialModules,
+  removeMaterialModule,
+  reorderMaterialModules,
+  updateMaterialModule,
+} from './module-service';
 import { materialMessages } from './messages';
 
 const PAGE_SIZE = 10;
+const copy = materialMessages.modules;
 
 export interface MaterialPanelProps {
   /** Extension slot for HU-BOT-001 (bot-enabled switch & indexing status). */
   readonly renderItemSlot?: (material: MaterialDto) => ReactNode;
+}
+
+type DialogState =
+  | { readonly kind: 'create' }
+  | { readonly kind: 'edit'; readonly module: MaterialModuleDto }
+  | { readonly kind: 'delete'; readonly module: MaterialModuleDto }
+  | { readonly kind: 'move'; readonly material: MaterialDto }
+  | { readonly kind: 'upload'; readonly target: ModuleSectionTarget };
+
+interface ActionNotice {
+  readonly kind: 'success' | 'error';
+  readonly title: string;
+  readonly description: string;
+}
+
+function messageFrom(error: unknown, fallback: string): string {
+  return error instanceof ApiError ? error.userMessage : fallback;
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    (error instanceof Error || error instanceof DOMException) &&
+    error.name === 'AbortError'
+  );
 }
 
 export function MaterialPanel({ renderItemSlot }: MaterialPanelProps = {}) {
@@ -82,21 +126,23 @@ function MaterialPanelContent({
   const context = useClassroomContext(classroomId);
   const capabilities = useClassroomCapabilities(classroomId);
 
-  const [page, setPage] = useState(1);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [pendingConfirmId, setPendingConfirmId] = useState<string | null>(null);
-  const [actionNotice, setActionNotice] = useState<{
-    readonly kind: 'success' | 'error';
-    readonly title: string;
-    readonly description: string;
-  } | null>(null);
+  const [actionNotice, setActionNotice] = useState<ActionNotice | null>(null);
+  const [dialog, setDialog] = useState<DialogState | null>(null);
+  const [reordering, setReordering] = useState(false);
+  const [focusRequest, setFocusRequest] = useState<FocusRequest | null>(null);
   const [togglingBotIds, setTogglingBotIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
   const togglingBotRef = useRef<Set<string>>(new Set());
   const terminalBotReconciledRef = useRef(false);
   const unmountAbortRef = useRef<AbortController | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const createButtonRef = useRef<HTMLButtonElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const focusNonceRef = useRef(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -113,17 +159,36 @@ function MaterialPanelContent({
   const canConfigureBot =
     capabilities.status === 'ready' && capabilities.can('configure_bot');
 
-  const query = useQuery({
+  const modulesKey = classroomMaterialModulesQueryKey(
+    userId ?? 'signed-out',
+    classroomId,
+  );
+  const modulesQuery = useQuery({
+    queryKey: modulesKey,
+    queryFn: ({ signal }) =>
+      listMaterialModules(client, classroomId, { signal }),
+    enabled: userId !== null,
+  });
+
+  // The "Sin módulo" list doubles as the panel-level count: its first page is
+  // shared with the section through the same query key.
+  const unassignedQuery = useQuery({
     queryKey: classroomMaterialsQueryKey(userId ?? 'signed-out', classroomId, {
-      page,
+      page: 1,
       pageSize: PAGE_SIZE,
       sort: '-createdAt',
+      moduleId: 'unassigned',
     }),
     queryFn: ({ signal }) =>
       listClassroomMaterials(
         client,
         classroomId,
-        { page, pageSize: PAGE_SIZE, sort: '-createdAt' },
+        {
+          page: 1,
+          pageSize: PAGE_SIZE,
+          sort: '-createdAt',
+          moduleId: 'unassigned',
+        },
         { signal },
       ),
     enabled: userId !== null,
@@ -181,19 +246,35 @@ function MaterialPanelContent({
     userId,
   ]);
 
-  async function reconcileMaterials(resetPage = false) {
-    if (resetPage) {
-      setPage(1);
-    }
+  async function reconcileMaterials() {
     if (userId === null) return;
-    await queryClient.invalidateQueries({
-      predicate: createClassroomMaterialsPredicate(userId, classroomId),
-    });
+    await Promise.all([
+      queryClient.invalidateQueries({
+        predicate: createClassroomMaterialsPredicate(userId, classroomId),
+      }),
+      queryClient.invalidateQueries({ queryKey: modulesKey, exact: true }),
+    ]);
     if (canConfigureBot) {
       await queryClient.invalidateQueries({
         predicate: createClassroomBotMaterialsPredicate(userId, classroomId),
       });
     }
+  }
+
+  function openDialog(next: DialogState, trigger: HTMLElement | null) {
+    setActionNotice(null);
+    returnFocusRef.current = trigger;
+    setDialog(next);
+  }
+
+  function closeDialog() {
+    setDialog(null);
+  }
+
+  function restoreFocus(event: Event) {
+    event.preventDefault();
+    const target = returnFocusRef.current;
+    (target?.isConnected ? target : rootRef.current)?.focus();
   }
 
   async function handleToggleBotMaterial(
@@ -254,20 +335,16 @@ function MaterialPanelContent({
             ),
       });
     } catch (error) {
-      if (
-        (error instanceof Error || error instanceof DOMException) &&
-        error.name === 'AbortError'
-      ) {
+      if (isAbortError(error)) {
         return;
       }
-      const description =
-        error instanceof ApiError
-          ? error.userMessage
-          : materialMessages.list.bot.toggleErrors.unexpected;
       setActionNotice({
         kind: 'error',
         title: materialMessages.list.bot.toggleErrorTitle,
-        description,
+        description: messageFrom(
+          error,
+          materialMessages.list.bot.toggleErrors.unexpected,
+        ),
       });
       if (
         error instanceof ApiError &&
@@ -300,7 +377,8 @@ function MaterialPanelContent({
       title: materialMessages.upload.confirmedTitle,
       description: materialMessages.upload.confirmedDescription(filename),
     });
-    await reconcileMaterials(true);
+    closeDialog();
+    await reconcileMaterials();
   }
 
   async function handleDownload(material: MaterialDto) {
@@ -320,20 +398,16 @@ function MaterialPanelContent({
       // Open server-issued short-lived signed URL without storing or logging it.
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (error) {
-      if (
-        (error instanceof Error || error instanceof DOMException) &&
-        error.name === 'AbortError'
-      ) {
+      if (isAbortError(error)) {
         return;
       }
-      const description =
-        error instanceof ApiError
-          ? error.userMessage
-          : materialMessages.list.downloadErrors.unexpected;
       setActionNotice({
         kind: 'error',
         title: materialMessages.list.downloadErrorTitle,
-        description,
+        description: messageFrom(
+          error,
+          materialMessages.list.downloadErrors.unexpected,
+        ),
       });
     } finally {
       if (!signal?.aborted) {
@@ -359,20 +433,172 @@ function MaterialPanelContent({
       await reconcileMaterials();
     } catch (error) {
       setPendingConfirmId(null);
-      const description =
-        error instanceof ApiError
-          ? error.userMessage
-          : materialMessages.list.removeErrors.unexpected;
       setActionNotice({
         kind: 'error',
         title: materialMessages.list.removeErrorTitle,
-        description,
+        description: messageFrom(
+          error,
+          materialMessages.list.removeErrors.unexpected,
+        ),
       });
       if (error instanceof ApiError && error.kind === 'not-found') {
         await reconcileMaterials();
       }
     } finally {
       setRemovingId(null);
+    }
+  }
+
+  async function handleSubmitModule(
+    values: { readonly name: string; readonly description: string },
+    editing: MaterialModuleDto | null,
+  ): Promise<string | null> {
+    try {
+      if (editing) {
+        const saved = await updateMaterialModule(
+          client,
+          classroomId,
+          editing.id,
+          {
+            name: values.name,
+            description: values.description === '' ? null : values.description,
+          },
+        );
+        setActionNotice({
+          kind: 'success',
+          title: copy.updatedTitle,
+          description: copy.updatedDescription(saved.name),
+        });
+      } else {
+        const created = await createMaterialModule(client, classroomId, {
+          name: values.name,
+          ...(values.description === ''
+            ? {}
+            : { description: values.description }),
+        });
+        setActionNotice({
+          kind: 'success',
+          title: copy.createdTitle,
+          description: copy.createdDescription(created.name),
+        });
+      }
+      closeDialog();
+      await queryClient.invalidateQueries({
+        queryKey: modulesKey,
+        exact: true,
+      });
+      return null;
+    } catch (error) {
+      if (error instanceof ApiError && error.kind === 'not-found') {
+        await queryClient.invalidateQueries({
+          queryKey: modulesKey,
+          exact: true,
+        });
+      }
+      return messageFrom(error, copy.unexpected);
+    }
+  }
+
+  async function handleDeleteModule(
+    target: MaterialModuleDto,
+  ): Promise<string | null> {
+    try {
+      await removeMaterialModule(client, classroomId, target.id);
+      setActionNotice({
+        kind: 'success',
+        title: copy.deletedTitle,
+        description: copy.deletedDescription(target.name),
+      });
+      closeDialog();
+      await reconcileMaterials();
+      return null;
+    } catch (error) {
+      if (error instanceof ApiError && error.kind === 'not-found') {
+        await reconcileMaterials();
+      }
+      return messageFrom(error, copy.unexpected);
+    }
+  }
+
+  async function handleMoveMaterial(
+    material: MaterialDto,
+    destination: string | null,
+  ): Promise<string | null> {
+    try {
+      await moveClassroomMaterial(
+        client,
+        classroomId,
+        material.id,
+        destination,
+      );
+      const destinationName =
+        modulesQuery.data?.items.find((entry) => entry.id === destination)
+          ?.name ?? copy.unassignedTitle;
+      setActionNotice({
+        kind: 'success',
+        title: copy.moveDialog.movedTitle,
+        description: copy.moveDialog.movedDescription(
+          material.filename,
+          destinationName,
+        ),
+      });
+      closeDialog();
+      await reconcileMaterials();
+      return null;
+    } catch (error) {
+      if (error instanceof ApiError && error.kind === 'not-found') {
+        await reconcileMaterials();
+      }
+      return messageFrom(error, copy.unexpected);
+    }
+  }
+
+  async function handleReorder(moduleId: string, direction: 'up' | 'down') {
+    const modules = modulesQuery.data?.items;
+    if (reordering || !modules) return;
+    const from = modules.findIndex((entry) => entry.id === moduleId);
+    const to = direction === 'up' ? from - 1 : from + 1;
+    if (from === -1 || to < 0 || to >= modules.length) return;
+    const ids = modules.map((entry) => entry.id);
+    const [moved] = ids.splice(from, 1);
+    if (moved === undefined) return;
+    ids.splice(to, 0, moved);
+
+    setActionNotice(null);
+    setReordering(true);
+    try {
+      const result = await reorderMaterialModules(client, classroomId, ids);
+      queryClient.setQueryData(modulesKey, result);
+      const atEnd = direction === 'up' ? to === 0 : to === modules.length - 1;
+      const pressed = direction;
+      const sibling = direction === 'up' ? 'down' : 'up';
+      focusNonceRef.current += 1;
+      setFocusRequest({
+        moduleId,
+        focus: atEnd ? sibling : pressed,
+        nonce: focusNonceRef.current,
+      });
+      setActionNotice({
+        kind: 'success',
+        title: copy.reorderedTitle,
+        description: copy.movedNotice(
+          modules[from]?.name ?? '',
+          to + 1,
+          modules.length,
+        ),
+      });
+    } catch (error) {
+      setActionNotice({
+        kind: 'error',
+        title: copy.reorderErrorTitle,
+        description: messageFrom(error, copy.unexpected),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: modulesKey,
+        exact: true,
+      });
+    } finally {
+      setReordering(false);
     }
   }
 
@@ -387,35 +613,43 @@ function MaterialPanelContent({
     );
   }
 
-  if (context.status === 'pending' || query.isPending) {
+  if (
+    context.status === 'pending' ||
+    modulesQuery.isPending ||
+    unassignedQuery.isPending
+  ) {
     return <LoadingState label={materialMessages.loading} />;
   }
 
-  if (query.isError && query.data === undefined) {
-    const errorDescription =
-      query.error instanceof ApiError
-        ? query.error.userMessage
-        : materialMessages.errorDescription;
+  const failedQuery =
+    modulesQuery.isError && modulesQuery.data === undefined
+      ? modulesQuery
+      : unassignedQuery.isError && unassignedQuery.data === undefined
+        ? unassignedQuery
+        : null;
+  if (failedQuery) {
     return (
       <ErrorState
         headingLevel="h3"
         title={materialMessages.errorTitle}
-        description={errorDescription}
-        onRetry={() => void query.refetch()}
+        description={
+          failedQuery.error instanceof ApiError
+            ? failedQuery.error.userMessage
+            : materialMessages.errorDescription
+        }
+        onRetry={() => {
+          void modulesQuery.refetch();
+          void unassignedQuery.refetch();
+        }}
       />
     );
   }
 
-  const data = query.data;
-  if (!data) {
-    return <LoadingState label={materialMessages.loading} />;
-  }
-
-  const pagination = getPaginationMeta({
-    page: data.page,
-    pageSize: data.pageSize,
-    total: data.total,
-  });
+  const modules = modulesQuery.data?.items ?? [];
+  const unassignedTotal = unassignedQuery.data?.total ?? 0;
+  const isEmpty = modules.length === 0 && unassignedTotal === 0;
+  const atCap = modules.length >= MODULE_CAP;
+  const isStale = modulesQuery.isError || unassignedQuery.isError;
 
   const botStateByMaterialId = new Map<string, BotAllowedMaterialDto>(
     (botQuery.data?.items ?? []).map((entry) => [entry.materialId, entry]),
@@ -438,21 +672,76 @@ function MaterialPanelContent({
         )
       : undefined);
 
-  return (
-    <div className="min-w-0 space-y-5">
-      <p className="text-sm text-muted-foreground">
-        {materialMessages.subtitle}
-      </p>
+  const fileActions: MaterialFileActions = {
+    canManage,
+    downloadingId,
+    removingId,
+    pendingConfirmId,
+    onDownload: (material) => void handleDownload(material),
+    onRequestMove: (material, trigger) =>
+      openDialog({ kind: 'move', material }, trigger),
+    onRequestRemove: (materialId) => setPendingConfirmId(materialId),
+    onConfirmRemove: (material) => void handleConfirmRemove(material),
+    onCancelRemove: () => setPendingConfirmId(null),
+    renderItemSlot: effectiveRenderItemSlot,
+  };
 
-      {canManage && (
-        <MaterialUploadSection
-          client={client}
-          classroomId={classroomId}
-          onUploaded={handleUploaded}
-          onReconcileRequired={() => reconcileMaterials(true)}
-          onInteraction={() => setActionNotice(null)}
-        />
-      )}
+  const sectionShared = {
+    client,
+    userId: userId ?? 'signed-out',
+    classroomId,
+    canManage,
+    reordering,
+    focusRequest,
+    fileActions,
+    onMove: (moduleId: string, direction: 'up' | 'down') =>
+      void handleReorder(moduleId, direction),
+    onAddFile: (target: ModuleSectionTarget, trigger: HTMLElement | null) =>
+      openDialog({ kind: 'upload', target }, trigger),
+    onEdit: (entry: MaterialModuleDto, trigger: HTMLElement | null) =>
+      openDialog({ kind: 'edit', module: entry }, trigger),
+    onDelete: (entry: MaterialModuleDto, trigger: HTMLElement | null) =>
+      openDialog({ kind: 'delete', module: entry }, trigger),
+  };
+
+  return (
+    <div ref={rootRef} tabIndex={-1} className="min-w-0 space-y-5 outline-none">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-4 gap-y-3">
+        <p className="max-w-prose min-w-0 basis-full text-sm text-muted-foreground sm:basis-0 sm:flex-1">
+          {materialMessages.subtitle}
+        </p>
+        {canManage && !isEmpty ? (
+          <Button
+            ref={createButtonRef}
+            type="button"
+            disabled={atCap}
+            className="w-full shrink-0 sm:w-auto"
+            onClick={() =>
+              openDialog({ kind: 'create' }, createButtonRef.current)
+            }
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="size-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.4}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            {copy.createAction}
+          </Button>
+        ) : null}
+      </div>
+
+      {canManage && atCap ? (
+        <p className="text-sm font-semibold text-warning-foreground">
+          {copy.capReachedMessage}
+        </p>
+      ) : null}
 
       {actionNotice && (
         <Alert
@@ -487,68 +776,124 @@ function MaterialPanelContent({
         </Alert>
       )}
 
-      {query.isError && (
+      {isStale && (
         <StaleDataNotice
           title={materialMessages.staleTitle}
           description={materialMessages.staleDescription}
-          onRetry={() => void query.refetch()}
+          onRetry={() => {
+            void modulesQuery.refetch();
+            void unassignedQuery.refetch();
+          }}
         />
       )}
 
-      {data.items.length === 0 ? (
-        page > 1 ? (
-          <EmptyState
-            title={materialMessages.emptyPageTitle}
-            description={materialMessages.emptyPageDescription}
-            action={
+      {isEmpty ? (
+        <EmptyState
+          title={materialMessages.emptyTitle}
+          description={
+            canManage
+              ? materialMessages.emptyTeacherDescription
+              : materialMessages.emptyStudentDescription
+          }
+          action={
+            canManage ? (
               <Button
+                ref={createButtonRef}
                 type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setPage(1)}
+                onClick={() =>
+                  openDialog({ kind: 'create' }, createButtonRef.current)
+                }
               >
-                {materialMessages.goToFirstPageAction}
+                {copy.createFirstAction}
               </Button>
-            }
-          />
-        ) : (
-          <EmptyState
-            title={materialMessages.emptyTitle}
-            description={
-              canManage
-                ? materialMessages.emptyTeacherDescription
-                : materialMessages.emptyStudentDescription
-            }
-          />
-        )
+            ) : undefined
+          }
+        />
       ) : (
-        <div className="space-y-4">
-          <MaterialList
-            items={data.items}
-            canManage={canManage}
-            downloadingId={downloadingId}
-            removingId={removingId}
-            pendingConfirmId={pendingConfirmId}
-            onDownload={(material) => void handleDownload(material)}
-            onRequestRemove={(materialId) => setPendingConfirmId(materialId)}
-            onConfirmRemove={(material) => void handleConfirmRemove(material)}
-            onCancelRemove={() => setPendingConfirmId(null)}
-            renderItemSlot={effectiveRenderItemSlot}
-          />
-
-          {pagination.totalPages > 1 && (
-            <PaginationControls
-              page={data.page}
-              pageSize={data.pageSize}
-              total={data.total}
-              onPageChange={(nextPage: number) => {
-                setPendingConfirmId(null);
-                setPage(nextPage);
-              }}
-            />
-          )}
-        </div>
+        <ul aria-label={copy.regionLabel} className="min-w-0 space-y-4">
+          {modules.map((entry, index) => (
+            <li key={entry.id} className="min-w-0">
+              <MaterialModuleSection
+                {...sectionShared}
+                target={{ kind: 'module', module: entry }}
+                index={index}
+                total={modules.length}
+              />
+            </li>
+          ))}
+          {unassignedTotal > 0 ? (
+            <li className="min-w-0">
+              <MaterialModuleSection
+                {...sectionShared}
+                target={{ kind: 'unassigned', count: unassignedTotal }}
+                defaultExpanded={modules.length === 0}
+                index={0}
+                total={0}
+              />
+            </li>
+          ) : null}
+        </ul>
       )}
+
+      {dialog?.kind === 'create' ? (
+        <ModuleFormDialog
+          mode="create"
+          onSubmit={(values) => handleSubmitModule(values, null)}
+          onClose={closeDialog}
+          onCloseAutoFocus={restoreFocus}
+        />
+      ) : null}
+      {dialog?.kind === 'edit' ? (
+        <ModuleFormDialog
+          mode="edit"
+          initial={dialog.module}
+          onSubmit={(values) => handleSubmitModule(values, dialog.module)}
+          onClose={closeDialog}
+          onCloseAutoFocus={restoreFocus}
+        />
+      ) : null}
+      {dialog?.kind === 'delete' ? (
+        <DeleteModuleDialog
+          module={dialog.module}
+          onConfirm={() => handleDeleteModule(dialog.module)}
+          onClose={closeDialog}
+          onCloseAutoFocus={restoreFocus}
+        />
+      ) : null}
+      {dialog?.kind === 'move' ? (
+        <MoveMaterialDialog
+          filename={dialog.material.filename}
+          currentModuleId={dialog.material.moduleId}
+          modules={modules}
+          onSubmit={(destination) =>
+            handleMoveMaterial(dialog.material, destination)
+          }
+          onClose={closeDialog}
+          onCloseAutoFocus={restoreFocus}
+        />
+      ) : null}
+      {dialog?.kind === 'upload' ? (
+        <UploadDialog
+          title={copy.uploadDialog.title(
+            dialog.target.kind === 'module'
+              ? dialog.target.module.name
+              : copy.unassignedTitle,
+          )}
+          onClose={closeDialog}
+          onCloseAutoFocus={restoreFocus}
+        >
+          <MaterialUploadSection
+            client={client}
+            classroomId={classroomId}
+            moduleId={
+              dialog.target.kind === 'module' ? dialog.target.module.id : null
+            }
+            onUploaded={handleUploaded}
+            onReconcileRequired={() => reconcileMaterials()}
+            onInteraction={() => setActionNotice(null)}
+          />
+        </UploadDialog>
+      ) : null}
     </div>
   );
 }

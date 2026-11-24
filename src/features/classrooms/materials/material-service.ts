@@ -15,6 +15,11 @@ export interface MaterialServiceOptions {
   readonly signal?: AbortSignal;
 }
 
+export interface UploadMaterialOptions extends MaterialServiceOptions {
+  /** Module to file the upload under; omitted means unassigned. */
+  readonly moduleId?: string | null;
+}
+
 const uncertainMaterialErrors = new WeakSet<ApiError>();
 
 /**
@@ -202,6 +207,7 @@ export async function listClassroomMaterials(
           page: params.page,
           pageSize: params.pageSize,
           sort: params.sort,
+          moduleId: params.moduleId,
         },
       },
       signal: options.signal,
@@ -219,9 +225,12 @@ export async function uploadClassroomMaterial(
   client: TypedApiClient,
   classroomId: string,
   file: File,
-  options: MaterialServiceOptions = {},
+  options: UploadMaterialOptions = {},
 ): Promise<MaterialDto> {
   const formData = new FormData();
+  if (options.moduleId) {
+    formData.append('moduleId', options.moduleId);
+  }
   formData.append('file', file, file.name);
 
   let payload: unknown;
@@ -313,4 +322,28 @@ export async function removeClassroomMaterial(
     }
     throw error;
   }
+}
+
+/**
+ * Moves a material into a module, or back to unassigned with `moduleId: null`.
+ */
+export async function moveClassroomMaterial(
+  client: TypedApiClient,
+  classroomId: string,
+  materialId: string,
+  moduleId: string | null,
+  options: MaterialServiceOptions = {},
+): Promise<MaterialDto> {
+  const payload = await requestApi(() =>
+    client.PATCH('/classrooms/{id}/materials/{materialId}', {
+      params: { path: { id: classroomId, materialId } },
+      body: { moduleId },
+      signal: options.signal,
+    }),
+  );
+  const parsed = materialDtoSchema.safeParse(payload);
+  if (!parsed.success) {
+    throw mapApiError(undefined, new Response(null, { status: 502 }));
+  }
+  return parsed.data;
 }

@@ -91,6 +91,7 @@ test('teacher uploads, captures responsive views, downloads via signed URL, and 
       filename: 'programa-anual.pdf',
       contentType: 'application/pdf',
       sizeBytes: 245760,
+      moduleId: null,
       createdAt: '2026-11-18T03:00:00.000Z',
     },
   ];
@@ -142,6 +143,7 @@ test('teacher uploads, captures responsive views, downloads via signed URL, and 
           filename: 'guia-practica.pdf',
           contentType: 'application/pdf',
           sizeBytes: 1280,
+          moduleId: null,
           createdAt: '2026-11-18T03:15:00.000Z',
         };
         items = [created, ...items];

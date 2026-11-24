@@ -20,6 +20,8 @@ import { materialMessages } from './messages';
 export interface MaterialUploadSectionProps {
   readonly client: TypedApiClient;
   readonly classroomId: string;
+  /** Module the file is filed under; omitted or null means unassigned. */
+  readonly moduleId?: string | null;
   readonly onUploaded: (filename: string) => Promise<void> | void;
   readonly onReconcileRequired: () => Promise<void> | void;
   readonly onInteraction?: () => void;
@@ -51,6 +53,7 @@ function isAbortError(cause: unknown): boolean {
 export function MaterialUploadSection({
   client,
   classroomId,
+  moduleId,
   onUploaded,
   onReconcileRequired,
   onInteraction,
@@ -114,7 +117,7 @@ export function MaterialUploadSection({
         client,
         classroomId,
         selectedFile,
-        { signal: controller.signal },
+        { signal: controller.signal, moduleId },
       );
       abortRef.current = null;
       setSelectedFile(null);

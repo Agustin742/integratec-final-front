@@ -49,6 +49,7 @@ export const classroomPanelCatalog = [
     key: 'material',
     title: messages.panels.material,
     component: MaterialPanel,
+    wide: true,
   },
   {
     key: 'grades',

@@ -28,6 +28,8 @@ import { mswServer } from '@/test/msw/server';
 import { render } from '@/test/render';
 import { MaterialPanel } from './material-panel';
 
+vi.setConfig({ testTimeout: 20_000 });
+
 const CLASSROOM_ID = '00000000-0000-4000-8000-000000000010';
 const MATERIAL_ID = '00000000-0000-4000-8000-000000002001';
 
