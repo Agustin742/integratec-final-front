@@ -263,7 +263,7 @@ Seasonal:
 
 ### Classroom pet (Michi, cat)
 
-- [ ] Pet model
+- [x] Pet model
 - [ ] Animation: sleep
 - [ ] Animation: walk
 - [ ] Animation: meow
