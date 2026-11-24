@@ -206,7 +206,7 @@ Seasonal:
 ### Decoration
 
 - [ ] Wall clock
-- [ ] Flag
+- [x] Flag
 - [ ] Map
 - [ ] Globe
 - [ ] Wall posters
@@ -249,21 +249,21 @@ Seasonal:
 
 ## 4. Interactive objects
 
-- [ ] Own student desk: Pending activities
-- [ ] Teacher desk: Classroom controls
-- [ ] Board: Collaborative tool / announcements
-- [ ] Door: Move to another classroom
-- [ ] Shop kiosk: Shop
-- [ ] Bulletin board: Forum and notices
-- [ ] Report card: Grades
-- [ ] Mailbox or computer: Chat
-- [ ] Game console / arcade: Minigames
-- [ ] Pet bed / corner: Pet interaction
-- [ ] Trophy shelf / chest: Achievements and streaks
+- [x] Own student desk: Pending activities
+- [x] Teacher desk: Classroom controls
+- [x] Board: Collaborative tool / announcements
+- [x] Door: Move to another classroom
+- [x] Shop kiosk: Shop
+- [x] Bulletin board: Forum and notices
+- [x] Report card: Grades
+- [x] Mailbox or computer: Chat
+- [x] Game console / arcade: Minigames
+- [x] Pet bed / corner: Pet interaction
+- [x] Trophy shelf / chest: Achievements and streaks
 
 ### Classroom pet (Michi, cat)
 
-- [ ] Pet model
+- [x] Pet model
 - [ ] Animation: sleep
 - [ ] Animation: walk
 - [ ] Animation: meow
@@ -275,18 +275,18 @@ Seasonal:
 
 ## 5. The bot
 
-- [ ] Tutor bot 3D model (friendly robot in the classroom palette)
-- [ ] Bot station / fixed corner in the classroom
-- [ ] Animation: idle hover
-- [ ] Animation: wave
-- [ ] Animation: talk
-- [ ] Animation: think
-- [ ] Animation: celebrate a right answer
-- [ ] Animation: encourage after a mistake
-- [ ] Face / screen: happy
-- [ ] Face / screen: thinking
-- [ ] Face / screen: talking
-- [ ] Face / screen: surprised
-- [ ] Face / screen: sleeping
-- [ ] 2D bot icon for the study panel and the daily review
+- [x] Tutor bot 3D model (friendly robot in the classroom palette)
+- [x] Bot station / fixed corner in the classroom
+- [x] Animation: idle hover
+- [x] Animation: wave
+- [x] Animation: talk
+- [x] Animation: think
+- [x] Animation: celebrate a right answer
+- [x] Animation: encourage after a mistake
+- [x] Face / screen: happy
+- [x] Face / screen: thinking
+- [x] Face / screen: talking
+- [x] Face / screen: surprised
+- [x] Face / screen: sleeping
+- [x] 2D bot icon for the study panel and the daily review
 - [ ] Color or accessory variants (future shop items)
