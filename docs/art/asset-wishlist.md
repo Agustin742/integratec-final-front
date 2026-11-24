@@ -185,23 +185,23 @@ Seasonal:
 
 ### Classroom shell
 
-- [ ] Walls
-- [ ] Floor
-- [ ] Ceiling
-- [ ] Windows with curtains
-- [ ] Baseboards
-- [ ] Ceiling lights
+- [x] Walls
+- [x] Floor
+- [ ] Ceiling _(omitted for isometric avatar visibility; walls use finished wood coping and crown molding)_
+- [x] Windows with curtains
+- [x] Baseboards
+- [x] Ceiling lights
 
 ### Furniture
 
-- [ ] Student desk
-- [ ] Student chair
-- [ ] Teacher desk
-- [ ] Board
-- [ ] Bookshelf
-- [ ] Cabinet
-- [ ] Coat rack
-- [ ] Trash bin
+- [x] Student desk
+- [x] Student chair
+- [x] Teacher desk
+- [x] Board
+- [x] Bookshelf
+- [x] Cabinet
+- [x] Coat rack
+- [x] Trash bin
 
 ### Decoration
 
