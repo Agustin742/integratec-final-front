@@ -1,5 +1,18 @@
 # Tracker — Alejo
 
+## 2026-11-24 — Author & export 6 modular back accessories and `BackTuck` hair morph target (#91)
+
+- **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)
+- **Area / files:** `assets/blender/avatars/shared/back/{backpack,rolling-backpack,superhero-cape,wings,guitar,racket}.blend`, `public/models/avatars/shared/back-wings.glb`, `public/models/avatars/{male,female}/back-{backpack,rolling-backpack,superhero-cape,guitar,racket}.glb`, `assets/blender/avatars/shared/hair/{long-straight,long-wavy,long-curls,braid,two-braids,half-up,box-braids,dreads}.blend`, `public/models/avatars/shared/hair-{long-straight,long-wavy,long-curls,braid,two-braids,half-up,box-braids,dreads}.glb`, `docs/art/{back-accessories,hair-long,hair-tied-up,hair-afro-textured}.md`, `docs/3d-assets.md`, `docs/ai-usage.md`, `docs/assets/back-{backpack,rolling-backpack,superhero-cape,wings,guitar,racket}/{male,female}-{1280,360}.png`, `scripts/assets/test-back-accessories.mjs`, `changelogs/tracker-alejo.md`.
+- **Change:** Exported all 6 Back accessories from `docs/art/asset-wishlist.md` (`Wings` `26,600` B under `shared/back-wings.glb`; `Backpack` `30,572` / `30,556` B, `Rolling backpack` `32,136` / `32,208` B, `Superhero cape` `30,844` / `30,860` B, `Guitar` `26,416` / `26,512` B, `Racket` `24,948` / `24,980` B under `{male,female}/back-*.glb` with neutral `#FFFFFF` `AvatarAccessoryTint` + `AvatarDetail`), cleared all `15` non-long hairstyles in geometry (`0` hits), added and exported the standardized glTF `BackTuck` morph target (`0.0` default; `1.0` when equipping a Back accessory) on all `8` long hairstyles (`101.4 KB–445.5 KB`), and documented the complete Three.js teammate integration contract in `docs/art/back-accessories.md`.
+- **Reason:** Complete all `6/6` Back accessories from `docs/art/asset-wishlist.md` for issue `#91` with zero long-hair clipping and teammate-ready PR documentation before local commit.
+- **Coordination:** Existing Alejo Project item `PVTI_lAHOCevXNc4BoRd2zhK9fEI`, issue `#91`.
+- **Evidence:**
+  - Authoring clearance (`1, 25, 62, 123, 201`) and decoded GLB roundtrips (`1, 62, 123, 201`) passed across all `11` Back GLBs on Male and Female with `0` body, `0` head, and `0` `TShirt` inward hits (`odd/artifacts/back-accessories-author-report.json`, `odd/artifacts/back-accessories-export.json`).
+  - Full `23 × 6 = 138`-pairing audit and decoded `8` long hair (`BackTuck=1.0`) × `6` Back GLB (`48`-pair) cross-check both passed with **`0` hits** (`odd/artifacts/back-accessories-hair-23x6-audit.json`, `odd/artifacts/back-accessories-export.json`).
+  - `node scripts/assets/test-back-accessories.mjs`, `test-long-hair.mjs`, `test-tied-up-hair.mjs`, `test-afro-hair.mjs`, `test-face-accessories.mjs`, `check-asset-budget.mjs`, `python scripts/ci/check_docs.py`, and `git diff --check` passed.
+- **Next step:** Human approved Back accessories and `BackTuck`; committed locally on `feat/91-modular-avatar-assets` without pushing (`asset-wishlist.md` checkboxes remain unchecked until merge). Teammates can wire `backId` / `backColor` and `BackTuck` using `docs/art/back-accessories.md`.
+
 ## 2026-11-23 — Author 6 modular face accessories (`shared/`) on both avatars (#91)
 
 - **Status:** completed (human visual review approved; local commit on `feat/91-modular-avatar-assets`, not pushed)

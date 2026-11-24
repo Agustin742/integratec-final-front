@@ -6,9 +6,9 @@
 
 | Style | Master (`.blend`) | Shared GLB (`.glb`) | Size | Meshes / Vertices (`DEF-spine.003` blended) |
 | --- | --- | --- | --- | --- |
-| Long straight | [long-straight.blend](../../assets/blender/avatars/shared/hair/long-straight.blend) | [hair-long-straight.glb](../../public/models/avatars/shared/hair-long-straight.glb) | `71,152` B | `3` (`HairLongStraight_{Cap,Curtain,CurtainBangs}`), `9,602` (`1,871`) |
-| Long wavy | [long-wavy.blend](../../assets/blender/avatars/shared/hair/long-wavy.blend) | [hair-long-wavy.glb](../../public/models/avatars/shared/hair-long-wavy.glb) | `83,192` B | `3` (`HairLongWavy_{Cap,Curtain,WaveBangs}`), `11,998` (`2,535`) |
-| Long curls | [long-curls.blend](../../assets/blender/avatars/shared/hair/long-curls.blend) | [hair-long-curls.glb](../../public/models/avatars/shared/hair-long-curls.glb) | `114,428` B | `3` (`HairLongCurls_{Cap,Curls,Curtain}`), `14,120` (`3,693`) |
+| Long straight | [long-straight.blend](../../assets/blender/avatars/shared/hair/long-straight.blend) | [hair-long-straight.glb](../../public/models/avatars/shared/hair-long-straight.glb) | `248,976` B | `3` (`HairLongStraight_{Cap,Curtain,CurtainBangs}`), `9,602` (`1,871`) |
+| Long wavy | [long-wavy.blend](../../assets/blender/avatars/shared/hair/long-wavy.blend) | [hair-long-wavy.glb](../../public/models/avatars/shared/hair-long-wavy.glb) | `321,456` B | `3` (`HairLongWavy_{Cap,Curtain,WaveBangs}`), `11,998` (`2,535`) |
+| Long curls | [long-curls.blend](../../assets/blender/avatars/shared/hair/long-curls.blend) | [hair-long-curls.glb](../../public/models/avatars/shared/hair-long-curls.glb) | `445,464` B | `3` (`HairLongCurls_{Cap,Curls,Curtain}`), `14,120` (`3,693`) |
 
 - [Standalone structural test](../../scripts/assets/test-long-hair.mjs).
 - Ignored animated viewer: `odd/previews/long-hair-review.blend`, scenes `REVIEW_HairLong{Straight,Wavy,Curls}_{Male,Female}` (scrub Idle `1–49`, Walk `50–74`, Sit `75–171`, Wave `172–231`).
@@ -34,6 +34,6 @@
 | --- | --- |
 | Authoring clearance (`1, 25, 62, 123, 201`) | `0` eye, `0` female eyelash, `0` ear, and `0` body/back/Wave-arm collisions (`p.z > 0.42`) across all 3 styles on both Male and Female (`odd/artifacts/long-hair-author-report.json`) |
 | Decoded GLB roundtrip (Blender MCP) | All 3 `shared/hair-*.glb` imports pass exact 34-bone canonical rest matrices (`< 1e-4`), `1..2` bone influences (`DEF-spine.006` + `DEF-spine.003` with max weight-sum error `<= 5.07e-7`), and `0` eye/lash/ear/body hits (`p.z > 0.42`) on decoded frames `1, 62, 123, 201` on both genders (`odd/artifacts/long-hair-export.json`) |
-| Structural & budget (`test-long-hair.mjs`, `check-asset-budget.mjs`) | Valid Draco-compressed GLBs (`71.2 KB–114.4 KB`, all `<= 1 MB`), zero animations/cameras/lights, neutral `#FFFFFF` `AvatarHairTint` with roughness `0.65` |
+| Structural & budget (`test-long-hair.mjs`, `check-asset-budget.mjs`) | Valid Draco-compressed GLBs (`249.0 KB–445.5 KB`, all `<= 1 MB`), zero animations/cameras/lights, neutral `#FFFFFF` `AvatarHairTint` with roughness `0.65`, plus optional `BackTuck` morph target (`0` default; `1` with Back accessories per [back accessories](back-accessories.md#runtime-integration-contract)) |
 
 Rules: [modular assets](../../rules/modular-avatar-assets.md), [art direction](../../rules/art-direction.md).

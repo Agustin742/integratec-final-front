@@ -7,8 +7,8 @@
 | Style | Master (`.blend`) | Shared GLB (`.glb`) | Size | Meshes / Vertices (`DEF-spine.003` blended) |
 | --- | --- | --- | --- | --- |
 | Afro | [afro.blend](../../assets/blender/avatars/shared/hair/afro.blend) | [hair-afro.glb](../../public/models/avatars/shared/hair-afro.glb) | `60,108` B | `2` (`HairAfro_{Cap,Cloud}`), `8,215` (`0`) |
-| Dreads | [dreads.blend](../../assets/blender/avatars/shared/hair/dreads.blend) | [hair-dreads.glb](../../public/models/avatars/shared/hair-dreads.glb) | `83,848` B | `2` (`HairDreads_{Cap,Locs}`), `9,970` (`1,214`) |
-| Box braids | [box-braids.blend](../../assets/blender/avatars/shared/hair/box-braids.blend) | [hair-box-braids.glb](../../public/models/avatars/shared/hair-box-braids.glb) | `66,856` B | `2` (`HairBoxBraids_{Braids,Cap}`), `7,640` (`1,701`) |
+| Dreads | [dreads.blend](../../assets/blender/avatars/shared/hair/dreads.blend) | [hair-dreads.glb](../../public/models/avatars/shared/hair-dreads.glb) | `269,472` B | `2` (`HairDreads_{Cap,Locs}`), `9,970` (`1,214`) |
+| Box braids | [box-braids.blend](../../assets/blender/avatars/shared/hair/box-braids.blend) | [hair-box-braids.glb](../../public/models/avatars/shared/hair-box-braids.glb) | `199,580` B | `2` (`HairBoxBraids_{Braids,Cap}`), `7,640` (`1,701`) |
 | Afro with headband | [afro-with-headband.blend](../../assets/blender/avatars/shared/hair/afro-with-headband.blend) | [hair-afro-with-headband.glb](../../public/models/avatars/shared/hair-afro-with-headband.glb) | `68,308` B | `3` (`HairAfroWithHeadband_{Cap,Cloud,Headband}`), `9,524` (`0`) |
 
 - [Standalone structural test](../../scripts/assets/test-afro-hair.mjs).
@@ -36,6 +36,6 @@
 | --- | --- |
 | Authoring clearance (`1, 25, 62, 123, 201`) | `0` eye, `0` female eyelash, `0` ear, and `0` body/back/Wave-arm collisions (`p.z > 0.42`) across all 4 styles on both Male and Female (`odd/artifacts/afro-hair-author-report.json`) |
 | Decoded GLB roundtrip (Blender MCP) | All 4 `shared/hair-*.glb` imports pass exact 34-bone canonical rest matrices (`< 1e-4`), `1..2` bone influences (`DEF-spine.006` + `DEF-spine.003` with max weight-sum error `<= 5.07e-7`), and `0` eye/lash/ear/body hits (`p.z > 0.42`) on decoded frames `1, 62, 123, 201` on both genders (`odd/artifacts/afro-hair-export.json`) |
-| Structural & budget (`test-afro-hair.mjs`, `check-asset-budget.mjs`) | Valid Draco-compressed GLBs (`60.1 KB–83.8 KB`, all `<= 1 MB`), zero animations/cameras/lights, neutral `#FFFFFF` `AvatarHairTint` (`roughness = 0.65`) and Coral `#E66861` `AvatarDetail` (`roughness = 0.85`) |
+| Structural & budget (`test-afro-hair.mjs`, `check-asset-budget.mjs`) | Valid Draco-compressed GLBs (`60.1 KB–269.5 KB`, all `<= 1 MB`), zero animations/cameras/lights, neutral `#FFFFFF` `AvatarHairTint` (`roughness = 0.65`) and Coral `#E66861` `AvatarDetail` (`roughness = 0.85`), plus optional `BackTuck` morph target on `Dreads` and `BoxBraids` (`0` default; `1` with Back accessories per [back accessories](back-accessories.md#runtime-integration-contract)) |
 
 Rules: [modular assets](../../rules/modular-avatar-assets.md), [art direction](../../rules/art-direction.md).
