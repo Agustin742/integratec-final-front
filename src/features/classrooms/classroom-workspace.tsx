@@ -430,6 +430,7 @@ function WorkspaceContext({
                 classroomId={classroomId}
                 petName={classroom.pet?.name ?? null}
                 selfPose={presence.selfPose}
+                selfEquipped={presence.selfEquipped}
                 connectionKey={presence.connectionKey}
                 frozen={presence.frozen}
                 remoteParticipants={presence.remoteParticipants}

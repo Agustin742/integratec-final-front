@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import type { Avatar } from '@/features/profile/avatar-options';
 import { CLASSROOM_LAYOUT, type AvatarInput } from '@/realtime';
+import type { AvatarEquipped } from '../avatar/avatar-part-plan';
 import type { Pose } from '../movement';
 import { WarmLighting } from '../world-lighting';
 import { buildClassroomScene } from './build-classroom-scene';
@@ -24,6 +25,8 @@ export interface ClassroomSceneProps {
   scopeKey?: string | undefined;
   /** Authoritative pose from the room for the local participant (#37). */
   selfPose?: Pose | undefined;
+  /** Accessory shop codes the local member wears in this classroom. */
+  selfEquipped?: AvatarEquipped | undefined;
   /** Connection epoch key that changes on join/reconnect/drop (#37). */
   connectionKey?: string | undefined;
   /** True while the classroom freeze lock is active (#37). */
@@ -59,6 +62,7 @@ export function ClassroomScene({
   avatar,
   scopeKey,
   selfPose,
+  selfEquipped,
   connectionKey,
   frozen = false,
   remoteParticipants = [],
@@ -170,6 +174,7 @@ export function ClassroomScene({
         controller={controller}
         marker={marker.object}
         avatar={avatar}
+        equipped={selfEquipped}
         scopeKey={scopeKey}
       />
       {remoteParticipants.map((participant) => (
@@ -183,6 +188,7 @@ export function ClassroomScene({
             rotation: participant.rotation,
           }}
           avatar={participant.avatar}
+          equipped={participant.equipped}
           scopeKey={scopeKey}
         />
       ))}

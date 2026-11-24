@@ -4,7 +4,7 @@ import {
   type Avatar,
 } from '@/features/profile/avatar-options';
 
-const AVATAR_MODELS_PATH = '/models/avatars';
+export const AVATAR_MODELS_PATH = '/models/avatars';
 const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
 
 /** Same defaults as the 2D `AvatarPreview`, so both stay visually aligned. */

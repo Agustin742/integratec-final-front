@@ -911,6 +911,55 @@ describe('createClassroomRealtimeClient (#23)', () => {
     client.dispose();
   });
 
+  it('exposes the equipped head, face and back item codes of a participant', async () => {
+    const { auth } = createFakeAuth('valid-token');
+    const sdk = createFakeSdk();
+    const room = new FakeRoom({ classroomId: CLASSROOM_A });
+    room.setAvatar('equipped-user', {
+      displayName: 'Lucía',
+      role: 'STUDENT',
+      status: 'online',
+    });
+    const equippedAvatar = room.state.avatars.get('equipped-user') as Avatar & {
+      appearance?: unknown;
+    };
+    const item = (slot: string, shopItemCode: string) => ({
+      slot,
+      shopItemId: `id-${slot}`,
+      shopItemCode,
+      shopItemName: shopItemCode,
+      kind: 'AVATAR_ACCESSORY',
+    });
+    equippedAvatar.appearance = {
+      baseAvatar: {
+        bodyId: 'female',
+        hairId: 'afro',
+        topId: 'hoodie',
+        hairColor: '#AF6D63',
+        clothingColor: '#7EBA8B',
+      },
+      items: {
+        head: item('head', 'head_crown'),
+        face: null,
+        back: item('back', 'back_wings'),
+        desk_decor: item('desk_decor', 'desk_plant'),
+      },
+    };
+    sdk.setJoinHandler(async () => room);
+    const client = createClassroomRealtimeClient({
+      auth,
+      realtimeUrl: 'wss://realtime.example.invalid',
+      createSdkClient: sdk.createSdkClient,
+    });
+
+    await client.connect(CLASSROOM_A);
+    expect(
+      client.getSnapshot().participants.get('equipped-user')?.avatar?.equipped,
+    ).toEqual({ head: 'head_crown', face: null, back: 'back_wings' });
+
+    client.dispose();
+  });
+
   it('reads nested memberAppearanceSchema baseAvatar and sanitizes non-finite coordinates', async () => {
     const { auth } = createFakeAuth('valid-token');
     const sdk = createFakeSdk();

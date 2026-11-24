@@ -23,10 +23,18 @@ vi.mock('@react-three/fiber', () => ({
   },
 }));
 vi.mock('../avatar/avatar-model', () => ({
-  AvatarModel: (props: { animation?: string; scopeKey?: string }) => {
+  AvatarModel: (props: {
+    animation?: string;
+    scopeKey?: string;
+    equipped?: { head?: string | null };
+  }) => {
     frame.renders += 1;
     return (
-      <div data-testid="remote-avatar-model" data-animation={props.animation}>
+      <div
+        data-testid="remote-avatar-model"
+        data-animation={props.animation}
+        data-head={props.equipped?.head ?? ''}
+      >
         {props.scopeKey}
       </div>
     );
@@ -63,6 +71,21 @@ beforeEach(() => {
 });
 
 describe('RemoteAvatar', () => {
+  test('passes the equipped accessories to the avatar model', () => {
+    render(
+      <RemoteAvatar
+        userId="remote-1"
+        targetPose={{ x: 0, z: 0, rotation: 0 }}
+        avatar={avatar}
+        equipped={{ head: 'head_crown' }}
+      />,
+    );
+    expect(screen.getByTestId('remote-avatar-model')).toHaveAttribute(
+      'data-head',
+      'head_crown',
+    );
+  });
+
   test('renders Idle initially and switches to Walk while interpolating toward a new server pose', () => {
     const { rerender } = render(
       <RemoteAvatar

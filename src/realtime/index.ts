@@ -6,6 +6,7 @@ export {
   type RealtimeAuthPort,
   type RealtimeAvatarAppearance,
   type RealtimeClassroomControls,
+  type RealtimeEquippedCodes,
   type RealtimeConnectionStatus,
   type RealtimeFailureReason,
   type RealtimeParticipant,

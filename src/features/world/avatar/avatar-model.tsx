@@ -12,11 +12,13 @@ import { AnimationClip, AnimationMixer } from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Avatar } from '@/features/profile/avatar-options';
 import { evictRejectedGlbAsset, readCachedGlbAsset } from '../asset-cache';
-import { resolveAvatarParts } from './avatar-parts';
+import { planAvatarParts, type AvatarEquipped } from './avatar-part-plan';
 import { composeAvatar, type AvatarPartKind } from './compose-avatar';
 
 export interface AvatarModelProps {
   readonly avatar: Avatar;
+  /** Equipped accessories by slot (shop item codes), for this classroom. */
+  readonly equipped?: AvatarEquipped | undefined;
   readonly scopeKey?: string;
   readonly position?: readonly [number, number, number];
   readonly rotation?: readonly [number, number, number];
@@ -100,8 +102,21 @@ function read(url: string, scopeKey: string | undefined): Read {
   }
 }
 
+/** Stable ids so a recomposition key notices a replaced cached asset. */
+const gltfIds = new WeakMap<GLTF, number>();
+let nextGltfId = 0;
+function gltfId(gltf: GLTF): number {
+  let id = gltfIds.get(gltf);
+  if (id === undefined) {
+    id = nextGltfId++;
+    gltfIds.set(gltf, id);
+  }
+  return id;
+}
+
 function LoadedAvatar({
   avatar,
+  equipped,
   scopeKey,
   position,
   rotation,
@@ -109,17 +124,18 @@ function LoadedAvatar({
   animation,
   onPartsSkipped,
 }: Omit<AvatarModelProps, 'fallback' | 'errorFallback' | 'onBodyError'>) {
-  const parts = resolveAvatarParts(avatar);
-  const body = read(parts.bodyUrl, scopeKey);
-  const hair = parts.hairUrl ? read(parts.hairUrl, scopeKey) : null;
-  const top = parts.topUrl ? read(parts.topUrl, scopeKey) : null;
+  // The plan is rebuilt per render, but only its content (not the identity of
+  // `equipped`, which realtime recreates on every state patch) drives the
+  // composition below.
+  const plan = planAvatarParts(avatar, equipped);
+  const body = read(plan.bodyUrl, scopeKey);
+  const reads = plan.parts.map((part) => read(part.url, scopeKey));
 
   // A part that failed stays out of the avatar; evict it on unmount so a
   // later mount retries the download.
-  const failedUrls = [
-    hair?.status === 'failed' ? parts.hairUrl : null,
-    top?.status === 'failed' ? parts.topUrl : null,
-  ].filter((url): url is string => url !== null);
+  const failedUrls = plan.parts.flatMap((part, index) =>
+    reads[index]?.status === 'failed' ? [part.url] : [],
+  );
   const failedKey = failedUrls.join('|');
   useEffect(() => {
     return () => {
@@ -131,34 +147,50 @@ function LoadedAvatar({
   }, [failedKey, scopeKey]);
 
   if (body.status === 'failed') throw body.error;
-  const pending = [body, hair, top].flatMap((item) =>
-    item?.status === 'pending' ? [item.promise] : [],
+  const pending = [body, ...reads].flatMap((item) =>
+    item.status === 'pending' ? [item.promise] : [],
   );
   if (pending.length > 0) {
     throw Promise.all(pending.map((promise) => promise.catch(() => undefined)));
   }
 
   const bodyGltf = (body as Extract<Read, { status: 'ready' }>).gltf;
-  const hairGltf = hair?.status === 'ready' ? hair.gltf : null;
-  const topGltf = top?.status === 'ready' ? top.gltf : null;
-  const { hairColor, clothingColor } = parts;
+  const loaded = plan.parts.flatMap((part, index) => {
+    const item = reads[index];
+    return item?.status === 'ready' ? [{ part, gltf: item.gltf }] : [];
+  });
+  const compositionKey = JSON.stringify(
+    loaded.map(({ part, gltf }) => [
+      part.key,
+      gltfId(gltf),
+      part.tints,
+      part.hiddenMeshes,
+      part.morphs,
+    ]),
+  );
 
   const composed = useMemo(
     () =>
       composeAvatar({
         body: bodyGltf.scene,
-        hair: hairGltf?.scene,
-        top: topGltf?.scene,
-        hairColor,
-        clothingColor,
+        parts: loaded.map(({ part, gltf }) => ({
+          key: part.key,
+          scene: gltf.scene,
+          tints: part.tints,
+          hiddenMeshes: part.hiddenMeshes,
+          morphs: part.morphs,
+        })),
       }),
-    [bodyGltf, hairGltf, topGltf, hairColor, clothingColor],
+    // `loaded` is fully described by `compositionKey`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [bodyGltf, compositionKey],
   );
   useEffect(() => () => composed.dispose(), [composed]);
 
   const skipped = [
-    ...(parts.hairUrl && !hairGltf ? ['hair' as const] : []),
-    ...(parts.topUrl && !topGltf ? ['top' as const] : []),
+    ...plan.parts.flatMap((part, index) =>
+      reads[index]?.status === 'failed' ? [part.key] : [],
+    ),
     ...composed.skippedParts,
   ];
   const skippedKey = skipped.join('|');
@@ -217,8 +249,8 @@ function LoadedAvatar({
 }
 
 /**
- * Renders a configured avatar (body plus hair and top) from the asset cache.
- * A failing hair or top is omitted; a failing body shows `errorFallback` and
+ * Renders a configured avatar (body, hair, top and equipped accessories) from the asset cache.
+ * A failing part is omitted; a failing body shows `errorFallback` and
  * calls `onBodyError` (`rules/avatars-and-customization.md`).
  */
 export function AvatarModel({
@@ -227,10 +259,8 @@ export function AvatarModel({
   onBodyError,
   ...rest
 }: AvatarModelProps) {
-  const { bodyUrl, hairUrl, topUrl } = resolveAvatarParts(rest.avatar);
-  const partUrls = [hairUrl, topUrl].filter(
-    (url): url is string => url !== null,
-  );
+  const { bodyUrl, parts } = planAvatarParts(rest.avatar, rest.equipped);
+  const partUrls = parts.map((part) => part.url);
   return (
     <BodyErrorBoundary
       key={`${rest.scopeKey ?? ''}:${bodyUrl}`}

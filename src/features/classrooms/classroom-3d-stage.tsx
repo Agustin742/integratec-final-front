@@ -9,7 +9,11 @@ import {
 } from 'react';
 import { useNavigate } from 'react-router';
 import type { AvatarInput } from '@/realtime';
-import type { Pose, RemoteClassroomParticipant } from '../world';
+import type {
+  AvatarEquipped,
+  Pose,
+  RemoteClassroomParticipant,
+} from '../world';
 import type { ClassroomInteractable } from '../world/classroom/classroom-interactables';
 import { worldMessages } from '../world/messages';
 import { PerformanceProbeRuntime } from '../world/performance-monitor';
@@ -29,6 +33,7 @@ export interface Classroom3DStageProps {
   readonly classroomId?: string;
   readonly petName?: string | null;
   readonly selfPose?: Pose | undefined;
+  readonly selfEquipped?: AvatarEquipped | undefined;
   readonly connectionKey?: string | undefined;
   readonly frozen?: boolean | undefined;
   readonly remoteParticipants?:
@@ -98,6 +103,7 @@ export function Classroom3DStage({
   classroomId,
   petName,
   selfPose,
+  selfEquipped,
   connectionKey,
   frozen,
   remoteParticipants,
@@ -113,6 +119,7 @@ export function Classroom3DStage({
       classroomId={resolvedClassroomId}
       petName={petName}
       selfPose={selfPose}
+      selfEquipped={selfEquipped}
       connectionKey={connectionKey}
       frozen={frozen}
       remoteParticipants={remoteParticipants}
@@ -128,6 +135,7 @@ function Classroom3DStageContent({
   classroomId,
   petName,
   selfPose,
+  selfEquipped,
   connectionKey,
   frozen,
   remoteParticipants,
@@ -139,6 +147,7 @@ function Classroom3DStageContent({
   readonly classroomId: string;
   readonly petName?: string | null;
   readonly selfPose?: Pose | undefined;
+  readonly selfEquipped?: AvatarEquipped | undefined;
   readonly connectionKey?: string | undefined;
   readonly frozen?: boolean | undefined;
   readonly remoteParticipants?:
@@ -333,6 +342,7 @@ function Classroom3DStageContent({
                 label={classroomMessages.viewMode.canvasLabel}
                 scopeKey={scopeKey}
                 selfPose={selfPose}
+                selfEquipped={selfEquipped}
                 connectionKey={connectionKey}
                 frozen={frozen}
                 remoteParticipants={remoteParticipants}

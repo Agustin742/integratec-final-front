@@ -333,6 +333,67 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
     await expectAccessible(container);
   });
 
+  test('forwards equipped accessory codes of the local and remote members to the stage', async () => {
+    const { sdk } = setupPresenceWorkspace();
+    await waitFor(() => {
+      expect(sdk.roomFor(CLASSROOM_A)).toBeDefined();
+    });
+    const room = sdk.roomFor(CLASSROOM_A)!;
+    const baseAvatar = {
+      bodyId: 'male',
+      hairId: 'dreads',
+      topId: 'hoodie',
+      hairColor: '#353849',
+      clothingColor: '#75B7DA',
+    };
+    const item = (slot: string, shopItemCode: string) => ({
+      slot,
+      shopItemId: `id-${slot}`,
+      shopItemCode,
+      shopItemName: shopItemCode,
+      kind: 'AVATAR_ACCESSORY',
+    });
+    const emptyItems = { head: null, face: null, back: null, desk_decor: null };
+
+    act(() => {
+      room.setAvatar({
+        userId: profile.id,
+        displayName: profile.displayName,
+        role: 'STUDENT',
+        appearance: {
+          baseAvatar,
+          items: { ...emptyItems, face: item('face', 'face_sunglasses') },
+        },
+      });
+      room.setAvatar({
+        userId: REMOTE_STUDENT_ID,
+        displayName: 'Mateo',
+        role: 'STUDENT',
+        appearance: {
+          baseAvatar,
+          items: {
+            ...emptyItems,
+            head: item('head', 'head_crown'),
+            back: item('back', 'back_wings'),
+          },
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(stage.props?.selfEquipped).toEqual({
+        head: null,
+        face: 'face_sunglasses',
+        back: null,
+      });
+      expect(
+        stage.props?.remoteParticipants?.find(
+          (p) => p.userId === REMOTE_STUDENT_ID,
+        )?.equipped,
+      ).toEqual({ head: 'head_crown', face: null, back: 'back_wings' });
+    });
+  });
+
   test('handles duplicate updates without ghost avatars and removes departed participants immediately', async () => {
     const { sdk } = setupPresenceWorkspace();
     await waitFor(() => {

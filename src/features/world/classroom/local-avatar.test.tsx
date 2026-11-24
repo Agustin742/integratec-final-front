@@ -20,10 +20,18 @@ vi.mock('@react-three/fiber', () => ({
   },
 }));
 vi.mock('../avatar/avatar-model', () => ({
-  AvatarModel: (props: { animation?: string; scopeKey?: string }) => {
+  AvatarModel: (props: {
+    animation?: string;
+    scopeKey?: string;
+    equipped?: { head?: string | null };
+  }) => {
     frame.renders += 1;
     return (
-      <div data-testid="avatar-model" data-animation={props.animation}>
+      <div
+        data-testid="avatar-model"
+        data-animation={props.animation}
+        data-head={props.equipped?.head ?? ''}
+      >
         {props.scopeKey}
       </div>
     );
@@ -64,6 +72,21 @@ beforeEach(() => {
 });
 
 describe('LocalAvatar', () => {
+  test('passes the equipped accessories to the avatar model', () => {
+    render(
+      <LocalAvatar
+        controller={makeController(() => false)}
+        marker={new Mesh()}
+        avatar={avatar}
+        equipped={{ head: 'head_crown' }}
+      />,
+    );
+    expect(screen.getByTestId('avatar-model')).toHaveAttribute(
+      'data-head',
+      'head_crown',
+    );
+  });
+
   test('renders the profile avatar idle, scoped to the classroom', () => {
     const controller = makeController(() => false);
     render(
