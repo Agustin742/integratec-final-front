@@ -215,6 +215,23 @@ test.beforeEach(async ({ page, baseURL }) => {
       expect(request.headers().authorization).toBe('Bearer synthetic-access');
       return route.fulfill({ json: studentProfile });
     }
+    if (url.origin === apiOrigin && url.pathname === '/users/me/daily-review') {
+      return route.fulfill({ json: { status: 'not_due' } });
+    }
+    if (
+      url.origin === apiOrigin &&
+      url.pathname === `/classrooms/${classroomId}/desks` &&
+      request.method() === 'GET'
+    ) {
+      return route.fulfill({ json: { items: [] } });
+    }
+    if (
+      url.origin === apiOrigin &&
+      url.pathname === '/chats' &&
+      request.method() === 'GET'
+    ) {
+      return route.fulfill({ json: { items: [] } });
+    }
     if (
       url.origin === apiOrigin &&
       url.pathname === '/notifications' &&
@@ -242,6 +259,13 @@ test.beforeEach(async ({ page, baseURL }) => {
       expect(request.method()).toBe('GET');
       expect(request.headers().authorization).toBe('Bearer synthetic-access');
       return route.fulfill({ json: wallet });
+    }
+    if (
+      url.origin === apiOrigin &&
+      url.pathname === `/classrooms/${classroomId}/messages/read-marker` &&
+      request.method() === 'PUT'
+    ) {
+      return route.fulfill({ status: 204 });
     }
     if (
       url.origin === 'https://realtime.example.invalid' ||
