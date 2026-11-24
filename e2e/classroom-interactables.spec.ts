@@ -1,8 +1,6 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
-import { OrthographicCamera, Vector3 } from 'three';
+import { expect, test, type Page } from '@playwright/test';
 import type { components } from '../src/api/schema.generated';
 import { classroomMessages } from '../src/features/classrooms/messages';
-import { CLASSROOM_BOUNDS, frameCamera } from '../src/features/world/camera';
 
 const apiOrigin = 'https://api.example.invalid';
 const classroomId = '00000000-0000-4000-8000-000000000038';
@@ -76,18 +74,6 @@ const wallet: components['schemas']['StudentWalletDto'] = {
   pageSize: 20,
   total: 0,
 };
-
-async function projectClassroomPoint(canvas: Locator, worldPoint: Vector3) {
-  const box = await canvas.boundingBox();
-  if (!box) throw new Error('Classroom canvas is not visible');
-  const camera = new OrthographicCamera();
-  frameCamera(camera, box.width, box.height, CLASSROOM_BOUNDS);
-  const projected = worldPoint.clone().project(camera);
-  return {
-    x: ((projected.x + 1) / 2) * box.width,
-    y: (1 - (projected.y + 1) / 2) * box.height,
-  };
-}
 
 async function openReadyClassroomStage(page: Page) {
   await page.goto(`./classrooms/${classroomId}`);
@@ -222,7 +208,7 @@ test.beforeEach(async ({ page, baseURL }) => {
   });
 });
 
-test('picks 3D objects on canvas, handles pet and floating panel buttons, and captures responsive evidence', async ({
+test('opens panels from the floating HUD buttons, and captures responsive evidence', async ({
   page,
 }, testInfo) => {
   const isMobile = testInfo.project.name === 'mobile';
@@ -240,7 +226,7 @@ test('picks 3D objects on canvas, handles pet and floating panel buttons, and ca
   });
 
   await page.setViewportSize({ width, height: 800 });
-  const { stageHeading, canvas } = await openReadyClassroomStage(page);
+  const { canvas } = await openReadyClassroomStage(page);
 
   await expect(
     page.getByRole('button', { name: 'Calificaciones' }),
@@ -259,76 +245,38 @@ test('picks 3D objects on canvas, handles pet and floating panel buttons, and ca
   }
   await canvas.scrollIntoViewIfNeeded();
 
-  if (!isMobile) {
-    // Project the board center [0, 1.55, -5.9] onto the canvas and click it directly.
-    const boardPos = await projectClassroomPoint(
-      canvas,
-      new Vector3(0, 1.55, -5.9),
-    );
-    await canvas.click({ position: boardPos });
+  // The follow camera keeps only a third of the room in view, so panels open
+  // from the standalone HUD buttons; the world objects are no longer clickable
+  // from the spawn point.
+  const activitiesButton = page.getByRole('button', {
+    name: classroomMessages.panels.activities,
+    exact: true,
+  });
+  await activitiesButton.click();
+  const activitiesDialog = page.getByRole('dialog', {
+    name: classroomMessages.panels.activities,
+    exact: true,
+  });
+  await expect(activitiesDialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(activitiesDialog).toHaveCount(0);
+  await expect(activitiesButton).toBeFocused();
 
-    const activitiesDialog = page.getByRole('dialog', {
-      name: classroomMessages.panels.activities,
-      exact: true,
-    });
-    await expect(activitiesDialog).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(activitiesDialog).toHaveCount(0);
-    await expect(stageHeading).toBeFocused();
+  // Keyboard navigation on the floating panel groups opens a panel and restores focus to that button.
+  const shopChip = page.getByRole('button', { name: 'Tienda' });
+  await shopChip.focus();
+  await expect(shopChip).toBeFocused();
+  await expect(page.getByTestId('classroom-active-target')).toHaveCount(0);
+  await page.keyboard.press('Enter');
 
-    // Activate the decorative pet without opening any panel or conflating with tutor-bot.
-    const petPos = await projectClassroomPoint(
-      canvas,
-      new Vector3(7, 0.25, -5.86),
-    );
-    await canvas.click({ position: petPos });
-    await expect(page.getByRole('dialog')).toHaveCount(0);
-    await expect(page.getByTestId('classroom-interactable-status')).toHaveText(
-      'Michi te saluda desde su rincón.',
-    );
-
-    // Keyboard navigation on the floating panel groups opens a panel and restores focus to that button.
-    const shopChip = page.getByRole('button', { name: 'Tienda' });
-    await shopChip.focus();
-    await expect(shopChip).toBeFocused();
-    await expect(page.getByTestId('classroom-active-target')).toHaveCount(0);
-    await page.keyboard.press('Enter');
-
-    const shopDialog = page.getByRole('dialog', {
-      name: classroomMessages.panels.shop,
-      exact: true,
-    });
-    await expect(shopDialog).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(shopDialog).toHaveCount(0);
-    await expect(shopChip).toBeFocused();
-  } else {
-    // Mobile touch tap without hover: tap board directly on canvas, then close.
-    const boardPos = await projectClassroomPoint(
-      canvas,
-      new Vector3(0, 1.55, -5.9),
-    );
-    await canvas.tap({ position: boardPos });
-
-    const activitiesDialog = page.getByRole('dialog', {
-      name: classroomMessages.panels.activities,
-      exact: true,
-    });
-    await expect(activitiesDialog).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(activitiesDialog).toHaveCount(0);
-    await expect(stageHeading).toBeFocused();
-
-    // Touch tap on the pet in the world verifies the decorative greeting without hover.
-    const petPos = await projectClassroomPoint(
-      canvas,
-      new Vector3(7, 0.25, -5.86),
-    );
-    await canvas.tap({ position: petPos });
-    await expect(page.getByTestId('classroom-interactable-status')).toHaveText(
-      'Michi te saluda desde su rincón.',
-    );
-  }
+  const shopDialog = page.getByRole('dialog', {
+    name: classroomMessages.panels.shop,
+    exact: true,
+  });
+  await expect(shopDialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(shopDialog).toHaveCount(0);
+  await expect(shopChip).toBeFocused();
 
   expect(
     await page.evaluate(
