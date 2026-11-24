@@ -1,5 +1,6 @@
 export const botMessages = {
   heading: 'Asistente de estudio',
+  headerTitle: 'Tu asistente del aula',
   subtitle:
     'Consultá dudas sobre el material habilitado por tu docente. El asistente guía tu estudio sin resolver actividades ni evaluaciones.',
   loading: 'Consultando disponibilidad del asistente…',
@@ -21,6 +22,15 @@ export const botMessages = {
   emptyHistoryTitle: 'Todavía no hiciste consultas en esta sesión',
   emptyHistoryDescription:
     'Escribí una pregunta sobre los apuntes o guías del aula. Vas a ver las fuentes citadas junto a cada respuesta.',
+  statusAvailable: 'Disponible',
+  statusUnavailable: 'No disponible',
+  suggestionsLabel: 'Sugerencias para empezar',
+  suggestions: [
+    'Explicame el tema principal del material con un ejemplo',
+    '¿Qué conceptos clave debería repasar?',
+    'Armame un resumen corto de la última unidad',
+  ],
+  thinking: 'El asistente está preparando una respuesta…',
   conversationRegionLabel: 'Historial de conversación con el asistente',
   userAuthorLabel: 'Vos',
   botAuthorLabel: 'Asistente de estudio',

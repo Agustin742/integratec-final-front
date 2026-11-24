@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import axe from 'axe-core';
 import { http, HttpResponse } from 'msw';
 import { createMemoryRouter } from 'react-router';
@@ -18,6 +18,7 @@ import {
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
 import { render } from '@/test/render';
+import { botMessages } from './messages';
 import { StudyGuideBotPanel } from './study-guide-bot-panel';
 
 const CLASSROOM_ID = '00000000-0000-4000-8000-000000000010';
@@ -291,5 +292,64 @@ describe('StudyGuideBotPanel (HU-BOT-002)', () => {
         'El asistente de estudio no está disponible en este momento para esta aula.',
       ),
     ).toBeInTheDocument();
+  });
+  it('opens with an assistant header and suggested prompts that fill the composer without sending', async () => {
+    const store = createClassroomBotStore({ classroomId: CLASSROOM_ID });
+    mswServer.use(...store.handlers);
+    renderBotPanel({ role: 'STUDENT' });
+
+    expect(
+      await screen.findByRole('heading', { name: botMessages.headerTitle }),
+    ).toBeVisible();
+    expect(screen.getByText(botMessages.statusAvailable)).toBeVisible();
+
+    const suggestions = screen.getByRole('group', {
+      name: botMessages.suggestionsLabel,
+    });
+    const first = within(suggestions).getByRole('button', {
+      name: botMessages.suggestions[0],
+    });
+    fireEvent.click(first);
+    expect(screen.getByLabelText('Tu consulta para el asistente')).toHaveValue(
+      botMessages.suggestions[0],
+    );
+    // Nothing was asked yet: the empty state is still there.
+    expect(screen.getByText(botMessages.emptyHistoryTitle)).toBeVisible();
+  });
+
+  it('renders the conversation as a log of bubbles with a thinking indicator while waiting', async () => {
+    let releaseAsk: (() => void) | undefined;
+    const store = createClassroomBotStore({
+      classroomId: CLASSROOM_ID,
+      onAsk: async () => {
+        await new Promise<void>((resolve) => {
+          releaseAsk = resolve;
+        });
+        return { answer: 'Mirá el capítulo 2.' };
+      },
+    });
+    mswServer.use(...store.handlers);
+    renderBotPanel({ role: 'STUDENT' });
+
+    fireEvent.change(
+      await screen.findByLabelText('Tu consulta para el asistente'),
+      { target: { value: 'Dudas de fracciones' } },
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar consulta' }));
+
+    const log = await screen.findByRole('log', {
+      name: botMessages.conversationRegionLabel,
+    });
+    expect(within(log).getByText('Dudas de fracciones')).toBeVisible();
+    expect(within(log).getByText(botMessages.userAuthorLabel)).toBeVisible();
+    expect(within(log).getByRole('status')).toHaveTextContent(
+      botMessages.thinking,
+    );
+
+    await waitFor(() => expect(releaseAsk).toBeDefined());
+    releaseAsk?.();
+    expect(await within(log).findByText('Mirá el capítulo 2.')).toBeVisible();
+    expect(within(log).queryByRole('status')).not.toBeInTheDocument();
+    expect(within(log).getByText(botMessages.botAuthorLabel)).toBeVisible();
   });
 });
