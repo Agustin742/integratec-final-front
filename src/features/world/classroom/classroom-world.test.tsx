@@ -42,12 +42,12 @@ beforeEach(() => {
   canvas.profile.data = undefined;
 });
 
-test('mounts the classroom scene inside the classroom-framed canvas', () => {
+test('mounts the classroom scene inside the follow-camera canvas', () => {
   render(<ClassroomWorld label="Escena" scopeKey="aula-1" />);
   const region = screen.getByRole('region', { name: 'Escena' });
   expect(within(region).getByTestId('classroom-scene')).toBeInTheDocument();
   expect(canvas.props.scopeKey).toBe('aula-1');
-  expect(canvas.props.framing ?? 'classroom').toBe('classroom');
+  expect(canvas.props.framing).toBe('follow');
 });
 
 test('describes the controls for assistive technology', () => {

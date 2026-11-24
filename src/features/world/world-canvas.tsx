@@ -25,7 +25,7 @@ import {
 import { worldMessages as copy } from './messages';
 import { WorldFallback } from './world-fallback';
 
-export type WorldFraming = 'classroom' | 'avatar' | 'reference';
+export type WorldFraming = 'classroom' | 'follow' | 'avatar' | 'reference';
 
 export interface WorldCanvasProps {
   children?: ReactNode;
@@ -33,8 +33,9 @@ export interface WorldCanvasProps {
   /** Changing `scopeKey` or unmounting disposes cached scene assets. */
   scopeKey?: string;
   /**
-   * Camera framing: the whole isometric classroom (default), one standing
-   * avatar, or the small 6x4 m technical reference.
+   * Camera framing: the whole isometric classroom (default), a scene-owned
+   * follow camera (`follow`, driven by a child such as `FollowCamera`), one
+   * standing avatar, or the small 6x4 m technical reference.
    */
   framing?: WorldFraming;
   /** Landmark role of the host; `img` suits a decorative preview. */
@@ -76,6 +77,7 @@ class SceneBoundary extends Component<
 function CameraFraming({ framing }: { framing: WorldFraming }) {
   const { camera, size, invalidate } = useThree();
   useLayoutEffect(() => {
+    if (framing === 'follow') return;
     if (camera instanceof OrthographicCamera) {
       if (framing === 'avatar')
         frameAvatarCamera(camera, size.width, size.height);

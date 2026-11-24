@@ -1,4 +1,4 @@
-import { OrthographicCamera, Vector3 } from 'three';
+import { MathUtils, OrthographicCamera, Vector3 } from 'three';
 import { CLASSROOM_LAYOUT } from '../../realtime/contracts.generated';
 
 // World convention: 1 unit = 1 meter, Y up, ground at Y = 0.
@@ -27,6 +27,9 @@ export const CLASSROOM_BOUNDS: FramingBounds = {
 };
 export const CAMERA_ELEVATION = 35.264;
 
+/** Distance from the look-at point to the camera; the direction never changes. */
+const CAMERA_DISTANCE = 16;
+
 export function frameCamera(
   camera: OrthographicCamera,
   width: number,
@@ -41,10 +44,10 @@ export function frameCamera(
   const centerY = (bounds.min[1] + bounds.max[1]) / 2;
   const centerZ = (bounds.min[2] + bounds.max[2]) / 2;
   const elevation = (CAMERA_ELEVATION * Math.PI) / 180;
-  const horizontal = (16 * Math.cos(elevation)) / Math.sqrt(2);
+  const horizontal = (CAMERA_DISTANCE * Math.cos(elevation)) / Math.sqrt(2);
   camera.position.set(
     centerX + horizontal,
-    centerY + 16 * Math.sin(elevation),
+    centerY + CAMERA_DISTANCE * Math.sin(elevation),
     centerZ + horizontal,
   );
   camera.up.set(0, 1, 0);
@@ -104,6 +107,157 @@ export function frameAvatarCamera(
   camera.bottom = -fittedHeight;
   camera.right = fittedHeight * aspect;
   camera.left = -camera.right;
+  camera.near = 0.1;
+  camera.far = 50;
+  camera.zoom = 1;
+  camera.updateProjectionMatrix();
+}
+
+/**
+ * Follow camera zoom: world units visible vertically (camera space) around the
+ * avatar. The whole classroom needs about 16, so 8 shows roughly a third of
+ * it. Tune this one number to zoom in or out.
+ */
+export const FOLLOW_VISIBLE_HEIGHT = 8;
+
+/**
+ * Smallest world width kept visible, so narrow and mobile viewports still show
+ * enough floor around the avatar to anticipate movement.
+ */
+export const FOLLOW_MIN_VISIBLE_WIDTH = 9;
+
+/** Height of the point the follow camera looks at (about avatar mid-body). */
+export const FOLLOW_TARGET_HEIGHT = 0.9;
+
+/** Follow smoothing rate (1/s) for `MathUtils.damp`; higher is snappier. */
+export const FOLLOW_DAMPING = 6;
+
+/** Distance (meters) under which the damped target counts as settled. */
+export const FOLLOW_SETTLE_DISTANCE = 0.001;
+
+export interface FollowPoint {
+  readonly x: number;
+  readonly z: number;
+}
+
+export interface FollowFrustum {
+  readonly halfWidth: number;
+  readonly halfHeight: number;
+}
+
+/** Half extents of the visible area for a viewport, in camera-space units. */
+export function followFrustum(width: number, height: number): FollowFrustum {
+  const aspect = width / height;
+  const halfHeight =
+    Math.max(FOLLOW_VISIBLE_HEIGHT, FOLLOW_MIN_VISIBLE_WIDTH / aspect) / 2;
+  return { halfWidth: halfHeight * aspect, halfHeight };
+}
+
+const ELEVATION_RAD = (CAMERA_ELEVATION * Math.PI) / 180;
+const SIN_ELEVATION = Math.sin(ELEVATION_RAD);
+const COS_ELEVATION = Math.cos(ELEVATION_RAD);
+
+// Camera-space (right, up) of a world point for the fixed isometric camera,
+// relative to any common origin.
+const viewX = (x: number, z: number) => (x - z) / Math.SQRT2;
+const viewY = (x: number, y: number, z: number) =>
+  (-SIN_ELEVATION * (x + z)) / Math.SQRT2 + COS_ELEVATION * y;
+
+function clampAxis(value: number, min: number, max: number, half: number) {
+  const low = min + half;
+  const high = max - half;
+  if (low > high) return (min + max) / 2;
+  return Math.min(Math.max(value, low), high);
+}
+
+/**
+ * Moves a follow target so the visible area never leaves the projected bounds
+ * of the room. An axis the viewport covers entirely is centered instead.
+ */
+export function clampFollowTarget(
+  target: FollowPoint,
+  frustum: FollowFrustum,
+  bounds: FramingBounds = CLASSROOM_BOUNDS,
+): FollowPoint {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const x of [bounds.min[0], bounds.max[0]])
+    for (const y of [bounds.min[1], bounds.max[1]])
+      for (const z of [bounds.min[2], bounds.max[2]]) {
+        minX = Math.min(minX, viewX(x, z));
+        maxX = Math.max(maxX, viewX(x, z));
+        minY = Math.min(minY, viewY(x, y, z));
+        maxY = Math.max(maxY, viewY(x, y, z));
+      }
+  const vx = clampAxis(
+    viewX(target.x, target.z),
+    minX,
+    maxX,
+    frustum.halfWidth,
+  );
+  const vy = clampAxis(
+    viewY(target.x, FOLLOW_TARGET_HEIGHT, target.z),
+    minY,
+    maxY,
+    frustum.halfHeight,
+  );
+  // Invert the two view coordinates back to world x/z at the target height.
+  const sum =
+    ((COS_ELEVATION * FOLLOW_TARGET_HEIGHT - vy) * Math.SQRT2) / SIN_ELEVATION;
+  const difference = vx * Math.SQRT2;
+  return { x: (sum + difference) / 2, z: (sum - difference) / 2 };
+}
+
+export interface FollowStep extends FollowPoint {
+  /** True when the target reached its destination; no more frames are needed. */
+  readonly settled: boolean;
+}
+
+/**
+ * One frame of the follow smoothing: frame-rate independent damping toward
+ * `desired`, or an instant jump when `reducedMotion` is set.
+ */
+export function advanceFollowTarget(
+  current: FollowPoint,
+  desired: FollowPoint,
+  dt: number,
+  reducedMotion: boolean,
+): FollowStep {
+  if (reducedMotion) return { x: desired.x, z: desired.z, settled: true };
+  const x = MathUtils.damp(current.x, desired.x, FOLLOW_DAMPING, dt);
+  const z = MathUtils.damp(current.z, desired.z, FOLLOW_DAMPING, dt);
+  if (Math.hypot(desired.x - x, desired.z - z) < FOLLOW_SETTLE_DISTANCE)
+    return { x: desired.x, z: desired.z, settled: true };
+  return { x, z, settled: false };
+}
+
+/**
+ * Places the isometric camera on `target` (same direction and projection as
+ * the whole-room framing) with the closer fixed follow zoom.
+ */
+export function applyFollowCamera(
+  camera: OrthographicCamera,
+  width: number,
+  height: number,
+  target: FollowPoint,
+): void {
+  if (width <= 0 || height <= 0) return;
+  const horizontal = (CAMERA_DISTANCE * COS_ELEVATION) / Math.SQRT2;
+  camera.position.set(
+    target.x + horizontal,
+    FOLLOW_TARGET_HEIGHT + CAMERA_DISTANCE * SIN_ELEVATION,
+    target.z + horizontal,
+  );
+  camera.up.set(0, 1, 0);
+  camera.lookAt(target.x, FOLLOW_TARGET_HEIGHT, target.z);
+  camera.updateMatrixWorld(true);
+  const { halfWidth, halfHeight } = followFrustum(width, height);
+  camera.top = halfHeight;
+  camera.bottom = -halfHeight;
+  camera.right = halfWidth;
+  camera.left = -halfWidth;
   camera.near = 0.1;
   camera.far = 50;
   camera.zoom = 1;

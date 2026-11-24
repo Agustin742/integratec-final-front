@@ -39,7 +39,7 @@ export interface ClassroomWorldProps extends Pick<
 }
 
 /**
- * The isometric classroom canvas: `WorldCanvas` framed to the room plus its
+ * The isometric classroom canvas: `WorldCanvas` with the follow camera plus its
  * scene and the signed-in user's avatar. The profile is read here, outside the
  * canvas, so the scene never depends on providers crossing the R3F boundary.
  */
@@ -65,7 +65,7 @@ export function ClassroomWorld({
     <WorldCanvas
       label={label}
       scopeKey={scopeKey}
-      framing="classroom"
+      framing="follow"
       description={worldMessages.classroomControls}
       {...(fill && {
         canvasClassName: 'h-full w-full',

@@ -12,6 +12,7 @@ import {
   type InteractablePointerEvent,
 } from './classroom-interactables';
 import type { FloorClickEvent } from './floor-click';
+import { FollowCamera } from './follow-camera';
 import { InteractableHighlight } from './interactable-highlight';
 import { LocalAvatar } from './local-avatar';
 import { RemoteAvatar, type RemoteClassroomParticipant } from './remote-avatar';
@@ -172,6 +173,8 @@ export function ClassroomScene({
         avatar={avatar}
         scopeKey={scopeKey}
       />
+      {/* After LocalAvatar so its frame callback sees the freshly stepped pose. */}
+      <FollowCamera poseRef={controller.poseRef} />
       {remoteParticipants.map((participant) => (
         <RemoteAvatar
           key={`${scopeKey ?? ''}:${participant.userId}`}

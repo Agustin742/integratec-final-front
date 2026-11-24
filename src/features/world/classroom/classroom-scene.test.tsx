@@ -33,6 +33,7 @@ vi.mock('./local-avatar', () => ({
     return <div data-testid="local-avatar" />;
   },
 }));
+vi.mock('./follow-camera', () => ({ FollowCamera: () => null }));
 vi.mock('./remote-avatar', () => ({
   RemoteAvatar: (props: unknown) => {
     nav.remoteAvatars.push(props);

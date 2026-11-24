@@ -5,13 +5,13 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState,
   type ReactNode,
 } from 'react';
 import { AnimationClip, AnimationMixer } from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Avatar } from '@/features/profile/avatar-options';
 import { evictRejectedGlbAsset, readCachedGlbAsset } from '../asset-cache';
+import { usePrefersReducedMotion } from '../use-prefers-reduced-motion';
 import { resolveAvatarParts } from './avatar-parts';
 import { composeAvatar, type AvatarPartKind } from './compose-avatar';
 
@@ -31,25 +31,6 @@ export interface AvatarModelProps {
   readonly onBodyError?: (error: unknown) => void;
   /** Parts left out because they failed to load or do not fit the body. */
   readonly onPartsSkipped?: (parts: readonly AvatarPartKind[]) => void;
-}
-
-const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
-
-function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(
-    () =>
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia(REDUCED_MOTION_QUERY).matches,
-  );
-  useEffect(() => {
-    if (typeof window.matchMedia !== 'function') return;
-    const query = window.matchMedia(REDUCED_MOTION_QUERY);
-    const update = () => setReduced(query.matches);
-    update();
-    query.addEventListener?.('change', update);
-    return () => query.removeEventListener?.('change', update);
-  }, []);
-  return reduced;
 }
 
 class BodyErrorBoundary extends Component<
