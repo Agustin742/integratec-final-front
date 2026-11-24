@@ -1,0 +1,53 @@
+import { z } from 'zod';
+import {
+  classroomFormSchema,
+  type ClassroomDetailResponseDto,
+  type UpdateClassroomPayload,
+} from '../classroom-schema';
+
+z.config({ jitless: true });
+
+/**
+ * Settings form: the `PATCH /classrooms/{id}` fields the product enforces. `collaborationLocked` and
+ * `gamesDisabled` are stored by the API but nothing consumes them yet, so they
+ * are deliberately not exposed (and never sent, so they are never overwritten). Name, subject and
+ * adult mode reuse the create/edit schema so limits stay in one place.
+ */
+export const classroomSettingsFormSchema = classroomFormSchema
+  .pick({ name: true, subject: true, adultMode: true })
+  .extend({
+    chatMuted: z.boolean(),
+  });
+
+export type ClassroomSettingsFormInput = z.input<
+  typeof classroomSettingsFormSchema
+>;
+export type ClassroomSettingsFormOutput = z.output<
+  typeof classroomSettingsFormSchema
+>;
+
+/** Form values that mirror what the server currently stores. */
+export function toSettingsFormValues(
+  classroom: Pick<
+    ClassroomDetailResponseDto,
+    'name' | 'subject' | 'adultMode' | 'chatMuted'
+  >,
+): ClassroomSettingsFormInput {
+  return {
+    name: classroom.name,
+    subject: classroom.subject ?? '',
+    adultMode: classroom.adultMode,
+    chatMuted: classroom.chatMuted,
+  };
+}
+
+export function toSettingsUpdatePayload(
+  values: ClassroomSettingsFormOutput,
+): UpdateClassroomPayload {
+  return {
+    name: values.name,
+    subject: values.subject === '' ? null : values.subject,
+    adultMode: values.adultMode,
+    chatMuted: values.chatMuted,
+  };
+}
