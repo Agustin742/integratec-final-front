@@ -47,41 +47,41 @@ Planned art for the classroom world. Tick an item when its GLB (or texture/mater
 
 Short:
 
-- [ ] Buzz cut
-- [ ] Classic short
-- [ ] Fringe
-- [ ] Short curls
-- [ ] Soft mohawk
-- [ ] Side part
+- [x] Buzz cut
+- [x] Classic short
+- [x] Fringe
+- [x] Short curls
+- [x] Soft mohawk
+- [x] Side part
 
 Medium:
 
-- [ ] Bob
-- [ ] Wavy
-- [ ] Messy
-- [ ] Middle part
+- [x] Bob
+- [x] Wavy
+- [x] Messy
+- [x] Middle part
 
 Long:
 
-- [ ] Long straight
-- [ ] Long wavy
-- [ ] Long curls
+- [x] Long straight
+- [x] Long wavy
+- [x] Long curls
 
 Tied up:
 
-- [ ] Ponytail
-- [ ] Two pigtails
-- [ ] Bun
-- [ ] Braid
-- [ ] Two braids
-- [ ] Half-up
+- [x] Ponytail
+- [x] Two pigtails
+- [x] Bun
+- [x] Braid
+- [x] Two braids
+- [x] Half-up
 
 Afro-textured:
 
-- [ ] Afro
-- [ ] Dreads
-- [ ] Box braids
-- [ ] Afro with headband
+- [x] Afro
+- [x] Dreads
+- [x] Box braids
+- [x] Afro with headband
 
 Colors:
 
@@ -96,27 +96,27 @@ Colors:
 
 School uniform:
 
-- [ ] White school smock (guardapolvo)
-- [ ] Polo shirt
-- [ ] School sweatshirt
-- [ ] Shirt and tie
+- [x] White school smock (guardapolvo)
+- [x] Polo shirt
+- [x] School sweatshirt
+- [x] Shirt and tie
 
 Casual:
 
-- [ ] T-shirt
-- [ ] Tank top
-- [ ] Hoodie
-- [ ] Denim jacket
-- [ ] Track jacket
-- [ ] Sweater
-- [ ] Flannel shirt
-- [ ] Vest
+- [x] T-shirt
+- [x] Tank top
+- [x] Hoodie
+- [x] Denim jacket
+- [x] Track jacket
+- [x] Sweater
+- [x] Flannel shirt
+- [x] Vest
 
 Seasonal:
 
-- [ ] Winter coat
-- [ ] Holiday sweater
-- [ ] National team jersey
+- [x] Winter coat
+- [x] Holiday sweater
+- [x] National team jersey
 
 ### Bottoms
 
@@ -138,33 +138,33 @@ Seasonal:
 
 ### Head accessories
 
-- [ ] Cap
-- [ ] Backwards cap
-- [ ] Beanie
-- [ ] Headband
-- [ ] Headphones
-- [ ] Astronaut helmet
-- [ ] Top hat
-- [ ] Crown (achievement)
-- [ ] Graduation cap (achievement)
+- [x] Cap
+- [x] Backwards cap
+- [x] Beanie
+- [x] Headband
+- [x] Headphones
+- [x] Astronaut helmet
+- [x] Top hat
+- [x] Crown (achievement)
+- [x] Graduation cap (achievement)
 
 ### Face accessories
 
-- [ ] Round glasses
-- [ ] Square glasses
-- [ ] Sunglasses
-- [ ] Mask (masquerade)
-- [ ] Face mask
-- [ ] Face paint
+- [x] Round glasses
+- [x] Square glasses
+- [x] Sunglasses
+- [x] Mask (masquerade)
+- [x] Face mask
+- [x] Face paint
 
 ### Back accessories
 
-- [ ] Backpack (several models)
-- [ ] Rolling backpack
-- [ ] Superhero cape
-- [ ] Wings
-- [ ] Guitar on the back
-- [ ] Racket
+- [x] Backpack (several models)
+- [x] Rolling backpack
+- [x] Superhero cape
+- [x] Wings
+- [x] Guitar on the back
+- [x] Racket
 
 ### Hand items
 
