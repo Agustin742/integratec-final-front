@@ -343,7 +343,9 @@ export async function moveClassroomMaterial(
   );
   const parsed = materialDtoSchema.safeParse(payload);
   if (!parsed.success) {
-    throw mapApiError(undefined, new Response(null, { status: 502 }));
+    throw markUncertain(
+      mapApiError(undefined, new Response(null, { status: 502 })),
+    );
   }
   return parsed.data;
 }

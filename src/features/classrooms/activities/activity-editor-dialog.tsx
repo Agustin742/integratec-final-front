@@ -197,7 +197,7 @@ export function ActivityEditorDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         key={formKey}
-        className="max-h-[calc(100dvh-2rem)] w-full max-w-xl [overflow-wrap:anywhere]"
+        className="max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-xl [overflow-wrap:anywhere]"
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           if (!focusIfUsable(getTriggerElement?.())) {

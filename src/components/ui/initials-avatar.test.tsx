@@ -8,6 +8,7 @@ describe('InitialsAvatar', () => {
     expect(getInitials('  prof. carlos pérez ')).toBe('PP');
     expect(getInitials('Madonna')).toBe('M');
     expect(getInitials('   ')).toBe('?');
+    expect(getInitials('🦊 Zorro')).toBe('🦊Z');
   });
 
   it('is decorative and deterministic per name', () => {

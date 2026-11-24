@@ -18,7 +18,7 @@ import {
 } from '@/components/feedback/states';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { useSessionService } from '@/session/provider';
+import { useSessionService, useSessionSnapshot } from '@/session/provider';
 import {
   useClassroomCapabilities,
   useClassroomContext,
@@ -41,6 +41,7 @@ import {
 import type { MaterialFileActions } from './material-row';
 import type { MaterialDto } from './material-schema';
 import {
+  isUncertainMaterialError,
   listClassroomMaterials,
   moveClassroomMaterial,
   removeClassroomMaterial,
@@ -56,6 +57,7 @@ import {
 import { MODULE_CAP, type MaterialModuleDto } from './module-schema';
 import {
   createMaterialModule,
+  isUncertainModuleError,
   listMaterialModules,
   removeMaterialModule,
   reorderMaterialModules,
@@ -97,6 +99,9 @@ function isAbortError(error: unknown): boolean {
 
 export function MaterialPanel({ renderItemSlot }: MaterialPanelProps = {}) {
   const { classroomId } = useParams();
+  const session = useSessionSnapshot();
+  const userId =
+    session.status === 'authenticated' ? session.user.id : 'signed-out';
   if (!classroomId) {
     return (
       <ErrorState
@@ -108,6 +113,7 @@ export function MaterialPanel({ renderItemSlot }: MaterialPanelProps = {}) {
   }
   return (
     <MaterialPanelContent
+      key={`${userId}:${classroomId}`}
       classroomId={classroomId}
       renderItemSlot={renderItemSlot}
     />
@@ -137,7 +143,10 @@ function MaterialPanelContent({
     () => new Set(),
   );
   const togglingBotRef = useRef<Set<string>>(new Set());
+  const removingRef = useRef(false);
+  const reorderingRef = useRef(false);
   const terminalBotReconciledRef = useRef(false);
+  const terminalMaterialsReconciledRef = useRef(false);
   const unmountAbortRef = useRef<AbortController | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const createButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -158,6 +167,15 @@ function MaterialPanelContent({
     capabilities.status === 'ready' && capabilities.can('publish_content');
   const canConfigureBot =
     capabilities.status === 'ready' && capabilities.can('configure_bot');
+
+  const [prevCanManage, setPrevCanManage] = useState(canManage);
+  if (prevCanManage !== canManage) {
+    setPrevCanManage(canManage);
+    if (!canManage) {
+      setDialog(null);
+      setPendingConfirmId(null);
+    }
+  }
 
   const modulesKey = classroomMaterialModulesQueryKey(
     userId ?? 'signed-out',
@@ -417,11 +435,17 @@ function MaterialPanelContent({
   }
 
   async function handleConfirmRemove(material: MaterialDto) {
-    if (removingId !== null) return;
+    if (userId === null || !canManage || removingRef.current) return;
+    const signal = unmountAbortRef.current?.signal;
+    if (signal?.aborted) return;
+    removingRef.current = true;
     setActionNotice(null);
     setRemovingId(material.id);
     try {
-      await removeClassroomMaterial(client, classroomId, material.id);
+      await removeClassroomMaterial(client, classroomId, material.id, {
+        signal,
+      });
+      if (signal?.aborted) return;
       setPendingConfirmId(null);
       setActionNotice({
         kind: 'success',
@@ -432,20 +456,32 @@ function MaterialPanelContent({
       });
       await reconcileMaterials();
     } catch (error) {
+      if (isAbortError(error) || signal?.aborted) return;
       setPendingConfirmId(null);
+      const uncertain = isUncertainMaterialError(error);
       setActionNotice({
         kind: 'error',
         title: materialMessages.list.removeErrorTitle,
-        description: messageFrom(
-          error,
-          materialMessages.list.removeErrors.unexpected,
-        ),
+        description: uncertain
+          ? materialMessages.list.removeErrors.uncertain
+          : messageFrom(error, materialMessages.list.removeErrors.unexpected),
       });
-      if (error instanceof ApiError && error.kind === 'not-found') {
+      if (error instanceof ApiError && error.kind === 'forbidden') {
+        await queryClient.invalidateQueries({
+          queryKey: classroomDetailQueryKey(userId, classroomId),
+        });
+      }
+      if (
+        uncertain ||
+        (error instanceof ApiError && error.kind === 'not-found')
+      ) {
         await reconcileMaterials();
       }
     } finally {
-      setRemovingId(null);
+      removingRef.current = false;
+      if (!signal?.aborted) {
+        setRemovingId(null);
+      }
     }
   }
 
@@ -453,6 +489,11 @@ function MaterialPanelContent({
     values: { readonly name: string; readonly description: string },
     editing: MaterialModuleDto | null,
   ): Promise<string | null> {
+    if (userId === null || !canManage) {
+      return materialMessages.upload.serverErrors.forbidden;
+    }
+    const signal = unmountAbortRef.current?.signal;
+    if (signal?.aborted) return null;
     try {
       if (editing) {
         const saved = await updateMaterialModule(
@@ -463,19 +504,27 @@ function MaterialPanelContent({
             name: values.name,
             description: values.description === '' ? null : values.description,
           },
+          { signal },
         );
+        if (signal?.aborted) return null;
         setActionNotice({
           kind: 'success',
           title: copy.updatedTitle,
           description: copy.updatedDescription(saved.name),
         });
       } else {
-        const created = await createMaterialModule(client, classroomId, {
-          name: values.name,
-          ...(values.description === ''
-            ? {}
-            : { description: values.description }),
-        });
+        const created = await createMaterialModule(
+          client,
+          classroomId,
+          {
+            name: values.name,
+            ...(values.description === ''
+              ? {}
+              : { description: values.description }),
+          },
+          { signal },
+        );
+        if (signal?.aborted) return null;
         setActionNotice({
           kind: 'success',
           title: copy.createdTitle,
@@ -489,21 +538,38 @@ function MaterialPanelContent({
       });
       return null;
     } catch (error) {
-      if (error instanceof ApiError && error.kind === 'not-found') {
+      if (isAbortError(error) || signal?.aborted) return null;
+      if (error instanceof ApiError && error.kind === 'forbidden') {
         await queryClient.invalidateQueries({
-          queryKey: modulesKey,
-          exact: true,
+          queryKey: classroomDetailQueryKey(userId, classroomId),
         });
       }
-      return messageFrom(error, copy.unexpected);
+      const uncertain = isUncertainModuleError(error);
+      if (
+        uncertain ||
+        (error instanceof ApiError &&
+          (error.kind === 'not-found' || error.kind === 'conflict'))
+      ) {
+        await reconcileMaterials();
+      }
+      if (signal?.aborted) return null;
+      return uncertain
+        ? copy.uncertainAction
+        : messageFrom(error, copy.unexpected);
     }
   }
 
   async function handleDeleteModule(
     target: MaterialModuleDto,
   ): Promise<string | null> {
+    if (userId === null || !canManage) {
+      return materialMessages.upload.serverErrors.forbidden;
+    }
+    const signal = unmountAbortRef.current?.signal;
+    if (signal?.aborted) return null;
     try {
-      await removeMaterialModule(client, classroomId, target.id);
+      await removeMaterialModule(client, classroomId, target.id, { signal });
+      if (signal?.aborted) return null;
       setActionNotice({
         kind: 'success',
         title: copy.deletedTitle,
@@ -513,10 +579,23 @@ function MaterialPanelContent({
       await reconcileMaterials();
       return null;
     } catch (error) {
-      if (error instanceof ApiError && error.kind === 'not-found') {
+      if (isAbortError(error) || signal?.aborted) return null;
+      if (error instanceof ApiError && error.kind === 'forbidden') {
+        await queryClient.invalidateQueries({
+          queryKey: classroomDetailQueryKey(userId, classroomId),
+        });
+      }
+      const uncertain = isUncertainModuleError(error);
+      if (
+        uncertain ||
+        (error instanceof ApiError && error.kind === 'not-found')
+      ) {
         await reconcileMaterials();
       }
-      return messageFrom(error, copy.unexpected);
+      if (signal?.aborted) return null;
+      return uncertain
+        ? copy.uncertainAction
+        : messageFrom(error, copy.unexpected);
     }
   }
 
@@ -524,13 +603,20 @@ function MaterialPanelContent({
     material: MaterialDto,
     destination: string | null,
   ): Promise<string | null> {
+    if (userId === null || !canManage) {
+      return materialMessages.upload.serverErrors.forbidden;
+    }
+    const signal = unmountAbortRef.current?.signal;
+    if (signal?.aborted) return null;
     try {
       await moveClassroomMaterial(
         client,
         classroomId,
         material.id,
         destination,
+        { signal },
       );
+      if (signal?.aborted) return null;
       const destinationName =
         modulesQuery.data?.items.find((entry) => entry.id === destination)
           ?.name ?? copy.unassignedTitle;
@@ -546,16 +632,33 @@ function MaterialPanelContent({
       await reconcileMaterials();
       return null;
     } catch (error) {
-      if (error instanceof ApiError && error.kind === 'not-found') {
+      if (isAbortError(error) || signal?.aborted) return null;
+      if (error instanceof ApiError && error.kind === 'forbidden') {
+        await queryClient.invalidateQueries({
+          queryKey: classroomDetailQueryKey(userId, classroomId),
+        });
+      }
+      const uncertain = isUncertainMaterialError(error);
+      if (
+        uncertain ||
+        (error instanceof ApiError && error.kind === 'not-found')
+      ) {
         await reconcileMaterials();
       }
-      return messageFrom(error, copy.unexpected);
+      if (signal?.aborted) return null;
+      return uncertain
+        ? copy.uncertainAction
+        : messageFrom(error, copy.unexpected);
     }
   }
 
   async function handleReorder(moduleId: string, direction: 'up' | 'down') {
     const modules = modulesQuery.data?.items;
-    if (reordering || !modules) return;
+    if (userId === null || !canManage || reorderingRef.current || !modules) {
+      return;
+    }
+    const signal = unmountAbortRef.current?.signal;
+    if (signal?.aborted) return;
     const from = modules.findIndex((entry) => entry.id === moduleId);
     const to = direction === 'up' ? from - 1 : from + 1;
     if (from === -1 || to < 0 || to >= modules.length) return;
@@ -564,10 +667,14 @@ function MaterialPanelContent({
     if (moved === undefined) return;
     ids.splice(to, 0, moved);
 
+    reorderingRef.current = true;
     setActionNotice(null);
     setReordering(true);
     try {
-      const result = await reorderMaterialModules(client, classroomId, ids);
+      const result = await reorderMaterialModules(client, classroomId, ids, {
+        signal,
+      });
+      if (signal?.aborted) return;
       queryClient.setQueryData(modulesKey, result);
       const atEnd = direction === 'up' ? to === 0 : to === modules.length - 1;
       const pressed = direction;
@@ -588,19 +695,56 @@ function MaterialPanelContent({
         ),
       });
     } catch (error) {
+      if (isAbortError(error) || signal?.aborted) return;
+      if (error instanceof ApiError && error.kind === 'forbidden') {
+        await queryClient.invalidateQueries({
+          queryKey: classroomDetailQueryKey(userId, classroomId),
+        });
+      }
       setActionNotice({
         kind: 'error',
         title: copy.reorderErrorTitle,
-        description: messageFrom(error, copy.unexpected),
+        description: isUncertainModuleError(error)
+          ? copy.uncertainAction
+          : messageFrom(error, copy.unexpected),
       });
       await queryClient.invalidateQueries({
         queryKey: modulesKey,
         exact: true,
       });
     } finally {
-      setReordering(false);
+      reorderingRef.current = false;
+      if (!signal?.aborted) {
+        setReordering(false);
+      }
     }
   }
+
+  const failedQuery =
+    modulesQuery.isError && modulesQuery.data === undefined
+      ? modulesQuery
+      : unassignedQuery.isError && unassignedQuery.data === undefined
+        ? unassignedQuery
+        : null;
+  const isTerminalMaterialLoadError =
+    failedQuery !== null &&
+    failedQuery.error instanceof ApiError &&
+    (failedQuery.error.kind === 'forbidden' ||
+      failedQuery.error.kind === 'not-found');
+
+  useEffect(() => {
+    if (userId === null) return;
+    if (!isTerminalMaterialLoadError) {
+      terminalMaterialsReconciledRef.current = false;
+      return;
+    }
+    if (!terminalMaterialsReconciledRef.current) {
+      terminalMaterialsReconciledRef.current = true;
+      void queryClient.invalidateQueries({
+        queryKey: classroomDetailQueryKey(userId, classroomId),
+      });
+    }
+  }, [classroomId, isTerminalMaterialLoadError, queryClient, userId]);
 
   if (context.status === 'error') {
     return (
@@ -621,12 +765,6 @@ function MaterialPanelContent({
     return <LoadingState label={materialMessages.loading} />;
   }
 
-  const failedQuery =
-    modulesQuery.isError && modulesQuery.data === undefined
-      ? modulesQuery
-      : unassignedQuery.isError && unassignedQuery.data === undefined
-        ? unassignedQuery
-        : null;
   if (failedQuery) {
     return (
       <ErrorState
@@ -637,10 +775,14 @@ function MaterialPanelContent({
             ? failedQuery.error.userMessage
             : materialMessages.errorDescription
         }
-        onRetry={() => {
-          void modulesQuery.refetch();
-          void unassignedQuery.refetch();
-        }}
+        onRetry={
+          isTerminalMaterialLoadError
+            ? undefined
+            : () => {
+                void modulesQuery.refetch();
+                void unassignedQuery.refetch();
+              }
+        }
       />
     );
   }
@@ -702,6 +844,7 @@ function MaterialPanelContent({
       openDialog({ kind: 'edit', module: entry }, trigger),
     onDelete: (entry: MaterialModuleDto, trigger: HTMLElement | null) =>
       openDialog({ kind: 'delete', module: entry }, trigger),
+    onDeletedFallbackFocus: () => rootRef.current?.focus(),
   };
 
   return (
@@ -835,7 +978,7 @@ function MaterialPanelContent({
         </ul>
       )}
 
-      {dialog?.kind === 'create' ? (
+      {canManage && dialog?.kind === 'create' ? (
         <ModuleFormDialog
           mode="create"
           onSubmit={(values) => handleSubmitModule(values, null)}
@@ -843,7 +986,7 @@ function MaterialPanelContent({
           onCloseAutoFocus={restoreFocus}
         />
       ) : null}
-      {dialog?.kind === 'edit' ? (
+      {canManage && dialog?.kind === 'edit' ? (
         <ModuleFormDialog
           mode="edit"
           initial={dialog.module}
@@ -852,7 +995,7 @@ function MaterialPanelContent({
           onCloseAutoFocus={restoreFocus}
         />
       ) : null}
-      {dialog?.kind === 'delete' ? (
+      {canManage && dialog?.kind === 'delete' ? (
         <DeleteModuleDialog
           module={dialog.module}
           onConfirm={() => handleDeleteModule(dialog.module)}
@@ -860,7 +1003,7 @@ function MaterialPanelContent({
           onCloseAutoFocus={restoreFocus}
         />
       ) : null}
-      {dialog?.kind === 'move' ? (
+      {canManage && dialog?.kind === 'move' ? (
         <MoveMaterialDialog
           filename={dialog.material.filename}
           currentModuleId={dialog.material.moduleId}
@@ -872,7 +1015,7 @@ function MaterialPanelContent({
           onCloseAutoFocus={restoreFocus}
         />
       ) : null}
-      {dialog?.kind === 'upload' ? (
+      {canManage && dialog?.kind === 'upload' ? (
         <UploadDialog
           title={copy.uploadDialog.title(
             dialog.target.kind === 'module'
@@ -885,6 +1028,7 @@ function MaterialPanelContent({
           <MaterialUploadSection
             client={client}
             classroomId={classroomId}
+            canManage={canManage}
             moduleId={
               dialog.target.kind === 'module' ? dialog.target.module.id : null
             }

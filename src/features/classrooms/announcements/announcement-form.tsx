@@ -126,7 +126,7 @@ export function AnnouncementForm({
         }
         if (isUncertainAnnouncementError(error)) {
           if (isEdit) {
-            onReconcileRequired(false);
+            await onReconcileRequired(false);
           } else {
             const published = await onUncertainCreate({
               title: values.title,
@@ -160,6 +160,8 @@ export function AnnouncementForm({
     },
   );
 
+  const Heading = isEdit ? 'h4' : 'h3';
+
   return (
     <section
       aria-labelledby={headingId}
@@ -171,11 +173,14 @@ export function AnnouncementForm({
       )}
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 id={headingId} className="text-base font-semibold text-foreground">
+        <Heading
+          id={headingId}
+          className="text-base font-semibold text-foreground"
+        >
           {isEdit
             ? announcementMessages.form.editHeading
             : announcementMessages.form.publishHeading}
-        </h3>
+        </Heading>
         {isEdit && onCancelEdit ? (
           <Button
             type="button"

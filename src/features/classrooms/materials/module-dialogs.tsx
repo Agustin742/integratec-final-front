@@ -1,4 +1,5 @@
 import {
+  useRef,
   useState,
   type FormEvent,
   type ReactElement,
@@ -65,10 +66,11 @@ export function ModuleFormDialog({
   } | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submitting) return;
+    if (submittingRef.current) return;
     const check = checkModuleForm({ name, description });
     if (!check.ok) {
       const message =
@@ -82,13 +84,18 @@ export function ModuleFormDialog({
     }
     setFieldError(null);
     setServerError(null);
+    submittingRef.current = true;
     setSubmitting(true);
-    const failure = await onSubmit({
-      name: check.name,
-      description: check.description,
-    });
-    setSubmitting(false);
-    if (failure !== null) setServerError(failure);
+    try {
+      const failure = await onSubmit({
+        name: check.name,
+        description: check.description,
+      });
+      if (failure !== null) setServerError(failure);
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
   }
 
   const isCreate = mode === 'create';
@@ -114,6 +121,7 @@ export function ModuleFormDialog({
               <Input
                 {...control}
                 value={name}
+                disabled={submitting}
                 maxLength={MODULE_NAME_MAX_LENGTH + 20}
                 autoComplete="off"
                 onChange={(event) => setName(event.target.value)}
@@ -132,10 +140,11 @@ export function ModuleFormDialog({
               <textarea
                 {...control}
                 value={description}
+                disabled={submitting}
                 rows={3}
                 maxLength={MODULE_DESCRIPTION_MAX_LENGTH + 100}
                 onChange={(event) => setDescription(event.target.value)}
-                className="motion-field min-h-24 w-full min-w-0 resize-y rounded-xl border-2 border-field-border bg-card px-4 py-2 text-base text-card-foreground shadow-inset placeholder:text-muted-foreground focus-visible:border-primary focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring aria-invalid:border-destructive"
+                className="motion-field min-h-24 w-full min-w-0 resize-y rounded-xl border-2 border-field-border bg-card px-4 py-2 text-base text-card-foreground shadow-inset placeholder:text-muted-foreground focus-visible:border-primary focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60 aria-invalid:border-destructive"
               />
             )}
           </Field>
@@ -179,15 +188,21 @@ export function DeleteModuleDialog({
   onCloseAutoFocus,
 }: DeleteModuleDialogProps): ReactElement {
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
   async function handleConfirm() {
-    if (submitting) return;
+    if (submittingRef.current) return;
     setServerError(null);
+    submittingRef.current = true;
     setSubmitting(true);
-    const failure = await onConfirm();
-    setSubmitting(false);
-    if (failure !== null) setServerError(failure);
+    try {
+      const failure = await onConfirm();
+      if (failure !== null) setServerError(failure);
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -248,20 +263,26 @@ export function MoveMaterialDialog({
 }: MoveMaterialDialogProps): ReactElement {
   const [target, setTarget] = useState<string>(currentModuleId ?? '');
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submitting) return;
+    if (submittingRef.current) return;
     if (target === (currentModuleId ?? '')) {
       onClose();
       return;
     }
     setServerError(null);
+    submittingRef.current = true;
     setSubmitting(true);
-    const failure = await onSubmit(target === '' ? null : target);
-    setSubmitting(false);
-    if (failure !== null) setServerError(failure);
+    try {
+      const failure = await onSubmit(target === '' ? null : target);
+      if (failure !== null) setServerError(failure);
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -278,8 +299,9 @@ export function MoveMaterialDialog({
               <select
                 {...control}
                 value={target}
+                disabled={submitting}
                 onChange={(event) => setTarget(event.target.value)}
-                className="motion-field min-h-11 w-full min-w-0 rounded-xl border-2 border-field-border bg-card px-4 py-2 text-base text-card-foreground shadow-inset focus-visible:border-primary focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring"
+                className="motion-field min-h-11 w-full min-w-0 rounded-xl border-2 border-field-border bg-card px-4 py-2 text-base text-card-foreground shadow-inset focus-visible:border-primary focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {modules.map((entry) => (
                   <option key={entry.id} value={entry.id}>

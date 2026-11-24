@@ -320,8 +320,14 @@ describe('ChatPanel moderation (#51, S3/S10: teacher-level hide)', () => {
     expect(button.classList.contains('invisible')).toBe(false);
     button.focus();
     expect(button).toHaveFocus();
-    // Others' messages sit on the left: the control takes the right side.
-    expect(button.className).toContain('left-full');
+    // Others' messages sit on the left with the control as a sibling outside [data-bubble].
+    const row = bubble?.closest('li');
+    expect(row).not.toBeNull();
+    expect(row).toContainElement(button);
+    expect(row?.className).toContain('justify-start');
+    expect(row?.className).not.toContain('flex-row-reverse');
+    expect(button.className).toContain('size-11');
+    expect(button.className).not.toContain('pointer-fine:pointer-events-none');
   });
 
   it('shows the pending state during the hide request and never presents the row as hidden before the 204', async () => {

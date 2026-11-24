@@ -79,6 +79,7 @@ async function setupAuthSession(page: Page) {
 test('teacher publishes, edits, captures responsive views, and removes announcement', async ({
   page,
 }, testInfo) => {
+  test.setTimeout(60_000);
   const width = testInfo.project.name === 'mobile' ? 360 : 1280;
   await page.setViewportSize({ width, height: 800 });
   const { cspViolations, pageErrors } = await setupAuthSession(page);

@@ -114,7 +114,7 @@ export function ClassroomSettingsForm({
       const detailKey = classroomDetailQueryKey(userId, classroomId);
       // The server echoes this write as a context hint; mark it so the open
       // panel is not torn down by it (see own-classroom-change.ts).
-      markOwnClassroomChange(queryClient, classroomId);
+      markOwnClassroomChange(queryClient, userId, classroomId);
       try {
         const saved = await updateClassroom(
           client,
@@ -123,6 +123,7 @@ export function ClassroomSettingsForm({
           { signal: controller.signal },
         );
         if (controller.signal.aborted) {
+          clearOwnClassroomChange(queryClient, userId, classroomId);
           return;
         }
         lastSeenUpdatedAtRef.current = saved.updatedAt;
@@ -157,17 +158,34 @@ export function ClassroomSettingsForm({
           description: settingsMessages.toastSavedDescription(saved.name),
         });
       } catch (error) {
-        if (error instanceof ApiError && error.kind === 'validation') {
-          clearOwnClassroomChange(queryClient, classroomId);
+        const isClientRejection =
+          error instanceof ApiError &&
+          (error.kind === 'validation' ||
+            error.kind === 'unauthenticated' ||
+            error.kind === 'forbidden' ||
+            error.kind === 'not-found' ||
+            error.status === 401 ||
+            error.status === 403 ||
+            error.status === 404);
+        if (
+          isClientRejection ||
+          isAbortError(error) ||
+          controller.signal.aborted
+        ) {
+          clearOwnClassroomChange(queryClient, userId, classroomId);
         }
         if (isAbortError(error) || controller.signal.aborted) {
           return;
         }
         if (error instanceof ApiError && error.kind !== 'validation') {
-          // Unknown outcome or lost access: re-read the truth before a retry.
+          // Unknown outcome or lost access: re-read both detail and classroom
+          // list before allowing another attempt.
           void queryClient.invalidateQueries({
             queryKey: detailKey,
             exact: true,
+          });
+          void queryClient.invalidateQueries({
+            predicate: createClassroomListPredicate(userId),
           });
         }
         throw error;
@@ -236,6 +254,7 @@ export function ClassroomSettingsForm({
             <Input
               {...fieldProps}
               type="text"
+              disabled={isSubmitting}
               maxLength={CLASSROOM_NAME_MAX_LENGTH}
               placeholder={classroomMessages.form.fields.name.placeholder}
               autoComplete="off"
@@ -252,6 +271,7 @@ export function ClassroomSettingsForm({
             <Input
               {...fieldProps}
               type="text"
+              disabled={isSubmitting}
               maxLength={CLASSROOM_SUBJECT_MAX_LENGTH}
               placeholder={classroomMessages.form.fields.subject.placeholder}
               autoComplete="off"
@@ -264,14 +284,24 @@ export function ClassroomSettingsForm({
         title={settingsMessages.sections.mode.title}
         description={settingsMessages.sections.mode.description}
       >
-        <SwitchField form={form} name="adultMode" />
+        <SwitchField
+          form={form}
+          name="adultMode"
+          disabled={isSubmitting}
+          onChangeInteraction={() => setJustSaved(false)}
+        />
       </SettingsSection>
 
       <SettingsSection
         title={settingsMessages.sections.controls.title}
         description={settingsMessages.sections.controls.description}
       >
-        <SwitchField form={form} name="chatMuted" />
+        <SwitchField
+          form={form}
+          name="chatMuted"
+          disabled={isSubmitting}
+          onChangeInteraction={() => setJustSaved(false)}
+        />
       </SettingsSection>
 
       <div
@@ -305,9 +335,13 @@ export function ClassroomSettingsForm({
 function SwitchField({
   form,
   name,
+  disabled,
+  onChangeInteraction,
 }: {
   readonly form: SettingsForm;
   readonly name: SwitchName;
+  readonly disabled: boolean;
+  readonly onChangeInteraction: () => void;
 }) {
   const copy = settingsMessages.fields[name];
   return (
@@ -319,8 +353,10 @@ function SwitchField({
           label={copy.label}
           description={copy.description}
           checked={field.value}
+          disabled={disabled}
           onBlur={field.onBlur}
           onCheckedChange={(next) => {
+            onChangeInteraction();
             field.onChange(next);
             form.clearErrors('root.serverError');
           }}

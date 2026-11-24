@@ -624,7 +624,7 @@ function ClassroomMetricsTable({
           <tr>
             <th
               scope="col"
-              className="sticky top-0 left-0 z-20 min-w-[9rem] border-b-2 border-edge bg-tray px-3 py-2.5 text-left font-semibold"
+              className="sticky top-0 left-0 z-20 min-w-[9rem] max-w-[11rem] border-b-2 border-edge bg-tray px-3 py-2.5 text-left font-semibold sm:max-w-[16rem]"
             >
               {columns.student}
             </th>
@@ -650,11 +650,11 @@ function ClassroomMetricsTable({
             <tr key={row.studentId} className="group">
               <th
                 scope="row"
-                className="sticky left-0 z-10 border-b border-edge/60 bg-card px-3 py-2.5 text-left font-normal group-hover:bg-row-hover"
+                className="sticky left-0 z-10 max-w-[11rem] border-b border-edge/60 bg-card px-3 py-2.5 text-left font-normal group-hover:bg-row-hover sm:max-w-[16rem]"
               >
-                <span className="flex items-center gap-2.5">
+                <span className="flex min-w-0 items-center gap-2.5">
                   <InitialsAvatar name={row.displayName} size="sm" />
-                  <span className="font-semibold text-foreground">
+                  <span className="min-w-0 truncate font-semibold text-foreground">
                     {row.displayName}
                   </span>
                 </span>

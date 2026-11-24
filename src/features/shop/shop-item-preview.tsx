@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { cn } from '@/lib/utils';
-import { renderGlbThumbnail } from './item-preview-renderer';
 import { resolveItemPreview } from './item-preview-source';
 import { shopMessages } from './messages';
 import type { ShopCatalogItemDto, ShopItemKind } from './shop-schema';
@@ -156,7 +155,12 @@ export function ShopItemPreview({ item, className }: ShopItemPreviewProps) {
   const [visible, setVisible] = useState(
     () => typeof IntersectionObserver === 'undefined',
   );
-  const [state, setState] = useState<PreviewState>({ status: 'idle' });
+  const previewKey = glbUrl === null ? null : `${glbUrl}|${tint ?? ''}`;
+  const [rendered, setRendered] = useState<
+    | { readonly key: string; readonly status: 'ready'; readonly src: string }
+    | { readonly key: string; readonly status: 'failed' }
+    | null
+  >(null);
 
   useEffect(() => {
     if (glbUrl === null || visible) return;
@@ -176,20 +180,33 @@ export function ShopItemPreview({ item, className }: ShopItemPreviewProps) {
   }, [glbUrl, visible]);
 
   useEffect(() => {
-    if (glbUrl === null || !visible) return;
+    if (glbUrl === null || previewKey === null || !visible) return;
     let cancelled = false;
-    renderGlbThumbnail(glbUrl, tint).then(
-      (src) => {
-        if (!cancelled) setState({ status: 'ready', src });
-      },
-      () => {
-        if (!cancelled) setState({ status: 'failed' });
-      },
-    );
+    import('./item-preview-renderer')
+      .then(({ renderGlbThumbnail }) => renderGlbThumbnail(glbUrl, tint))
+      .then(
+        (src) => {
+          if (!cancelled) {
+            setRendered({ key: previewKey, status: 'ready', src });
+          }
+        },
+        () => {
+          if (!cancelled) {
+            setRendered({ key: previewKey, status: 'failed' });
+          }
+        },
+      );
     return () => {
       cancelled = true;
     };
-  }, [glbUrl, tint, visible]);
+  }, [glbUrl, previewKey, tint, visible]);
+
+  const state: PreviewState =
+    previewKey !== null && rendered?.key === previewKey
+      ? rendered.status === 'ready'
+        ? { status: 'ready', src: rendered.src }
+        : { status: 'failed' }
+      : { status: 'idle' };
 
   return (
     <div

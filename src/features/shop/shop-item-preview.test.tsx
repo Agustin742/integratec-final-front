@@ -44,9 +44,11 @@ describe('ShopItemPreview', () => {
     expect(screen.getByRole('status')).toHaveTextContent(
       'Cargando vista previa',
     );
-    expect(renderGlbThumbnail).toHaveBeenCalledWith(
-      '/models/avatars/male/accessory-cap.glb',
-      undefined,
+    await waitFor(() =>
+      expect(renderGlbThumbnail).toHaveBeenCalledWith(
+        '/models/avatars/male/accessory-cap.glb',
+        undefined,
+      ),
     );
 
     await act(async () => resolve('data:image/png;base64,AAAA'));
@@ -122,5 +124,41 @@ describe('ShopItemPreview', () => {
     act(() => trigger?.([{ isIntersecting: true }]));
     await screen.findByRole('img', { name: 'Vista previa de Gorra azul' });
     expect(renderGlbThumbnail).toHaveBeenCalledTimes(1);
+  });
+
+  it('resets rendered thumbnail immediately when item model or tint changes', async () => {
+    renderGlbThumbnail.mockResolvedValueOnce('data:image/png;base64,FIRST');
+    let resolveSecond!: (value: string) => void;
+    renderGlbThumbnail.mockReturnValueOnce(
+      new Promise<string>((r) => {
+        resolveSecond = r;
+      }),
+    );
+
+    const { rerender } = render(<ShopItemPreview item={makeItem()} />);
+    expect(
+      await screen.findByRole('img', { name: 'Vista previa de Gorra azul' }),
+    ).toHaveAttribute('src', 'data:image/png;base64,FIRST');
+
+    rerender(
+      <ShopItemPreview
+        item={makeItem({
+          id: 'item-2',
+          name: 'Gorra roja',
+          metadata: { slot: 'head', assetId: 'cap', color: '#DC2626' },
+        })}
+      />,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Cargando vista previa',
+    );
+    expect(
+      screen.queryByRole('img', { name: /Vista previa/ }),
+    ).not.toBeInTheDocument();
+
+    await act(async () => resolveSecond('data:image/png;base64,SECOND'));
+    expect(
+      await screen.findByRole('img', { name: 'Vista previa de Gorra roja' }),
+    ).toHaveAttribute('src', 'data:image/png;base64,SECOND');
   });
 });

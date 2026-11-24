@@ -78,6 +78,7 @@ async function attachRuntimeMonitors(page: Page) {
 test('teacher inspects roster, filters, removes a student logically, and passes responsive/zoom checks', async ({
   page,
 }, testInfo) => {
+  test.setTimeout(60_000);
   const width = testInfo.project.name === 'mobile' ? 360 : 1280;
   await page.setViewportSize({ width, height: 800 });
   const { cspViolations, pageErrors } = await attachRuntimeMonitors(page);

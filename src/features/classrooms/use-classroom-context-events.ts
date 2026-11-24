@@ -5,7 +5,10 @@ import { ApiError } from '@/api/errors';
 import { classroomDetailQueryKey } from '@/api/query-keys';
 import { useSessionService, useSessionSnapshot } from '@/session/provider';
 import { readContextEvents } from './context-events';
-import { consumeOwnClassroomChange } from './own-classroom-change';
+import {
+  clearAllOwnClassroomChanges,
+  consumeOwnClassroomChange,
+} from './own-classroom-change';
 
 /**
  * Client-side connection renewal. It must stay below the backend
@@ -37,7 +40,7 @@ export function useClassroomContextEvents(
       // The echo of this user's own settings save only needs a refetch: the
       // open panel (and its unsaved state) must survive it. The refetch stays
       // authoritative, so a real revocation still hides private content.
-      if (consumeOwnClassroomChange(queryClient, classroomId)) {
+      if (consumeOwnClassroomChange(queryClient, userId, classroomId)) {
         void queryClient.invalidateQueries({ queryKey, exact: true });
         return;
       }
@@ -56,7 +59,10 @@ export function useClassroomContextEvents(
       clearTimeout(renewal);
       clearTimeout(retry);
     };
-    const unregister = controller.registerCleanup(stop);
+    const unregister = controller.registerCleanup(() => {
+      stop();
+      clearAllOwnClassroomChanges(queryClient);
+    });
     async function connect() {
       if (stopped) return;
       connection = new AbortController();

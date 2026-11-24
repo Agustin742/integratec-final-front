@@ -71,6 +71,7 @@ export function ChatDockList({
   registerItem,
 }: ChatDockListProps) {
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (closing) return;
     if (event.key === 'Escape' && !event.defaultPrevented) {
       event.preventDefault();
       onClose();
@@ -84,6 +85,8 @@ export function ChatDockList({
     <section
       id={id}
       aria-label={messages.listLabel}
+      inert={closing || undefined}
+      aria-hidden={closing || undefined}
       onKeyDown={handleKeyDown}
       data-state={closing ? 'closed' : 'open'}
       onAnimationEnd={(event) => {

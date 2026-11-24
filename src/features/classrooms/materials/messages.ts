@@ -56,6 +56,9 @@ export const materialMessages = {
     deletedDescription: (name: string) =>
       `Eliminamos «${name}». Sus archivos quedaron en «Sin módulo».`,
     deleteErrorTitle: 'No pudimos eliminar el módulo',
+    paginationLabel: (title: string) => `Paginación de ${title}`,
+    uncertainAction:
+      'No pudimos confirmar si el cambio se guardó en el servidor. Actualizamos la lista para verificarlo antes de reintentar.',
     unexpected: 'Ocurrió un error inesperado. Intentá de nuevo.',
     form: {
       createTitle: 'Nuevo módulo',
@@ -174,6 +177,8 @@ export const materialMessages = {
     removeErrors: {
       forbidden: 'No tenés permiso para quitar material de esta aula.',
       notFound: 'Este material ya fue quitado o no está disponible.',
+      uncertain:
+        'No pudimos confirmar si el archivo se quitó en el servidor. Actualizamos la lista para verificarlo antes de reintentar.',
       unexpected: 'Ocurrió un error inesperado al quitar el material.',
     },
     bot: {

@@ -352,4 +352,35 @@ describe('StudyGuideBotPanel (HU-BOT-002)', () => {
     expect(within(log).queryByRole('status')).not.toBeInTheDocument();
     expect(within(log).getByText(botMessages.botAuthorLabel)).toBeVisible();
   });
+
+  it('re-enables composer cleanly when an exam lock aborts an in-flight question and later unlocks', async () => {
+    let releaseAsk: (() => void) | undefined;
+    const store = createClassroomBotStore({
+      classroomId: CLASSROOM_ID,
+      onAsk: async () => {
+        await new Promise<void>((resolve) => {
+          releaseAsk = resolve;
+        });
+        return { answer: 'Respuesta tardía' };
+      },
+    });
+    mswServer.use(...store.handlers);
+    const { queryClient } = renderBotPanel({ role: 'STUDENT' });
+
+    const input = await screen.findByLabelText('Tu consulta para el asistente');
+    fireEvent.change(input, { target: { value: 'Pregunta abortada' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar consulta' }));
+    expect(input).toBeDisabled();
+
+    await waitFor(() => expect(releaseAsk).toBeDefined());
+    store.setExamLocked(true);
+    await queryClient.refetchQueries();
+    expect(await screen.findByText(botMessages.examLockedTitle)).toBeVisible();
+    expect(screen.queryByText('Respuesta tardía')).not.toBeInTheDocument();
+    releaseAsk?.();
+
+    store.setExamLocked(false);
+    await queryClient.refetchQueries();
+    await waitFor(() => expect(input).toBeEnabled());
+  });
 });

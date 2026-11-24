@@ -217,12 +217,17 @@ function ChatComposerForm({
   const abortControllerRef = useRef<AbortController | null>(null);
   const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Auto-grow: one line at rest, up to MAX_DRAFT_LINES lines, then the
-  // textarea scrolls inside. Measured in JS (no `field-sizing`: not universal).
-  // Runs on every value change, so a cleared draft goes back to one line.
-  useLayoutEffect(() => {
+  // The muted state is server-owned context (`chatMuted` on the classroom
+  // detail): while muted, only students lose the send path (S11). The
+  // disabled control is never the enforcement; a send that still reaches the
+  // server is rejected and that outcome is presented below.
+  const isMutedForMe = chatMuted && myRole === 'STUDENT';
+  const hasMentionPicker = canListDirectory && !isMutedForMe;
+
+  const syncHeight = useCallback(() => {
     const element = textareaRef.current;
     if (element === null) return;
+    const savedScrollTop = element.scrollTop;
     element.style.height = 'auto';
     if (element.scrollHeight <= 0) return; // no layout available
     const style = window.getComputedStyle(element);
@@ -241,7 +246,36 @@ function ChatComposerForm({
       px(style.borderBottomWidth);
     element.style.height = `${String(Math.min(wanted, maxHeight))}px`;
     element.style.overflowY = wanted > maxHeight ? 'auto' : 'hidden';
-  }, [bodyValue]);
+    element.scrollTop = savedScrollTop;
+  }, []);
+
+  // Auto-grow: one line at rest, up to MAX_DRAFT_LINES lines, then the
+  // textarea scrolls inside. Measured in JS (no `field-sizing`: not universal).
+  // Runs on every value/mute transition and width resize.
+  useLayoutEffect(() => {
+    syncHeight();
+  }, [bodyValue, isMutedForMe, syncHeight]);
+
+  useEffect(() => {
+    const element = textareaRef.current;
+    if (
+      element === null ||
+      isMutedForMe ||
+      typeof ResizeObserver === 'undefined'
+    ) {
+      return;
+    }
+    let lastWidth = element.clientWidth;
+    const observer = new ResizeObserver((entries) => {
+      const nextWidth = entries[0]?.contentRect.width ?? element.clientWidth;
+      if (nextWidth !== lastWidth) {
+        lastWidth = nextWidth;
+        syncHeight();
+      }
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [isMutedForMe, syncHeight]);
 
   useEffect(() => {
     if (focusOnMount) {
@@ -259,13 +293,6 @@ function ChatComposerForm({
       }
     };
   }, []);
-
-  // The muted state is server-owned context (`chatMuted` on the classroom
-  // detail): while muted, only students lose the send path (S11). The
-  // disabled control is never the enforcement; a send that still reaches the
-  // server is rejected and that outcome is presented below.
-  const isMutedForMe = chatMuted && myRole === 'STUDENT';
-  const hasMentionPicker = canListDirectory && !isMutedForMe;
 
   const rawMentionQuery = activeMention?.query ?? null;
 
@@ -711,7 +738,7 @@ function ChatComposerForm({
                   }}
                   onKeyDown={handleKeyDown}
                   className={cn(
-                    'min-w-0 flex-1 resize-none overflow-y-hidden rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground shadow-xs transition-colors',
+                    'min-h-11 min-w-0 flex-1 resize-none overflow-y-hidden rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground shadow-xs transition-colors',
                     'placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     'disabled:cursor-not-allowed disabled:opacity-50',
                     isSubmitting && 'opacity-70',

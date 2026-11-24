@@ -45,6 +45,7 @@ export const announcementMessages = {
     removeErrorTitle: 'No pudimos eliminar el anuncio',
     authorSelf: 'Vos',
     authorFallback: 'Equipo docente',
+    justNow: 'recién',
     roleTeacher: 'Docente',
     roleStudent: 'Estudiante',
     actionsAriaLabel: (title: string) => `Acciones del anuncio «${title}»`,

@@ -18,30 +18,42 @@ const OWN_CHANGE_WINDOW_MS = 15_000;
 
 const marks = new WeakMap<QueryClient, Map<string, number>>();
 
+function markKey(userId: string, classroomId: string): string {
+  return `${userId}:${classroomId}`;
+}
+
 export function markOwnClassroomChange(
   queryClient: QueryClient,
+  userId: string,
   classroomId: string,
 ): void {
-  const byClassroom = marks.get(queryClient) ?? new Map<string, number>();
-  byClassroom.set(classroomId, Date.now() + OWN_CHANGE_WINDOW_MS);
-  marks.set(queryClient, byClassroom);
+  const byScope = marks.get(queryClient) ?? new Map<string, number>();
+  byScope.set(markKey(userId, classroomId), Date.now() + OWN_CHANGE_WINDOW_MS);
+  marks.set(queryClient, byScope);
 }
 
 export function clearOwnClassroomChange(
   queryClient: QueryClient,
+  userId: string,
   classroomId: string,
 ): void {
-  marks.get(queryClient)?.delete(classroomId);
+  marks.get(queryClient)?.delete(markKey(userId, classroomId));
+}
+
+export function clearAllOwnClassroomChanges(queryClient: QueryClient): void {
+  marks.delete(queryClient);
 }
 
 /** True once per mark: the first hint inside the window consumes it. */
 export function consumeOwnClassroomChange(
   queryClient: QueryClient,
+  userId: string,
   classroomId: string,
 ): boolean {
-  const byClassroom = marks.get(queryClient);
-  const expiresAt = byClassroom?.get(classroomId);
+  const byScope = marks.get(queryClient);
+  const key = markKey(userId, classroomId);
+  const expiresAt = byScope?.get(key);
   if (expiresAt === undefined) return false;
-  byClassroom?.delete(classroomId);
+  byScope?.delete(key);
   return expiresAt >= Date.now();
 }

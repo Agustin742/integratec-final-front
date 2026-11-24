@@ -12,6 +12,7 @@ import { PaginationControls } from '@/components/pagination/pagination-controls'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useSessionService } from '@/session/provider';
+import { classroomDetailQueryKey } from '@/api/query-keys';
 import type { ClassroomDirectoryMemberDto } from '../activities/forum/forum-schema';
 import { listClassroomDirectoryMembers } from '../activities/forum/forum-service';
 import {
@@ -104,6 +105,27 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
     return (canPublish && item.authorId === userId) || canManageSchool;
   };
 
+  const accessKey = `${userId ?? 'anon'}:${canPublish}:${canManageSchool}`;
+  const [prevAccessKey, setPrevAccessKey] = useState(accessKey);
+  if (prevAccessKey !== accessKey) {
+    setPrevAccessKey(accessKey);
+    if (!canPublish) {
+      setComposerOpen(false);
+    }
+    if (!canPublish && !canManageSchool) {
+      setEditingAnnouncement(null);
+      setPendingConfirmId(null);
+    } else if (
+      editingAnnouncement &&
+      !(
+        (canPublish && editingAnnouncement.authorId === userId) ||
+        canManageSchool
+      )
+    ) {
+      setEditingAnnouncement(null);
+    }
+  }
+
   const query = useQuery({
     queryKey: classroomAnnouncementsQueryKey(
       userId ?? 'signed-out',
@@ -170,30 +192,42 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
       setPage(1);
     }
     if (userId === null) return;
-    await queryClient.invalidateQueries({
-      predicate: createClassroomAnnouncementsPredicate(userId, classroomId),
-    });
-    if (
-      editingAnnouncement === null ||
-      resetPage ||
-      editPageRef.current !== page
-    ) {
-      return;
-    }
-    const refreshed = queryClient.getQueryData<{
-      readonly items: readonly AnnouncementDto[];
-    }>(
-      classroomAnnouncementsQueryKey(userId, classroomId, {
-        page,
-        pageSize: PAGE_SIZE,
-      }),
-    );
-    if (
-      refreshed &&
-      !refreshed.items.some((item) => item.id === editingAnnouncement.id)
-    ) {
-      setEditingAnnouncement(null);
-      headingRef.current?.focus();
+    const targetPage = resetPage ? 1 : page;
+    try {
+      await queryClient.invalidateQueries({
+        predicate: createClassroomAnnouncementsPredicate(userId, classroomId),
+      });
+      if (
+        unmountAbortRef.current?.signal.aborted ||
+        editingAnnouncement === null ||
+        resetPage ||
+        editPageRef.current !== page
+      ) {
+        return;
+      }
+      const refreshed = await queryClient.fetchQuery({
+        queryKey: classroomAnnouncementsQueryKey(userId, classroomId, {
+          page: targetPage,
+          pageSize: PAGE_SIZE,
+        }),
+        queryFn: ({ signal }) =>
+          listClassroomAnnouncements(
+            client,
+            classroomId,
+            { page: targetPage, pageSize: PAGE_SIZE },
+            { signal },
+          ),
+        staleTime: 0,
+      });
+      if (
+        !unmountAbortRef.current?.signal.aborted &&
+        !refreshed.items.some((item) => item.id === editingAnnouncement.id)
+      ) {
+        setEditingAnnouncement(null);
+        headingRef.current?.focus();
+      }
+    } catch {
+      // Query invalidation leaves stale state visible with retry notice.
     }
   }
 
@@ -201,7 +235,6 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
     readonly title: string;
     readonly content: string;
   }): Promise<boolean> {
-    setPage(1);
     if (userId === null) return false;
     const params = { page: 1, pageSize: PAGE_SIZE };
     let first: { readonly items: readonly AnnouncementDto[] };
@@ -215,6 +248,10 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
     } catch {
       return false;
     }
+    if (unmountAbortRef.current?.signal.aborted) {
+      return false;
+    }
+    setPage(1);
     void queryClient.invalidateQueries({
       predicate: createClassroomAnnouncementsPredicate(userId, classroomId),
     });
@@ -269,22 +306,25 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
           : announcementMessages.form.updatedNoticeDescription(saved.title),
     });
     await reconcileAnnouncements(mode === 'create');
-    if (mode === 'edit') {
+    if (!unmountAbortRef.current?.signal.aborted && mode === 'edit') {
       headingRef.current?.focus();
     }
   }
 
   async function handleConfirmRemove(item: AnnouncementDto) {
-    if (removingRef.current) {
+    if (userId === null || !canModifyItem(item) || removingRef.current) {
       return;
     }
+    const signal = unmountAbortRef.current?.signal;
+    if (signal?.aborted) return;
     removingRef.current = true;
     setRemovingId(item.id);
     setActionNotice(null);
     try {
       await removeClassroomAnnouncement(client, classroomId, item.id, {
-        signal: unmountAbortRef.current?.signal,
+        signal,
       });
+      if (signal?.aborted) return;
       setPendingConfirmId(null);
       if (editingAnnouncement?.id === item.id) {
         setEditingAnnouncement(null);
@@ -299,10 +339,15 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
       await reconcileAnnouncements(false);
       headingRef.current?.focus();
     } catch (error) {
-      if (isAbortError(error)) {
+      if (isAbortError(error) || signal?.aborted) {
         return;
       }
       setPendingConfirmId(null);
+      if (error instanceof ApiError && error.status === 403) {
+        await queryClient.invalidateQueries({
+          queryKey: classroomDetailQueryKey(userId, classroomId),
+        });
+      }
       if (error instanceof ApiError && error.status === 404) {
         if (editingAnnouncement?.id === item.id) {
           setEditingAnnouncement(null);
@@ -330,7 +375,9 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
       });
     } finally {
       removingRef.current = false;
-      setRemovingId(null);
+      if (!signal?.aborted) {
+        setRemovingId(null);
+      }
     }
   }
 
@@ -469,9 +516,9 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
             onSuccess={(saved, mode) => {
               void handleFormSuccess(saved, mode);
             }}
-            onReconcileRequired={(resetPage) => {
-              void reconcileAnnouncements(resetPage);
-            }}
+            onReconcileRequired={(resetPage) =>
+              reconcileAnnouncements(resetPage)
+            }
             onUncertainCreate={handleUncertainCreate}
             onCancelCreate={() => {
               setComposerOpen(false);

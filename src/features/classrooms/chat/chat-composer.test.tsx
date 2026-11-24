@@ -1180,4 +1180,13 @@ describe('ChatComposer hardening (#113: mentions, cooldown)', () => {
       vi.useRealTimers();
     }
   });
+
+  it('keeps at least 44px touch height on the single-line draft textarea', async () => {
+    setupStore();
+    renderComposerRoute();
+    const textarea = await screen.findByRole('textbox', {
+      name: 'Mensaje del chat',
+    });
+    expect(textarea.className).toContain('min-h-11');
+  });
 });

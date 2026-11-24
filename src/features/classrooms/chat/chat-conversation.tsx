@@ -701,104 +701,100 @@ function ChatConversationView({
                     key={message.id}
                     data-own={isOwn ? 'true' : 'false'}
                     className={cn(
-                      'flex min-w-0',
-                      isOwn ? 'justify-end' : 'justify-start',
+                      'group flex min-w-0 items-start gap-1',
+                      isOwn
+                        ? 'flex-row-reverse justify-start'
+                        : 'justify-start',
                     )}
                   >
-                    {/* The wrapper anchors the moderation control next to the
-                        bubble (absolute: it reserves no space inside it, so
-                        the bubble is as tall for teachers as for students). */}
-                    <div className="group relative min-w-0 max-w-[88%]">
-                      <div
-                        data-bubble=""
+                    {/* Keep the moderation button as a sibling outside [data-bubble]
+                        so teacher and student bubbles share identical height, while
+                        keeping the whole row hoverable without pointer gaps. */}
+                    <div
+                      data-bubble=""
+                      className={cn(
+                        'min-w-0 max-w-[min(88%,calc(100%-3rem))] space-y-1 rounded-2xl border px-3 py-2 shadow-xs',
+                        isOwn
+                          ? 'rounded-br-md border-success-edge bg-success text-success-foreground'
+                          : 'rounded-bl-md border-edge bg-card text-foreground',
+                      )}
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        {isOwn ? (
+                          // Alignment and tint already say it is you.
+                          <span className="sr-only">{chat.authorSelf}</span>
+                        ) : (
+                          <>
+                            <span className="min-w-0 truncate text-xs font-semibold">
+                              {author.label}
+                            </span>
+                            {author.roleLabel !== null ? (
+                              <Badge
+                                variant={author.roleVariant}
+                                className="px-2 py-0 text-[10px] shadow-none"
+                              >
+                                {author.roleLabel}
+                              </Badge>
+                            ) : null}
+                          </>
+                        )}
+                        {isHidden ? (
+                          <Badge variant="secondary">{chat.hiddenBadge}</Badge>
+                        ) : null}
+                      </div>
+
+                      {/* Strict plain text node rendering (never dangerouslySetInnerHTML). */}
+                      <p
+                        data-hidden={isHidden ? 'true' : 'false'}
                         className={cn(
-                          'min-w-0 space-y-1 rounded-2xl border px-3 py-2 shadow-xs',
-                          isOwn
-                            ? 'rounded-br-md border-success-edge bg-success text-success-foreground'
-                            : 'rounded-bl-md border-edge bg-card text-foreground',
+                          'whitespace-pre-wrap break-words text-sm',
+                          isHidden && 'italic text-muted-foreground',
                         )}
                       >
-                        <div className="flex min-w-0 items-center gap-2">
-                          {isOwn ? (
-                            // Alignment and tint already say it is you.
-                            <span className="sr-only">{chat.authorSelf}</span>
-                          ) : (
-                            <>
-                              <span className="min-w-0 truncate text-xs font-semibold">
-                                {author.label}
-                              </span>
-                              {author.roleLabel !== null ? (
-                                <Badge
-                                  variant={author.roleVariant}
-                                  className="px-2 py-0 text-[10px] shadow-none"
-                                >
-                                  {author.roleLabel}
-                                </Badge>
-                              ) : null}
-                            </>
-                          )}
-                          {isHidden ? (
-                            <Badge variant="secondary">
-                              {chat.hiddenBadge}
-                            </Badge>
-                          ) : null}
-                        </div>
+                        {message.body}
+                      </p>
 
-                        {/* Strict plain text node rendering (never dangerouslySetInnerHTML). */}
-                        <p
-                          data-hidden={isHidden ? 'true' : 'false'}
-                          className={cn(
-                            'whitespace-pre-wrap break-words text-sm',
-                            isHidden && 'italic text-muted-foreground',
-                          )}
+                      <div className="flex flex-wrap items-center justify-end gap-x-2 text-[11px] opacity-80">
+                        {hiddenAt !== null ? (
+                          <span className="mr-auto">
+                            {chat.hiddenAudit(
+                              moderator,
+                              formatInstant(hiddenAt),
+                            )}
+                          </span>
+                        ) : null}
+                        <time
+                          dateTime={message.createdAt}
+                          title={formatInstant(message.createdAt)}
                         >
-                          {message.body}
-                        </p>
-
-                        <div className="flex flex-wrap items-center justify-end gap-x-2 text-[11px] opacity-80">
-                          {hiddenAt !== null ? (
-                            <span className="mr-auto">
-                              {chat.hiddenAudit(
-                                moderator,
-                                formatInstant(hiddenAt),
-                              )}
-                            </span>
-                          ) : null}
-                          <time
-                            dateTime={message.createdAt}
-                            title={formatInstant(message.createdAt)}
-                          >
-                            {formatTimeOfDay(message.createdAt)}
-                          </time>
-                        </div>
+                          {formatTimeOfDay(message.createdAt)}
+                        </time>
                       </div>
-                      {canModerateChat && !isHidden ? (
-                        <button
-                          type="button"
-                          aria-label={chat.moderation.hideAriaLabel(
-                            author.label,
-                            formatInstant(message.createdAt),
-                          )}
-                          aria-expanded={hideTarget?.id === message.id}
-                          disabled={hideTarget !== null}
-                          onClick={(event) => {
-                            hideTriggerRef.current = event.currentTarget;
-                            setHideTarget(message);
-                          }}
-                          className={cn(
-                            'absolute top-1 inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-opacity hover:bg-tray hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
-                            // Outer free side of the bubble.
-                            isOwn ? 'right-full mr-1' : 'left-full ml-1',
-                            // Hover-capable pointers: hidden until the row is
-                            // hovered or focus is inside (opacity only, so
-                            // it stays focusable); always visible on touch.
-                            'pointer-fine:pointer-events-none pointer-fine:opacity-0 pointer-fine:group-focus-within:pointer-events-auto pointer-fine:group-focus-within:opacity-100 pointer-fine:group-hover:pointer-events-auto pointer-fine:group-hover:opacity-100',
-                          )}
-                        >
-                          <HideIcon />
-                        </button>
-                      ) : null}
                     </div>
+                    {canModerateChat && !isHidden ? (
+                      <button
+                        type="button"
+                        aria-label={chat.moderation.hideAriaLabel(
+                          author.label,
+                          formatInstant(message.createdAt),
+                        )}
+                        aria-expanded={hideTarget?.id === message.id}
+                        disabled={hideTarget !== null}
+                        onClick={(event) => {
+                          hideTriggerRef.current = event.currentTarget;
+                          setHideTarget(message);
+                        }}
+                        className={cn(
+                          'mt-1 inline-flex size-11 pointer-fine:size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-opacity hover:bg-tray hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+                          // Hover-capable pointers: faded until the row is hovered
+                          // or focused (keeps pointer events active so Playwright
+                          // and real clicks never get intercepted by the row).
+                          'pointer-fine:opacity-0 pointer-fine:group-focus-within:opacity-100 pointer-fine:group-hover:opacity-100',
+                        )}
+                      >
+                        <HideIcon />
+                      </button>
+                    ) : null}
                   </li>
                 );
               })}

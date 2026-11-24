@@ -351,6 +351,46 @@ describe('ChatDock', () => {
       expect(surface).toContainElement(list);
       expect(surface?.firstElementChild?.contains(launcher)).toBe(true);
     });
+
+    it('marks closing list inert, closes list on Escape from launcher, and closes instead of minimizing on compact viewports', async () => {
+      stubReducedMotion(false);
+      setup();
+      const launcher = await openList();
+      const listRegion = document.getElementById(
+        launcher.getAttribute('aria-controls') ?? '',
+      );
+      expect(listRegion).not.toBeNull();
+      expect(listRegion).not.toHaveAttribute('inert');
+
+      fireEvent.keyDown(launcher, { key: 'Escape' });
+      expect(launcher).toHaveAttribute('aria-expanded', 'false');
+      expect(listRegion).toHaveAttribute('inert');
+      expect(listRegion).toHaveAttribute('aria-hidden', 'true');
+
+      // Compact viewport: Escape closes the conversation instead of entering hidden minimized state.
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        writable: true,
+        value: (query: string) => ({
+          matches: query === '(max-width: 639px)',
+          media: query,
+          addEventListener: () => undefined,
+          removeEventListener: () => undefined,
+        }),
+      });
+      await openConversation(/Matemática/);
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Chat de Matemática',
+      });
+      const draft = await within(dialog).findByRole('textbox', {
+        name: 'Mensaje del chat',
+      });
+      fireEvent.keyDown(draft, { key: 'Escape' });
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(
+        screen.queryByRole('region', { name: 'Chat de Matemática' }),
+      ).toBeNull();
+    });
   });
 
   it('opens a conversation with its history and a focused composer, one at a time', async () => {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import { ApiError } from '@/api/errors';
@@ -113,9 +113,12 @@ function StudyGuideBotConversation({
   const sendingRef = useRef(false);
   const activeAbortRef = useRef<AbortController | null>(null);
   const terminalReconciledRef = useRef(false);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
+      isMountedRef.current = false;
       activeAbortRef.current?.abort();
       activeAbortRef.current = null;
     };
@@ -143,6 +146,9 @@ function StudyGuideBotConversation({
     statusQuery.data !== undefined &&
     !statusQuery.data.available &&
     statusQuery.data.reason === 'exam_in_progress';
+
+  const composerId = useId();
+  const fieldErrorId = useId();
 
   useEffect(() => {
     if (isExamLocked || isTerminalStatusError) {
@@ -327,11 +333,11 @@ function StudyGuideBotConversation({
       });
     } finally {
       sendingRef.current = false;
-      setPendingQuestion(null);
       if (activeAbortRef.current === controller) {
         activeAbortRef.current = null;
       }
-      if (!controller.signal.aborted) {
+      if (isMountedRef.current) {
+        setPendingQuestion(null);
         setIsSending(false);
       }
     }
@@ -502,19 +508,17 @@ function StudyGuideBotConversation({
         noValidate
         className="space-y-1.5 rounded-2xl border border-edge bg-card p-2 shadow-panel"
       >
-        <label htmlFor="study-guide-bot-question" className="sr-only">
+        <label htmlFor={composerId} className="sr-only">
           {botMessages.composerLabel}
         </label>
         <div className="flex min-w-0 items-end gap-2">
           <textarea
-            id="study-guide-bot-question"
+            id={composerId}
             rows={2}
             value={question}
             disabled={isUnavailable || effectiveIsSending}
             aria-invalid={fieldError !== null || undefined}
-            aria-describedby={
-              fieldError !== null ? 'study-guide-bot-field-error' : undefined
-            }
+            aria-describedby={fieldError !== null ? fieldErrorId : undefined}
             placeholder={botMessages.composerPlaceholder}
             onChange={(event) => {
               setQuestion(event.target.value);
@@ -545,7 +549,7 @@ function StudyGuideBotConversation({
         </div>
         {fieldError !== null && (
           <p
-            id="study-guide-bot-field-error"
+            id={fieldErrorId}
             role="alert"
             className="px-3 text-xs text-destructive"
           >

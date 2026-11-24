@@ -12,8 +12,29 @@ export interface ModuleServiceOptions {
   readonly signal?: AbortSignal;
 }
 
+const uncertainModuleErrors = new WeakSet<ApiError>();
+
+/**
+ * Returns `true` when a module mutation failed with an outcome-uncertain
+ * result (`5xx`, transport/network error, or malformed `2xx` payload), meaning
+ * the UI must reconcile module queries before allowing a retry.
+ */
+export function isUncertainModuleError(error: unknown): boolean {
+  if (!(error instanceof ApiError)) {
+    return false;
+  }
+  if (uncertainModuleErrors.has(error)) {
+    return true;
+  }
+  return (
+    error.kind === 'network' || (error.status !== null && error.status >= 500)
+  );
+}
+
 function invalidResponse(): ApiError {
-  return mapApiError(undefined, new Response(null, { status: 502 }));
+  const err = mapApiError(undefined, new Response(null, { status: 502 }));
+  uncertainModuleErrors.add(err);
+  return err;
 }
 
 function parseList(payload: unknown): MaterialModuleListDto {

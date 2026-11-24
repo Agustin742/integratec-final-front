@@ -15,10 +15,61 @@ import { classroomMessages } from './messages';
 
 const copy = classroomMessages.members;
 const DIRECTORY_PARAMS = { page: 1, pageSize: 100 } as const;
+const MAX_DIRECTORY_PAGES = 50;
+
+async function listAllClassroomDirectoryMembers(
+  client: ReturnType<typeof useSessionService>['client'],
+  classroomId: string,
+  signal?: AbortSignal,
+) {
+  const first = await listClassroomDirectoryMembers(
+    client,
+    classroomId,
+    DIRECTORY_PARAMS,
+    { signal },
+  );
+  if (first.items.length >= first.total || first.items.length === 0) {
+    return first;
+  }
+
+  const seenUserIds = new Set(first.items.map((member) => member.userId));
+  const collected = [...first.items];
+  let page = first.page + 1;
+
+  while (collected.length < first.total && page <= MAX_DIRECTORY_PAGES) {
+    if (signal?.aborted) {
+      throw new DOMException('Aborted', 'AbortError');
+    }
+    const next = await listClassroomDirectoryMembers(
+      client,
+      classroomId,
+      { page, pageSize: first.pageSize },
+      { signal },
+    );
+    if (next.items.length === 0) {
+      break;
+    }
+    for (const member of next.items) {
+      if (!seenUserIds.has(member.userId)) {
+        seenUserIds.add(member.userId);
+        collected.push(member);
+      }
+    }
+    page += 1;
+  }
+
+  return {
+    items: collected,
+    page: 1,
+    pageSize: first.pageSize,
+    total: first.total,
+  };
+}
 
 /**
  * `GET /classrooms/{id}/members`: public member cards (name and role only),
- * shared with chat, notices and presence through the same query key.
+ * shared with chat, notices and presence through the same query key. Loads all
+ * pages when a classroom has more members than a single page.
  */
 export function useClassroomDirectory(classroomId: string) {
   const { client } = useSessionService();
@@ -31,9 +82,7 @@ export function useClassroomDirectory(classroomId: string) {
       DIRECTORY_PARAMS,
     ),
     queryFn: ({ signal }) =>
-      listClassroomDirectoryMembers(client, classroomId, DIRECTORY_PARAMS, {
-        signal,
-      }),
+      listAllClassroomDirectoryMembers(client, classroomId, signal),
     enabled: userId !== null && classroomId !== '',
     staleTime: 60_000,
     retry: false,

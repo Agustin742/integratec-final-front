@@ -73,6 +73,7 @@ export interface MaterialModuleSectionProps {
     module: MaterialModuleDto,
     trigger: HTMLElement | null,
   ) => void;
+  readonly onDeletedFallbackFocus?: () => void;
 }
 
 const iconProps = {
@@ -152,6 +153,7 @@ export function MaterialModuleSection({
   onAddFile,
   onEdit,
   onDelete,
+  onDeletedFallbackFocus,
 }: MaterialModuleSectionProps): ReactElement {
   const isModule = target.kind === 'module';
   const moduleEntry = isModule ? target.module : null;
@@ -289,6 +291,7 @@ export function MaterialModuleSection({
           items={data.items}
           actions={fileActions}
           label={`${materialMessages.list.regionLabel}: ${title}`}
+          onDeletedFallbackFocus={onDeletedFallbackFocus}
         />
         {pagination.totalPages > 1 ? (
           <div className="border-t border-edge p-3 sm:p-4">
@@ -296,7 +299,7 @@ export function MaterialModuleSection({
               page={data.page}
               pageSize={data.pageSize}
               total={data.total}
-              label={`Paginación de ${title}`}
+              label={materialMessages.modules.paginationLabel(title)}
               className="border-0 bg-transparent px-1 py-0 shadow-none"
               onPageChange={(nextPage: number) => {
                 fileActions.onCancelRemove();

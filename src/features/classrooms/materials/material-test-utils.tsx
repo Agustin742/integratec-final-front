@@ -58,13 +58,16 @@ export function renderMaterialPanel(options: {
     { initialEntries: [`/classrooms/${CLASSROOM_ID}`] },
   );
 
-  return render(
-    <ApiQueryProvider client={queryClient}>
-      <SessionProvider service={session.service}>
-        <RouterProvider router={router} />
-      </SessionProvider>
-    </ApiQueryProvider>,
-  );
+  return {
+    ...render(
+      <ApiQueryProvider client={queryClient}>
+        <SessionProvider service={session.service}>
+          <RouterProvider router={router} />
+        </SessionProvider>
+      </ApiQueryProvider>,
+    ),
+    queryClient,
+  };
 }
 
 export const MODULE_1 = '00000000-0000-4000-8000-000000002001';

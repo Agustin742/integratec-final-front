@@ -196,14 +196,14 @@
   @keyframes dock-in {
     from {
       opacity: 0;
-      translate: 0 -0.5rem;
+      translate: 0 0.5rem;
       scale: 1 0.96;
     }
   }
   @keyframes dock-out {
     to {
       opacity: 0;
-      translate: 0 -0.5rem;
+      translate: 0 0.5rem;
       scale: 1 0.96;
     }
   }

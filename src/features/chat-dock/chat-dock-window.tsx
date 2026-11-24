@@ -48,10 +48,17 @@ export function ChatDockWindow({
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (minimized || event.key !== 'Escape' || event.defaultPrevented) return;
     // Portaled layers (the moderation dialog) bubble through React: only the
-    // keys pressed inside this window's own DOM minimize it. The mention list
+    // keys pressed inside this window's own DOM handle Escape. The mention list
     // consumes its own Escape (`defaultPrevented`).
     if (!event.currentTarget.contains(event.target as Node)) return;
     event.preventDefault();
+    const isCompactViewport =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(max-width: 639px)').matches;
+    if (isCompactViewport) {
+      onClose();
+      return;
+    }
     onMinimize();
   };
 
@@ -66,7 +73,7 @@ export function ChatDockWindow({
       className={cn(
         'pointer-events-auto flex origin-bottom motion-safe:animate-dock-in w-[22rem] max-w-full flex-col overflow-hidden rounded-t-2xl border border-b-0 border-edge bg-card text-card-foreground shadow-float',
         minimized
-          ? 'max-sm:w-64'
+          ? 'max-sm:w-auto max-sm:max-w-[calc(100vw-10rem)]'
           : 'h-[min(36rem,calc(100dvh-6rem))] max-sm:fixed max-sm:inset-x-0 max-sm:top-0 max-sm:z-40 max-sm:h-dvh max-sm:w-auto max-sm:rounded-none max-sm:border-0 max-sm:pb-[env(safe-area-inset-bottom)]',
       )}
     >

@@ -18,6 +18,7 @@ import type { components } from '@/api/schema.generated';
 import { fakeSession } from '@/app/router/fake-session';
 import { SessionProvider } from '@/session/provider';
 import { profile } from '@/session/test-fixtures';
+import { expectAccessible } from '@/test/accessibility';
 import {
   TEST_API_BASE_URL,
   createClassroomDetailHandler,
@@ -334,8 +335,8 @@ describe('ClassroomSettingsPanel', () => {
     mswServer.use(
       http.get(`${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}`, () =>
         HttpResponse.json(
-          { code: 'NOT_FOUND', message: 'nope', correlationId: 'c' },
-          { status: 404 },
+          { code: 'INTERNAL_ERROR', message: 'boom', correlationId: 'c' },
+          { status: 500 },
         ),
       ),
     );
@@ -364,6 +365,45 @@ describe('ClassroomSettingsPanel', () => {
     expect(
       await screen.findByText('No pudimos cargar la configuración'),
     ).toBeVisible();
+  });
+
+  it('renders non-disclosing permission denial without retry when the classroom returns 404', async () => {
+    mswServer.use(
+      http.get(`${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}`, () =>
+        HttpResponse.json(
+          { code: 'NOT_FOUND', message: 'nope', correlationId: 'c' },
+          { status: 404 },
+        ),
+      ),
+    );
+    const client = createApiClient({ baseUrl: TEST_API_BASE_URL });
+    const session = fakeSession(
+      { status: 'authenticated', user: profile },
+      client,
+    );
+    const router = createMemoryRouter(
+      [
+        {
+          path: '/classrooms/:classroomId',
+          element: <ClassroomSettingsPanel />,
+        },
+      ],
+      { initialEntries: [`/classrooms/${CLASSROOM_ID}`] },
+    );
+    render(
+      <ApiQueryProvider client={createAppQueryClient()}>
+        <SessionProvider service={session.service}>
+          <RouterProvider router={router} />
+        </SessionProvider>
+      </ApiQueryProvider>,
+    );
+
+    expect(
+      await screen.findByText('Sin permisos para configurar el aula'),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Reintentar' }),
+    ).not.toBeInTheDocument();
   });
 
   it('gates the panel behind configure_classroom', async () => {
@@ -418,5 +458,77 @@ describe('ClassroomSettingsPanel', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     const region = copy.closest('section') ?? document.body;
     expect(within(region).getByText('Código de acceso')).toBeVisible();
+  });
+
+  it('disables inputs and switches while PATCH is in flight and is accessible', async () => {
+    let resolvePatch!: () => void;
+    mswServer.use(
+      http.patch(
+        `${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}`,
+        () =>
+          new Promise<Response>((resolve) => {
+            resolvePatch = () =>
+              resolve(
+                HttpResponse.json({
+                  id: CLASSROOM_ID,
+                  name: 'Matemática 5to B',
+                  subject: 'Álgebra',
+                  adultMode: false,
+                  chatMuted: false,
+                  updatedAt: '2026-11-24T20:00:00.000Z',
+                }),
+              );
+          }),
+      ),
+    );
+    const { container } = renderSettings();
+    const input = await nameField();
+    await expectAccessible(container);
+
+    fireEvent.change(input, { target: { value: 'Matemática 5to B' } });
+    fireEvent.click(saveButton());
+
+    await waitFor(() => expect(input).toBeDisabled());
+    expect(screen.getByRole('textbox', { name: /Materia/ })).toBeDisabled();
+    expect(
+      screen.getByRole('switch', { name: /Educación de adultos/ }),
+    ).toBeDisabled();
+
+    resolvePatch();
+    await waitFor(() => expect(input).toBeEnabled());
+    expect(input).toHaveValue('Matemática 5to B');
+  });
+
+  it('reconciles detail and classroom list on uncertain 5xx settings save', async () => {
+    mswServer.use(
+      http.patch(`${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}`, () =>
+        HttpResponse.json(
+          {
+            error: {
+              code: 'INTERNAL_ERROR',
+              message: 'fail',
+              correlationId: 'c',
+            },
+          },
+          { status: 500 },
+        ),
+      ),
+    );
+    const { queryClient } = renderSettings();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const input = await nameField();
+    fireEvent.change(input, { target: { value: 'Nombre Incierto' } });
+    fireEvent.click(saveButton());
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          queryKey: classroomDetailQueryKey(profile.id, CLASSROOM_ID),
+        }),
+      ),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ predicate: expect.any(Function) }),
+    );
   });
 });

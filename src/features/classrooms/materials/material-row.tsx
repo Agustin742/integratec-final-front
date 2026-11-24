@@ -40,12 +40,14 @@ export interface MaterialRowListProps {
   readonly items: readonly MaterialDto[];
   readonly actions: MaterialFileActions;
   readonly label: string;
+  readonly onDeletedFallbackFocus?: () => void;
 }
 
 export function MaterialRowList({
   items,
   actions,
   label,
+  onDeletedFallbackFocus,
 }: MaterialRowListProps): ReactElement {
   const triggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const cancelRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -58,9 +60,14 @@ export function MaterialRowList({
     if (pendingConfirmId && pendingConfirmId !== prev) {
       cancelRefs.current[pendingConfirmId]?.focus();
     } else if (!pendingConfirmId && prev) {
-      triggerRefs.current[prev]?.focus();
+      const trigger = triggerRefs.current[prev];
+      if (trigger?.isConnected) {
+        trigger.focus();
+      } else {
+        onDeletedFallbackFocus?.();
+      }
     }
-  }, [pendingConfirmId]);
+  }, [onDeletedFallbackFocus, pendingConfirmId]);
 
   return (
     <ul aria-label={label} className="min-w-0 divide-y divide-edge">

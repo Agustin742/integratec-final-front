@@ -1,4 +1,5 @@
 import { DEFAULT_LOCALE, DEFAULT_SCHOOL_TIME_ZONE } from '@/lib/dates';
+import { announcementMessages } from './messages';
 
 const relativeFormatter = new Intl.RelativeTimeFormat(DEFAULT_LOCALE, {
   numeric: 'auto',
@@ -28,7 +29,7 @@ export function formatNoticeAge(iso: string, now: number = Date.now()): string {
   }
   const age = now - published;
   if (age < MINUTE_MS) {
-    return 'recién';
+    return announcementMessages.list.justNow;
   }
   if (age < HOUR_MS) {
     return relativeFormatter.format(-Math.round(age / MINUTE_MS), 'minute');

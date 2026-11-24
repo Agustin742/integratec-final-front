@@ -194,4 +194,57 @@ describe('ClassroomMembersPanel', () => {
       screen.getByRole('tab', { name: copy.invitationsTab }),
     ).toBeVisible();
   });
+
+  test('loads all directory pages when classroom has over 100 members', async () => {
+    const firstPage = Array.from({ length: 100 }, (_, i) => ({
+      id: `id-${i + 1}`,
+      userId: `u-student-${i + 1}`,
+      displayName: `Estudiante ${i + 1}`,
+      role: 'STUDENT' as const,
+    }));
+    const secondPage = [
+      {
+        id: 'id-101',
+        userId: 'u-teacher-page2',
+        displayName: 'Docente Página Dos',
+        role: 'TEACHER' as const,
+      },
+      {
+        id: 'id-102',
+        userId: 'u-student-101',
+        displayName: 'Estudiante Ciento Uno',
+        role: 'STUDENT' as const,
+      },
+    ];
+    mswServer.use(
+      createClassroomContextHandler(CLASSROOM_ID, { myRole: 'STUDENT' }),
+      http.get(`${TEST_API_BASE_URL}/classrooms/:id/members`, ({ request }) => {
+        const page = Number(
+          new URL(request.url).searchParams.get('page') ?? '1',
+        );
+        return HttpResponse.json({
+          items: page === 1 ? firstPage : secondPage,
+          page,
+          pageSize: 100,
+          total: 102,
+        });
+      }),
+    );
+
+    renderMembers();
+
+    const teachersRegion = await screen.findByRole('region', {
+      name: new RegExp(`^${copy.teachersHeading}`),
+    });
+    expect(
+      within(teachersRegion).getByText('Docente Página Dos'),
+    ).toBeVisible();
+    const studentsRegion = screen.getByRole('region', {
+      name: new RegExp(`^${copy.studentsHeading}`),
+    });
+    expect(
+      within(studentsRegion).getByText('Estudiante Ciento Uno'),
+    ).toBeVisible();
+    expect(studentsRegion.querySelectorAll('li')).toHaveLength(101);
+  });
 });

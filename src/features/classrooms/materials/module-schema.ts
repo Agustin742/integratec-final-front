@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import type { components } from '@/api/schema.generated';
 
+z.config({ jitless: true });
+
 export type MaterialModuleDto = components['schemas']['MaterialModuleDto'];
 export type MaterialModuleListDto =
   components['schemas']['MaterialModuleListDto'];

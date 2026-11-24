@@ -3,15 +3,32 @@ import { useCallback, useEffect, useState } from 'react';
 /** Longest exit animation (`--motion-duration-base`) plus a small margin. */
 const EXIT_FALLBACK_MS = 260;
 
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
 function prefersReducedMotion(): boolean {
   try {
     return (
       typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      window.matchMedia(REDUCED_MOTION_QUERY).matches
     );
   } catch {
     return false;
   }
+}
+
+function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(prefersReducedMotion);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const query = window.matchMedia(REDUCED_MOTION_QUERY);
+    const update = () => setReduced(query.matches);
+    update();
+    query.addEventListener?.('change', update);
+    return () => query.removeEventListener?.('change', update);
+  }, []);
+
+  return reduced;
 }
 
 /**
@@ -25,10 +42,11 @@ function prefersReducedMotion(): boolean {
  */
 export function useDockPresence(open: boolean) {
   const [exited, setExited] = useState(!open);
+  const reducedMotion = usePrefersReducedMotion();
   const animated =
     typeof window !== 'undefined' &&
     typeof window.matchMedia === 'function' &&
-    !prefersReducedMotion();
+    !reducedMotion;
 
   // Reopening cancels a finished exit (state adjusted during render).
   if (open && exited) {

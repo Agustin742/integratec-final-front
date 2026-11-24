@@ -1,4 +1,4 @@
-import type { ReactElement, ReactNode } from 'react';
+import { useId, type ReactElement, type ReactNode } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { announcementMessages } from './messages';
@@ -55,16 +55,17 @@ export function NoticeBoardEmpty({
   readonly description: string;
   readonly action?: ReactNode;
 }): ReactElement {
+  const titleId = useId();
   return (
     <NoticeBoardSurface>
       <section
-        aria-labelledby="notice-board-empty-title"
+        aria-labelledby={titleId}
         data-state-kind="empty"
         className="mx-auto max-w-md space-y-2 rounded-2xl border border-dashed border-border bg-card px-6 py-8 text-center shadow-ambient"
       >
         <PinIcon />
         <h4
-          id="notice-board-empty-title"
+          id={titleId}
           className="font-display text-lg font-semibold text-foreground"
         >
           {title}

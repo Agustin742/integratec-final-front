@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { HttpResponse, http } from 'msw';
 import {
   afterAll,
   afterEach,
@@ -8,7 +9,10 @@ import {
   it,
   vi,
 } from 'vitest';
-import { createClassroomMaterialsStore } from '@/test/msw/handlers';
+import {
+  TEST_API_BASE_URL,
+  createClassroomMaterialsStore,
+} from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
 import {
   CLASSROOM_ID,
@@ -669,5 +673,101 @@ describe('MaterialPanel modules', () => {
       'Unidad 2',
       'Unidad 3',
     ]);
+  });
+
+  it('closes an open upload dialog immediately when publish_content capability is revoked', async () => {
+    let capabilities: Array<'publish_content' | 'configure_bot'> = [
+      'publish_content',
+    ];
+    const store = createClassroomMaterialsStore({
+      classroomId: CLASSROOM_ID,
+      initialModules: THREE_MODULES,
+    });
+    mswServer.use(...store.handlers);
+    const { queryClient } = renderMaterialPanel({ role: 'TEACHER' });
+    mswServer.use(
+      http.get(`${TEST_API_BASE_URL}/classrooms/${CLASSROOM_ID}`, () =>
+        HttpResponse.json({
+          id: CLASSROOM_ID,
+          name: 'Matemática 5to A',
+          subject: null,
+          schoolId: null,
+          independentTeacherId: null,
+          adultMode: false,
+          chatMuted: false,
+          collaborationLocked: false,
+          gamesDisabled: false,
+          myRole: capabilities.includes('publish_content')
+            ? 'TEACHER'
+            : 'STUDENT',
+          capabilities,
+          availablePanels: ['material'],
+          deskCount: 12,
+          pet: null,
+          createdAt: '2026-11-18T10:00:00.000Z',
+          updatedAt: '2026-11-18T10:00:00.000Z',
+        }),
+      ),
+    );
+    await moduleSection('Unidad 1');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Agregar archivo a «Unidad 1»' }),
+    );
+    expect(
+      await screen.findByRole('dialog', {
+        name: 'Subir material a «Unidad 1»',
+      }),
+    ).toBeVisible();
+
+    capabilities = [];
+    await queryClient.invalidateQueries();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', {
+          name: 'Subir material a «Unidad 1»',
+        }),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it('reconciles modules after an uncertain 500 module creation error', async () => {
+    const store = createClassroomMaterialsStore({
+      classroomId: CLASSROOM_ID,
+      initialModules: THREE_MODULES,
+    });
+    mswServer.use(...store.handlers);
+    let invalidated = false;
+    const { queryClient } = renderMaterialPanel({ role: 'TEACHER' });
+    const origInvalidate = queryClient.invalidateQueries.bind(queryClient);
+    vi.spyOn(queryClient, 'invalidateQueries').mockImplementation((...args) => {
+      invalidated = true;
+      return origInvalidate(...args);
+    });
+
+    await moduleSection('Unidad 1');
+    fireEvent.click(screen.getByRole('button', { name: 'Nuevo módulo' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Nuevo módulo' });
+    fireEvent.change(within(dialog).getByLabelText('Nombre del módulo'), {
+      target: { value: 'Unidad 4' },
+    });
+    store.failNext('moduleCreate', {
+      status: 500,
+      body: {
+        code: 'INTERNAL_ERROR',
+        message: 'timeout',
+        correlationId: 'corr-mod-500',
+      },
+    });
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Crear módulo' }),
+    );
+
+    await waitFor(() => expect(invalidated).toBe(true));
+    expect(
+      await within(dialog).findByText(
+        /No pudimos confirmar si el cambio se guardó en el servidor/,
+      ),
+    ).toBeVisible();
   });
 });

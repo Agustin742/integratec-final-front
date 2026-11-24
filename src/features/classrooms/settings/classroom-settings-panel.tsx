@@ -33,8 +33,12 @@ export function ClassroomSettingsPanel({
   }
 
   if (context.status === 'error') {
-    return context.error.kind === 'forbidden' ||
-      context.error.status === 403 ? (
+    const isTerminalDenied =
+      context.error.kind === 'forbidden' ||
+      context.error.status === 403 ||
+      context.error.kind === 'not-found' ||
+      context.error.status === 404;
+    return isTerminalDenied ? (
       <ErrorState
         headingLevel="h3"
         title={settingsMessages.forbiddenTitle}
