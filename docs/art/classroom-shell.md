@@ -57,6 +57,15 @@ Every GLB uses `1 unit = 1 meter`, `+Y` up, applied transforms, and faces `+Z` i
 - **Near Cutaway Skirting & Entrance**: Place `baseboard-cutaway.glb` along `x = maxX` (`rotation.y = -Math.PI / 2`) and `z = maxZ` (`rotation.y = 0`) leaving the `2.0 m` entrance gap `x ∈ [-1, +1]`, flanked by `baseboard-doorway-post.glb` at `(±1.08, 0, maxZ + 0.06)`.
 - **Standalone Ceiling Lights (no beams/ceiling, mount pivot `Y = 0`)**: Hang `ceiling-light.glb` instances directly at `Y = 2.65 m` (`x ∈ {-4.2, 0.0, +4.2}`, `z ∈ {-3.0, +1.8}`). Each lamp hangs `0.445 m`, keeping `>= 2.205 m` headroom above the floor and unobstructed isometric sightlines.
 
+### Three.js Lighting & Tone Mapping Reference
+
+All PBR material colors, roughness values, and relief geometry are embedded in the `.glb` modules, while the contrast seen in `assembly-1280.png` comes from pairing those materials with directional key lighting, cool shadow fill, and tone mapping (a flat ambient/HDRI preview without scene lights will look noticeably flatter):
+
+- **Renderer & tone mapping**: Use `THREE.SRGBColorSpace` with `THREE.AgXToneMapping` (matching Blender `AgX — Medium High Contrast`, exposure `~1.04`, or `THREE.ACESFilmicToneMapping` as fallback) to preserve tonal separation across warm cream/sand/terracotta surfaces without clipping shadows to black.
+- **Key directional light (`DirectionalLight`)**: Warm `#FFF0D8`, shadow-casting (`castShadow = true`, soft PCF shadows), angled from above-east (e.g. `(7.0, 11.0, 3.5)` aiming at `(0, 1.2, 0)`), keeping a strong key-to-fill ratio (`~7.5:1`, matching the Cycles preview rig's `3.2` key vs `0.42` fill).
+- **Cool lavender shadow fill**: Pair the key light with a low-intensity cool lavender fill (`#B5A7D6`, via a secondary `DirectionalLight` from `(-6.0, 6.0, 7.0)` and/or `HemisphereLight` / ambient bounce around `~0.3` relative to the key) so shaded wall recesses, wainscoting, and overhangs retain cool depth.
+- **Mesh shadow flags**: Enable `castShadow` and `receiveShadow` on opaque architectural meshes (`wall-*`, `baseboard-*`, `floor-*`, `window` frame, `window-curtains`, `ceiling-light`), and keep translucent `ShellGlassTeal` / `ShellGlassHighlight` (`BLEND`) panes `castShadow = false` so sunlight passes through the windows.
+
 ## Palette & Materials
 
 | Material                                 | Color / Purpose                                                                      |       Roughness | Metallic | Alpha   |
