@@ -140,6 +140,13 @@ describe('createCallRoomClient join (#141)', () => {
 });
 
 describe('createCallRoomClient live room (#141)', () => {
+  it('reads an empty snapshot while the room state has not synced yet', async () => {
+    const { sdk, connection } = await open();
+    (sdk.lastRoom.state as unknown as { participants?: unknown }).participants =
+      undefined;
+    expect(connection.getSnapshot().participants.size).toBe(0);
+  });
+
   it('reads participants, flags and appearance into a plain snapshot', async () => {
     const { sdk, h, connection } = await open();
     sdk.lastRoom.setParticipant({

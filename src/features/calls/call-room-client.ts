@@ -227,7 +227,8 @@ function reasonFromClose(
 
 function readSnapshot(state: CallState): CallStateSnapshot {
   const participants = new Map<string, CallParticipantView>();
-  state.participants.forEach((participant, sessionId) => {
+  // Before the first full state patch the decoded state has no map yet.
+  state.participants?.forEach((participant, sessionId) => {
     const items: Record<string, CallEquippedItemView> = {};
     participant.appearance?.items?.forEach((item, slot) => {
       items[slot] = Object.freeze({
