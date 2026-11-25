@@ -234,11 +234,11 @@ Seasonal:
 
 ### Classroom themes
 
-- [ ] Warm
-- [ ] Night
-- [ ] Space
-- [ ] Forest
-- [ ] Holiday
+- [x] Warm
+- [x] Night
+- [x] Space
+- [x] Forest
+- [x] Holiday
 
 ### Other spaces (if more than one room)
 
