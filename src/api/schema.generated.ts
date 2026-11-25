@@ -806,7 +806,7 @@ export interface paths {
         put?: never;
         /**
          * Grade a file submission
-         * @description Classroom staff (`OWNER`, `ADMIN`, or assigned `TEACHER`) only. Assigns a 0-100 score and visible feedback (`1-5000` characters) to an ungraded `FILE` submission, computes server-weighted points (`round(score * typeWeight * activity.weightMultiplier)`), credits the points ledger atomically when points > 0, and records a student-only `grade_posted` notification. Returns `409` if already graded or not a `FILE` activity, `403` for classroom students or linked parents, and `404` for out-of-scope actors.
+         * @description Classroom staff (`OWNER`, `ADMIN`, or assigned `TEACHER`) only. Assigns a 0-100 score and visible feedback (`1-5000` characters) to an ungraded `FILE` submission, computes server-weighted points (`round(score * typeWeight * activity.weightMultiplier)`), credits the points ledger atomically when points > 0, and records `grade_posted` notifications for the student and any active linked parents when adult mode is off. Returns `409` if already graded or not a `FILE` activity, `403` for classroom students or linked parents, and `404` for out-of-scope actors.
          */
         post: operations["SubmissionGradesController_grade"];
         delete?: never;
@@ -814,7 +814,7 @@ export interface paths {
         head?: never;
         /**
          * Regrade an existing submission grade
-         * @description Classroom staff (`OWNER`, `ADMIN`, or assigned `TEACHER`) only. Uses optimistic concurrency (`version`) to update score and feedback, appends a `GradeRevision` row, applies a compensating ledger entry (or initial earning from 0) when weighted points change, and records a student-only `grade_posted` notification. Returns `409` on stale `version` or if a negative delta would drive student points below zero.
+         * @description Classroom staff (`OWNER`, `ADMIN`, or assigned `TEACHER`) only. Uses optimistic concurrency (`version`) to update score and feedback, appends a `GradeRevision` row, applies a compensating ledger entry (or initial earning from 0) when weighted points change, and records `grade_posted` notifications for the student and any active linked parents when adult mode is off. Returns `409` on stale `version` or if a negative delta would drive student points below zero.
          */
         patch: operations["SubmissionGradesController_regrade"];
         trace?: never;
@@ -1008,6 +1008,46 @@ export interface paths {
          * @description Atomically saves `EquippedItem` for the authenticated active student after validating the slot (404), the shop item (404), its kind/slot compatibility (409), and classroom-scoped ownership against StudentPurchase (403). Body `{ shopItemId: string | null }`; null (or an absent field) unequips the slot. Idempotent.
          */
         put: operations["EquipmentController_setSlot"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/parent-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List active parent-child links for the authenticated user
+         * @description Returns all active parent links for the authenticated user whose classroom (and owning school, if any) is live and whose linked child is still an active enrolled student. Links in adult-mode classrooms are included with `adultMode: true` so clients can display them as disabled while adult mode is active. Ordered by `createdAt` ascending, then `id` ascending.
+         */
+        get: operations["FamilyController_listMyParentLinks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/parent-links/{linkId}/report-card": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a linked child's report card and participation metrics
+         * @description Parent-only read view (HU-ACT-006) scoped to one active parent link. Reuses the same graded-activity report card and participation metrics as the student view. Returns `404` for malformed UUIDs, foreign or inactive links, deleted classrooms/schools, or removed students (strict anti-enumeration), and `403` while the classroom is in adult education mode.
+         */
+        get: operations["FamilyController_getChildReportCard"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -2867,6 +2907,109 @@ export interface components {
              */
             shopItemId?: string | null;
         };
+        FamilyLinkDto: {
+            /**
+             * Format: uuid
+             * @description ParentLink UUID.
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Classroom UUID.
+             */
+            classroomId: string;
+            /** @description Classroom display name. */
+            classroomName: string;
+            /** @description Classroom subject or description, if configured. */
+            classroomSubject: string | null;
+            /**
+             * Format: uuid
+             * @description Owning school UUID, or null for an independent-teacher classroom.
+             */
+            schoolId: string | null;
+            /** @description Whether the classroom is currently in adult education mode. Existing links remain visible so clients can indicate that parent actions are disabled while adult mode is active. */
+            adultMode: boolean;
+            /**
+             * Format: uuid
+             * @description Linked student user UUID.
+             */
+            childId: string;
+            /** @description Linked student display name. */
+            childDisplayName: string;
+            /**
+             * Format: date-time
+             * @description Link creation timestamp (UTC ISO-8601).
+             */
+            createdAt: string;
+        };
+        FamilyLinksResponseDto: {
+            /** @description Active parent links where the classroom and school are live and the child is an active enrolled student, ordered by createdAt ascending then id ascending. */
+            items: components["schemas"]["FamilyLinkDto"][];
+        };
+        ReportCardItemDto: {
+            /**
+             * Format: uuid
+             * @description Graded activity UUID.
+             */
+            activityId: string;
+            /** @description Activity title frozen at grading time; later edits do not change it. */
+            activityTitle: string;
+            /**
+             * @description Activity type.
+             * @enum {string}
+             */
+            activityType: "TP" | "EXAM";
+            /** @description Activity maxScore (0-100) frozen at grading time; later edits do not change it. */
+            maxScore: number;
+            /** @description Awarded score (0..maxScore). */
+            score: number;
+            /** @description Written feedback left by the grader. */
+            feedback: string;
+            /** @description Net credited weighted points for this grade. */
+            pointsAwarded: number;
+            /** @description Whether the submission was late. */
+            isLate: boolean;
+            /**
+             * Format: date-time
+             * @description Submission instant (UTC).
+             */
+            submittedAt: string;
+            /**
+             * Format: date-time
+             * @description Latest grading instant (UTC).
+             */
+            gradedAt: string;
+        };
+        StudentParticipationSummaryDto: {
+            /** @description Sum of connected seconds across all recorded UTC days. */
+            connectedSeconds: number;
+            /** @description Sum of raw submission events across all recorded UTC days. */
+            submissionCount: number;
+            /** @description Sum of classroom chat messages sent across all recorded UTC days. */
+            messageCount: number;
+            /** @description Number of graded submissions to published non-deleted activities. */
+            gradedCount: number;
+            /** @description Number of submitted but not yet graded submissions to published non-deleted activities. */
+            ungradedCount: number;
+            /** @description Number of published non-deleted activities without a submission yet. */
+            pendingCount: number;
+            /** @description Mean percentage score (0-100, rounded to 2 decimals) across graded published activities with maxScore > 0, or null when none are graded. */
+            averageScorePercent: number | null;
+        };
+        FamilyReportCardResponseDto: {
+            /** @description Verified active parent-child link summary. */
+            link: components["schemas"]["FamilyLinkDto"];
+            /** @description Graded published activities for the linked child, latest grading first. */
+            items: components["schemas"]["ReportCardItemDto"][];
+            /** @description Current 1-based page number. */
+            page: number;
+            /** @description Page size. */
+            pageSize: number;
+            /** @description Total number of graded published activities for the linked child. */
+            total: number;
+            /** @description Aggregated participation and grade progress totals for the linked child. */
+            metrics: components["schemas"]["StudentParticipationSummaryDto"];
+        };
         StreakSummaryDto: {
             /** @description Consecutive qualifying local days whose chain is still alive (the last one is today or yesterday). A bare login never changes it. */
             currentStreak: number;
@@ -3452,40 +3595,6 @@ export interface components {
         };
         CreateForumPostDto: {
             body: string;
-        };
-        ReportCardItemDto: {
-            /**
-             * Format: uuid
-             * @description Graded activity UUID.
-             */
-            activityId: string;
-            /** @description Activity title frozen at grading time; later edits do not change it. */
-            activityTitle: string;
-            /**
-             * @description Activity type.
-             * @enum {string}
-             */
-            activityType: "TP" | "EXAM";
-            /** @description Activity maxScore (0-100) frozen at grading time; later edits do not change it. */
-            maxScore: number;
-            /** @description Awarded score (0..maxScore). */
-            score: number;
-            /** @description Written feedback left by the grader. */
-            feedback: string;
-            /** @description Net credited weighted points for this grade. */
-            pointsAwarded: number;
-            /** @description Whether the submission was late. */
-            isLate: boolean;
-            /**
-             * Format: date-time
-             * @description Submission instant (UTC).
-             */
-            submittedAt: string;
-            /**
-             * Format: date-time
-             * @description Latest grading instant (UTC).
-             */
-            gradedAt: string;
         };
         DailyMetricDto: {
             /**
@@ -6978,6 +7087,99 @@ export interface operations {
             };
             /** @description Per-user equipment change rate limit exceeded. */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    FamilyController_listMyParentLinks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active parent-child links for the authenticated user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FamilyLinksResponseDto"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    FamilyController_getChildReportCard: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                /** @description ParentLink UUID */
+                linkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The linked child's report card and participation metrics. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FamilyReportCardResponseDto"];
+                };
+            };
+            /** @description Invalid pagination parameters (`page`, `pageSize`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Parent viewing is disabled while the classroom is in adult education mode. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Malformed, nonexistent, inactive, or inaccessible parent link. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

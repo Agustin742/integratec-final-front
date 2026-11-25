@@ -1758,3 +1758,76 @@ export function createClassroomEquipmentPredicate(
     );
   };
 }
+
+export interface FamilyReportCardQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+}
+
+export interface NormalizedFamilyReportCardQueryParams {
+  readonly linkId: string;
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+/**
+ * Key of `GET /me/parent-links`: active parent-child links for the
+ * authenticated user, scoped by `userId` (`rules/state-management.md`).
+ */
+export function familyLinksQueryKey(userId: string): ScopedQueryKey {
+  return createScopedQueryKey({ userId }, 'family', 'links');
+}
+
+/**
+ * Key of `GET /me/parent-links/{linkId}/report-card`: a linked child's
+ * paginated report card and participation summary, scoped by `userId` and
+ * `linkedChildId` (`linkId`) so switching children or accounts reads an
+ * isolated cache entry (`rules/state-management.md`, `rules/classrooms-and-roles.md`).
+ */
+export function familyReportCardQueryKey(
+  userId: string,
+  linkId: string,
+  params: FamilyReportCardQueryParams = {},
+): ScopedQueryKey<NormalizedFamilyReportCardQueryParams> {
+  const normalizedLinkId = normalizeRequiredText(linkId, 'linkId');
+  const normalizedParams = Object.freeze({
+    linkId: normalizedLinkId,
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+  });
+  return createScopedQueryKey(
+    { userId, linkedChildId: normalizedLinkId },
+    'family',
+    'report-card',
+    normalizedParams,
+  );
+}
+
+/**
+ * Predicate matching every family report card query entry owned by `userId`
+ * and `linkId`. Used to clear stale pages on terminal `403`/`404` responses.
+ */
+export function createFamilyReportCardPredicate(
+  userId: string,
+  linkId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedLinkId = normalizeRequiredText(linkId, 'linkId');
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; linkedChildId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.linkedChildId === normalizedLinkId &&
+      segment.domain === 'family' &&
+      segment.resource === 'report-card'
+    );
+  };
+}
