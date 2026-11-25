@@ -60,6 +60,10 @@ export interface RealtimeClassroomControls {
   readonly chatMuted?: boolean | undefined;
   readonly collaborationLocked?: boolean | undefined;
   readonly gamesDisabled?: boolean | undefined;
+  /** A class voice call is running (mirrored from the call room, #149). */
+  readonly classCallActive?: boolean | undefined;
+  /** Focus mode locks the 3D world for students during the class call. */
+  readonly focusMode?: boolean | undefined;
   readonly frozen: boolean;
 }
 
@@ -134,6 +138,8 @@ export interface ClassroomRealtimeClient {
   connect(classroomId: string): Promise<boolean>;
   disconnect(): Promise<void>;
   sendAvatarInput(input: AvatarInput): boolean;
+  /** Sends a client message after validating it against its contract schema. */
+  send<T>(type: string, schema: z.ZodType<T>, payload: unknown): boolean;
   onMessage<T>(
     type: string,
     schema: z.ZodType<T>,
@@ -282,11 +288,19 @@ function readControls(
     typeof record.gamesDisabled === 'boolean'
       ? record.gamesDisabled
       : undefined;
+  const classCallActive =
+    typeof record.classCallActive === 'boolean'
+      ? record.classCallActive
+      : undefined;
+  const focusMode =
+    typeof record.focusMode === 'boolean' ? record.focusMode : undefined;
   const frozen = typeof record.frozen === 'boolean' ? record.frozen : false;
   if (
     chatMuted === undefined &&
     collaborationLocked === undefined &&
     gamesDisabled === undefined &&
+    !classCallActive &&
+    !focusMode &&
     !frozen
   ) {
     return DEFAULT_CONTROLS;
@@ -295,6 +309,8 @@ function readControls(
     ...(chatMuted !== undefined ? { chatMuted } : {}),
     ...(collaborationLocked !== undefined ? { collaborationLocked } : {}),
     ...(gamesDisabled !== undefined ? { gamesDisabled } : {}),
+    ...(classCallActive !== undefined ? { classCallActive } : {}),
+    ...(focusMode !== undefined ? { focusMode } : {}),
     frozen,
   });
 }
@@ -401,7 +417,7 @@ function classifyFailure(
   };
 }
 
-function isUnauthorizedError(error: unknown): boolean {
+export function isUnauthorizedError(error: unknown): boolean {
   const code = extractErrorCode(error);
   if (
     code === CLOSE_CODE_ACCESS_REVOKED ||
@@ -935,6 +951,17 @@ export function createClassroomRealtimeClient(
         return false;
       }
       activeRoom.send(AVATAR_INPUT_MESSAGE, parsed.data);
+      return true;
+    },
+    send(type, schema, payload) {
+      if (disposed || snapshot.status !== 'connected' || !activeRoom) {
+        return false;
+      }
+      const parsed = schema.safeParse(payload);
+      if (!parsed.success) {
+        return false;
+      }
+      activeRoom.send(type, parsed.data);
       return true;
     },
     onMessage(type, schema, handler) {
