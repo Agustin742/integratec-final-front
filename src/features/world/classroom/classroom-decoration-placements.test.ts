@@ -157,7 +157,10 @@ describe('deriveDecorationPlacements', () => {
     );
     const others: [string, Rect][] = [
       ...layout.obstacles.map((o, i): [string, Rect] => [`desk ${i}`, o]),
-      ...layout.props.map((p): [string, Rect] => [p.id, p]),
+      // The shared layout lists the floor decorations themselves as props; skip those.
+      ...layout.props
+        .filter((p) => !footprints.some((f) => f.id === p.id))
+        .map((p): [string, Rect] => [p.id, p]),
       ...furniture.map((p): [string, Rect] => [p.moduleId, worldRect(p)]),
     ];
     for (const item of footprints) {
@@ -180,6 +183,19 @@ describe('deriveDecorationPlacements', () => {
         if (other.id === item.id) continue;
         expect(overlap(item, other), `${item.id} vs ${other.id}`).toBe(false);
       }
+    }
+  });
+
+  // Collision footprints may differ from the GLB extents by a few centimetres (1 decimal).
+  it('matches the shared layout props so avatars and NPCs collide with the floor decorations', () => {
+    const footprints = deriveDecorationFloorFootprints(layout);
+    for (const item of footprints) {
+      const prop = layout.props.find((p) => p.id === item.id);
+      expect(prop, item.id).toBeDefined();
+      expect(prop!.minX, item.id).toBeCloseTo(item.minX, 1);
+      expect(prop!.maxX, item.id).toBeCloseTo(item.maxX, 1);
+      expect(prop!.minZ, item.id).toBeCloseTo(item.minZ, 1);
+      expect(prop!.maxZ, item.id).toBeCloseTo(item.maxZ, 1);
     }
   });
 
