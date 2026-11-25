@@ -10,6 +10,7 @@ import {
   DEFAULT_BACKEND_REPO,
   FRONTEND_OUTPUT_PATHS,
   GENERATED_HEADER,
+  extractCallContracts,
   formatPulledTypeArtifact,
   parseAndValidateOpenApiDocument,
   parseSyncCliArgs,
@@ -316,6 +317,80 @@ describe('sync-contracts', () => {
         "import { Schema, type, type DataChange } from '@colyseus/schema';",
       );
       expect(syncedAvatar).toContain('export interface Avatar');
+    });
+  });
+
+  describe('nested call and appearance schemas (#141)', () => {
+    it('extracts only the self-contained call contract section', () => {
+      const source = [
+        'export const X = 1;',
+        '',
+        '/**',
+        ' * Voice call contract (#149). Intro.',
+        ' */',
+        "export const CALL_ROOM_NAME = 'call';",
+        'export type CallRingCanceledPayload = string;',
+        '',
+        'export interface LayoutBox {}',
+      ].join(String.fromCharCode(10));
+      const extracted = extractCallContracts(source);
+      expect(extracted).toContain("import { z } from 'zod';");
+      expect(extracted).toContain('CALL_ROOM_NAME');
+      expect(extracted).not.toContain('LayoutBox');
+      expect(extracted).not.toContain('export const X');
+      expect(extractCallContracts('export const X = 1;')).toBeNull();
+    });
+
+    it('syncs call and appearance schemas and rewrites PascalCase relative imports to kebab-case generated files', async () => {
+      const backendDir = await createTempDir('backend-with-call-');
+      const frontendDir = await createTempDir('frontend-with-call-');
+      const seed = async (artifactPath: string, content: string) => {
+        const file = path.join(backendDir, artifactPath);
+        await mkdir(path.dirname(file), { recursive: true });
+        await writeFile(file, content);
+      };
+      await seed(
+        BACKEND_ARTIFACT_PATHS.openapi,
+        JSON.stringify(SAMPLE_OPENAPI),
+      );
+      await seed(BACKEND_ARTIFACT_PATHS.contracts, SAMPLE_CONTRACTS_TS);
+      await seed(BACKEND_ARTIFACT_PATHS.realtimeState, 'export class A {}\n');
+      await seed(BACKEND_ARTIFACT_PATHS.realtimeAvatar, 'export class B {}\n');
+      await seed(
+        BACKEND_ARTIFACT_PATHS.realtimeCallState,
+        "import { CallParticipant } from './CallParticipant';\nexport class CallState {}\n",
+      );
+      await seed(
+        BACKEND_ARTIFACT_PATHS.realtimeCallParticipant,
+        "import { AvatarAppearance } from './AvatarAppearance';\nexport class CallParticipant {}\n",
+      );
+
+      const result = await syncContracts({ backendDir, rootDir: frontendDir });
+
+      expect(result.warnings).toEqual([]);
+      expect(result.syncedFiles.map((item) => item.relativeOutputPath)).toEqual(
+        expect.arrayContaining([
+          FRONTEND_OUTPUT_PATHS.realtimeCallState,
+          FRONTEND_OUTPUT_PATHS.realtimeCallParticipant,
+        ]),
+      );
+      expect(FRONTEND_OUTPUT_PATHS.realtimeCallState).toBe(
+        'src/realtime/call-state.generated.ts',
+      );
+      const callState = await readFile(
+        path.join(frontendDir, FRONTEND_OUTPUT_PATHS.realtimeCallState),
+        'utf8',
+      );
+      expect(callState).toContain(
+        "import { CallParticipant } from './call-participant.generated';",
+      );
+      const participant = await readFile(
+        path.join(frontendDir, FRONTEND_OUTPUT_PATHS.realtimeCallParticipant),
+        'utf8',
+      );
+      expect(participant).toContain(
+        "import { AvatarAppearance } from './avatar-appearance.generated';",
+      );
     });
   });
 

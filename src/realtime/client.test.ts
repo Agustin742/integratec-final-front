@@ -270,6 +270,15 @@ function createFakeSdk() {
   };
 }
 
+/** Plain data bypasses the typed schema setter, mimicking legacy payload shapes. */
+function setPlainAppearance(avatar: object, value: unknown): void {
+  Object.defineProperty(avatar, 'appearance', {
+    value,
+    configurable: true,
+    writable: true,
+  });
+}
+
 describe('createClassroomRealtimeClient (#23)', () => {
   it('S1 & S2: configures endpoint from F05, sets client.auth.token (never in join options), joins classroom room, and syncs typed participants', async () => {
     const { auth } = createFakeAuth('bearer-token-123');
@@ -723,16 +732,16 @@ describe('createClassroomRealtimeClient (#23)', () => {
     });
     const avatarWithLook = room.state.avatars.get(
       'user-with-look',
-    ) as Avatar & {
+    ) as unknown as Omit<Avatar, 'appearance'> & {
       appearance?: unknown;
     };
-    avatarWithLook.appearance = {
+    setPlainAppearance(avatarWithLook, {
       bodyId: 'female',
       hairId: 'original',
       topId: 'tshirt',
       hairColor: '#6C4D48',
       clothingColor: '#75B7DA',
-    };
+    });
     Object.assign(room.state, {
       chatMuted: true,
       collaborationLocked: true,
@@ -923,10 +932,12 @@ describe('createClassroomRealtimeClient (#23)', () => {
       rotation: Number.NEGATIVE_INFINITY,
       status: 'online',
     });
-    const nestedAvatar = room.state.avatars.get('nested-user') as Avatar & {
+    const nestedAvatar = room.state.avatars.get(
+      'nested-user',
+    ) as unknown as Omit<Avatar, 'appearance'> & {
       appearance?: unknown;
     };
-    nestedAvatar.appearance = {
+    setPlainAppearance(nestedAvatar, {
       baseAvatar: {
         bodyId: 'female',
         hairId: 'afro',
@@ -940,7 +951,7 @@ describe('createClassroomRealtimeClient (#23)', () => {
         back: null,
         desk_decor: null,
       },
-    };
+    });
     sdk.setJoinHandler(async () => room);
 
     const client = createClassroomRealtimeClient({

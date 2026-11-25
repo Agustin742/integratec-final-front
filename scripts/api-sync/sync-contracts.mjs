@@ -10,6 +10,14 @@ export const BACKEND_ARTIFACT_PATHS = Object.freeze({
   contracts: 'packages/contracts/src/index.ts',
   realtimeState: 'packages/contracts/src/realtime/generated/ClassroomState.ts',
   realtimeAvatar: 'packages/contracts/src/realtime/generated/Avatar.ts',
+  realtimeAvatarAppearance:
+    'packages/contracts/src/realtime/generated/AvatarAppearance.ts',
+  realtimeEquippedItemView:
+    'packages/contracts/src/realtime/generated/EquippedItemView.ts',
+  realtimeCallState: 'packages/contracts/src/realtime/generated/CallState.ts',
+  realtimeCallParticipant:
+    'packages/contracts/src/realtime/generated/CallParticipant.ts',
+  realtimeCallContracts: 'packages/contracts/src/index.ts',
 });
 
 export const FRONTEND_OUTPUT_PATHS = Object.freeze({
@@ -17,6 +25,11 @@ export const FRONTEND_OUTPUT_PATHS = Object.freeze({
   contracts: 'src/realtime/contracts.generated.ts',
   realtimeState: 'src/realtime/room-state.generated.ts',
   realtimeAvatar: 'src/realtime/avatar.generated.ts',
+  realtimeAvatarAppearance: 'src/realtime/avatar-appearance.generated.ts',
+  realtimeEquippedItemView: 'src/realtime/equipped-item-view.generated.ts',
+  realtimeCallState: 'src/realtime/call-state.generated.ts',
+  realtimeCallParticipant: 'src/realtime/call-participant.generated.ts',
+  realtimeCallContracts: 'src/realtime/call-contracts.generated.ts',
 });
 
 export const GENERATED_HEADER = [
@@ -337,6 +350,27 @@ export async function generateOpenApiTypes(
   );
 }
 
+const CALL_CONTRACTS_START = '/**\n * Voice call contract (#149)';
+const CALL_CONTRACTS_END = 'export type CallRingCanceledPayload';
+
+/**
+ * Extracts the self-contained voice call section (zod schemas, constants and
+ * types) of the shared contracts, or `null` when the backend does not have it.
+ * @param {string} rawSource
+ * @returns {string | null}
+ */
+export function extractCallContracts(rawSource) {
+  const source = rawSource.replace(/\r\n?/g, '\n');
+  const start = source.indexOf(CALL_CONTRACTS_START);
+  const endMarker = source.indexOf(CALL_CONTRACTS_END);
+  if (start === -1 || endMarker === -1 || endMarker < start) {
+    return null;
+  }
+  const endOfLine = source.indexOf('\n', endMarker);
+  const section = source.slice(start, endOfLine === -1 ? undefined : endOfLine);
+  return `import { z } from 'zod';\n\n${section}\n`;
+}
+
 /**
  * Wraps a TypeScript contract artifact with the generated header.
  * @param {string} rawSource
@@ -354,7 +388,11 @@ export function formatPulledTypeArtifact(rawSource, artifactPath) {
       /(?<!type\s)\bDataChange\b(?=\s*\}\s*from\s*['"]@colyseus\/schema['"])/g,
       'type DataChange',
     )
-    .replace(/from (['"])\.\/Avatar\1/g, 'from $1./avatar.generated$1');
+    .replace(
+      /from (['"])\.\/([A-Z][A-Za-z0-9]*)\1/g,
+      (_match, quote, name) =>
+        `from ${quote}./${name.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()}.generated${quote}`,
+    );
   return normalizeLineEndings(
     `${buildGeneratedFileBanner(artifactPath)}${stripped}`,
   );
@@ -457,11 +495,36 @@ export async function syncContracts(options = {}) {
     },
   ];
 
-  for (const target of optionalTargets) {
+  // Schemas nested inside the room states; synced when the backend has them, silently skipped otherwise.
+  const nestedSchemaTargets = [
+    {
+      kind: 'realtimeAvatarAppearance',
+      label: 'Avatar appearance schema types',
+    },
+    { kind: 'realtimeEquippedItemView', label: 'Equipped item schema types' },
+    { kind: 'realtimeCallState', label: 'Call room-state schema types' },
+    { kind: 'realtimeCallParticipant', label: 'Call participant schema types' },
+    {
+      kind: 'realtimeCallContracts',
+      label: 'Call message contracts',
+      extract: extractCallContracts,
+    },
+  ].map((target) => ({
+    ...target,
+    artifactPath: artifactPaths[target.kind],
+    relativeOutputPath: outputPaths[target.kind],
+    optional: true,
+  }));
+
+  for (const target of [...optionalTargets, ...nestedSchemaTargets]) {
     const source = resolveArtifactSource(target.artifactPath, sourceOptions);
     const result = await readArtifactContent(source, {
       fetchImpl: options.fetchImpl,
     });
+
+    if (!result.found && target.optional) {
+      continue;
+    }
 
     if (!result.found) {
       const warningMessage = `${target.label} are not yet published at "${source.artifactPath}" (${source.location}); skipping ${target.relativeOutputPath}.`;
@@ -470,8 +533,14 @@ export async function syncContracts(options = {}) {
       continue;
     }
 
+    const content = target.extract
+      ? target.extract(result.content)
+      : result.content;
+    if (content === null) {
+      continue;
+    }
     const formattedContent = formatPulledTypeArtifact(
-      result.content,
+      content,
       source.artifactPath,
     );
     const absoluteOutputPath = path.resolve(rootDir, target.relativeOutputPath);

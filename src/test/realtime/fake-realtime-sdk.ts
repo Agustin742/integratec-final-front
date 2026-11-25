@@ -30,7 +30,9 @@ export interface FakeAvatarSeed {
   readonly appearance?: FakeAvatarAppearance;
 }
 
-type FakeAvatarRecord = Avatar & { appearance?: FakeAvatarAppearance };
+type FakeAvatarRecord = Omit<Avatar, 'appearance'> & {
+  appearance?: FakeAvatarAppearance;
+};
 type FakeStateRecord = ClassroomState & {
   chatMuted?: boolean;
   collaborationLocked?: boolean;
@@ -52,12 +54,21 @@ function cloneAppearance(source: FakeAvatarAppearance): FakeAvatarAppearance {
   return { ...source };
 }
 
+/** Plain data bypasses the typed schema setter, mimicking legacy payload shapes. */
+function setPlainAppearance(avatar: object, value: FakeAvatarAppearance): void {
+  Object.defineProperty(avatar, 'appearance', {
+    value,
+    configurable: true,
+    writable: true,
+  });
+}
+
 function cloneAvatarInto(
   target: MapSchema<Avatar>,
   source: Avatar,
   key: string,
 ): void {
-  const copy = new Avatar() as FakeAvatarRecord;
+  const copy = new Avatar() as unknown as FakeAvatarRecord;
   copy.userId = source.userId;
   copy.displayName = source.displayName;
   copy.role = source.role;
@@ -67,9 +78,9 @@ function cloneAvatarInto(
   copy.status = source.status;
   const sourceAppearance = (source as FakeAvatarRecord).appearance;
   if (sourceAppearance) {
-    copy.appearance = cloneAppearance(sourceAppearance);
+    setPlainAppearance(copy, cloneAppearance(sourceAppearance));
   }
-  target.set(key, copy);
+  target.set(key, copy as unknown as Avatar);
 }
 
 /**
@@ -128,7 +139,7 @@ export class FakeRealtimeRoom implements RealtimeRoomLike<ClassroomState> {
   setAvatar(input: FakeAvatarSeed): Avatar {
     const existing = this.state.avatars.get(input.userId) as
       FakeAvatarRecord | undefined;
-    const avatar = existing ?? (new Avatar() as FakeAvatarRecord);
+    const avatar = existing ?? (new Avatar() as unknown as FakeAvatarRecord);
     avatar.userId = input.userId;
     avatar.displayName =
       input.displayName ?? existing?.displayName ?? 'Estudiante';
@@ -138,11 +149,11 @@ export class FakeRealtimeRoom implements RealtimeRoomLike<ClassroomState> {
     avatar.rotation = input.rotation ?? existing?.rotation ?? 0;
     avatar.status = input.status ?? existing?.status ?? 'online';
     if (input.appearance !== undefined) {
-      avatar.appearance = cloneAppearance(input.appearance);
+      setPlainAppearance(avatar, cloneAppearance(input.appearance));
     }
-    this.state.avatars.set(input.userId, avatar);
+    this.state.avatars.set(input.userId, avatar as unknown as Avatar);
     this.emitStateChange();
-    return avatar;
+    return avatar as unknown as Avatar;
   }
 
   removeAvatar(userId: string): void {
