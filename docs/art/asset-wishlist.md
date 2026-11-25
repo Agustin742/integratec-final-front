@@ -181,10 +181,15 @@ Seasonal:
 
 ### Neck and ears
 
-- [ ] Scarf
-- [ ] Necklace
-- [ ] Earrings
-- [ ] Bow tie
+- [x] Scarf ([neck-scarf.glb](../../public/models/avatars/male/neck-scarf.glb) · [female](../../public/models/avatars/female/neck-scarf.glb) — [neck and ears guide](neck-ears.md))
+- [x] Necklace ([neck-necklace.glb](../../public/models/avatars/male/neck-necklace.glb) · [female](../../public/models/avatars/female/neck-necklace.glb) — [neck and ears guide](neck-ears.md))
+- [x] Earrings ([neck-earrings.glb](../../public/models/avatars/shared/neck-earrings.glb) — [neck and ears guide](neck-ears.md))
+- [x] Bow tie ([neck-bow-tie.glb](../../public/models/avatars/male/neck-bow-tie.glb) · [female](../../public/models/avatars/female/neck-bow-tie.glb) — [neck and ears guide](neck-ears.md))
+- [x] Lanyard badge _(extra)_ ([neck-lanyard-badge.glb](../../public/models/avatars/male/neck-lanyard-badge.glb) · [female](../../public/models/avatars/female/neck-lanyard-badge.glb) — [neck and ears guide](neck-ears.md))
+- [x] Bandana _(extra)_ ([neck-bandana.glb](../../public/models/avatars/male/neck-bandana.glb) · [female](../../public/models/avatars/female/neck-bandana.glb) — [neck and ears guide](neck-ears.md))
+- [x] Achievement medal _(extra)_ ([neck-achievement-medal.glb](../../public/models/avatars/male/neck-achievement-medal.glb) · [female](../../public/models/avatars/female/neck-achievement-medal.glb) — [neck and ears guide](neck-ears.md))
+- [x] Star earrings _(extra)_ ([neck-star-earrings.glb](../../public/models/avatars/shared/neck-star-earrings.glb) — [neck and ears guide](neck-ears.md))
+- [x] Ear cuffs _(extra)_ ([neck-ear-cuffs.glb](../../public/models/avatars/shared/neck-ear-cuffs.glb) — [neck and ears guide](neck-ears.md))
 
 ## 3. Environment objects
 
