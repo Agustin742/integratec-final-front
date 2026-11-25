@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { UseCallSessionResult } from './use-call-session';
 
@@ -99,6 +105,22 @@ describe('CallProvider', () => {
       screen.getByRole('button', { name: 'Salir de la llamada' }),
     );
     expect(session.leave).toHaveBeenCalledOnce();
+  });
+
+  it('surfaces a failed join as a Spanish toast', async () => {
+    makeSession({ join: vi.fn().mockRejectedValue(new Error('boom')) });
+    render(
+      <CallProvider>
+        <Starter />
+      </CallProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'start' }));
+    await waitFor(() =>
+      expect(toastMock.toast).toHaveBeenCalledWith(
+        'Se cortó la llamada. Probá unirte de nuevo.',
+        expect.anything(),
+      ),
+    );
   });
 
   it('announces the end reason in Spanish', () => {

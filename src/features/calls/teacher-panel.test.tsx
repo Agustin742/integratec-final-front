@@ -30,6 +30,7 @@ function setup(overrides: Partial<TeacherPanelProps> = {}) {
       person(0, { role: 'TEACHER', isSelf: true, displayName: 'Profe' }),
       person(1),
       person(2, { muted: true, forcedMuted: true }),
+      person(3, { muted: true, selfMuted: true }),
     ],
     allowSelfUnmute: false,
     focusMode: false,
@@ -52,12 +53,28 @@ describe('TeacherPanel', () => {
       targetUserId: '00000000-0000-4000-8000-000000000001',
     });
     fireEvent.click(
-      screen.getByRole('button', { name: 'Activar el micrófono de Alumno 2' }),
+      screen.getByRole('button', { name: 'Permitir hablar a Alumno 2' }),
     );
     expect(props.onModerate).toHaveBeenCalledWith({
       action: 'unmute',
       targetUserId: '00000000-0000-4000-8000-000000000002',
     });
+  });
+
+  it('keys the action on the forced mute, not on the student own mute', () => {
+    const props = setup();
+    expect(
+      screen.queryByRole('button', { name: 'Permitir hablar a Alumno 3' }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Silenciar a Alumno 3' }),
+    );
+    expect(props.onModerate).toHaveBeenCalledWith({
+      action: 'mute',
+      targetUserId: '00000000-0000-4000-8000-000000000003',
+    });
+    expect(screen.getByText('(Se silenció solo)')).toBeInTheDocument();
+    expect(screen.getByText('(Silenciado por vos)')).toBeInTheDocument();
   });
 
   it('mute all also forbids self-unmute', () => {

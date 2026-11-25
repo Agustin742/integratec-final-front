@@ -44,7 +44,9 @@ export function CallProvider({ children }: { readonly children: ReactNode }) {
       inCall,
       start: (options, nextLabel) => {
         setLabel(nextLabel);
-        void join(options);
+        void join(options).catch(() => {
+          toast(callMessages.ended.unexpected, { id: 'call-ended' });
+        });
       },
     }),
     [inCall, join],

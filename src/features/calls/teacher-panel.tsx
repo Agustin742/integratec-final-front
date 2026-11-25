@@ -110,9 +110,14 @@ export function TeacherPanel({
               <li key={p.sessionId} className="flex items-center gap-2">
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">
                   {p.displayName}
-                  {p.muted && (
+                  {p.forcedMuted && (
                     <span className="ml-2 text-xs text-muted-foreground">
-                      ({copy.mutedBadge})
+                      ({copy.forcedMutedBadge})
+                    </span>
+                  )}
+                  {p.selfMuted && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      ({copy.selfMutedBadge})
                     </span>
                   )}
                 </span>
@@ -121,12 +126,12 @@ export function TeacherPanel({
                   size="sm"
                   variant="outline"
                   aria-label={
-                    p.muted
+                    p.forcedMuted
                       ? copy.unmuteOne(p.displayName)
                       : copy.muteOne(p.displayName)
                   }
                   onClick={() =>
-                    p.muted
+                    p.forcedMuted
                       ? act(
                           { action: 'unmute', targetUserId: p.userId },
                           copy.unmutedOneAnnouncement(p.displayName),
@@ -137,7 +142,7 @@ export function TeacherPanel({
                         )
                   }
                 >
-                  {p.muted ? 'Activar' : 'Silenciar'}
+                  {p.forcedMuted ? 'Permitir hablar' : 'Silenciar'}
                 </Button>
               </li>
             ))}
