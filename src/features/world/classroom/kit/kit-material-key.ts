@@ -15,6 +15,9 @@ export interface MaterialAppearance {
   readonly opacity: number;
   readonly transparent: boolean;
   readonly doubleSided: boolean;
+  readonly vertexColors: boolean;
+  readonly alphaTest: number;
+  readonly flatShading: boolean;
 }
 
 const fixed = (value: number, digits: number): string => value.toFixed(digits);
@@ -34,17 +37,25 @@ export function materialAppearanceKey(appearance: MaterialAppearance): string {
     `e${channels(appearance.emissive)}`,
     `o${fixed(appearance.opacity, 2)}${appearance.transparent ? 't' : ''}`,
     appearance.doubleSided ? 'ds' : 'fs',
+    appearance.vertexColors ? 'vc' : '',
+    `a${fixed(appearance.alphaTest, 2)}`,
+    appearance.flatShading ? 'flat' : 'smooth',
   ].join('|');
 }
 
+/** Any of these makes a material unique: textures are compared by identity, not by value. */
 const TEXTURE_SLOTS = [
   'map',
+  'lightMap',
+  'bumpMap',
   'normalMap',
+  'displacementMap',
+  'envMap',
+  'aoMap',
+  'emissiveMap',
+  'alphaMap',
   'roughnessMap',
   'metalnessMap',
-  'emissiveMap',
-  'aoMap',
-  'alphaMap',
 ] as const;
 
 const DOUBLE_SIDE = 2;
@@ -65,5 +76,8 @@ export function threeMaterialAppearanceKey(material: Material): string | null {
     opacity: standard.opacity,
     transparent: standard.transparent,
     doubleSided: standard.side === DOUBLE_SIDE,
+    vertexColors: standard.vertexColors,
+    alphaTest: standard.alphaTest,
+    flatShading: standard.flatShading,
   });
 }

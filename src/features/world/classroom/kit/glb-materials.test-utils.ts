@@ -84,28 +84,41 @@ export function glbSkinnedDrawCalls(url: string): {
 }
 
 /**
- * Test helper: draw calls of the kit once batched by material appearance
- * (`materialAppearanceKey`), so identical colours from differently named
- * materials count once. Reads the JSON chunk of a public GLB.
+ * Test helper: draw calls of the kit once batched by material, following the
+ * runtime rule of `buildBatchedKit` primitive by primitive. Named standard
+ * materials without textures share a bucket by appearance
+ * (`materialAppearanceKey`); other named materials share by type and name;
+ * unnamed ones are never shared. Reads the JSON chunk of a public GLB.
  */
 export function glbMaterialKeys(url: string): string[] {
   const json = readGlbJson(url);
   const keys = new Set<string>();
-  for (const mesh of json.meshes) {
+  json.meshes.forEach((mesh, meshIndex) => {
     for (const primitive of mesh.primitives) {
       const material = json.materials?.[primitive.material ?? -1] as
         GltfMaterial | undefined;
+      if (!material?.name) {
+        keys.add(
+          `#${url}:${String(meshIndex)}:${String(primitive.material ?? 'none')}`,
+        );
+        continue;
+      }
+      const type = gltfMaterialType(material);
+      const comparable =
+        type === 'MeshStandardMaterial' &&
+        !materialHasTexture(material as Record<string, unknown>);
       keys.add(
-        material && !materialHasTexture(material as Record<string, unknown>)
-          ? `MeshStandardMaterial:${materialAppearanceKey(gltfAppearance(material))}`
-          : `#${String(primitive.material)}:${url}`,
+        comparable
+          ? `${type}|${materialAppearanceKey(gltfAppearance(material, primitive))}`
+          : `${type}:${material.name}`,
       );
     }
-  }
+  });
   return [...keys];
 }
 
 interface GltfMaterial {
+  name?: string;
   pbrMetallicRoughness?: {
     baseColorFactor?: number[];
     roughnessFactor?: number;
@@ -113,10 +126,27 @@ interface GltfMaterial {
   };
   emissiveFactor?: number[];
   alphaMode?: string;
+  alphaCutoff?: number;
   doubleSided?: boolean;
+  extensions?: Record<string, unknown>;
 }
 
-function gltfAppearance(material: GltfMaterial): MaterialAppearance {
+/** The three.js material class `GLTFLoader` builds for a glTF material. */
+function gltfMaterialType(material: GltfMaterial): string {
+  const extensions = Object.keys(material.extensions ?? {});
+  if (extensions.includes('KHR_materials_unlit')) return 'MeshBasicMaterial';
+  const physical = extensions.some(
+    (name) =>
+      name.startsWith('KHR_materials_') &&
+      name !== 'KHR_materials_emissive_strength',
+  );
+  return physical ? 'MeshPhysicalMaterial' : 'MeshStandardMaterial';
+}
+
+function gltfAppearance(
+  material: GltfMaterial,
+  primitive: { attributes: Record<string, number> },
+): MaterialAppearance {
   const pbr = material.pbrMetallicRoughness ?? {};
   const [r = 1, g = 1, b = 1, a = 1] = pbr.baseColorFactor ?? [];
   const [er = 0, eg = 0, eb = 0] = material.emissiveFactor ?? [];
@@ -128,6 +158,10 @@ function gltfAppearance(material: GltfMaterial): MaterialAppearance {
     opacity: a,
     transparent: material.alphaMode === 'BLEND',
     doubleSided: material.doubleSided === true,
+    vertexColors: primitive.attributes.COLOR_0 !== undefined,
+    alphaTest:
+      material.alphaMode === 'MASK' ? (material.alphaCutoff ?? 0.5) : 0,
+    flatShading: primitive.attributes.NORMAL === undefined,
   };
 }
 

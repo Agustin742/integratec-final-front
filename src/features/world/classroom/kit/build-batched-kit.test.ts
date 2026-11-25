@@ -137,6 +137,48 @@ describe('buildBatchedKit', () => {
     expect(wood?.userData).toEqual({ kitModuleIds: ['board', 'cabinet'] });
   });
 
+  it('keeps same-coloured materials apart when vertex colours or alpha test differ', () => {
+    const plain = material('Plain', 'brown');
+    const vertex = material('Vertex', 'brown');
+    vertex.vertexColors = true;
+    const cutout = material('Cutout', 'brown');
+    cutout.alphaTest = 0.5;
+    const built = buildBatchedKit(
+      modules([
+        ['board', moduleScene([{ name: 'a', material: plain }]).scene],
+        ['cabinet', moduleScene([{ name: 'b', material: vertex }]).scene],
+        ['bookshelf', moduleScene([{ name: 'c', material: cutout }]).scene],
+      ]),
+      [
+        place('board', [0, 0, 0]),
+        place('cabinet', [2, 0, 0]),
+        place('bookshelf', [4, 0, 0]),
+      ],
+    );
+    expect(built.meshes).toHaveLength(3);
+  });
+
+  it('gives every batch mesh a unique name even when two materials share a name', () => {
+    const built = buildBatchedKit(
+      modules([
+        [
+          'board',
+          moduleScene([{ name: 'a', material: material('Same', 'red') }]).scene,
+        ],
+        [
+          'cabinet',
+          moduleScene([{ name: 'b', material: material('Same', 'blue') }])
+            .scene,
+        ],
+      ]),
+      [place('board', [0, 0, 0]), place('cabinet', [2, 0, 0])],
+    );
+    const names = built.meshes.map((m) => m.name);
+    expect(names).toHaveLength(2);
+    expect(new Set(names).size).toBe(2);
+    expect(names[0]).toBe('kit:batch:MeshStandardMaterial:Same');
+  });
+
   it('does not merge unnamed materials that are different instances', () => {
     const a = moduleScene([{ name: 'a', material: material('') }]);
     const b = moduleScene([{ name: 'b', material: material('') }]);

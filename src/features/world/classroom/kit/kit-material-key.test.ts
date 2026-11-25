@@ -1,4 +1,8 @@
-import { MeshStandardMaterial } from 'three';
+import {
+  MeshBasicMaterial,
+  MeshPhysicalMaterial,
+  MeshStandardMaterial,
+} from 'three';
 import { describe, expect, it } from 'vitest';
 import { glbMaterialKeys } from './glb-materials.test-utils';
 import {
@@ -15,6 +19,9 @@ const base: MaterialAppearance = {
   opacity: 1,
   transparent: false,
   doubleSided: true,
+  vertexColors: false,
+  alphaTest: 0,
+  flatShading: false,
 };
 
 describe('materialAppearanceKey', () => {
@@ -33,6 +40,9 @@ describe('materialAppearanceKey', () => {
     expect(differs({ roughness: 0.38 })).toBe(true);
     expect(differs({ transparent: true, opacity: 0.54 })).toBe(true);
     expect(differs({ doubleSided: false })).toBe(true);
+    expect(differs({ vertexColors: true })).toBe(true);
+    expect(differs({ alphaTest: 0.5 })).toBe(true);
+    expect(differs({ flatShading: true })).toBe(true);
   });
 });
 
@@ -47,12 +57,45 @@ describe('threeMaterialAppearanceKey', () => {
     material.color.setRGB(0.429, 0.198, 0.084);
     expect(
       glbMaterialKeys('/models/scenes/classroom/furniture/board.glb'),
-    ).toContain(`MeshStandardMaterial:${threeMaterialAppearanceKey(material)}`);
+    ).toContain(`MeshStandardMaterial|${threeMaterialAppearanceKey(material)}`);
   });
 
-  it('declines textured materials so they keep a per-instance key', () => {
-    const material = new MeshStandardMaterial();
-    material.map = {} as never;
-    expect(threeMaterialAppearanceKey(material)).toBeNull();
+  it.each([
+    'map',
+    'lightMap',
+    'bumpMap',
+    'normalMap',
+    'displacementMap',
+    'envMap',
+    'aoMap',
+    'emissiveMap',
+    'alphaMap',
+    'roughnessMap',
+    'metalnessMap',
+  ] as const)(
+    'declines a material with a %s so it keeps its own key',
+    (slot) => {
+      const material = new MeshStandardMaterial();
+      material[slot] = {} as never;
+      expect(threeMaterialAppearanceKey(material)).toBeNull();
+    },
+  );
+
+  it('separates vertex colours, alpha test and flat shading', () => {
+    const key = threeMaterialAppearanceKey(new MeshStandardMaterial());
+    for (const change of [
+      { vertexColors: true },
+      { alphaTest: 0.5 },
+      { flatShading: true },
+    ]) {
+      expect(
+        threeMaterialAppearanceKey(new MeshStandardMaterial(change)),
+      ).not.toBe(key);
+    }
+  });
+
+  it('declines other material types', () => {
+    expect(threeMaterialAppearanceKey(new MeshBasicMaterial())).toBeNull();
+    expect(threeMaterialAppearanceKey(new MeshPhysicalMaterial())).toBeNull();
   });
 });

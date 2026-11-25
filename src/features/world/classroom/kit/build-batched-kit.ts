@@ -163,6 +163,13 @@ function materialKey(material: Material): string {
     : `${material.type}:${material.name}`;
 }
 
+/** Keeps the first name as is and numbers later duplicates (`#2`, `#3`, ...). */
+function uniqueName(name: string, used: Map<string, number>): string {
+  const count = (used.get(name) ?? 0) + 1;
+  used.set(name, count);
+  return count === 1 ? name : `${name}#${String(count)}`;
+}
+
 /**
  * Statically batches every placed kit module by material: each source mesh
  * geometry is baked to world space (`placement * meshMatrixInScene`) and all
@@ -229,13 +236,14 @@ export function buildBatchedKit(
   const meshes: Mesh[] = [];
   const owned: BufferGeometry[] = [];
   const allModuleIds = new Set<ClassroomKitModuleId>();
+  const usedNames = new Map<string, number>();
 
   for (const bucket of buckets.values()) {
     const kitModuleIds = [...bucket.moduleIds].sort();
     for (const id of kitModuleIds) allModuleIds.add(id);
     for (const geometry of mergeBucket(bucket.parts)) {
       const mesh = new Mesh(geometry, bucket.material);
-      mesh.name = kitBatchMeshName(bucket.label);
+      mesh.name = uniqueName(kitBatchMeshName(bucket.label), usedNames);
       mesh.userData = { kitModuleIds };
       // Static: the room never moves, so skip per-frame matrix updates.
       mesh.matrixAutoUpdate = false;
