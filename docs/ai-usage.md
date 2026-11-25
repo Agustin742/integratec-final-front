@@ -4,6 +4,13 @@ Course declaration of AI use in the development process (see [course requirement
 
 > Status: partial evidence recorded. Sections marked _Pending_ still require team input and human review.
 
+## Classroom Pet (Michi) Animation Recovery & Export
+
+- **Tools and scope:** Antigravity and Blender 5.2.2 LTS (`--background`) extracted Michi's 4 authored animation clips (`Walk`, `Sleep`, `Meow`, `AskForPets`) from the preserved `PetCat_AnimationShowcase` preview file (`odd/previews/classroom-pet-review.blend`), embedded them into `assets/blender/pets/cat/body.blend` (`665,865` B), and re-exported `public/models/pets/cat/body.glb` (`325,796` B / `318.2` KB) on `feat/environment-decor-assets` without modifying `src/`, `e2e/`, or any other asset.
+- **Useful result:** Recovered all 4 clips (`Walk` `1.04 s`, `Sleep` `2.29 s`, `Meow` `2.67 s`, `AskForPets` `3.42 s`) as unified NLA glTF tracks driving both the 30-bone `PetCatRig` skeleton and synced facial morph targets (`Pet_Eyes`: `EyesClosed`, `EyesHappy`; `Pet_Mouth`: `Meow`, `Happy`), keeping the Draco GLB at `31.1%` of the `1 MB` FD8 character limit and matching issue `#138` clip names.
+- **Detected problems and corrections:** PR #137 exported `public/models/pets/cat/body.glb` with `0` animations because `assets/blender/pets/cat/body.blend` held only the rest stand pose while the showcase animations lived in `classroom-pet-review.blend`. Clamped `EyesHappy`/`Happy` to `0.0` during `Meow` and at `AskForPets` endpoints so sequential timeline transitions in the showcase never bled across standalone clips.
+- **Human verification:** Verified via `scripts/assets/test-classroom-pet.mjs` (4 clips, 92 channels/clip, bone + morph verification), `check-asset-budget.mjs`, and prior human visual review of `PetCat_AnimationShowcase` in Blender; committed locally on `feat/environment-decor-assets`.
+
 ## Classroom Decoration Pack (7 remaining Section 3 assets)
 
 - **Tools and scope:** Antigravity and Blender MCP authored the 7 remaining Section 3 **Decoration** assets from [asset wishlist](art/asset-wishlist.md) ([guide](art/classroom-decoration.md)) — `wall-clock`, `wall-map`, `globe`, `wall-posters`, `plants-and-pots`, `rug`, and `garlands` — as modular `.blend` masters (`assets/blender/environment/classroom-decoration/`) and Draco-compressed GLBs (`public/models/scenes/classroom/decoration/`) on `feat/environment-decor-assets` without modifying `src/`, `e2e/`, or the 3 previously merged decoration GLBs (`christmas-tree`, `flag-argentina`, `flag-integrar`).

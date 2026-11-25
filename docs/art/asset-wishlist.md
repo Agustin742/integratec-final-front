@@ -264,10 +264,10 @@ Seasonal:
 ### Classroom pet (Michi, cat)
 
 - [x] Pet model
-- [ ] Animation: sleep
-- [ ] Animation: walk
-- [ ] Animation: meow
-- [ ] Animation: ask for pets
+- [x] Animation: sleep
+- [x] Animation: walk
+- [x] Animation: meow
+- [x] Animation: ask for pets
 - [ ] Accessory: scarf
 - [ ] Accessory: hat
 - [ ] Accessory: bow
