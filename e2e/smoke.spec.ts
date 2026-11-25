@@ -31,6 +31,7 @@ test('serves the semantic placeholder without horizontal overflow', async ({
   expect(headers['x-content-type-options']).toBe('nosniff');
   expect(headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
   expect(headers['permissions-policy']).toContain('camera=()');
+  expect(headers['permissions-policy']).toContain('microphone=(self)');
   expect(headers['x-frame-options']).toBe('DENY');
   expect(headers['strict-transport-security']).toContain('max-age=63072000');
 
