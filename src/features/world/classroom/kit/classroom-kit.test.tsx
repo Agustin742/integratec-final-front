@@ -13,6 +13,9 @@ import { render } from '@/test/render';
 import { clearAssetCache, setGlbLoaderForTests } from '../../asset-cache';
 import * as builder from './build-batched-kit';
 import { ClassroomKit } from './classroom-kit';
+import { CLASSROOM_LAYOUT } from '@/realtime';
+import { buildClassroomScene } from '../build-classroom-scene';
+import type { ClassroomKitModuleId } from './classroom-kit-manifest';
 import type { KitPlacement } from './kit-placement';
 
 function gltf(): GLTF {
@@ -33,6 +36,44 @@ const placements: KitPlacement[] = [
 ];
 
 describe('ClassroomKit', () => {
+  it('recovers floor and desks from real loader failures without replacing a surviving board', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const scene = buildClassroomScene(CLASSROOM_LAYOUT);
+    const failed = new Set<ClassroomKitModuleId>();
+    const batch = vi.spyOn(builder, 'buildBatchedKit');
+    setGlbLoaderForTests({
+      loadAsync: (url: string) =>
+        url.endsWith('board.glb')
+          ? Promise.resolve(gltf())
+          : Promise.reject(new Error('unavailable')),
+    });
+    const mounted = render(
+      <ClassroomKit
+        placements={[
+          ...placements.slice(0, 1),
+          { moduleId: 'floor-tile', position: [0, 0, 0], rotationY: 0 },
+          { moduleId: 'student-desk', position: [0, 0, 0], rotationY: 0 },
+        ]}
+        onModuleError={(id) => {
+          failed.add(id);
+          scene.setFailedModules(failed);
+        }}
+      />,
+    );
+    await waitFor(() => expect(batch).toHaveBeenCalled());
+    expect(failed).toEqual(new Set(['floor-tile', 'student-desk']));
+    for (const name of ['walkable-floor', 'student-desks', 'desk-legs']) {
+      const target = scene.root.getObjectByName(name) as Mesh;
+      expect((target.material as MeshStandardMaterial).visible).toBe(true);
+    }
+    expect(
+      (scene.root.getObjectByName('classroom-board')!.children[0] as Mesh)
+        .material,
+    ).toMatchObject({ visible: false });
+    expect([...batch.mock.calls[0]![0].keys()]).toEqual(['board']);
+    mounted.unmount();
+    scene.dispose();
+  });
   afterEach(() => {
     vi.restoreAllMocks();
     clearAssetCache({ disposeDecoders: true });

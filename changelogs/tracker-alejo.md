@@ -1,5 +1,15 @@
 # Tracker — Alejo
 
+## 2026-11-24 — PR #136 isolated develop reconciliation
+
+- **Status:** blocked (source reconciliation and affected hardware E2E verified; geometry-budget decision and real-backend endpoints/data confirmation pending)
+- **Area / files:** `e2e/study-materials.spec.ts`, `src/features/classrooms/materials/material-schema.ts`, local `odd/tasks/pr136-readiness.md`.
+- **Change:** Resolved the two source conflicts on `fix/135-reconcile-develop`: preserved develop's module-aware materials flow with HEAD's `classic-short` / `basic-tshirt` avatar fixture and nullable `moduleId.default(null)` compatibility. Read all three merge stages. No generated contracts or assets edited.
+- **Reason:** Integrate contributor changes without touching the other frontend asset session or discarding either source intent.
+- **Verification:** Parent resolved the tracker conflict with explicit user consent, preserving both original histories as ordered subsequences, then staged all three resolutions. Fallback/profile corrections were applied without copying generated documentation captures. The new combined candidate passed 2,019 unit tests in 187 files, lint, types, build, security, format, 114-file docs checks and staged/working whitespace on Node22. Independent source review found no concrete contract/recovery regression. Earlier fixture-check timeouts remain historical failures, not retroactively passed checks. Node22 E2E for the affected flows and module-aware materials now runs on this distinct candidate with unchanged limits and zero retries.
+- **Browser evidence:** Default SwiftShader run had 35/42 passes. A separate capability probe confirmed the actual RTX4070SUPER through D3D11. With unchanged assertions/timeouts and zero retries, the same candidate passed all 42 affected tests and then the complete suite: 173 passed, one existing desktop-only reference measurement skipped on mobile, exit 0. Four final normal/combined-failure captures at 1280/360 completed on D3D11 with no document overflow; the status and retained furniture were inspected. Showcase diagnostic overlay/mobile framing limits remain documented. These are synthetic tests, not live-backend proof. The 2x2 spatial-batching proposal failed its conservative static triangle gate and was not implemented.
+- **Next step:** Obtain the team's geometry-budget disposition and local HTTP/realtime endpoints/disposable-data confirmation before live integration. Full backend integration and school-device performance remain unproven. Local work-unit commits preserve the reconciliation and fixes; no push or remote PR update. Source Blender/GLB assets were not authored or optimized by this correction. See `docs/pr136-readiness.md` for evidence and open gates.
+
 ## 2026-11-24 — Recover and export 4 animation clips for Classroom Pet (Michi)
 
 - **Status:** completed (committed locally on `feat/environment-decor-assets` in `odd/worktrees/environment-decor-assets`; not pushed)

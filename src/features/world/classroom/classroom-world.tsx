@@ -16,6 +16,7 @@ export interface ClassroomWorldProps extends Pick<
 > {
   /** Authoritative pose from the room for the local user (#37). */
   selfPose?: Pose | undefined;
+  onAssetError?: (() => void) | undefined;
   selfEquipped?: AvatarEquipped | undefined;
   /** Connection epoch key that changes on join, reconnect, or drop (#37). */
   connectionKey?: string | undefined;
@@ -53,6 +54,7 @@ export interface ClassroomWorldProps extends Pick<
 export function ClassroomWorld({
   label,
   scopeKey,
+  onAssetError,
   selfPose,
   selfEquipped,
   connectionKey,
@@ -93,6 +95,7 @@ export function ClassroomWorld({
       })}
     >
       <ClassroomScene
+        onAssetError={onAssetError}
         avatar={query.data?.avatar}
         scopeKey={scopeKey}
         selfPose={selfPose}

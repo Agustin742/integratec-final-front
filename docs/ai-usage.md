@@ -4,6 +4,13 @@ Course declaration of AI use in the development process (see [course requirement
 
 > Status: partial evidence recorded. Sections marked _Pending_ still require team input and human review.
 
+## Classroom kit failure recovery and readiness (#135 / PR #136)
+
+- **Tools and scope:** AI coding assistance implemented selective scene-owned floor/furniture recovery, centralized Spanish DOM feedback, picking regressions and profile ownership fixtures. No authored Blender/GLB assets or live backend data were changed by these corrections.
+- **Useful result:** Failed essential modules retain visible replacements without removing successful modules. Independent review caught missing demand-frame invalidation and stale failure IDs when returning to a classroom; RED/GREEN tests verified both corrections, with failure tracking now keyed by scene identity.
+- **Verification:** Focused recovery tests passed 59/59. The initial isolated candidate passed official Node22.23.4 lint, types, 1,921 unit tests, build, security and formatting. Its full E2E run had 158 passed, 15 failed and 1 skipped; a corrected ownership fixture then passed profile desktop/mobile 2/2. Later fixture lint/typecheck attempts timed out at 30 seconds and remain incomplete. Synthetic captures are not live integration proof. The one-run render comparison did not collect the required sample count, so no FPS conclusion is claimed. The reconciled candidate subsequently passed 2,019 unit tests, all Node22 source/build/security checks, and full hardware E2E: 173 passed and one existing desktop-only measurement skipped on mobile. Four normal/recovery captures were inspected at 1280/360. Showcase mobile-layout limitations, live-backend integration and the geometry-budget decision remain open; see [the readiness guide](pr136-readiness.md).
+- **Human control:** The user authorized preserving both complete histories in the conflicted Agustin tracker. Integration was performed in a separate worktree and preserved in local reviewable work-unit commits. Publication and approval remain separate human decisions.
+
 ## Classroom Pet (Michi) Animation Recovery & Export
 
 - **Tools and scope:** Antigravity and Blender 5.2.2 LTS (`--background`) extracted Michi's 4 authored animation clips (`Walk`, `Sleep`, `Meow`, `AskForPets`) from the preserved `PetCat_AnimationShowcase` preview file (`odd/previews/classroom-pet-review.blend`), embedded them into `assets/blender/pets/cat/body.blend` (`665,865` B), and re-exported `public/models/pets/cat/body.glb` (`325,796` B / `318.2` KB) on `feat/environment-decor-assets` without modifying `src/`, `e2e/`, or any other asset.

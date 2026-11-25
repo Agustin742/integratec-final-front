@@ -141,7 +141,7 @@ export function Classroom3DStage({
   const resolvedClassroomId = classroomId ?? scopeKey ?? '';
   return (
     <Classroom3DStageContent
-      key={resolvedClassroomId}
+      key={`${resolvedClassroomId}:${scopeKey ?? ''}`}
       headingRef={headingRef}
       scopeKey={scopeKey}
       classroomId={resolvedClassroomId}
@@ -211,6 +211,8 @@ function Classroom3DStageContent({
   readonly presenceSlot?: ReactNode;
 }) {
   useLockPageScroll();
+  const [assetFailed, setAssetFailed] = useState(false);
+  const handleAssetError = useCallback(() => setAssetFailed(true), []);
   const [LazyClassroomWorld] = useState(() => lazy(loadClassroomWorld));
   const [LazyWorldProbe] = useState(() => lazy(loadWorldProbe));
   const supportsBrowserObservers = typeof ResizeObserver !== 'undefined';
@@ -446,6 +448,7 @@ function Classroom3DStageContent({
             >
               <LazyClassroomWorld
                 fill
+                onAssetError={handleAssetError}
                 label={classroomMessages.viewMode.canvasLabel}
                 scopeKey={scopeKey}
                 selfPose={selfPose}
@@ -490,6 +493,14 @@ function Classroom3DStageContent({
       <div className="pointer-events-none absolute inset-0 z-10">
         <div className="absolute inset-x-0 top-0 flex flex-col items-center gap-2 p-3 sm:p-4">
           {topSlot}
+          {assetFailed && (
+            <p
+              role="status"
+              className="max-w-xl rounded-xl bg-background p-3 text-sm shadow"
+            >
+              {worldMessages.classroomAssetError}
+            </p>
+          )}
         </div>
         <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4">
           {presenceSlot}
