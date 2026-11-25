@@ -8957,3 +8957,175 @@ export function createClassroomEquipmentStore(
     getCounts: () => ({ ...counts }),
   };
 }
+
+export type FamilyLinkPayload = components['schemas']['FamilyLinkDto'];
+export type FamilyLinksResponsePayload =
+  components['schemas']['FamilyLinksResponseDto'];
+export type FamilyReportCardItemPayload =
+  components['schemas']['ReportCardItemDto'];
+
+export interface FamilyMetricsSummaryPayload {
+  readonly connectedSeconds: number;
+  readonly submissionCount: number;
+  readonly messageCount: number;
+  readonly gradedCount: number;
+  readonly ungradedCount: number;
+  readonly pendingCount: number;
+  readonly averageScorePercent: number | null;
+}
+
+export interface FamilyReportCardPayload {
+  readonly link: FamilyLinkPayload;
+  readonly items: readonly FamilyReportCardItemPayload[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
+  readonly metrics: FamilyMetricsSummaryPayload;
+}
+
+export interface FamilyLinksHandlerOptions {
+  readonly baseUrl?: string;
+  readonly items?: readonly FamilyLinkPayload[];
+  readonly status?: number;
+  readonly delayMs?: number;
+  readonly onRequest?: (request: Request) => void;
+}
+
+export function createFamilyLinksHandler(
+  options: FamilyLinksHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = (options.baseUrl ?? TEST_API_BASE_URL).replace(/\/+$/, '');
+  const status = options.status ?? 200;
+
+  return http.get(`${baseUrl}/me/parent-links`, async ({ request }) => {
+    options.onRequest?.(request);
+    if (options.delayMs !== undefined && options.delayMs > 0) {
+      await delay(options.delayMs);
+    }
+
+    if (status === 401) {
+      return createErrorEnvelopeResponse(401, {
+        code: 'UNAUTHENTICATED',
+        message: 'Unauthorized',
+        correlationId: 'req-family-links-401',
+      });
+    }
+
+    if (status >= 400) {
+      return createErrorEnvelopeResponse(status, {
+        code: 'INTERNAL_ERROR',
+        message: 'Raw backend failure for family links',
+        correlationId: `req-family-links-${status}`,
+      });
+    }
+
+    return HttpResponse.json({
+      items: [...(options.items ?? [])],
+    } satisfies FamilyLinksResponsePayload);
+  });
+}
+
+export interface FamilyReportCardHandlerOptions {
+  readonly baseUrl?: string;
+  readonly linkId?: string;
+  readonly link?: FamilyLinkPayload;
+  readonly items?: readonly FamilyReportCardItemPayload[];
+  readonly metrics?: FamilyMetricsSummaryPayload;
+  readonly status?: number;
+  readonly delayMs?: number;
+  readonly onRequest?: (request: Request, linkId: string) => void;
+}
+
+const DEFAULT_FAMILY_METRICS: FamilyMetricsSummaryPayload = {
+  connectedSeconds: 0,
+  submissionCount: 0,
+  messageCount: 0,
+  gradedCount: 0,
+  ungradedCount: 0,
+  pendingCount: 0,
+  averageScorePercent: null,
+};
+
+export function createFamilyReportCardHandler(
+  options: FamilyReportCardHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = (options.baseUrl ?? TEST_API_BASE_URL).replace(/\/+$/, '');
+  const status = options.status ?? 200;
+
+  return http.get(
+    `${baseUrl}/me/parent-links/:linkId/report-card`,
+    async ({ params, request }) => {
+      const linkId = String(params.linkId ?? '');
+      if (options.linkId !== undefined && linkId !== options.linkId) {
+        return;
+      }
+
+      options.onRequest?.(request, linkId);
+      if (options.delayMs !== undefined && options.delayMs > 0) {
+        await delay(options.delayMs);
+      }
+
+      if (status === 403) {
+        return createErrorEnvelopeResponse(403, {
+          code: 'FORBIDDEN',
+          message:
+            'Parent viewing is disabled while the classroom is in adult education mode',
+          correlationId: 'req-family-report-card-403',
+        });
+      }
+
+      if (status === 404) {
+        return createErrorEnvelopeResponse(404, {
+          code: 'NOT_FOUND',
+          message: 'Parent link not found',
+          correlationId: 'req-family-report-card-404',
+        });
+      }
+
+      if (status >= 400) {
+        return createErrorEnvelopeResponse(status, {
+          code: 'INTERNAL_ERROR',
+          message: 'Raw backend failure for report card',
+          correlationId: `req-family-report-card-${status}`,
+        });
+      }
+
+      const url = new URL(request.url);
+      const rawPage = Number(url.searchParams.get('page') ?? '1');
+      const rawPageSize = Number(url.searchParams.get('pageSize') ?? '20');
+      const page =
+        Number.isFinite(rawPage) && rawPage >= 1 ? Math.trunc(rawPage) : 1;
+      const pageSize =
+        Number.isFinite(rawPageSize) && rawPageSize >= 1
+          ? Math.trunc(rawPageSize)
+          : 20;
+
+      const allItems = options.items ?? [];
+      const start = (page - 1) * pageSize;
+      const pageItems = allItems.slice(start, start + pageSize);
+
+      const fallbackLink: FamilyLinkPayload = options.link ?? {
+        id: linkId,
+        classroomId: '00000000-0000-4000-8000-000000000301',
+        classroomName: 'Aula 1',
+        classroomSubject: null,
+        schoolId: null,
+        adultMode: false,
+        childId: '00000000-0000-4000-8000-000000000401',
+        childDisplayName: 'Estudiante',
+        createdAt: '2026-11-20T12:00:00.000Z',
+      };
+
+      const payload: FamilyReportCardPayload = {
+        link: fallbackLink,
+        items: pageItems,
+        page,
+        pageSize,
+        total: allItems.length,
+        metrics: options.metrics ?? DEFAULT_FAMILY_METRICS,
+      };
+
+      return HttpResponse.json(payload);
+    },
+  );
+}
