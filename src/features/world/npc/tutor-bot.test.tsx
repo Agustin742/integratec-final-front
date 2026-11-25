@@ -1,5 +1,6 @@
 import { act, waitFor } from '@testing-library/react';
 import {
+  AnimationAction,
   AnimationClip,
   BoxGeometry,
   Group,
@@ -151,6 +152,38 @@ describe('TutorBot model', () => {
       />,
     );
     expect(handle.group.userData.activeClip).toBe('Talk');
+  });
+});
+
+describe('TutorBot one-shot clips', () => {
+  it('settles into IdleHover without a crossfade when a one-shot ends under reduced motion', async () => {
+    frame.reduced = true;
+    const fade = vi.spyOn(AnimationAction.prototype, 'crossFadeTo');
+    const { ui, handle } = await setup(home);
+    ui.rerender(
+      <TutorBot
+        npc={view({ state: 'emote', emote: 'Wave', reactionSeq: 1 })}
+      />,
+    );
+    expect(handle.group.userData.activeClip).toBe('Wave');
+    tick(2);
+    expect(handle.group.userData.activeClip).toBe('IdleHover');
+    expect(fade).not.toHaveBeenCalled();
+    fade.mockRestore();
+  });
+
+  it('still blends back to IdleHover when motion is allowed', async () => {
+    const fade = vi.spyOn(AnimationAction.prototype, 'crossFadeTo');
+    const { ui, handle } = await setup(home);
+    ui.rerender(
+      <TutorBot
+        npc={view({ state: 'emote', emote: 'Wave', reactionSeq: 1 })}
+      />,
+    );
+    tick(2);
+    expect(handle.group.userData.activeClip).toBe('IdleHover');
+    expect(fade).toHaveBeenCalledWith(expect.anything(), 0.25, false);
+    fade.mockRestore();
   });
 });
 

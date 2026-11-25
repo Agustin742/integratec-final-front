@@ -107,6 +107,9 @@ function startClip(
     if (fadeSeconds > 0) previous.crossFadeTo(next, fadeSeconds, false);
     else previous.stop();
   }
+  // An instant switch must show now: the frame loop may not step the mixer
+  // again (frozen hover under reduced motion).
+  if (fadeSeconds === 0) visual.mixer.update(0);
   visual.active = next;
   visual.activeClip = playable.clip;
 }
@@ -131,6 +134,11 @@ export function TutorBot({
 }: TutorBotProps) {
   const reducedMotion = usePrefersReducedMotion();
   const invalidate = useThree((state) => state.invalidate);
+  // The mixer's `finished` listener outlives renders; it reads the live value.
+  const reducedMotionRef = useRef(reducedMotion);
+  useEffect(() => {
+    reducedMotionRef.current = reducedMotion;
+  });
 
   const root = useMemo(() => {
     const group = new Group();
@@ -216,8 +224,8 @@ export function TutorBot({
           startClip(
             visual,
             { clip: BOT_IDLE_CLIP, loop: true, lean: 0 },
-            botCrossfadeSeconds(false),
-            false,
+            botCrossfadeSeconds(reducedMotionRef.current),
+            reducedMotionRef.current,
           );
           tagActiveClip(root, visual.activeClip);
           invalidate();
