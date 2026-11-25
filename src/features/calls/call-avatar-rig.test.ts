@@ -12,11 +12,11 @@ import { createAvatarRig } from './call-avatar-rig';
 function build() {
   const root = new Group();
   const chest = new Bone();
-  chest.name = 'DEF-spine.003';
+  chest.name = 'DEF-spine003';
   const neck = new Bone();
-  neck.name = 'DEF-spine.005';
+  neck.name = 'DEF-spine005';
   const head = new Bone();
-  head.name = 'DEF-spine.006';
+  head.name = 'DEF-spine006';
   root.add(chest, neck, head);
   const face = new Mesh(new BufferGeometry(), new MeshBasicMaterial());
   face.morphTargetDictionary = { Blink: 0, Happy: 1, Sad: 2, Angry: 3 };
@@ -50,9 +50,7 @@ describe('createAvatarRig', () => {
     const rig = createAvatarRig(root);
     for (let i = 0; i < 300; i += 1) {
       rig.update({ dt: 0.016, level: 1, animated: true, blink: 0 });
-      expect(head.quaternion.angleTo(new Group().quaternion)).toBeLessThan(
-        0.2,
-      );
+      expect(head.quaternion.angleTo(new Group().quaternion)).toBeLessThan(0.2);
     }
   });
 

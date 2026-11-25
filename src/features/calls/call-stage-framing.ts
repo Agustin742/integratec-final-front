@@ -12,16 +12,16 @@ export interface StageFrame {
 /** Used until the model has loaded, and for the placeholder capsule. */
 export const DEFAULT_FRAME: StageFrame = {
   centerX: 0,
-  centerY: 1.36,
-  half: 0.5,
+  centerY: 0.95,
+  half: 0.48,
 };
 
 /** Smallest head height accepted from a measurement (meters). */
 const MIN_HEAD_HEIGHT = 0.12;
-/** Visible height below the head joint, in head heights: neck plus shoulders. */
-const BELOW_HEAD = 1.7;
+/** Visible height below the head joint, in head heights: neck and shoulders (stylized big-head body: head 0.79-1.32 m). */
+const BELOW_HEAD = 0.6;
 /** Headroom above the crown, in head heights. */
-const HEADROOM = 0.3;
+const HEADROOM = 0.2;
 
 /**
  * Head-and-shoulders window from two measurements of the loaded model: the

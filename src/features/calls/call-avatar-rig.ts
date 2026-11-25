@@ -4,8 +4,8 @@ import { nodAngles } from './speaking-nod';
 
 /** Joints of the canonical 34-joint avatar skeleton used for call motion. */
 export const RIG_BONES = {
-  chest: 'DEF-spine.003',
-  head: 'DEF-spine.006',
+  chest: 'DEF-spine003',
+  head: 'DEF-spine006',
 } as const;
 
 const BREATH_PERIOD_SECONDS = 4;
