@@ -33,8 +33,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Register account and select organizational path
-         * @description Creates a user account, baseline avatar configuration, and the initial organizational structure atomically.
+         * Register account and select onboarding path
+         * @description Creates a user account and baseline avatar configuration atomically with its initial organizational structure (SCHOOL or INDEPENDENT_TEACHER), or issues an initial authenticated session with zero school/classroom roles for INVITEE accounts.
          */
         post: operations["AuthController_register"];
         delete?: never;
@@ -1428,11 +1428,11 @@ export interface components {
              */
             displayName: string;
             /**
-             * @description Organizational path chosen during registration
+             * @description Registration path: INDEPENDENT_TEACHER, SCHOOL, or INVITEE (standalone account with no school/workspace until joining via invitation or code)
              * @example INDEPENDENT_TEACHER
              * @enum {string}
              */
-            path: "INDEPENDENT_TEACHER" | "SCHOOL";
+            path: "INDEPENDENT_TEACHER" | "SCHOOL" | "INVITEE";
             /**
              * @description School name (required when path is SCHOOL)
              * @example Colegio Belgrano Day
@@ -1461,6 +1461,29 @@ export interface components {
              */
             timeZone: string;
         };
+        TokenPairResponseDto: {
+            /**
+             * @description Short-lived JWT (HS256). Send it as `Authorization: Bearer <accessToken>`.
+             * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIuLi4ifQ.signature
+             */
+            accessToken: string;
+            /**
+             * @description Opaque refresh token. Stored server-side only as a SHA-256 digest; keep it secret.
+             * @example q3VZk0mH1xk4oQe2l7Yw5r8m9uJcT6bNf0aXsD1pLhE
+             */
+            refreshToken: string;
+            /**
+             * @description Authorization scheme.
+             * @example Bearer
+             * @enum {string}
+             */
+            tokenType: "Bearer";
+            /**
+             * @description Access token lifetime in seconds.
+             * @example 900
+             */
+            expiresIn: number;
+        };
         RegisterResponseDto: {
             /**
              * @description Unique user identifier (UUID)
@@ -1482,7 +1505,7 @@ export interface components {
              * @example INDEPENDENT_TEACHER
              * @enum {string}
              */
-            path: "INDEPENDENT_TEACHER" | "SCHOOL";
+            path: "INDEPENDENT_TEACHER" | "SCHOOL" | "INVITEE";
             /** @description Created school details if path is SCHOOL */
             school?: components["schemas"]["SchoolSummaryDto"];
             /**
@@ -1490,6 +1513,8 @@ export interface components {
              * @example 2026-11-05T20:00:00.000Z
              */
             createdAt: string;
+            /** @description Authenticated session issued immediately when path is INVITEE; omitted for SCHOOL and INDEPENDENT_TEACHER. */
+            session?: components["schemas"]["TokenPairResponseDto"];
         };
         /**
          * @description Stable machine-readable code. Clients branch on this, never on the message.
@@ -1539,29 +1564,6 @@ export interface components {
              * @example passwordSegura123
              */
             password: string;
-        };
-        TokenPairResponseDto: {
-            /**
-             * @description Short-lived JWT (HS256). Send it as `Authorization: Bearer <accessToken>`.
-             * @example eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIuLi4ifQ.signature
-             */
-            accessToken: string;
-            /**
-             * @description Opaque refresh token. Stored server-side only as a SHA-256 digest; keep it secret.
-             * @example q3VZk0mH1xk4oQe2l7Yw5r8m9uJcT6bNf0aXsD1pLhE
-             */
-            refreshToken: string;
-            /**
-             * @description Authorization scheme.
-             * @example Bearer
-             * @enum {string}
-             */
-            tokenType: "Bearer";
-            /**
-             * @description Access token lifetime in seconds.
-             * @example 900
-             */
-            expiresIn: number;
         };
         RefreshRequestDto: {
             /**
@@ -2448,7 +2450,7 @@ export interface components {
         ShopCatalogItemDto: {
             /** Format: uuid */
             id: string;
-            /** @example cap_blue */
+            /** @example head_cap */
             code: string;
             /** @example Blue Classroom Cap */
             name: string;
@@ -2488,7 +2490,7 @@ export interface components {
             studentId: string;
             /** Format: uuid */
             shopItemId: string;
-            /** @example cap_blue */
+            /** @example head_cap */
             shopItemCode: string;
             /** @example Blue Classroom Cap */
             shopItemName: string;
@@ -2708,7 +2710,7 @@ export interface components {
             slot: components["schemas"]["EquippedSlotName"];
             /** Format: uuid */
             shopItemId: string;
-            /** @example cap_blue */
+            /** @example head_cap */
             shopItemCode: string;
             /** @example Blue Classroom Cap */
             shopItemName: string;
