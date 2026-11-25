@@ -42,9 +42,10 @@ describe('deriveClassroomInteractables', () => {
     });
     expect(byId.get('tutor-bot')).toMatchObject({
       type: 'tutor-bot',
-      interactionClass: 'opens_panel',
-      panelKey: 'bot',
+      interactionClass: 'npc',
+      npcId: 'tutorBot',
     });
+    expect(byId.get('tutor-bot')?.panelKey).toBeUndefined();
     expect(byId.get('bot-station')).toMatchObject({
       type: 'bot-station',
       interactionClass: 'opens_panel',
@@ -92,8 +93,8 @@ describe('deriveClassroomInteractables', () => {
     const bot = byId.get('tutor-bot')!;
     expect(pet.id).not.toBe(bot.id);
     expect(pet.interactionClass).toBe('decorative');
-    expect(bot.interactionClass).toBe('opens_panel');
-    expect(bot.panelKey).toBe('bot');
+    expect(bot.interactionClass).toBe('npc');
+    expect(bot.panelKey).toBeUndefined();
     expect(pet.worldPosition).not.toEqual(bot.worldPosition);
   });
 });
@@ -107,7 +108,8 @@ describe('bot station', () => {
     const bot = byId.get('tutor-bot')!;
     expect(station.id).not.toBe(bot.id);
     expect(station.worldPosition).not.toEqual(bot.worldPosition);
-    expect(station.panelKey).toBe(bot.panelKey);
+    expect(station.panelKey).toBe('bot');
+    expect(bot.panelKey).toBeUndefined();
   });
 
   test('resolves a hit on its proxy to the bot-station interactable', () => {
@@ -228,7 +230,6 @@ describe('resolveInteractableHit', () => {
         ['classroom-bulletin-board', 'bulletin-board'],
         ['classroom-shop', 'shop'],
         ['classroom-pet', 'pet'],
-        ['classroom-tutor-bot', 'tutor-bot'],
       ] as const;
 
       for (const [objectName, expectedId] of placeholderNames) {

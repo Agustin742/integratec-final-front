@@ -23,6 +23,7 @@ import {
   type ClassroomInteractable,
 } from '../world/classroom/classroom-interactables';
 import { worldMessages } from '../world/messages';
+import type { NpcSpeech, NpcView, NpcViews } from '../world/npc/npc-view';
 import { PerformanceProbeRuntime } from '../world/performance-monitor';
 import { PerformanceStatsOverlay } from '../world/performance-stats-overlay';
 import { WorldFallback } from '../world/world-fallback';
@@ -37,6 +38,7 @@ import {
 import { useClassroomDesks } from './desks/classroom-desks-api';
 import { classroomMessages } from './messages';
 import { useOptionalClassroomPanels } from './panels/classroom-panels';
+import { NpcSpeechBubble } from './npc-speech-bubble';
 import { anchorProximityPrompt, ProximityPrompt } from './proximity-prompt';
 import { useInteractKey } from './use-interact-key';
 
@@ -52,6 +54,16 @@ export interface Classroom3DStageProps {
   readonly remoteParticipants?:
     readonly RemoteClassroomParticipant[] | undefined;
   readonly onIntentChange?: ((intent: AvatarInput) => void) | undefined;
+  /** Synced NPC state by id; the tutor bot rests at home while it is absent. */
+  readonly npcs?: NpcViews | undefined;
+  /** Text of an NPC phrase reaction, resolved from its synced phrase id. */
+  readonly resolveNpcPhrase?:
+    ((npc: NpcView) => string | undefined) | undefined;
+  /**
+   * The local user pressed E or clicked a roaming NPC (`npcId` is its key in
+   * the synced NPC map). The realtime layer sends `npc:interact` from here.
+   */
+  readonly onInteractNpc?: ((npcId: string) => void) | undefined;
   /** Fired when the canvas measures sustained low fps (#56). */
   readonly onSustainedLowFps?: () => void;
   /**
@@ -134,6 +146,9 @@ export function Classroom3DStage({
   frozen,
   remoteParticipants,
   onIntentChange,
+  npcs,
+  resolveNpcPhrase,
+  onInteractNpc,
   onSustainedLowFps,
   topSlot,
   presenceSlot,
@@ -152,6 +167,9 @@ export function Classroom3DStage({
       frozen={frozen}
       remoteParticipants={remoteParticipants}
       onIntentChange={onIntentChange}
+      npcs={npcs}
+      resolveNpcPhrase={resolveNpcPhrase}
+      onInteractNpc={onInteractNpc}
       onSustainedLowFps={onSustainedLowFps}
       topSlot={topSlot}
       presenceSlot={presenceSlot}
@@ -165,6 +183,9 @@ export function Classroom3DStage({
  */
 const ALL_INTERACTABLES = deriveClassroomInteractables(CLASSROOM_LAYOUT);
 const INTERACTABLES_BY_ID = indexClassroomInteractables(ALL_INTERACTABLES);
+
+/** Until the realtime layer wires `npc:interact`, interacting with an NPC does nothing. */
+const NOOP_INTERACT_NPC = (): void => undefined;
 
 /** Pet greetings fade on their own; errors with a retry never do. */
 const PET_FEEDBACK_MS = 3500;
@@ -191,6 +212,9 @@ function Classroom3DStageContent({
   frozen,
   remoteParticipants,
   onIntentChange,
+  npcs,
+  resolveNpcPhrase,
+  onInteractNpc = NOOP_INTERACT_NPC,
   onSustainedLowFps,
   topSlot,
   presenceSlot,
@@ -206,6 +230,10 @@ function Classroom3DStageContent({
   readonly remoteParticipants?:
     readonly RemoteClassroomParticipant[] | undefined;
   readonly onIntentChange?: ((intent: AvatarInput) => void) | undefined;
+  readonly npcs?: NpcViews | undefined;
+  readonly resolveNpcPhrase?:
+    ((npc: NpcView) => string | undefined) | undefined;
+  readonly onInteractNpc?: ((npcId: string) => void) | undefined;
   readonly onSustainedLowFps?: () => void;
   readonly topSlot?: ReactNode;
   readonly presenceSlot?: ReactNode;
@@ -228,6 +256,8 @@ function Classroom3DStageContent({
   const promptAnchorRef = useRef<HTMLDivElement | null>(null);
   const [petReactionNonce, setPetReactionNonce] = useState(0);
   const [feedback, setFeedback] = useState<InteractableFeedback | null>(null);
+  const [npcSpeech, setNpcSpeech] = useState<NpcSpeech | undefined>(undefined);
+  const npcBubbleRef = useRef<HTMLDivElement | null>(null);
 
   const interactionLocked = panels?.hasActivePanel ?? false;
 
@@ -311,6 +341,11 @@ function Classroom3DStageContent({
         return;
       }
 
+      if (interactable.interactionClass === 'npc') {
+        if (interactable.npcId) onInteractNpc(interactable.npcId);
+        return;
+      }
+
       if (interactable.interactionClass === 'decorative') {
         setPetReactionNonce((nonce) => nonce + 1);
         setFeedback({
@@ -378,6 +413,7 @@ function Classroom3DStageContent({
       desks.myDeskIndex,
       handleRetryDesks,
       resolvedPetName,
+      onInteractNpc,
       navigate,
       panels,
       restoreStageHeadingFocus,
@@ -467,6 +503,12 @@ function Classroom3DStageContent({
                 onProximityAnchor={(anchor) =>
                   anchorProximityPrompt(promptAnchorRef.current, anchor)
                 }
+                npcs={npcs}
+                resolveNpcPhrase={resolveNpcPhrase}
+                onNpcSpeech={setNpcSpeech}
+                onNpcSpeechAnchor={(anchor) =>
+                  anchorProximityPrompt(npcBubbleRef.current, anchor)
+                }
               >
                 <LazyWorldProbe
                   runtime={performanceRuntime}
@@ -507,6 +549,7 @@ function Classroom3DStageContent({
             }
           }}
         />
+        <NpcSpeechBubble anchorRef={npcBubbleRef} speech={npcSpeech} />
         <ClassroomWorldHud
           highlightedId={effectiveHighlightedId}
           myDeskIndex={desks.myDeskIndex}

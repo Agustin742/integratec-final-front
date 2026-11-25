@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { Mesh } from 'three';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { Avatar } from '@/features/profile/avatar-options';
+import type { NpcView } from '../npc/npc-view';
 import { ClassroomScene } from './classroom-scene';
 
 const nav = vi.hoisted(() => ({
@@ -16,6 +17,7 @@ const nav = vi.hoisted(() => ({
   highlightProps: null as unknown,
   kitProps: null as unknown,
   doorProps: null as unknown,
+  botProps: null as unknown as Record<string, unknown> | null,
   trackerProps: null as unknown as {
     interactables: { id: string }[];
     onChange?: unknown;
@@ -71,6 +73,12 @@ vi.mock('./classroom-door', () => ({
     return <div data-testid="classroom-door" />;
   },
 }));
+vi.mock('../npc/tutor-bot', () => ({
+  TutorBot: (props: Record<string, unknown>) => {
+    nav.botProps = props;
+    return <div data-testid="tutor-bot" />;
+  },
+}));
 vi.mock('./interactable-highlight', () => ({
   InteractableHighlight: (props: unknown) => {
     nav.highlightProps = props;
@@ -95,6 +103,7 @@ beforeEach(() => {
   nav.highlightProps = null;
   nav.kitProps = null;
   nav.doorProps = null;
+  nav.botProps = null;
   nav.trackerProps = null;
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -143,6 +152,59 @@ describe('ClassroomScene', () => {
       (nav.localAvatarProps as { controller: { poseRef: unknown } }).controller
         .poseRef,
     );
+  });
+
+  test('mounts the tutor bot idle at its home in front of the station when no NPC state arrives', () => {
+    render(<ClassroomScene scopeKey="room-1" />);
+    expect(screen.getByTestId('tutor-bot')).toBeInTheDocument();
+    const { npc, scopeKey } = nav.botProps as {
+      npc: { id: string; x: number; z: number; state: string };
+      scopeKey: string;
+    };
+    expect(scopeKey).toBe('room-1');
+    expect(npc).toMatchObject({ id: 'tutorBot', state: 'idle' });
+    expect(npc.x).toBeCloseTo(-5.611, 2);
+    expect(npc.z).toBeCloseTo(1.05, 2);
+  });
+
+  test('feeds the bot the synced NPC state and its resolved phrase text', () => {
+    const synced: NpcView = {
+      id: 'tutorBot',
+      x: 1,
+      z: 2,
+      rotation: 0,
+      state: 'reacting',
+      emote: '',
+      reaction: 'phrase',
+      phraseId: 4,
+      reactionSeq: 3,
+      reactingSessionId: 's1',
+    };
+    const resolveNpcPhrase = vi.fn(() => 'La luna orbita la Tierra');
+    render(
+      <ClassroomScene
+        scopeKey="room-1"
+        npcs={new Map([['tutorBot', synced]])}
+        resolveNpcPhrase={resolveNpcPhrase}
+      />,
+    );
+    expect(nav.botProps).toMatchObject({
+      npc: synced,
+      phraseText: 'La luna orbita la Tierra',
+    });
+    expect(resolveNpcPhrase).toHaveBeenCalledWith(synced);
+  });
+
+  test('shares live NPC positions with proximity and highlight', () => {
+    render(<ClassroomScene scopeKey="room-1" />);
+    const live = (nav.botProps as { positions: unknown }).positions;
+    expect(live).toBeInstanceOf(Map);
+    expect((nav.trackerProps as { npcPositions?: unknown }).npcPositions).toBe(
+      live,
+    );
+    expect(
+      (nav.highlightProps as { npcPositions?: unknown }).npcPositions,
+    ).toBe(live);
   });
 
   test('still renders without a profile avatar', () => {

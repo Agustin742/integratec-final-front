@@ -203,7 +203,6 @@ describe('placeholders', () => {
     'classroom-bulletin-board': 'bulletin-board',
     'classroom-shop': 'shop',
     'classroom-pet': 'pet',
-    'classroom-tutor-bot': 'tutor-bot',
   } as const;
 
   test.each(Object.entries(expected))(
@@ -216,12 +215,14 @@ describe('placeholders', () => {
     },
   );
 
-  test('the pet and the tutor bot are distinct objects with distinct colours', () => {
+  test('the tutor bot is no longer a static placeholder: the moving bot owns its proxy', () => {
+    const { root } = build();
+    expect(root.getObjectByName('classroom-tutor-bot')).toBeUndefined();
+  });
+
+  test('the pet keeps its green placeholder colours', () => {
     const { root } = build();
     const pet = named(root, 'classroom-pet');
-    const bot = named(root, 'classroom-tutor-bot');
-    expect(pet.getObjectById(bot.id)).toBeUndefined();
-    expect(bot.getObjectById(pet.id)).toBeUndefined();
     const colours = (object: Object3D) =>
       new Set(
         meshes(object).map((mesh) =>
@@ -231,9 +232,7 @@ describe('placeholders', () => {
         ),
       );
     expect(colours(pet).has(0x65b96a)).toBe(true);
-    expect(colours(bot).has(0xb5a7d6)).toBe(true);
     expect(colours(pet).has(0xb5a7d6)).toBe(false);
-    expect(colours(bot).has(0x65b96a)).toBe(false);
   });
 
   /**
@@ -304,12 +303,6 @@ describe('placeholders', () => {
       .intersectObject(root, true)
       .find((h) => h.object.name !== 'walkable-floor');
     expect(hit?.object.parent?.name).toBe('classroom-bot-station');
-  });
-
-  test('the tutor bot stands on the teacher desk top', () => {
-    const { root } = build();
-    const box = worldBox(named(root, 'classroom-tutor-bot'));
-    expect(box.min.y).toBeCloseTo(DESK_HEIGHT);
   });
 
   test('props on the near side stay low enough not to hide avatars', () => {

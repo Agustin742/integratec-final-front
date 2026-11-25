@@ -5,6 +5,7 @@ import { worldMessages } from '../messages';
 import type { AvatarEquipped } from '../avatar/avatar-part-plan';
 import type { Pose } from '../movement';
 import { WorldCanvas, type WorldCanvasProps } from '../world-canvas';
+import type { NpcSpeech, NpcView, NpcViews } from '../npc/npc-view';
 import type { ClassroomInteractable } from './classroom-interactables';
 import { ClassroomScene } from './classroom-scene';
 import type { ProximityAnchor } from './proximity-tracker';
@@ -36,6 +37,11 @@ export interface ClassroomWorldProps extends Pick<
     ((interactable: ClassroomInteractable) => boolean) | undefined;
   onProximityChange?: ((id: string | undefined) => void) | undefined;
   onProximityAnchor?: ((anchor: ProximityAnchor) => void) | undefined;
+  /** Synced NPC state by id (pet, tutor bot); the bot rests at home without it. */
+  npcs?: NpcViews | undefined;
+  resolveNpcPhrase?: ((npc: NpcView) => string | undefined) | undefined;
+  onNpcSpeech?: ((speech: NpcSpeech | undefined) => void) | undefined;
+  onNpcSpeechAnchor?: ((anchor: ProximityAnchor) => void) | undefined;
   /**
    * Fills the positioned parent instead of using the fixed card height, for
    * a full-screen world (#128). The parent must have a definite size.
@@ -68,6 +74,10 @@ export function ClassroomWorld({
   isProximityTarget,
   onProximityChange,
   onProximityAnchor,
+  npcs,
+  resolveNpcPhrase,
+  onNpcSpeech,
+  onNpcSpeechAnchor,
   fill = false,
   children,
 }: ClassroomWorldProps) {
@@ -110,6 +120,10 @@ export function ClassroomWorld({
         isProximityTarget={isProximityTarget}
         onProximityChange={onProximityChange}
         onProximityAnchor={onProximityAnchor}
+        npcs={npcs}
+        resolveNpcPhrase={resolveNpcPhrase}
+        onNpcSpeech={onNpcSpeech}
+        onNpcSpeechAnchor={onNpcSpeechAnchor}
       />
       {children}
     </WorldCanvas>

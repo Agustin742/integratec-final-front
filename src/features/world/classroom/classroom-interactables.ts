@@ -6,6 +6,11 @@ import {
   deriveDesks,
 } from './classroom-desks';
 
+/** Half the station's 1.278 m depth once rotated to face +x. */
+const BOT_STATION_HALF_DEPTH = 1.278 / 2;
+/** Clear floor between the station and the bot's home hover spot. */
+const BOT_HOME_GAP = 0.7;
+
 /** Width of the back-wall entrance gap (shell); the door and exit target sit in it. */
 export const ENTRANCE_WIDTH = 2;
 
@@ -41,11 +46,13 @@ export function deriveClassroomPropSpecs(
 ): ClassroomPropSpecs {
   const { bounds } = layout;
   const frontZ = bounds.minZ;
-  const teacher = deriveDesks(layout).find((desk) => desk.kind === 'teacher');
-  const tutorBotPos: readonly [number, number, number] = [
-    teacher ? teacher.centerX + teacher.width / 2 - 0.5 : 0,
-    DESK_HEIGHT,
-    teacher ? teacher.centerZ : 0,
+  // Tutor Corner (`docs/art/tutor-bot.md`); the bot hovers just in front of it.
+  const stationX = -6.95;
+  const stationZ = 1.05;
+  const botHome: readonly [number, number, number] = [
+    stationX + BOT_STATION_HALF_DEPTH + BOT_HOME_GAP,
+    0,
+    stationZ,
   ];
 
   return {
@@ -80,15 +87,18 @@ export function deriveClassroomPropSpecs(
       footprint: [1.0, 0.32],
       beaconHeight: 0.85,
     },
+    // Home of the roaming tutor bot: where it rests when not moving. Its live
+    // position replaces `interactablePosition` once it walks (`npc-live-position`).
     tutorBot: {
-      position: tutorBotPos,
-      interactablePosition: tutorBotPos,
-      footprint: [0.45, 0.45],
-      beaconHeight: DESK_HEIGHT + 0.95,
+      position: botHome,
+      rotationY: Math.PI / 2,
+      interactablePosition: botHome,
+      footprint: [0.6, 0.6],
+      beaconHeight: 1.35,
     },
     // Tutor Corner under the left window bay, facing +x (`docs/art/tutor-bot.md`).
     botStation: {
-      position: [-6.95, 0, 1.05],
+      position: [stationX, 0, stationZ],
       rotationY: Math.PI / 2,
       // Walk-up strip on the floor in front (+x) of the prop, not its centre.
       interactablePosition: [-5.95, 0, 1.05],
@@ -121,8 +131,12 @@ export function deriveClassroomPropSpecs(
   };
 }
 
+/**
+ * `npc` targets a synced roaming character (`npcId`): it follows the NPC and
+ * hands the interaction to the realtime layer instead of opening a panel.
+ */
 export type InteractionClass =
-  'decorative' | 'opens_panel' | 'direct_transition';
+  'decorative' | 'opens_panel' | 'direct_transition' | 'npc';
 
 export type ClassroomInteractableType =
   | 'board'
@@ -154,6 +168,8 @@ export interface ClassroomInteractable {
   readonly interactionClass: InteractionClass;
   readonly panelKey?: ClassroomInteractablePanelKey;
   readonly deskIndex?: number;
+  /** Synced NPC id for `npc` interactables (key of `ClassroomState.npcs`). */
+  readonly npcId?: string;
   readonly worldPosition: readonly [number, number, number];
   readonly footprint: readonly [number, number];
   readonly beaconHeight: number;
@@ -254,8 +270,8 @@ export function deriveClassroomInteractables(
     {
       id: 'tutor-bot',
       type: 'tutor-bot',
-      interactionClass: 'opens_panel',
-      panelKey: 'bot',
+      interactionClass: 'npc',
+      npcId: 'tutorBot',
       worldPosition: specs.tutorBot.interactablePosition,
       footprint: specs.tutorBot.footprint,
       beaconHeight: specs.tutorBot.beaconHeight,

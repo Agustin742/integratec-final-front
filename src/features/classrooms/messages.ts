@@ -100,7 +100,7 @@ export const classroomMessages = {
       shelf: 'Abrir material',
       'bulletin-board': 'Abrir avisos',
       shop: 'Abrir tienda',
-      'tutor-bot': 'Abrir asistente de estudio',
+      'tutor-bot': 'Hablar con el bot',
       'bot-station': 'Abrir asistente de estudio',
       'chat-computer': 'Abrir el chat',
       'report-card-stand': 'Abrir calificaciones',

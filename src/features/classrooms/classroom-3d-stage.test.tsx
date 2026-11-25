@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -11,6 +11,8 @@ import {
   Classroom3DStage,
   type Classroom3DStageProps,
 } from './classroom-3d-stage';
+import { CLASSROOM_LAYOUT } from '@/realtime';
+import { deriveClassroomInteractables } from '../world/classroom/classroom-interactables';
 import { classroomMessages } from './messages';
 import { ClassroomPanelsProvider } from './panels/classroom-panels';
 
@@ -179,4 +181,65 @@ test('centers the StageBoundary fallback inside a padded wrapper below the float
     'p-4',
     'pt-28',
   );
+});
+
+test('selecting the tutor bot calls onInteractNpc with its id and opens no panel', async () => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+  const onInteractNpc = vi.fn();
+  renderStage('aula-7', { onInteractNpc });
+  await screen.findByTestId('scene-host');
+  const bot = deriveClassroomInteractables(CLASSROOM_LAYOUT).find(
+    (item) => item.id === 'tutor-bot',
+  )!;
+  const select = world.props.onSelectInteractable as (item: unknown) => void;
+  act(() => select(bot));
+  expect(onInteractNpc).toHaveBeenCalledWith('tutorBot');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test('selecting the tutor bot is a harmless no-op when nothing handles NPC interactions yet', async () => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+  renderStage('aula-7');
+  await screen.findByTestId('scene-host');
+  const bot = deriveClassroomInteractables(CLASSROOM_LAYOUT).find(
+    (item) => item.id === 'tutor-bot',
+  )!;
+  const select = world.props.onSelectInteractable as (item: unknown) => void;
+  expect(() => act(() => select(bot))).not.toThrow();
+});
+
+test('mounts the NPC speech bubble with the bot phrase from the world', async () => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+  renderStage('aula-7');
+  await screen.findByTestId('scene-host');
+  const onNpcSpeech = world.props.onNpcSpeech as (speech: unknown) => void;
+  act(() =>
+    onNpcSpeech({ npcId: 'tutorBot', text: 'Los angulos suman 180', seq: 1 }),
+  );
+  expect(screen.getByTestId('npc-speech-bubble')).toHaveTextContent(
+    'Los angulos suman 180',
+  );
+  act(() => onNpcSpeech(undefined));
+  expect(screen.queryByTestId('npc-speech-bubble')).not.toBeInTheDocument();
 });

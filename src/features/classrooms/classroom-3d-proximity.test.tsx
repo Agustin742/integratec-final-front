@@ -300,6 +300,13 @@ describe('availability and highlight', () => {
       isTarget('pet', { type: 'pet', interactionClass: 'decorative' }),
     ).toBe(true);
     expect(
+      isTarget('tutor-bot', {
+        type: 'tutor-bot',
+        interactionClass: 'npc',
+        npcId: 'tutorBot',
+      }),
+    ).toBe(true);
+    expect(
       isTarget('entrance', {
         type: 'entrance',
         interactionClass: 'direct_transition',

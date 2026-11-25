@@ -67,7 +67,8 @@ type Vec3 = readonly [number, number, number];
  * rendered by `<ClassroomKit>`; this scene keeps the invisible walkable-floor
  * and entrance raycast planes, invisible picking proxies for desks, board,
  * shelf, shop, bulletin board, door and bot station, the teaching zone and the
- * remaining prop placeholders (pet, tutor bot).
+ * remaining pet placeholder. The roaming tutor bot is drawn and picked by
+ * `<TutorBot>`, which mounts its own proxy under this root.
  */
 export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   const { bounds } = layout;
@@ -326,22 +327,6 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
     propSpecs.bulletinBoard.rotationY ?? 0,
   );
   proxy(bulletin, [2.01, 1.34, 0.23], [0, 1.66, 0.115]);
-
-  // Tutor bot stands on the teacher desk, so its footprint is inside the obstacle.
-  const bot = prop(
-    'classroom-tutor-bot',
-    'tutor-bot',
-    propSpecs.tutorBot.position,
-  );
-  block(bot, CLASSROOM_COLORS.lavender, [0.28, 0.3, 0.2], [0, 0.15, 0]);
-  part(
-    bot,
-    sphere,
-    CLASSROOM_COLORS.lavender,
-    [0.24, 0.24, 0.24],
-    [0, 0.42, 0],
-  );
-  block(bot, CLASSROOM_COLORS.lavender, [0.02, 0.1, 0.02], [0, 0.59, 0]);
 
   const dispose = () => {
     const geometries = new Set<BufferGeometry>();

@@ -3,6 +3,15 @@ import type { Avatar } from '@/features/profile/avatar-options';
 import { CLASSROOM_LAYOUT, type AvatarInput } from '@/realtime';
 import type { AvatarEquipped } from '../avatar/avatar-part-plan';
 import type { Pose } from '../movement';
+import {
+  TUTOR_BOT_NPC_ID,
+  deriveTutorBotHome,
+  findNpcView,
+  type NpcSpeech,
+  type NpcView,
+  type NpcViews,
+} from '../npc/npc-view';
+import { TutorBot } from '../npc/tutor-bot';
 import { WarmLighting } from '../world-lighting';
 import { buildClassroomScene } from './build-classroom-scene';
 import {
@@ -21,6 +30,7 @@ import { FollowCamera } from './follow-camera';
 import { InteractableHighlight } from './interactable-highlight';
 import { ClassroomKit } from './kit/classroom-kit';
 import { LocalAvatar } from './local-avatar';
+import { createNpcLivePositions } from './npc-live-position';
 import { ProximityTracker, type ProximityAnchor } from './proximity-tracker';
 import { RemoteAvatar, type RemoteClassroomParticipant } from './remote-avatar';
 import { useClassroomNavigation } from './use-classroom-navigation';
@@ -59,6 +69,17 @@ export interface ClassroomSceneProps {
   onProximityChange?: ((id: string | undefined) => void) | undefined;
   /** Screen point of the nearby target, every frame it is shown. */
   onProximityAnchor?: ((anchor: ProximityAnchor) => void) | undefined;
+  /**
+   * Synced NPC state by id. Without it the tutor bot rests idle at its home
+   * in front of the bot station, so the scene never lacks one.
+   */
+  npcs?: NpcViews | undefined;
+  /** Text for an NPC phrase reaction (resolved from its synced phrase id). */
+  resolveNpcPhrase?: ((npc: NpcView) => string | undefined) | undefined;
+  /** Phrase an NPC is saying now, or undefined once it fades. */
+  onNpcSpeech?: ((speech: NpcSpeech | undefined) => void) | undefined;
+  /** Screen point (0..1, y down) above the speaking NPC, every frame it moves. */
+  onNpcSpeechAnchor?: ((anchor: ProximityAnchor) => void) | undefined;
 }
 
 type ScenePointerEvent = FloorClickEvent & InteractablePointerEvent;
@@ -90,6 +111,10 @@ export function ClassroomScene({
   isProximityTarget,
   onProximityChange,
   onProximityAnchor,
+  npcs,
+  resolveNpcPhrase,
+  onNpcSpeech,
+  onNpcSpeechAnchor,
 }: ClassroomSceneProps) {
   const scene = useMemo(() => buildClassroomScene(CLASSROOM_LAYOUT), []);
   useEffect(() => () => scene.dispose(), [scene]);
@@ -108,6 +133,12 @@ export function ClassroomScene({
       ),
     [],
   );
+
+  const npcPositions = useMemo(() => createNpcLivePositions(), []);
+  const botHome = useMemo(() => deriveTutorBotHome(CLASSROOM_LAYOUT), []);
+  const bot = findNpcView(npcs, TUTOR_BOT_NPC_ID) ?? botHome;
+  const botPhrase =
+    bot.reaction === 'phrase' ? resolveNpcPhrase?.(bot) : undefined;
 
   const proximityCandidates = useMemo(
     () =>
@@ -193,7 +224,17 @@ export function ClassroomScene({
         onClick={handleClick}
         onPointerMove={handlePointerMove}
         onPointerOut={handlePointerOut}
-      />
+      >
+        {/* Under the scene root so clicks on the moving bot reach its handlers. */}
+        <TutorBot
+          npc={bot}
+          phraseText={botPhrase}
+          scopeKey={scopeKey}
+          positions={npcPositions}
+          onSpeech={onNpcSpeech}
+          onSpeechAnchor={onNpcSpeechAnchor}
+        />
+      </primitive>
       <ClassroomKit placements={kitPlacements} scopeKey={scopeKey} />
       <ClassroomDoor poseRef={controller.poseRef} scopeKey={scopeKey} />
       <InteractableHighlight
@@ -204,6 +245,7 @@ export function ClassroomScene({
         ownDeskIndex={ownDeskIndex}
         sceneRoot={scene.root}
         petReactionNonce={petReactionNonce}
+        npcPositions={npcPositions}
       />
       <LocalAvatar
         controller={controller}
@@ -219,6 +261,7 @@ export function ClassroomScene({
         interactables={proximityCandidates}
         onChange={onProximityChange}
         onAnchor={onProximityAnchor}
+        npcPositions={npcPositions}
       />
       {remoteParticipants.map((participant) => (
         <RemoteAvatar

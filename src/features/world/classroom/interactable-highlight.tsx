@@ -7,6 +7,7 @@ import {
   OctahedronGeometry,
 } from 'three';
 import type { ClassroomInteractable } from './classroom-interactables';
+import { npcFollowOffset, type NpcLivePositions } from './npc-live-position';
 import {
   applyPointerCursor,
   resetBeaconTransform,
@@ -193,6 +194,8 @@ export interface InteractableHighlightProps {
   readonly ownDeskIndex?: number | null | undefined;
   readonly sceneRoot: Group;
   readonly petReactionNonce?: number | undefined;
+  /** Live spots of roaming NPCs; their highlight follows them. */
+  readonly npcPositions?: NpcLivePositions | undefined;
 }
 
 /**
@@ -206,6 +209,7 @@ export function InteractableHighlight({
   ownDeskIndex,
   sceneRoot,
   petReactionNonce = 0,
+  npcPositions,
 }: InteractableHighlightProps) {
   const invalidate = useThree((state) => state.invalidate);
   const gl = useThree(
@@ -264,6 +268,13 @@ export function InteractableHighlight({
     group.name = 'interactable-beacon';
     return group;
   }, []);
+  // Frame, outline and beacon of a roaming NPC ride in this group, shifted each
+  // frame by how far the NPC walked from its catalog spot.
+  const followGroup = useMemo(() => {
+    const group = new Group();
+    group.name = 'interactable-follow';
+    return group;
+  }, []);
   const beaconElapsedRef = useRef(0);
   const beaconPulseActiveRef = useRef(false);
   const lastPetNonceRef = useRef(petReactionNonce);
@@ -317,6 +328,13 @@ export function InteractableHighlight({
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
     let needsMoreFrames = false;
+
+    if (highlighted?.npcId) {
+      const [dx, dz] = npcFollowOffset(highlighted, npcPositions);
+      followGroup.position.set(dx, 0, dz);
+    } else if (followGroup.position.x !== 0 || followGroup.position.z !== 0) {
+      followGroup.position.set(0, 0, 0);
+    }
 
     if (highlighted && beaconPulseActiveRef.current) {
       if (reducedMotion) {
@@ -376,7 +394,7 @@ export function InteractableHighlight({
       )}
 
       {highlighted && (
-        <>
+        <primitive object={followGroup}>
           <FrameOutline
             centerX={highlighted.worldPosition[0]}
             baseY={highlighted.worldPosition[1] + 0.018}
@@ -412,7 +430,7 @@ export function InteractableHighlight({
               rotation={[0, Math.PI / 4, 0]}
             />
           </primitive>
-        </>
+        </primitive>
       )}
     </>
   );
