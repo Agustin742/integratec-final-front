@@ -61,6 +61,60 @@ export const familyMessages = {
     feedbackLabel: 'Devolución docente',
     gradedAtLabel: 'Corregida:',
   },
+  messaging: {
+    defaultTitle: 'Mensajes con el docente',
+    parentSubtitle:
+      'Conversación privada sobre el seguimiento del estudiante en esta aula.',
+    staffTitle: 'Mensajes con el tutor',
+    staffSubtitle: (parentName: string, childName: string) =>
+      `Conversación privada con ${parentName} sobre ${childName}.`,
+    loading: 'Cargando mensajes de la conversación…',
+    listLabel: 'Historial de mensajes privados',
+    emptyTitle: 'Todavía no hay mensajes en esta conversación',
+    emptyDescriptionParent:
+      'Escribí un mensaje para comunicarte en privado con el equipo docente del aula.',
+    emptyDescriptionStaff:
+      'Escribí un mensaje para comunicarte en privado con el padre o tutor vinculado.',
+    emptyPageTitle: 'No hay mensajes en esta página',
+    emptyPageDescription:
+      'Volvé a la primera página para consultar la conversación.',
+    backToFirstPage: 'Volver a la primera página',
+    roleBadges: {
+      PARENT: 'Familiar',
+      STAFF: 'Docente',
+    },
+    composer: {
+      label: 'Escribí un mensaje',
+      placeholder: 'Escribí tu mensaje para esta conversación privada…',
+      description: 'Solo texto plano, hasta 2000 caracteres.',
+      submitAction: 'Enviar mensaje',
+      submittingAction: 'Enviando…',
+      sentAnnouncement: 'Mensaje enviado.',
+      validation: {
+        required: 'Escribí un mensaje antes de enviarlo.',
+        tooLong: 'El mensaje no puede superar los 2000 caracteres.',
+      },
+    },
+    errors: {
+      loadTitle: 'No pudimos cargar los mensajes',
+      loadDescription:
+        'Ocurrió un problema al consultar la conversación. Revisá tu conexión e intentá nuevamente.',
+      staleTitle: 'Mostrando los últimos mensajes confirmados',
+      staleDescription:
+        'Falló la actualización automática; la conversación puede no estar al día.',
+      sendTitle: 'No pudimos enviar el mensaje',
+      sendValidation:
+        'El mensaje no es válido. Revisá que no esté vacío, no supere los 2000 caracteres y no incluya caracteres no permitidos.',
+      sendAdultMode:
+        'Esta aula pasó a modalidad de educación de adultos. La mensajería familiar quedó desactivada.',
+      sendNotFound:
+        'Este vínculo familiar ya no está disponible o el estudiante dejó de estar activo en el aula.',
+      sendUncertain:
+        'No pudimos confirmar si el mensaje llegó al servidor. Conservamos tu borrador y actualizamos la conversación para que lo verifiques antes de reintentar.',
+      sendUnexpected:
+        'Ocurrió un problema inesperado al enviar el mensaje. Conservamos tu borrador para que puedas reintentar.',
+    },
+  },
   errors: {
     linksTitle: 'No pudimos cargar el área familiar',
     linksDescription:

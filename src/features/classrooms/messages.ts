@@ -687,6 +687,12 @@ export const classroomMessages = {
       linkedToLabel: (childDisplayName: string) =>
         `Estudiante vinculado: ${childDisplayName}`,
       createdAtLabel: (formattedDate: string) => `Vinculado: ${formattedDate}`,
+      messagesAction: 'Mensajes',
+      messagesAriaLabel: (parentName: string, childName: string) =>
+        `Abrir mensajes con ${parentName} sobre ${childName}`,
+      messagesDialogTitle: (parentName: string) => `Mensajes con ${parentName}`,
+      messagesDialogDescription: (childName: string) =>
+        `Conversación privada sobre el seguimiento de ${childName}.`,
       unlinkAction: 'Desvincular',
       unlinkAriaLabel: (parentName: string, childName: string) =>
         `Desvincular a ${parentName} de ${childName}`,

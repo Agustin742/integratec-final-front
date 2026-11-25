@@ -28,6 +28,7 @@ import {
   createFamilyLinksHandler,
   createFamilyReportCardHandler,
   createOwnProfileHandler,
+  createParentLinkMessagesHandler,
   type FamilyLinkPayload,
   type FamilyMetricsSummaryPayload,
   type FamilyReportCardItemPayload,
@@ -243,6 +244,11 @@ describe('FamilyAreaView (/family)', () => {
         items,
         metrics: sofiaMetrics,
       }),
+      createParentLinkMessagesHandler({
+        linkId: linkSofia.id,
+        link: linkSofia,
+        items: [],
+      }),
     );
 
     const { container } = await renderFamilyRoute('/family');
@@ -311,6 +317,11 @@ describe('FamilyAreaView (/family)', () => {
           averageScorePercent: null,
         },
       }),
+      createParentLinkMessagesHandler({
+        linkId: linkSofia.id,
+        link: linkSofia,
+        items: [],
+      }),
     );
 
     await renderFamilyRoute('/family');
@@ -355,6 +366,36 @@ describe('FamilyAreaView (/family)', () => {
         items: tomasItems,
         metrics: tomasMetrics,
       }),
+      createParentLinkMessagesHandler({
+        linkId: linkSofia.id,
+        link: linkSofia,
+        items: [
+          {
+            id: '77777777-7777-4777-8777-000000000001',
+            parentLinkId: linkSofia.id,
+            authorId: '00000000-0000-4000-8000-000000000091',
+            authorDisplayName: 'Prof. Matemática',
+            authorRole: 'STAFF',
+            body: 'Mensaje privado de Sofía',
+            createdAt: '2026-11-20T12:00:00.000Z',
+          },
+        ],
+      }),
+      createParentLinkMessagesHandler({
+        linkId: linkTomas.id,
+        link: linkTomas,
+        items: [
+          {
+            id: '77777777-7777-4777-8777-000000000002',
+            parentLinkId: linkTomas.id,
+            authorId: '00000000-0000-4000-8000-000000000092',
+            authorDisplayName: 'Prof. Historia',
+            authorRole: 'STAFF',
+            body: 'Mensaje privado de Tomás',
+            createdAt: '2026-11-21T12:00:00.000Z',
+          },
+        ],
+      }),
     );
 
     const { router } = await renderFamilyRoute(
@@ -363,6 +404,9 @@ describe('FamilyAreaView (/family)', () => {
 
     expect(
       await screen.findByRole('heading', { name: 'Examen Exclusivo de Sofía' }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText('Mensaje privado de Sofía'),
     ).toBeInTheDocument();
 
     const selectorRegion = screen.getByRole('region', {
@@ -390,19 +434,30 @@ describe('FamilyAreaView (/family)', () => {
       }),
     ).toBeInTheDocument();
     expect(
+      await screen.findByText('Mensaje privado de Tomás'),
+    ).toBeInTheDocument();
+    expect(
       screen.queryByRole('heading', { name: 'Examen Exclusivo de Sofía' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Mensaje privado de Sofía'),
     ).not.toBeInTheDocument();
     expect(tomasButton).toHaveAttribute('aria-pressed', 'true');
     expect(sofiaButton).toHaveAttribute('aria-pressed', 'false');
   });
 
-  test('shows adult-mode notice without calling report-card when link has adultMode=true', async () => {
+  test('shows adult-mode notice without calling report-card or messages when link has adultMode=true', async () => {
     const reportCardSpy = vi.fn();
+    const messagesSpy = vi.fn();
     mswServer.use(
       createFamilyLinksHandler({ items: [linkAdultMode] }),
       createFamilyReportCardHandler({
         linkId: linkAdultMode.id,
         onRequest: reportCardSpy,
+      }),
+      createParentLinkMessagesHandler({
+        linkId: linkAdultMode.id,
+        onRequest: messagesSpy,
       }),
     );
 
@@ -416,7 +471,13 @@ describe('FamilyAreaView (/family)', () => {
     expect(
       screen.getByText(familyMessages.adultMode.description),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', {
+        name: familyMessages.messaging.defaultTitle,
+      }),
+    ).not.toBeInTheDocument();
     expect(reportCardSpy).not.toHaveBeenCalled();
+    expect(messagesSpy).not.toHaveBeenCalled();
 
     await expectAccessible(container);
   });
@@ -428,15 +489,18 @@ describe('FamilyAreaView (/family)', () => {
         linkId: linkSofia.id,
         status: 403,
       }),
+      createParentLinkMessagesHandler({
+        linkId: linkSofia.id,
+        status: 403,
+      }),
     );
 
     await renderFamilyRoute(`/family/${linkSofia.id}`);
 
-    expect(
-      await screen.findByRole('heading', {
-        name: familyMessages.errors.adultModeTitle,
-      }),
-    ).toBeInTheDocument();
+    const adultModeHeadings = await screen.findAllByRole('heading', {
+      name: familyMessages.errors.adultModeTitle,
+    });
+    expect(adultModeHeadings.length).toBeGreaterThanOrEqual(1);
     expect(
       screen.queryByText(/Parent viewing is disabled/i),
     ).not.toBeInTheDocument();
@@ -449,15 +513,18 @@ describe('FamilyAreaView (/family)', () => {
         linkId: linkSofia.id,
         status: 404,
       }),
+      createParentLinkMessagesHandler({
+        linkId: linkSofia.id,
+        status: 404,
+      }),
     );
 
     await renderFamilyRoute(`/family/${linkSofia.id}`);
 
-    expect(
-      await screen.findByRole('heading', {
-        name: familyMessages.errors.notFoundTitle,
-      }),
-    ).toBeInTheDocument();
+    const notFoundHeadings = await screen.findAllByRole('heading', {
+      name: familyMessages.errors.notFoundTitle,
+    });
+    expect(notFoundHeadings.length).toBeGreaterThanOrEqual(1);
     expect(
       screen.queryByText(/Parent link not found/i),
     ).not.toBeInTheDocument();
@@ -471,6 +538,11 @@ describe('FamilyAreaView (/family)', () => {
       createFamilyReportCardHandler({
         linkId: linkSofia.id,
         status: 500,
+      }),
+      createParentLinkMessagesHandler({
+        linkId: linkSofia.id,
+        link: linkSofia,
+        items: [],
       }),
     );
 

@@ -31,8 +31,15 @@ import { PaginationControls } from '@/components/pagination/pagination-controls'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
+import { ParentLinkMessagesThread } from '@/features/family/parent-link-messages-thread';
 import { formatInstant } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 import { useSessionService, useSessionSnapshot } from '@/session/provider';
@@ -303,8 +310,10 @@ function ClassroomInvitationsContent({
     string | null
   >(null);
 
-  // Parent links inline unlink state.
+  // Parent links inline unlink & messaging dialog state.
   const [confirmUnlinkTarget, setConfirmUnlinkTarget] =
+    useState<ClassroomParentLinkDto | null>(null);
+  const [activeMessageLink, setActiveMessageLink] =
     useState<ClassroomParentLinkDto | null>(null);
   const [isUnlinkingParentLink, setIsUnlinkingParentLink] = useState(false);
   const [unlinkParentLinkError, setUnlinkParentLinkError] = useState<
@@ -942,6 +951,9 @@ function ClassroomInvitationsContent({
 
       restoreUnlinkTriggerIdRef.current = null;
       setConfirmUnlinkTarget(null);
+      setActiveMessageLink((current) =>
+        current?.id === target.id ? null : current,
+      );
       setUnlinkParentLinkError(null);
       const description = messages.parentLinks.unlinkedDescription(
         target.parentDisplayName,
@@ -1994,22 +2006,40 @@ function ClassroomInvitationsContent({
                         </div>
                       </div>
 
-                      <Button
-                        ref={setUnlinkButtonRef(link.id)}
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        aria-label={messages.parentLinks.unlinkAriaLabel(
-                          link.parentDisplayName,
-                          link.childDisplayName,
+                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        {!adultMode && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            aria-label={messages.parentLinks.messagesAriaLabel(
+                              link.parentDisplayName,
+                              link.childDisplayName,
+                            )}
+                            disabled={isUnlinkingParentLink}
+                            onClick={() => setActiveMessageLink(link)}
+                            className="min-h-11 shrink-0"
+                          >
+                            {messages.parentLinks.messagesAction}
+                          </Button>
                         )}
-                        aria-expanded={isConfirmingThis}
-                        disabled={isUnlinkingParentLink || isConfirmingThis}
-                        onClick={() => handleOpenUnlinkConfirmation(link)}
-                        className="min-h-11 shrink-0"
-                      >
-                        {messages.parentLinks.unlinkAction}
-                      </Button>
+                        <Button
+                          ref={setUnlinkButtonRef(link.id)}
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          aria-label={messages.parentLinks.unlinkAriaLabel(
+                            link.parentDisplayName,
+                            link.childDisplayName,
+                          )}
+                          aria-expanded={isConfirmingThis}
+                          disabled={isUnlinkingParentLink || isConfirmingThis}
+                          onClick={() => handleOpenUnlinkConfirmation(link)}
+                          className="min-h-11 shrink-0"
+                        >
+                          {messages.parentLinks.unlinkAction}
+                        </Button>
+                      </div>
                     </div>
 
                     {isConfirmingThis && (
@@ -2080,6 +2110,42 @@ function ClassroomInvitationsContent({
           )}
         </section>
       )}
+
+      <Dialog
+        open={!adultMode && activeMessageLink !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setActiveMessageLink(null);
+          }
+        }}
+      >
+        <DialogContent className="w-[calc(100%-2rem)] max-w-xl">
+          {!adultMode && activeMessageLink !== null && (
+            <div className="min-w-0 space-y-4">
+              <div className="min-w-0 space-y-1">
+                <DialogTitle className="wrap-anywhere">
+                  {messages.parentLinks.messagesDialogTitle(
+                    activeMessageLink.parentDisplayName,
+                  )}
+                </DialogTitle>
+                <DialogDescription className="wrap-anywhere">
+                  {messages.parentLinks.messagesDialogDescription(
+                    activeMessageLink.childDisplayName,
+                  )}
+                </DialogDescription>
+              </div>
+              <ParentLinkMessagesThread
+                key={`${userId}:${activeMessageLink.id}`}
+                userId={userId}
+                linkId={activeMessageLink.id}
+                viewerRole="STAFF"
+                headingLevel="h3"
+                hideHeader
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

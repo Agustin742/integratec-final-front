@@ -32,6 +32,7 @@ import {
   listFamilyLinks,
 } from './family-service';
 import { familyMessages } from './messages';
+import { ParentLinkMessagesThread } from './parent-link-messages-thread';
 
 export interface FamilyAreaViewProps {
   readonly title?: string;
@@ -295,11 +296,22 @@ function FamilyAreaWorkspace({ userId, title }: FamilyAreaWorkspaceProps) {
                   </AlertDescription>
                 </Alert>
               ) : (
-                <FamilyReportCardSection
-                  key={`${userId}:${selectedLink.id}`}
-                  userId={userId}
-                  link={selectedLink}
-                />
+                <div className="min-w-0 space-y-6">
+                  <FamilyReportCardSection
+                    key={`${userId}:${selectedLink.id}`}
+                    userId={userId}
+                    link={selectedLink}
+                  />
+                  <ParentLinkMessagesThread
+                    key={`messages:${userId}:${selectedLink.id}`}
+                    userId={userId}
+                    linkId={selectedLink.id}
+                    viewerRole="PARENT"
+                    headingLevel="h3"
+                    title={familyMessages.messaging.defaultTitle}
+                    subtitle={familyMessages.messaging.parentSubtitle}
+                  />
+                </div>
               )}
             </div>
           ) : null}

@@ -33,11 +33,15 @@ import {
   createClassroomInvitationsStore,
   createClassroomParentLinksHandler,
   createClassroomRosterHandler,
+  createParentLinkMessagesHandler,
+  createSendParentLinkMessageHandler,
   type ClassroomDetailPayload,
   type ClassroomInvitationPayload,
   type ClassroomParentLinkPayload,
+  type ParentLinkMessagePayload,
   type RosterStudentPayload,
 } from '@/test/msw/handlers';
+import { familyMessages } from '@/features/family/messages';
 
 vi.setConfig({ testTimeout: 20_000 });
 import { mswServer } from '@/test/msw/server';
@@ -899,5 +903,101 @@ describe('ClassroomInvitationsPanel (#32)', () => {
     );
     expect(await screen.findByText(copy.parentLinks.emptyTitle)).toBeVisible();
     expect(store.readParentLinks()[0]?.state).toBe('INACTIVE');
+  });
+
+  test('opens private messaging dialog for a linked guardian and sends a teacher reply', async () => {
+    const activeLink: ClassroomParentLinkPayload = {
+      id: '6e5f6a7b-0000-4000-8000-000000000002',
+      parentId: '00000000-0000-4000-8000-000000000090',
+      parentDisplayName: 'Laura Gómez',
+      childId: '4e5f6a7b-0000-4000-8000-000000000009',
+      childDisplayName: 'Valentina Gómez',
+      state: 'ACTIVE',
+      createdAt: '2026-11-18T12:00:00.000Z',
+    };
+    const threadMessages: ParentLinkMessagePayload[] = [
+      {
+        id: '88888888-8888-4888-8888-000000000001',
+        parentLinkId: activeLink.id,
+        authorId: activeLink.parentId,
+        authorDisplayName: activeLink.parentDisplayName,
+        authorRole: 'PARENT',
+        body: 'Hola profe, ¿Valentina entregó el TP 2?',
+        createdAt: '2026-11-24T14:00:00.000Z',
+      },
+    ];
+
+    const store = createClassroomInvitationsStore({
+      classroomId,
+      initialInvitations: [],
+      initialParentLinks: [activeLink],
+    });
+    mswServer.use(
+      createStaffDetailHandler({ adultMode: false }),
+      ...store.handlers,
+      createParentLinkMessagesHandler({
+        linkId: activeLink.id,
+        items: () => threadMessages,
+      }),
+      createSendParentLinkMessageHandler({
+        linkId: activeLink.id,
+        authorId: profile.id,
+        authorDisplayName: profile.displayName,
+        authorRole: 'STAFF',
+        onMessageCreated: (created) => {
+          threadMessages.push(created);
+        },
+      }),
+    );
+
+    renderInvitationsPanel();
+
+    const messagesButton = await screen.findByRole('button', {
+      name: copy.parentLinks.messagesAriaLabel(
+        activeLink.parentDisplayName,
+        activeLink.childDisplayName,
+      ),
+    });
+    fireEvent.click(messagesButton);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByRole('heading', {
+        name: copy.parentLinks.messagesDialogTitle(
+          activeLink.parentDisplayName,
+        ),
+      }),
+    ).toBeVisible();
+    expect(
+      within(dialog).getByText(
+        copy.parentLinks.messagesDialogDescription(activeLink.childDisplayName),
+      ),
+    ).toBeVisible();
+    expect(
+      await within(dialog).findByText(
+        'Hola profe, ¿Valentina entregó el TP 2?',
+      ),
+    ).toBeVisible();
+
+    await expectAccessible(dialog);
+
+    const textarea = within(dialog).getByLabelText(
+      familyMessages.messaging.composer.label,
+    ) as HTMLTextAreaElement;
+    fireEvent.change(textarea, {
+      target: { value: 'Sí Laura, lo entregó ayer en fecha.' },
+    });
+    fireEvent.click(
+      within(dialog).getByRole('button', {
+        name: familyMessages.messaging.composer.submitAction,
+      }),
+    );
+
+    expect(
+      await within(dialog).findByText('Sí Laura, lo entregó ayer en fecha.'),
+    ).toBeVisible();
+    await waitFor(() => {
+      expect(textarea.value).toBe('');
+    });
   });
 });

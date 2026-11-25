@@ -9129,3 +9129,206 @@ export function createFamilyReportCardHandler(
     },
   );
 }
+
+export type ParentLinkMessagePayload =
+  components['schemas']['ParentLinkMessageDto'];
+export type ParentLinkMessagesResponsePayload =
+  components['schemas']['ParentLinkMessagesResponseDto'];
+
+export interface ParentLinkMessagesHandlerOptions {
+  readonly baseUrl?: string;
+  readonly linkId?: string;
+  readonly link?: FamilyLinkPayload;
+  readonly items?:
+    | readonly ParentLinkMessagePayload[]
+    | (() => readonly ParentLinkMessagePayload[]);
+  readonly status?: number;
+  readonly delayMs?: number;
+  readonly onRequest?: (request: Request, linkId: string) => void;
+}
+
+export function createParentLinkMessagesHandler(
+  options: ParentLinkMessagesHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = (options.baseUrl ?? TEST_API_BASE_URL).replace(/\/+$/, '');
+  const status = options.status ?? 200;
+
+  return http.get(
+    `${baseUrl}/parent-links/:linkId/messages`,
+    async ({ params, request }) => {
+      const linkId = String(params.linkId ?? '');
+      if (options.linkId !== undefined && linkId !== options.linkId) {
+        return;
+      }
+
+      options.onRequest?.(request, linkId);
+      if (options.delayMs !== undefined && options.delayMs > 0) {
+        await delay(options.delayMs);
+      }
+
+      if (status === 403) {
+        return createErrorEnvelopeResponse(403, {
+          code: 'FORBIDDEN',
+          message:
+            'Parent messaging is disabled while the classroom is in adult education mode',
+          correlationId: 'req-parent-link-messages-403',
+        });
+      }
+
+      if (status === 404) {
+        return createErrorEnvelopeResponse(404, {
+          code: 'NOT_FOUND',
+          message: 'Parent link not found',
+          correlationId: 'req-parent-link-messages-404',
+        });
+      }
+
+      if (status >= 400) {
+        return createErrorEnvelopeResponse(status, {
+          code: 'INTERNAL_ERROR',
+          message: 'Raw backend failure for parent link messages',
+          correlationId: `req-parent-link-messages-${status}`,
+        });
+      }
+
+      const url = new URL(request.url);
+      const rawPage = Number(url.searchParams.get('page') ?? '1');
+      const rawPageSize = Number(url.searchParams.get('pageSize') ?? '30');
+      const page =
+        Number.isFinite(rawPage) && rawPage >= 1 ? Math.trunc(rawPage) : 1;
+      const pageSize =
+        Number.isFinite(rawPageSize) && rawPageSize >= 1
+          ? Math.min(50, Math.trunc(rawPageSize))
+          : 30;
+
+      const allItems =
+        typeof options.items === 'function'
+          ? options.items()
+          : (options.items ?? []);
+      const start = (page - 1) * pageSize;
+      const pageItems = allItems.slice(start, start + pageSize);
+
+      const fallbackLink: FamilyLinkPayload = options.link ?? {
+        id: linkId,
+        classroomId: '00000000-0000-4000-8000-000000000301',
+        classroomName: 'Aula 1',
+        classroomSubject: null,
+        schoolId: null,
+        adultMode: false,
+        childId: '00000000-0000-4000-8000-000000000401',
+        childDisplayName: 'Estudiante',
+        createdAt: '2026-11-20T12:00:00.000Z',
+      };
+
+      const payload: ParentLinkMessagesResponsePayload = {
+        link: fallbackLink,
+        items: [...pageItems],
+        page,
+        pageSize,
+        total: allItems.length,
+      };
+
+      return HttpResponse.json(payload);
+    },
+  );
+}
+
+export interface SendParentLinkMessageHandlerOptions {
+  readonly baseUrl?: string;
+  readonly linkId?: string;
+  readonly authorId?: string;
+  readonly authorDisplayName?: string;
+  readonly authorRole?: 'PARENT' | 'STAFF';
+  readonly status?: number;
+  readonly delayMs?: number;
+  readonly onMessageCreated?: (message: ParentLinkMessagePayload) => void;
+  readonly onRequest?: (
+    request: Request,
+    linkId: string,
+    body: unknown,
+  ) => void;
+}
+
+export function createSendParentLinkMessageHandler(
+  options: SendParentLinkMessageHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = (options.baseUrl ?? TEST_API_BASE_URL).replace(/\/+$/, '');
+  const status = options.status ?? 201;
+  let seq = 1;
+
+  return http.post(
+    `${baseUrl}/parent-links/:linkId/messages`,
+    async ({ params, request }) => {
+      const linkId = String(params.linkId ?? '');
+      if (options.linkId !== undefined && linkId !== options.linkId) {
+        return;
+      }
+
+      const rawBody = (await request.json().catch(() => null)) as {
+        body?: unknown;
+      } | null;
+      options.onRequest?.(request, linkId, rawBody);
+
+      if (options.delayMs !== undefined && options.delayMs > 0) {
+        await delay(options.delayMs);
+      }
+
+      if (status === 400) {
+        return createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Raw backend validation error for parent message',
+          correlationId: 'req-send-parent-link-message-400',
+        });
+      }
+
+      if (status === 403) {
+        return createErrorEnvelopeResponse(403, {
+          code: 'FORBIDDEN',
+          message:
+            'Parent messaging is disabled while the classroom is in adult education mode',
+          correlationId: 'req-send-parent-link-message-403',
+        });
+      }
+
+      if (status === 404) {
+        return createErrorEnvelopeResponse(404, {
+          code: 'NOT_FOUND',
+          message: 'Parent link not found',
+          correlationId: 'req-send-parent-link-message-404',
+        });
+      }
+
+      if (status >= 400) {
+        return createErrorEnvelopeResponse(status, {
+          code: 'INTERNAL_ERROR',
+          message: 'Raw backend failure sending parent link message',
+          correlationId: `req-send-parent-link-message-${status}`,
+        });
+      }
+
+      const bodyText =
+        typeof rawBody?.body === 'string' ? rawBody.body.trim() : '';
+      if (bodyText === '' || bodyText.length > 2000) {
+        return createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Message body must be 1..2000 characters',
+          correlationId: 'req-send-parent-link-message-400-body',
+        });
+      }
+
+      const created: ParentLinkMessagePayload = {
+        id: `99999999-9999-4999-8999-${String(seq).padStart(12, '0')}`,
+        parentLinkId: linkId,
+        authorId: options.authorId ?? '00000000-0000-4000-8000-000000000090',
+        authorDisplayName: options.authorDisplayName ?? 'Laura Martínez',
+        authorRole: options.authorRole ?? 'PARENT',
+        body: bodyText,
+        createdAt: new Date(Date.UTC(2026, 10, 25, 15, seq, 0)).toISOString(),
+      };
+      seq += 1;
+      options.onMessageCreated?.(created);
+
+      return HttpResponse.json(created, { status: 201 });
+    },
+  );
+}

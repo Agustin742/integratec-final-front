@@ -3,12 +3,17 @@ import { ApiError } from '@/api/errors';
 import {
   familyLinksResponseSchema,
   familyReportCardResponseSchema,
+  parentLinkMessageSchema,
+  parentLinkMessagesResponseSchema,
+  type CreateParentLinkMessageDto,
   type FamilyLinksResponseDto,
   type FamilyReportCardResponseDto,
+  type ParentLinkMessageDto,
+  type ParentLinkMessagesResponseDto,
 } from './family-schema';
 import { familyMessages } from './messages';
 
-function isAbortError(error: unknown): boolean {
+export function isAbortError(error: unknown): boolean {
   return (
     (error instanceof Error || error instanceof DOMException) &&
     error.name === 'AbortError'
@@ -16,7 +21,12 @@ function isAbortError(error: unknown): boolean {
 }
 
 export type FamilyServiceErrorKind =
-  'adult-mode' | 'not-found' | 'unauthorized' | 'network' | 'unexpected';
+  | 'adult-mode'
+  | 'not-found'
+  | 'validation'
+  | 'unauthorized'
+  | 'network'
+  | 'unexpected';
 
 /**
  * Typed domain error for Family Area reads. Never forwards raw backend error
@@ -177,6 +187,176 @@ export async function getFamilyReportCard(
   const parsed = familyReportCardResponseSchema.safeParse(payload);
   if (!parsed.success) {
     throw toUnexpectedPayloadError();
+  }
+  return parsed.data;
+}
+
+export interface ParentLinkMessagesPageParams {
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+/**
+ * Returns `true` when a message send error leaves server persistence uncertain
+ * (network drop, 5xx, or malformed 201 payload), signaling the caller to
+ * preserve the user's draft and reconcile against the server.
+ */
+export function isUncertainFamilyWriteError(error: unknown): boolean {
+  if (error instanceof FamilyServiceError) {
+    return error.kind === 'network' || error.kind === 'unexpected';
+  }
+  if (error instanceof ApiError) {
+    return (
+      error.kind === 'network' ||
+      error.kind === 'unexpected' ||
+      error.status === null ||
+      error.status >= 500
+    );
+  }
+  return false;
+}
+
+function mapFamilyMessageWriteError(error: unknown): FamilyServiceError {
+  if (error instanceof FamilyServiceError) {
+    return error;
+  }
+  if (error instanceof ApiError) {
+    if (error.status === 403 || error.kind === 'forbidden') {
+      return new FamilyServiceError({
+        kind: 'adult-mode',
+        status: 403,
+        userMessage: familyMessages.messaging.errors.sendAdultMode,
+        cause: error,
+      });
+    }
+    if (error.status === 404 || error.kind === 'not-found') {
+      return new FamilyServiceError({
+        kind: 'not-found',
+        status: 404,
+        userMessage: familyMessages.messaging.errors.sendNotFound,
+        cause: error,
+      });
+    }
+    if (
+      error.status === 400 ||
+      error.kind === 'validation' ||
+      error.kind === 'bad-request'
+    ) {
+      return new FamilyServiceError({
+        kind: 'validation',
+        status: 400,
+        userMessage: familyMessages.messaging.errors.sendValidation,
+        cause: error,
+      });
+    }
+    if (error.status === 401 || error.kind === 'unauthenticated') {
+      return new FamilyServiceError({
+        kind: 'unauthorized',
+        status: 401,
+        userMessage: familyMessages.errors.unauthorized,
+        cause: error,
+      });
+    }
+    if (error.kind === 'network') {
+      return new FamilyServiceError({
+        kind: 'network',
+        status: null,
+        userMessage: familyMessages.messaging.errors.sendUncertain,
+        cause: error,
+      });
+    }
+    const isServerFailure = error.status !== null && error.status >= 500;
+    return new FamilyServiceError({
+      kind: 'unexpected',
+      status: error.status,
+      userMessage: isServerFailure
+        ? familyMessages.messaging.errors.sendUncertain
+        : familyMessages.messaging.errors.sendUnexpected,
+      cause: error,
+    });
+  }
+  return new FamilyServiceError({
+    kind: 'unexpected',
+    status: null,
+    userMessage: familyMessages.messaging.errors.sendUncertain,
+    cause: error,
+  });
+}
+
+/**
+ * `GET /parent-links/{linkId}/messages`: lists paginated chronological private
+ * messages for one active parent-child link.
+ */
+export async function listParentLinkMessages(
+  client: TypedApiClient,
+  linkId: string,
+  params: ParentLinkMessagesPageParams,
+  options: { readonly signal?: AbortSignal } = {},
+): Promise<ParentLinkMessagesResponseDto> {
+  let payload: unknown;
+  try {
+    payload = await requestApi(() =>
+      client.GET('/parent-links/{linkId}/messages', {
+        params: {
+          path: { linkId },
+          query: {
+            page: params.page,
+            pageSize: params.pageSize,
+          },
+        },
+        signal: options.signal,
+      }),
+    );
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw error;
+    }
+    throw mapFamilyReadError(error);
+  }
+
+  const parsed = parentLinkMessagesResponseSchema.safeParse(payload);
+  if (!parsed.success) {
+    throw toUnexpectedPayloadError();
+  }
+  return parsed.data;
+}
+
+/**
+ * `POST /parent-links/{linkId}/messages`: sends a plain-text private message
+ * in a parent-teacher thread. Maps `400`, `403`, `404`, and uncertain network/
+ * `5xx` errors to typed `FamilyServiceError` without exposing raw backend text.
+ */
+export async function sendParentLinkMessage(
+  client: TypedApiClient,
+  linkId: string,
+  body: CreateParentLinkMessageDto,
+  options: { readonly signal?: AbortSignal } = {},
+): Promise<ParentLinkMessageDto> {
+  let payload: unknown;
+  try {
+    payload = await requestApi(() =>
+      client.POST('/parent-links/{linkId}/messages', {
+        params: {
+          path: { linkId },
+        },
+        body,
+        signal: options.signal,
+      }),
+    );
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw error;
+    }
+    throw mapFamilyMessageWriteError(error);
+  }
+
+  const parsed = parentLinkMessageSchema.safeParse(payload);
+  if (!parsed.success) {
+    throw new FamilyServiceError({
+      kind: 'unexpected',
+      status: 201,
+      userMessage: familyMessages.messaging.errors.sendUncertain,
+    });
   }
   return parsed.data;
 }

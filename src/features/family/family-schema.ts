@@ -1,13 +1,23 @@
 import { z } from 'zod';
 import type { components } from '@/api/schema.generated';
+import { familyMessages } from './messages';
 
 // Keep Zod v4 compatible with the strict Content-Security-Policy (FD1).
 z.config({ jitless: true });
+
+export const PARENT_LINK_MESSAGE_MAX_LENGTH = 2000;
 
 export type FamilyLinkDto = components['schemas']['FamilyLinkDto'];
 export type FamilyLinksResponseDto =
   components['schemas']['FamilyLinksResponseDto'];
 export type ReportCardItemDto = components['schemas']['ReportCardItemDto'];
+export type ParentLinkMessageDto =
+  components['schemas']['ParentLinkMessageDto'];
+export type ParentLinkMessageAuthorRole = ParentLinkMessageDto['authorRole'];
+export type ParentLinkMessagesResponseDto =
+  components['schemas']['ParentLinkMessagesResponseDto'];
+export type CreateParentLinkMessageDto =
+  components['schemas']['CreateParentLinkMessageDto'];
 
 /**
  * Runtime shape of `metrics` returned by `GET /me/parent-links/{linkId}/report-card`.
@@ -95,3 +105,42 @@ export const familyReportCardResponseSchema: z.ZodType<FamilyReportCardResponseD
     total: nonNegativeInteger,
     metrics: familyMetricsSummarySchema,
   });
+
+export const parentLinkMessageSchema: z.ZodType<ParentLinkMessageDto> =
+  z.object({
+    id: z.string().uuid(),
+    parentLinkId: z.string().uuid(),
+    authorId: z.string().uuid(),
+    authorDisplayName: nonBlankText,
+    authorRole: z.enum(['PARENT', 'STAFF']),
+    body: nonBlankText,
+    createdAt: isoInstant,
+  });
+
+export const parentLinkMessagesResponseSchema: z.ZodType<ParentLinkMessagesResponseDto> =
+  z.object({
+    link: familyLinkSchema,
+    items: z.array(parentLinkMessageSchema),
+    page: z.number().int().min(1),
+    pageSize: z.number().int().min(1),
+    total: nonNegativeInteger,
+  });
+
+export const sendParentLinkMessageFormSchema = z.object({
+  body: z
+    .string()
+    .transform((value) => value.trim())
+    .refine((value) => value.length > 0, {
+      message: familyMessages.messaging.composer.validation.required,
+    })
+    .refine((value) => value.length <= PARENT_LINK_MESSAGE_MAX_LENGTH, {
+      message: familyMessages.messaging.composer.validation.tooLong,
+    }),
+});
+
+export type SendParentLinkMessageFormInput = z.input<
+  typeof sendParentLinkMessageFormSchema
+>;
+export type SendParentLinkMessageFormOutput = z.output<
+  typeof sendParentLinkMessageFormSchema
+>;
