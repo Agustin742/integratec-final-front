@@ -1,7 +1,9 @@
 import { MapSchema } from '@colyseus/schema';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
+import { AvatarAppearance } from './avatar-appearance.generated';
 import { Avatar } from './avatar.generated';
+import { EquippedItemView } from './equipped-item-view.generated';
 import {
   AVATAR_INPUT_MESSAGE,
   CLASSROOM_ROOM_NAME,
@@ -962,31 +964,26 @@ describe('createClassroomRealtimeClient (#23)', () => {
       role: 'STUDENT',
       status: 'online',
     });
-    const equippedAvatar = room.state.avatars.get('equipped-user') as Avatar & {
-      appearance?: unknown;
-    };
-    const item = (slot: string, shopItemCode: string) => ({
-      slot,
-      shopItemId: `id-${slot}`,
-      shopItemCode,
-      shopItemName: shopItemCode,
-      kind: 'AVATAR_ACCESSORY',
+    const equippedAvatar = room.state.avatars.get('equipped-user') as Avatar;
+    const item = (slot: string, shopItemCode: string) =>
+      Object.assign(new EquippedItemView(), {
+        slot,
+        shopItemId: `id-${slot}`,
+        shopItemCode,
+        shopItemName: shopItemCode,
+        kind: 'AVATAR_ACCESSORY',
+      });
+    const appearance = Object.assign(new AvatarAppearance(), {
+      bodyId: 'female',
+      hairId: 'afro',
+      topId: 'hoodie',
+      hairColor: '#AF6D63',
+      clothingColor: '#7EBA8B',
     });
-    equippedAvatar.appearance = {
-      baseAvatar: {
-        bodyId: 'female',
-        hairId: 'afro',
-        topId: 'hoodie',
-        hairColor: '#AF6D63',
-        clothingColor: '#7EBA8B',
-      },
-      items: {
-        head: item('head', 'head_crown'),
-        face: null,
-        back: item('back', 'back_wings'),
-        desk_decor: item('desk_decor', 'desk_plant'),
-      },
-    };
+    appearance.items.set('head', item('head', 'head_crown'));
+    appearance.items.set('back', item('back', 'back_wings'));
+    appearance.items.set('desk_decor', item('desk_decor', 'desk_plant'));
+    equippedAvatar.appearance = appearance;
     sdk.setJoinHandler(async () => room);
     const client = createClassroomRealtimeClient({
       auth,

@@ -251,7 +251,13 @@ function readParticipantAppearance(
 }
 
 function readItemCode(items: Record<string, unknown>, slot: string) {
-  const item = items[slot];
+  // Colyseus decodes `items` as a MapSchema, which is read with `get`; plain
+  // records (older payloads, tests) are indexed by slot.
+  const getter = (items as { get?: unknown }).get;
+  const item =
+    typeof getter === 'function'
+      ? (getter as (key: string) => unknown).call(items, slot)
+      : items[slot];
   if (typeof item !== 'object' || item === null) {
     return null;
   }
