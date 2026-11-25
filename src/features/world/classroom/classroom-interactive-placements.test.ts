@@ -2,6 +2,7 @@ import { Mesh } from 'three';
 import { describe, expect, it } from 'vitest';
 import { CLASSROOM_LAYOUT } from '@/realtime';
 import { buildClassroomScene } from './build-classroom-scene';
+import { deriveDecorationPlacements } from './classroom-decoration-placements';
 import { deriveFurniturePlacements } from './classroom-furniture-placements';
 import {
   ENTRANCE_WIDTH,
@@ -17,6 +18,7 @@ import {
   type ClassroomKitModuleId,
 } from './kit/classroom-kit-manifest';
 import {
+  glbMaterialKeys,
   glbMaterialNames,
   glbSkinnedDrawCalls,
 } from './kit/glb-materials.test-utils';
@@ -204,6 +206,7 @@ describe('deriveInteractivePlacements', () => {
       ...deriveShellPlacements(layout),
       ...deriveFurniturePlacements(layout),
       ...interactive,
+      ...deriveDecorationPlacements(layout),
     ];
     // The door is drawn outside the batch with its own materials.
     const doorDrawCalls = glbMaterialNames(
@@ -212,7 +215,7 @@ describe('deriveInteractivePlacements', () => {
     const meshCounts = Object.fromEntries(
       [...groupPlacementsByModule(all).keys()].map((id) => [
         id,
-        glbMaterialNames(getKitModuleUrl(id)),
+        glbMaterialKeys(getKitModuleUrl(id)),
       ]),
     );
     const kit = estimateKitDrawCalls(all, meshCounts);
@@ -231,9 +234,11 @@ describe('deriveInteractivePlacements', () => {
     expect(cat.after).toBeLessThan(cat.before);
     const scenery = kit + doorDrawCalls + primitive;
     expect(scenery).toBeLessThanOrEqual(60);
-    // Scenery (54) + merged bot (16) + merged cat (9). The morph-target face
+    // Scenery (34: kit 26 batched by appearance incl. the decorations, door 7,
+    // primitive 1) + merged bot (16) + merged cat (9). The morph-target face
     // meshes (9 + 4 primitives) cannot merge without breaking their clips, so
     // the NPC-inclusive ceiling leaves ~20 of the ~100 FD8 calls for avatars.
+    expect(scenery).toBe(34);
     expect(scenery + bot.after + cat.after).toBeLessThanOrEqual(80);
   });
 });

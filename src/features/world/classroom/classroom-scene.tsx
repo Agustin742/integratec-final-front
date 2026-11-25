@@ -24,6 +24,7 @@ import {
   type ClassroomInteractable,
   type InteractablePointerEvent,
 } from './classroom-interactables';
+import { deriveDecorationPlacements } from './classroom-decoration-placements';
 import { deriveFurniturePlacements } from './classroom-furniture-placements';
 import { deriveInteractivePlacements } from './classroom-interactive-placements';
 import { deriveShellPlacements } from './classroom-shell-placements';
@@ -123,6 +124,7 @@ export function ClassroomScene({
       ...deriveShellPlacements(CLASSROOM_LAYOUT),
       ...deriveFurniturePlacements(CLASSROOM_LAYOUT),
       ...deriveInteractivePlacements(CLASSROOM_LAYOUT),
+      ...deriveDecorationPlacements(CLASSROOM_LAYOUT),
     ],
     [],
   );

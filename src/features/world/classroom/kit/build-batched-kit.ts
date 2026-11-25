@@ -14,6 +14,7 @@ import {
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { ClassroomKitModuleId } from './classroom-kit-manifest';
+import { threeMaterialAppearanceKey } from './kit-material-key';
 import { groupPlacementsByModule, type KitPlacement } from './kit-placement';
 
 export interface BatchedKit {
@@ -135,20 +136,31 @@ function mergeBucket(parts: BufferGeometry[]): BufferGeometry[] {
 
 interface Bucket {
   readonly key: string;
+  /** Readable name of the first material in the bucket, used for the mesh name. */
+  readonly label: string;
   readonly material: Material;
   readonly parts: BufferGeometry[];
   readonly moduleIds: Set<ClassroomKitModuleId>;
 }
 
-/**
- * GlTF files each carry their own material objects, so identity is useless
- * across modules: same type + name is the same material (the first instance
- * wins). Unnamed materials are only shared when they are the same object.
- */
-function materialKey(material: Material): string {
-  return material.name
+const materialLabel = (material: Material): string =>
+  material.name
     ? `${material.type}:${material.name}`
     : `${material.type}:#${material.uuid}`;
+
+/**
+ * GlTF files each carry their own material objects, so identity is useless
+ * across modules. Named materials that look the same (same colour, finish and
+ * transparency) are one material even under different names, because each GLB
+ * family ships its own copy of the palette; the first instance wins. Unnamed
+ * materials are only shared when they are the same object.
+ */
+function materialKey(material: Material): string {
+  if (!material.name) return materialLabel(material);
+  const appearance = threeMaterialAppearanceKey(material);
+  return appearance
+    ? `${material.type}|${appearance}`
+    : `${material.type}:${material.name}`;
 }
 
 /**
@@ -196,6 +208,7 @@ export function buildBatchedKit(
       if (!bucket) {
         bucket = {
           key,
+          label: materialLabel(source.material),
           material: source.material,
           parts: [],
           moduleIds: new Set(),
@@ -222,7 +235,7 @@ export function buildBatchedKit(
     for (const id of kitModuleIds) allModuleIds.add(id);
     for (const geometry of mergeBucket(bucket.parts)) {
       const mesh = new Mesh(geometry, bucket.material);
-      mesh.name = kitBatchMeshName(bucket.key);
+      mesh.name = kitBatchMeshName(bucket.label);
       mesh.userData = { kitModuleIds };
       // Static: the room never moves, so skip per-frame matrix updates.
       mesh.matrixAutoUpdate = false;

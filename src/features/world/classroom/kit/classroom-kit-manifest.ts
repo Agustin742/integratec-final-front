@@ -1,12 +1,13 @@
 /**
  * Modular classroom kit manifest: module id -> public GLB URL
  * (`docs/art/classroom-shell.md`, `docs/art/classroom-furniture.md`,
- * `docs/art/classroom-interactive.md`).
+ * `docs/art/classroom-interactive.md`, `docs/art/classroom-decoration.md`).
  * Assets are Draco-compressed, +Y up, face +Z, 1 unit = 1 m, transforms applied.
  */
 const SHELL_BASE = '/models/scenes/classroom/shell';
 const FURNITURE_BASE = '/models/scenes/classroom/furniture';
 const INTERACTIVE_BASE = '/models/scenes/classroom/interactive';
+const DECORATION_BASE = '/models/scenes/classroom/decoration';
 
 export const CLASSROOM_SHELL_MODULES = {
   'baseboard-cutaway': `${SHELL_BASE}/baseboard-cutaway.glb`,
@@ -49,10 +50,28 @@ export const CLASSROOM_INTERACTIVE_MODULES = {
   'shop-kiosk': `${INTERACTIVE_BASE}/shop-kiosk.glb`,
 } as const;
 
+/**
+ * Seasonal, institutional and room decorations
+ * (`docs/art/classroom-decoration.md`).
+ */
+export const CLASSROOM_DECORATION_MODULES = {
+  'christmas-tree': `${DECORATION_BASE}/christmas-tree.glb`,
+  'flag-argentina': `${DECORATION_BASE}/flag-argentina.glb`,
+  'flag-integrar': `${DECORATION_BASE}/flag-integrar.glb`,
+  garlands: `${DECORATION_BASE}/garlands.glb`,
+  globe: `${DECORATION_BASE}/globe.glb`,
+  'plants-and-pots': `${DECORATION_BASE}/plants-and-pots.glb`,
+  rug: `${DECORATION_BASE}/rug.glb`,
+  'wall-clock': `${DECORATION_BASE}/wall-clock.glb`,
+  'wall-map': `${DECORATION_BASE}/wall-map.glb`,
+  'wall-posters': `${DECORATION_BASE}/wall-posters.glb`,
+} as const;
+
 export const CLASSROOM_KIT_MANIFEST = {
   ...CLASSROOM_SHELL_MODULES,
   ...CLASSROOM_FURNITURE_MODULES,
   ...CLASSROOM_INTERACTIVE_MODULES,
+  ...CLASSROOM_DECORATION_MODULES,
 } as const;
 
 export type ClassroomKitModuleId = keyof typeof CLASSROOM_KIT_MANIFEST;

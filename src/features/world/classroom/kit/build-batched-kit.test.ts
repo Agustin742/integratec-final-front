@@ -15,8 +15,14 @@ import type { ClassroomKitModuleId } from './classroom-kit-manifest';
 import { countBatchedDrawCalls, estimateKitDrawCalls } from './kit-draw-calls';
 import type { KitPlacement } from './kit-placement';
 
-function material(name: string, color = 'red', transparent = false) {
-  const m = new MeshStandardMaterial({ color, transparent });
+/** Named materials get a colour derived from the name, so they differ unless a test says otherwise. */
+function material(name: string, color?: string, transparent = false) {
+  const m = new MeshStandardMaterial({
+    color:
+      color ??
+      `hsl(${String(((name.charCodeAt(0) || 0) * 37) % 360)}, 70%, 50%)`,
+    transparent,
+  });
   m.name = name;
   return m;
 }
@@ -101,6 +107,34 @@ describe('buildBatchedKit', () => {
 
     expect(built.meshes).toHaveLength(1);
     expect(built.meshes[0]?.material).toBe(first);
+  });
+
+  it('merges differently named materials that look the same', () => {
+    const a = moduleScene([
+      { name: 'a', material: material('FurnWood', 'brown') },
+    ]);
+    const b = moduleScene([
+      { name: 'b', material: material('DecWood', 'brown') },
+    ]);
+    const c = moduleScene([
+      { name: 'c', material: material('DecPaint', 'teal') },
+    ]);
+    const built = buildBatchedKit(
+      modules([
+        ['board', a.scene],
+        ['cabinet', b.scene],
+        ['bookshelf', c.scene],
+      ]),
+      [
+        place('board', [0, 0, 0]),
+        place('cabinet', [2, 0, 0]),
+        place('bookshelf', [4, 0, 0]),
+      ],
+    );
+    expect(built.meshes).toHaveLength(2);
+    const wood = built.meshes.find((m) => m.name.endsWith(':FurnWood'));
+    expect(wood?.geometry.getAttribute('position').count).toBe(48);
+    expect(wood?.userData).toEqual({ kitModuleIds: ['board', 'cabinet'] });
   });
 
   it('does not merge unnamed materials that are different instances', () => {

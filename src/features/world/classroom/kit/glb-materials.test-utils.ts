@@ -1,5 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import {
+  materialAppearanceKey,
+  type MaterialAppearance,
+} from './kit-material-key';
 
 /**
  * Test helper: distinct material names referenced by the primitives of a
@@ -77,4 +81,78 @@ export function glbSkinnedDrawCalls(url: string): {
     }
   }
   return { before, after: merged.size + morph };
+}
+
+/**
+ * Test helper: draw calls of the kit once batched by material appearance
+ * (`materialAppearanceKey`), so identical colours from differently named
+ * materials count once. Reads the JSON chunk of a public GLB.
+ */
+export function glbMaterialKeys(url: string): string[] {
+  const json = readGlbJson(url);
+  const keys = new Set<string>();
+  for (const mesh of json.meshes) {
+    for (const primitive of mesh.primitives) {
+      const material = json.materials?.[primitive.material ?? -1] as
+        GltfMaterial | undefined;
+      keys.add(
+        material && !materialHasTexture(material as Record<string, unknown>)
+          ? `MeshStandardMaterial:${materialAppearanceKey(gltfAppearance(material))}`
+          : `#${String(primitive.material)}:${url}`,
+      );
+    }
+  }
+  return [...keys];
+}
+
+interface GltfMaterial {
+  pbrMetallicRoughness?: {
+    baseColorFactor?: number[];
+    roughnessFactor?: number;
+    metallicFactor?: number;
+  };
+  emissiveFactor?: number[];
+  alphaMode?: string;
+  doubleSided?: boolean;
+}
+
+function gltfAppearance(material: GltfMaterial): MaterialAppearance {
+  const pbr = material.pbrMetallicRoughness ?? {};
+  const [r = 1, g = 1, b = 1, a = 1] = pbr.baseColorFactor ?? [];
+  const [er = 0, eg = 0, eb = 0] = material.emissiveFactor ?? [];
+  return {
+    color: [r, g, b],
+    roughness: pbr.roughnessFactor ?? 1,
+    metalness: pbr.metallicFactor ?? 1,
+    emissive: [er, eg, eb],
+    opacity: a,
+    transparent: material.alphaMode === 'BLEND',
+    doubleSided: material.doubleSided === true,
+  };
+}
+
+/** Test helper: axis-aligned bounds of a public GLB's POSITION accessors. */
+export function glbBounds(url: string): {
+  min: [number, number, number];
+  max: [number, number, number];
+} {
+  const buffer = readFileSync(resolve(process.cwd(), 'public', url.slice(1)));
+  const jsonLength = buffer.readUInt32LE(12);
+  const json = JSON.parse(buffer.toString('utf8', 20, 20 + jsonLength)) as {
+    accessors: { min: number[]; max: number[] }[];
+    meshes: { primitives: { attributes: Record<string, number> }[] }[];
+  };
+  const min: [number, number, number] = [Infinity, Infinity, Infinity];
+  const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+  for (const mesh of json.meshes) {
+    for (const primitive of mesh.primitives) {
+      const accessor = json.accessors[primitive.attributes.POSITION ?? -1];
+      if (!accessor) continue;
+      for (let i = 0; i < 3; i += 1) {
+        min[i] = Math.min(min[i]!, accessor.min[i]!);
+        max[i] = Math.max(max[i]!, accessor.max[i]!);
+      }
+    }
+  }
+  return { min, max };
 }
