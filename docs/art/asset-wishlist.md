@@ -226,36 +226,36 @@ Seasonal:
 
 ### Desk clutter
 
-- [ ] Notebooks
-- [ ] Pencil case
-- [ ] Pencils
-- [ ] Stacked books
-- [ ] Backpack on the floor
+- [x] Notebooks
+- [x] Pencil case
+- [x] Pencils
+- [x] Stacked books
+- [x] Backpack on the floor
 
 ### Desk decor (shop)
 
-- [ ] Plant
-- [ ] Lamp
-- [ ] Photo frame
-- [ ] Puzzle cube
-- [ ] Figurine
-- [ ] Mug
-- [ ] Mini globe
+- [x] Plant
+- [x] Lamp
+- [x] Photo frame
+- [x] Puzzle cube
+- [x] Figurine
+- [x] Mug
+- [x] Mini globe
 
 ### Classroom themes
 
-- [ ] Warm
-- [ ] Night
-- [ ] Space
-- [ ] Forest
-- [ ] Holiday
+- [x] Warm
+- [x] Night
+- [x] Space
+- [x] Forest
+- [x] Holiday
 
 ### Other spaces (if more than one room)
 
-- [ ] Hallway
-- [ ] Schoolyard
-- [ ] Library
-- [ ] Lab
+- [x] Hallway
+- [x] Schoolyard
+- [x] Library
+- [x] Lab
 
 ## 4. Interactive objects
 
