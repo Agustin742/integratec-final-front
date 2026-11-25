@@ -17,6 +17,7 @@ import { createNpcLivePositions } from '../classroom/npc-live-position';
 import { ClassroomPet, type ClassroomPetHandle } from './classroom-pet';
 import type { NpcView } from './npc-view';
 import { PET_SLEEP_LIFT } from './pet-clips';
+import { skinnedGltf, skinnedMeshes } from './skinned-fixture.test-utils';
 
 const frame = vi.hoisted(() => ({
   callback: null as null | ((state: unknown, delta: number) => void),
@@ -121,6 +122,25 @@ afterEach(() => {
 });
 
 describe('ClassroomPet model', () => {
+  it('merges the skinned parts of one material but keeps the morph face apart', async () => {
+    setGlbLoaderForTests({
+      loadAsync: () => Promise.resolve(skinnedGltf(3, CLIPS)),
+    });
+    let handle: ClassroomPetHandle | undefined;
+    render(
+      <ClassroomPet
+        npc={home}
+        positions={createNpcLivePositions()}
+        onReady={(built) => (handle = built)}
+      />,
+    );
+    await waitFor(() => expect(handle).toBeDefined());
+    const meshes = skinnedMeshes(handle!.group);
+    expect(meshes).toHaveLength(2);
+    expect(meshes.filter((mesh) => mesh.morphTargetDictionary)).toHaveLength(1);
+    expect(handle!.group.getObjectByName('Hips')).toBeDefined();
+  });
+
   it('stands at the synced spot, tagged as the pet interactable with a pickable proxy', async () => {
     const { handle } = await setup(home);
     expect(handle.group.position.x).toBeCloseTo(6.73);

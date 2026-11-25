@@ -16,6 +16,7 @@ import { render } from '@/test/render';
 import { clearAssetCache, setGlbLoaderForTests } from '../asset-cache';
 import { createNpcLivePositions } from '../classroom/npc-live-position';
 import type { NpcView } from './npc-view';
+import { skinnedGltf, skinnedMeshes } from './skinned-fixture.test-utils';
 import { TutorBot, type TutorBotHandle } from './tutor-bot';
 
 const frame = vi.hoisted(() => ({
@@ -110,6 +111,19 @@ afterEach(() => {
 });
 
 describe('TutorBot model', () => {
+  it('merges the skinned parts of one material but keeps the morph face apart', async () => {
+    setGlbLoaderForTests({
+      loadAsync: () => Promise.resolve(skinnedGltf(3, CLIPS)),
+    });
+    const { handle } = await setup(home);
+    const meshes = skinnedMeshes(handle.group);
+    expect(meshes).toHaveLength(2);
+    expect(meshes.filter((mesh) => mesh.morphTargetDictionary)).toHaveLength(1);
+    // Clips still bind: the shared bone resolves by name under the bot.
+    expect(handle.group.getObjectByName('Hips')).toBeDefined();
+    expect(handle.group.userData.activeClip).toBe('IdleHover');
+  });
+
   it('stands at the synced spot, tagged as the tutor-bot interactable with a pickable proxy', async () => {
     const { handle } = await setup(home);
     expect(handle.group.position.x).toBeCloseTo(-5.6);

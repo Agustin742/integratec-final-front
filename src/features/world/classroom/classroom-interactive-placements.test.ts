@@ -16,9 +16,14 @@ import {
   getKitModuleUrl,
   type ClassroomKitModuleId,
 } from './kit/classroom-kit-manifest';
-import { glbMaterialNames } from './kit/glb-materials.test-utils';
+import {
+  glbMaterialNames,
+  glbSkinnedDrawCalls,
+} from './kit/glb-materials.test-utils';
 import { estimateKitDrawCalls } from './kit/kit-draw-calls';
 import { groupPlacementsByModule } from './kit/kit-placement';
+import { PET_URL } from '../npc/classroom-pet';
+import { TUTOR_BOT_URL } from '../npc/tutor-bot';
 
 const layout = CLASSROOM_LAYOUT;
 const { bounds } = layout;
@@ -219,6 +224,16 @@ describe('deriveInteractivePlacements', () => {
       primitive += 1;
     });
     scene.dispose();
-    expect(kit + doorDrawCalls + primitive).toBeLessThanOrEqual(60);
+    // The skinned NPCs are merged by material at load time (mergeSkinnedByMaterial).
+    const bot = glbSkinnedDrawCalls(TUTOR_BOT_URL);
+    const cat = glbSkinnedDrawCalls(PET_URL);
+    expect(bot.after).toBeLessThan(bot.before);
+    expect(cat.after).toBeLessThan(cat.before);
+    const scenery = kit + doorDrawCalls + primitive;
+    expect(scenery).toBeLessThanOrEqual(60);
+    // Scenery (54) + merged bot (16) + merged cat (9). The morph-target face
+    // meshes (9 + 4 primitives) cannot merge without breaking their clips, so
+    // the NPC-inclusive ceiling leaves ~20 of the ~100 FD8 calls for avatars.
+    expect(scenery + bot.after + cat.after).toBeLessThanOrEqual(80);
   });
 });

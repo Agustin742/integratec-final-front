@@ -12,6 +12,7 @@ import {
   type AnimationAction,
   type AnimationClip,
   type Object3D,
+  type SkinnedMesh,
 } from 'three';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { loadGlbAsset } from '../asset-cache';
@@ -20,6 +21,7 @@ import { placeAvatar } from '../classroom/local-avatar-frame';
 import type { NpcLivePositions } from '../classroom/npc-live-position';
 import type { Pose } from '../movement';
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion';
+import { mergeSkinnedByMaterial } from './merge-skinned-by-material';
 import { advanceNpc, BOT_LEAN_RADIANS } from './npc-frame';
 import {
   NPC_SPEECH_VISIBLE_MS,
@@ -195,6 +197,7 @@ export function TutorBot({
 
   useEffect(() => {
     let cancelled = false;
+    let mergedMeshes: readonly SkinnedMesh[] = [];
     let built: BotVisual | null = null;
     loadGlbAsset(
       TUTOR_BOT_URL,
@@ -203,6 +206,8 @@ export function TutorBot({
       (gltf) => {
         if (cancelled) return;
         const model = cloneSkeleton(gltf.scene);
+        // Fewer draw calls: same-material skinned parts become one mesh.
+        mergedMeshes = mergeSkinnedByMaterial(model);
         model.traverse((node) => {
           // Skinned meshes are costly to raycast; the proxy owns picking.
           node.raycast = () => undefined;
@@ -242,6 +247,7 @@ export function TutorBot({
         built.mixer.stopAllAction();
         built.mixer.uncacheRoot(built.model);
         holder.remove(built.model);
+        for (const merged of mergedMeshes) merged.geometry.dispose();
       }
       visualRef.current = null;
       setReady(false);
