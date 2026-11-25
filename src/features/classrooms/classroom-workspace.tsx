@@ -19,7 +19,7 @@ import { useDocumentTitle } from '@/app/router/document-title';
 import { ErrorState, LoadingState } from '@/components/feedback/states';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
-  ClassroomCallBanner,
+  ClassCallButton,
   FocusModeNotice,
   IncomingCallListener,
   useWorldLocked,
@@ -309,12 +309,8 @@ function WorkspaceContext({
       ? { confirmed: true as const, keys }
       : { confirmed: false as const };
   const immersive = !isParent && mode === '3d' && !worldLocked;
-  const callBanner = isParent ? null : (
-    <ClassroomCallBanner
-      classroomId={classroomId}
-      classroomName={classroom.name}
-      canStart={classroom.capabilities.includes('moderate_chat')}
-    />
+  const callAction = isParent ? null : (
+    <ClassCallButton classroomId={classroomId} classroomName={classroom.name} />
   );
   const joinAlert = joinOutcome && (
     <Alert
@@ -381,6 +377,7 @@ function WorkspaceContext({
                   classroomName={classroom.name}
                   roleLabel={messages.roles[classroom.myRole]}
                   headingRef={heading}
+                  callAction={callAction}
                   modeToggleLabel={messages.viewMode.switchTo2d}
                   onToggleMode={handleModeToggle}
                   wallet={
@@ -394,9 +391,6 @@ function WorkspaceContext({
                     {joinAlert}
                   </div>
                 )}
-                <div className="pointer-events-auto w-full max-w-3xl empty:hidden">
-                  {callBanner}
-                </div>
                 {/* Sustained low fps shows a non-blocking offer (#56); the
                     app never switches modes without the user's choice. */}
                 <div className="pointer-events-auto w-full max-w-3xl empty:hidden">
@@ -452,26 +446,31 @@ function WorkspaceContext({
                     </p>
                   </div>
                 </div>
-                {!isParent && !worldLocked && (
+                {!isParent && (
                   <div className="flex flex-wrap items-center gap-2.5">
-                    {/* Visual cue only: aria-keyshortcuts on the button already announces Alt+M. */}
-                    <span
-                      aria-hidden="true"
-                      className="hidden text-xs text-muted-foreground sm:inline"
-                    >
-                      {messages.viewMode.shortcutHint}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      aria-keyshortcuts="Alt+M"
-                      onClick={handleModeToggle}
-                    >
-                      {mode === '3d'
-                        ? messages.viewMode.switchTo2d
-                        : messages.viewMode.switchTo3d}
-                    </Button>
+                    {callAction}
+                    {!worldLocked && (
+                      <>
+                        {/* Visual cue only: aria-keyshortcuts on the button already announces Alt+M. */}
+                        <span
+                          aria-hidden="true"
+                          className="hidden text-xs text-muted-foreground sm:inline"
+                        >
+                          {messages.viewMode.shortcutHint}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          aria-keyshortcuts="Alt+M"
+                          onClick={handleModeToggle}
+                        >
+                          {mode === '3d'
+                            ? messages.viewMode.switchTo2d
+                            : messages.viewMode.switchTo3d}
+                        </Button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -488,7 +487,6 @@ function WorkspaceContext({
             </header>
             {joinAlert}
             {worldLocked && <FocusModeNotice />}
-            {callBanner}
             {!isParent && (
               <Classroom2DLayout
                 classroomId={classroomId}

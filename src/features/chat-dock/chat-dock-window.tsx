@@ -104,6 +104,7 @@ export function ChatDockWindow({
           <ClassCallButton
             classroomId={classroomId}
             classroomName={classroomName}
+            compact
           />
         )}
         <Button

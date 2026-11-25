@@ -45,6 +45,37 @@ describe('CallView', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows the participant count in the top bar', () => {
+    const p = (n: number) =>
+      ({
+        sessionId: `s${n}`,
+        userId: `u${n}`,
+        displayName: `P${n}`,
+        isSelf: n === 0,
+        muted: false,
+      }) as (typeof base.participants)[number];
+    render(<CallView {...base} participants={[p(0), p(1), p(2)]} />);
+    expect(screen.getByText('3 en la llamada')).toBeInTheDocument();
+  });
+
+  it('toggles the in-call chat panel when a chat is provided', () => {
+    render(<CallView {...base} chatPanel={<div>CHAT BODY</div>} />);
+    expect(screen.queryByText('CHAT BODY')).not.toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: 'Abrir el chat' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(toggle);
+    expect(screen.getByText('CHAT BODY')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar el chat' }));
+    expect(screen.queryByText('CHAT BODY')).not.toBeInTheDocument();
+  });
+
+  it('has no chat toggle without a chat panel', () => {
+    render(<CallView {...base} />);
+    expect(
+      screen.queryByRole('button', { name: 'Abrir el chat' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('offers to unlock blocked audio from a click', () => {
     const onResumeAudio = vi.fn();
     render(

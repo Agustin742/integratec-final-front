@@ -1,10 +1,13 @@
+import { useState, type ReactNode } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type {
   CallEmote,
   CallModerate,
 } from '@/realtime/call-contracts.generated';
 import { CallControlsBar } from './call-controls-bar';
+import { ChatIcon } from './call-icons';
 import { callMessages } from './call-messages';
 import { CallStage } from './call-stage';
 import type { CallParticipantState, CallSelfState } from './call-session';
@@ -22,6 +25,8 @@ export interface CallViewProps {
   readonly allowSelfUnmute: boolean;
   readonly focusMode: boolean;
   readonly getLevel: (sessionId: string) => number;
+  /** Classroom chat shown in a toggleable side panel (drawer on small screens). */
+  readonly chatPanel?: ReactNode;
   readonly onToggleMute: () => void;
   readonly onSendEmote: (emote: CallEmote) => void;
   readonly onLeave: () => void;
@@ -31,14 +36,39 @@ export interface CallViewProps {
 }
 
 /**
- * Presentational call screen: banners, the avatar stage, the teacher panel
- * (class calls, moderators only) and the bottom controls bar.
+ * Presentational call screen on a dark, elevated stage: top bar (title,
+ * participant count, chat toggle), banners, the avatar stage, side panels
+ * (teacher controls, chat) and the floating bottom controls bar.
  */
 export function CallView(props: CallViewProps) {
+  const [chatOpen, setChatOpen] = useState(false);
   const showPanel = props.isModerator && props.kind === 'classroom';
+  const hasChat = props.chatPanel !== undefined;
+  const chatLabel = chatOpen ? callMessages.closeChat : callMessages.openChat;
+
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 p-3 sm:p-4">
-      <h2 className="font-display text-xl font-semibold">{props.title}</h2>
+    <div className="flex h-dvh min-h-0 flex-col gap-3 bg-foreground p-3 text-background sm:p-4">
+      <header className="flex min-w-0 items-center gap-3">
+        <h2 className="min-w-0 flex-1 truncate font-display text-lg font-semibold sm:text-xl">
+          {props.title}
+        </h2>
+        <Badge variant="secondary">
+          {callMessages.participantCount(props.participants.length)}
+        </Badge>
+        {hasChat && (
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            aria-label={chatLabel}
+            title={chatLabel}
+            aria-expanded={chatOpen}
+            onClick={() => setChatOpen((open) => !open)}
+          >
+            <ChatIcon />
+          </Button>
+        )}
+      </header>
       {props.micError && (
         <Alert variant="warning" role="alert">
           <AlertDescription>
@@ -56,21 +86,34 @@ export function CallView(props: CallViewProps) {
           </AlertDescription>
         </Alert>
       )}
-      <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
-        <div className="min-h-64 min-w-0 flex-1">
+      <div className="relative flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
+        <div className="min-h-48 min-w-0 flex-1 overflow-hidden rounded-3xl bg-foreground/60 p-2 shadow-inset ring-1 ring-background/10">
           <CallStage
             participants={props.participants}
             getLevel={props.getLevel}
           />
         </div>
         {showPanel && (
-          <aside className="max-h-72 shrink-0 overflow-y-auto rounded-2xl border border-edge bg-card p-4 text-card-foreground lg:max-h-none lg:w-80">
+          <aside className="max-h-60 shrink-0 overflow-y-auto rounded-3xl border border-edge bg-card p-4 text-card-foreground shadow-float lg:max-h-none lg:w-80">
             <TeacherPanel
               participants={props.participants}
               allowSelfUnmute={props.allowSelfUnmute}
               focusMode={props.focusMode}
               onModerate={props.onModerate}
             />
+          </aside>
+        )}
+        {hasChat && chatOpen && (
+          <aside
+            aria-label={callMessages.chatTitle}
+            className="absolute inset-y-0 right-0 z-10 flex w-[min(22rem,100%)] flex-col overflow-hidden rounded-3xl border border-edge bg-card text-card-foreground shadow-float lg:static lg:z-auto lg:w-80 lg:shrink-0"
+          >
+            <div className="flex shrink-0 items-center gap-2 border-b border-edge px-3 py-1">
+              <h3 className="min-w-0 flex-1 truncate font-display text-base font-semibold">
+                {callMessages.chatTitle}
+              </h3>
+            </div>
+            <div className="min-h-0 flex-1 p-2">{props.chatPanel}</div>
           </aside>
         )}
       </div>

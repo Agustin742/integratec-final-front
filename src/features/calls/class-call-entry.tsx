@@ -1,72 +1,47 @@
 import { Button } from '@/components/ui/button';
+import { PhoneIcon } from './call-icons';
 import { callMessages } from './call-messages';
 import type { IncomingCall } from './use-classroom-call-signals';
 
 const copy = callMessages.entry;
-
-export interface ClassCallBannerProps {
-  /** The server granted this user the right to run class calls. */
-  readonly canStart: boolean;
-  /** A class call is running in this classroom. */
-  readonly active: boolean;
-  readonly inCall: boolean;
-  readonly onStart: () => void;
-  readonly onJoin: () => void;
-}
-
-/**
- * Classroom entry point. Moderators start the class call; everybody else only
- * sees the join banner once it is running (the server rejects other starts).
- */
-export function ClassCallBanner({
-  canStart,
-  active,
-  inCall,
-  onStart,
-  onJoin,
-}: ClassCallBannerProps) {
-  if (inCall) return null;
-  if (active) {
-    return (
-      <div
-        role="status"
-        className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-info-edge bg-info px-4 py-3 text-info-foreground"
-      >
-        <p className="font-display font-semibold">{copy.classActive}</p>
-        <Button type="button" size="sm" onClick={onJoin}>
-          {copy.join}
-        </Button>
-      </div>
-    );
-  }
-  if (!canStart) return null;
-  return (
-    <div>
-      <Button type="button" variant="secondary" onClick={onStart}>
-        {copy.startClass}
-      </Button>
-    </div>
-  );
-}
 
 export interface ClassCallButtonViewProps {
   readonly canStart: boolean;
   readonly active: boolean;
   readonly inCall: boolean;
   readonly onClick: () => void;
+  /** Icon-only variant for the chat headers, like their sibling actions. */
+  readonly compact?: boolean;
 }
 
-/** Compact call button for the chat headers, with the same rules as the banner. */
+/** Header call action: moderators start the class call, everybody else joins it while it runs. */
 export function ClassCallButtonView({
   canStart,
   active,
   inCall,
   onClick,
+  compact = false,
 }: ClassCallButtonViewProps) {
   if (inCall || (!canStart && !active)) return null;
+  const label = active ? copy.joinShort : copy.startClass;
+  if (compact) {
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        aria-label={label}
+        title={label}
+        onClick={onClick}
+      >
+        <PhoneIcon />
+      </Button>
+    );
+  }
   return (
     <Button type="button" variant="outline" size="sm" onClick={onClick}>
-      {active ? copy.joinShort : copy.startClass}
+      <PhoneIcon />
+      {label}
     </Button>
   );
 }

@@ -27,7 +27,6 @@ export { computeStageLayout, MAX_STAGE_TILES } from './call-stage-layout';
 export { CallProvider, useCalls, type CallsController } from './call-provider';
 export {
   ClassCallButton,
-  ClassroomCallBanner,
   DirectCallButton,
   IncomingCallListener,
   useWorldLocked,

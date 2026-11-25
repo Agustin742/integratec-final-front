@@ -159,6 +159,7 @@ export function ChatsPageView({
             <ClassCallButton
               classroomId={selected.classroomId}
               classroomName={selected.classroomName}
+              compact
             />
           </header>
           <div className="min-h-0 flex-1 p-2">

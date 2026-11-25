@@ -24,7 +24,6 @@ vi.mock('@/features/classrooms/use-classroom-capabilities', () => ({
 
 import {
   ClassCallButton,
-  ClassroomCallBanner,
   DirectCallButton,
   IncomingCallListener,
   useWorldLocked,
@@ -99,58 +98,6 @@ describe('IncomingCallListener', () => {
   });
 });
 
-describe('ClassroomCallBanner', () => {
-  it('moderators start the class call', () => {
-    render(
-      <ClassroomCallBanner
-        classroomId={CLASSROOM}
-        classroomName="Mate"
-        canStart
-      />,
-    );
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Iniciar clase en llamada' }),
-    );
-    expect(calls?.start).toHaveBeenCalledWith(
-      { kind: 'classroom', classroomId: CLASSROOM },
-      'Mate',
-    );
-  });
-
-  it('students only see the join banner while the call is active', () => {
-    const { rerender } = render(
-      <ClassroomCallBanner
-        classroomId={CLASSROOM}
-        classroomName="Mate"
-        canStart={false}
-      />,
-    );
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
-    signals = makeSignals({ classCallActive: true });
-    rerender(
-      <ClassroomCallBanner
-        classroomId={CLASSROOM}
-        classroomName="Mate"
-        canStart={false}
-      />,
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Unirse' }));
-    expect(calls?.start).toHaveBeenCalledOnce();
-  });
-
-  it('renders nothing outside the call provider', () => {
-    calls = null;
-    const { container } = render(
-      <ClassroomCallBanner
-        classroomId={CLASSROOM}
-        classroomName="Mate"
-        canStart
-      />,
-    );
-    expect(container).toBeEmptyDOMElement();
-  });
-});
-
 describe('ClassCallButton', () => {
   it('shows for classroom moderators (moderate_chat) and starts the call', () => {
     capabilities = ['moderate_chat'];
@@ -200,7 +147,11 @@ describe('DirectCallButton', () => {
         peerName="Ana"
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Llamar a Ana' }));
+    const button = screen.getByRole('button', { name: 'Llamar a Ana' });
+    expect(button).toHaveAttribute('title', 'Llamar a Ana');
+    expect(button).toHaveTextContent('Llamar');
+    expect(button.querySelector('svg')).not.toBeNull();
+    fireEvent.click(button);
     expect(calls?.start).toHaveBeenCalledWith(
       { kind: 'direct', classroomId: CLASSROOM, peerUserId: PEER },
       'Ana',

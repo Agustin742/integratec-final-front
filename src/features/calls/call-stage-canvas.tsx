@@ -13,6 +13,7 @@ import { usePrefersReducedMotion } from '@/features/world/use-prefers-reduced-mo
 import { createBlinkScheduler } from './blink-scheduler';
 import { createAvatarRig, type AvatarRig } from './call-avatar-rig';
 import type { TileRect } from './call-stage-layout';
+import { FRAME_CENTER_Y, FRAME_HALF } from './call-stage-framing';
 import { roundedRectsPath, tileRadius } from './rounded-rects-path';
 import { useEmotePlayback } from './use-emote-playback';
 
@@ -20,9 +21,6 @@ const SCOPE_KEY = 'call-stage';
 const BACKGROUND = '#FFF9EB';
 /** World distance between avatars: far beyond the 1 m camera window, so no avatar leaks into a neighbor's viewport. */
 const SLOT_SPACING = 4;
-/** Head-and-shoulders window: half of the visible height, centered on the upper chest. */
-const FRAME_HALF = 0.5;
-const FRAME_CENTER_Y = 1.36;
 
 export interface StageTile {
   readonly sessionId: string;

@@ -12,7 +12,11 @@ export const callMessages = {
   forcedMuteHint:
     'Tu profe te silenció y todavía no habilitó que actives tu micrófono.',
   noMicHint: 'No hay micrófono disponible: seguís la llamada como oyente.',
-  emotes: 'Emociones',
+  emotes: 'Reacción',
+  openChat: 'Abrir el chat',
+  closeChat: 'Cerrar el chat',
+  chatTitle: 'Chat de la clase',
+  participantCount: (count: number) => `${count} en la llamada`,
   leave: 'Salir de la llamada',
   endClass: 'Finalizar clase',
   unlockAudio: 'Activar audio',
@@ -66,9 +70,6 @@ export const callMessages = {
   },
   entry: {
     startClass: 'Iniciar clase en llamada',
-    classActive: 'La clase está en llamada',
-    join: 'Unirse',
-    startShort: 'Llamada de la clase',
     joinShort: 'Unirse a la llamada',
     callMember: (name: string) => `Llamar a ${name}`,
     callAction: 'Llamar',

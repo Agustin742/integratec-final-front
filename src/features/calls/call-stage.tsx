@@ -189,7 +189,7 @@ export function CallStage({
               aria-label={tileName(p, speaking)}
               data-speaking={speaking}
               className={cn(
-                'absolute overflow-hidden border-2 border-edge',
+                'absolute overflow-hidden border-2 border-edge shadow-float',
                 !webglFailed ? 'bg-transparent' : 'bg-card',
                 speaking && 'call-tile-speaking border-accent',
               )}

@@ -61,12 +61,30 @@ describe('CallControlsBar', () => {
 
   it('offers the six emotes and sends the chosen one', () => {
     const props = setup();
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Emociones' }), {
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Reacción' }), {
       key: 'Enter',
     });
     expect(screen.getAllByRole('menuitem')).toHaveLength(6);
     fireEvent.click(screen.getByRole('menuitem', { name: /Celebrar/ }));
     expect(props.onSendEmote).toHaveBeenCalledWith('celebrate');
+  });
+
+  it('labels the emote button Reacción with an icon, no emoji, and a tooltip', () => {
+    setup();
+    const button = screen.getByRole('button', { name: 'Reacción' });
+    expect(button).toHaveAttribute('title', 'Reacción');
+    expect(button.textContent).not.toMatch(/[\u{1F300}-\u{1FAFF}]/u);
+    expect(button.querySelector('svg')).not.toBeNull();
+  });
+
+  it('gives every icon button a tooltip', () => {
+    setup({ isModerator: true });
+    for (const name of ['Silenciar mi micrófono', 'Salir de la llamada']) {
+      expect(screen.getByRole('button', { name })).toHaveAttribute(
+        'title',
+        name,
+      );
+    }
   });
 
   it('leaves the call', () => {

@@ -11,6 +11,8 @@ export interface Classroom3DTopBarProps {
   readonly roleLabel: string;
   /** Receives focus when the panel dialogs have nowhere better to return it. */
   readonly headingRef: RefObject<HTMLHeadingElement | null>;
+  /** Voice-call action, shown beside the other header actions. */
+  readonly callAction?: ReactNode;
   readonly modeToggleLabel: string;
   readonly onToggleMode: () => void;
   /** Student wallet chip, when the viewer has one. */
@@ -27,6 +29,7 @@ export function Classroom3DTopBar({
   classroomName,
   roleLabel,
   headingRef,
+  callAction,
   modeToggleLabel,
   onToggleMode,
   wallet,
@@ -74,6 +77,7 @@ export function Classroom3DTopBar({
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           {wallet}
+          {callAction}
           {/* Visual cue only: aria-keyshortcuts on the button already announces Alt+M. */}
           <span
             aria-hidden="true"

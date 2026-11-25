@@ -20,6 +20,9 @@ let session: Partial<UseCallSessionResult>;
 vi.mock('./use-call-session', () => ({
   useCallSession: () => session,
 }));
+vi.mock('@/features/classrooms/chat/chat-conversation', () => ({
+  ChatConversationWithComposer: () => <div>chat</div>,
+}));
 vi.mock('./call-stage', () => ({
   CallStage: () => <div data-testid="stage" />,
 }));

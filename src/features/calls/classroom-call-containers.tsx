@@ -3,12 +3,9 @@ import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toast';
 import { useClassroomContext } from '@/features/classrooms/use-classroom-capabilities';
 import { useCalls } from './call-provider';
+import { PhoneIcon } from './call-icons';
 import { callMessages } from './call-messages';
-import {
-  ClassCallBanner,
-  ClassCallButtonView,
-  IncomingCallPrompt,
-} from './class-call-entry';
+import { ClassCallButtonView, IncomingCallPrompt } from './class-call-entry';
 import { isWorldLocked } from './focus-mode';
 import {
   useClassroomCallSignals,
@@ -66,36 +63,11 @@ export function IncomingCallListener({
   );
 }
 
-/** Classroom entry point: moderators start the class call, students join it. */
-export function ClassroomCallBanner({
-  classroomId,
-  classroomName,
-  canStart,
-}: {
-  readonly classroomId: string;
-  readonly classroomName: string;
-  readonly canStart: boolean;
-}) {
-  const calls = useCalls();
-  const { classCallActive } = useClassroomCallSignals(classroomId);
-  if (calls === null) return null;
-  const start = () =>
-    calls.start({ kind: 'classroom', classroomId }, classroomName);
-  return (
-    <ClassCallBanner
-      canStart={canStart}
-      active={classCallActive}
-      inCall={calls.inCall}
-      onStart={start}
-      onJoin={start}
-    />
-  );
-}
-
-/** Button for the chat headers (dock and chats page); same rules as the banner. */
+/** Call action for the classroom and chat headers; moderators start, others join while it runs. */
 export function ClassCallButton(props: {
   readonly classroomId: string;
   readonly classroomName: string;
+  readonly compact?: boolean;
 }) {
   const calls = useCalls();
   if (calls === null) return null;
@@ -106,10 +78,12 @@ function ClassCallButtonContent({
   calls,
   classroomId,
   classroomName,
+  compact,
 }: {
   readonly calls: NonNullable<ReturnType<typeof useCalls>>;
   readonly classroomId: string;
   readonly classroomName: string;
+  readonly compact?: boolean;
 }) {
   const context = useClassroomContext(classroomId);
   const { classCallActive } = useClassroomCallSignals(classroomId);
@@ -121,6 +95,7 @@ function ClassCallButtonContent({
       canStart={canStart}
       active={classCallActive}
       inCall={calls.inCall}
+      compact={compact}
       onClick={() =>
         calls.start({ kind: 'classroom', classroomId }, classroomName)
       }
@@ -155,10 +130,12 @@ export function DirectCallButton({
       size="sm"
       variant="outline"
       aria-label={callMessages.entry.callMember(peerName)}
+      title={callMessages.entry.callMember(peerName)}
       onClick={() =>
         calls.start({ kind: 'direct', classroomId, peerUserId }, peerName)
       }
     >
+      <PhoneIcon />
       {callMessages.entry.callAction}
     </Button>
   );

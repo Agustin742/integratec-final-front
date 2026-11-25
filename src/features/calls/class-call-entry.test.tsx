@@ -1,76 +1,25 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  ClassCallBanner,
-  ClassCallButtonView,
-  IncomingCallPrompt,
-} from './class-call-entry';
-
-describe('ClassCallBanner', () => {
-  it('lets a moderator start a class call', () => {
-    const onStart = vi.fn();
-    render(
-      <ClassCallBanner
-        canStart
-        active={false}
-        inCall={false}
-        onStart={onStart}
-        onJoin={vi.fn()}
-      />,
-    );
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Iniciar clase en llamada' }),
-    );
-    expect(onStart).toHaveBeenCalledOnce();
-  });
-
-  it('shows students the running class call with a join button', () => {
-    const onJoin = vi.fn();
-    render(
-      <ClassCallBanner
-        canStart={false}
-        active
-        inCall={false}
-        onStart={vi.fn()}
-        onJoin={onJoin}
-      />,
-    );
-    expect(screen.getByText('La clase está en llamada')).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Iniciar clase en llamada' }),
-    ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Unirse' }));
-    expect(onJoin).toHaveBeenCalledOnce();
-  });
-
-  it('shows nothing to a student when no class call is running', () => {
-    const { container } = render(
-      <ClassCallBanner
-        canStart={false}
-        active={false}
-        inCall={false}
-        onStart={vi.fn()}
-        onJoin={vi.fn()}
-      />,
-    );
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it('hides itself while already in a call', () => {
-    const { container } = render(
-      <ClassCallBanner
-        canStart
-        active
-        inCall
-        onStart={vi.fn()}
-        onJoin={vi.fn()}
-      />,
-    );
-    expect(container).toBeEmptyDOMElement();
-  });
-});
+import { ClassCallButtonView, IncomingCallPrompt } from './class-call-entry';
 
 describe('ClassCallButtonView', () => {
+  it('renders the compact variant as an icon button with a tooltip', () => {
+    render(
+      <ClassCallButtonView
+        compact
+        canStart
+        active={false}
+        inCall={false}
+        onClick={vi.fn()}
+      />,
+    );
+    const button = screen.getByRole('button', {
+      name: 'Iniciar clase en llamada',
+    });
+    expect(button).toHaveAttribute('title', 'Iniciar clase en llamada');
+    expect(button.querySelector('svg')).not.toBeNull();
+  });
+
   it('starts for moderators and joins for students only when active', () => {
     const onClick = vi.fn();
     const { rerender } = render(

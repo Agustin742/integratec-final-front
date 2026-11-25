@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { toast } from '@/components/ui/toast';
 import type { CallJoinOptions } from '@/realtime/call-contracts.generated';
+import { ChatConversationWithComposer } from '@/features/classrooms/chat/chat-conversation';
 import { callMessages, endReasonMessage } from './call-messages';
 import { CallView } from './call-view';
 import { useCallSession } from './use-call-session';
@@ -34,7 +35,8 @@ export function useCalls(): CallsController | null {
  */
 export function CallProvider({ children }: { readonly children: ReactNode }) {
   const call = useCallSession();
-  const [label, setLabel] = useState('');
+  const [target, setTarget] = useState({ label: '', classroomId: '' });
+  const label = target.label;
   const { join, status, endReason } = call;
   const inCall =
     status === 'joining' || status === 'connected' || status === 'reconnecting';
@@ -43,7 +45,7 @@ export function CallProvider({ children }: { readonly children: ReactNode }) {
     () => ({
       inCall,
       start: (options, nextLabel) => {
-        setLabel(nextLabel);
+        setTarget({ label: nextLabel, classroomId: options.classroomId });
         void join(options).catch(() => {
           toast(callMessages.ended.unexpected, { id: 'call-ended' });
         });
@@ -79,6 +81,14 @@ export function CallProvider({ children }: { readonly children: ReactNode }) {
             allowSelfUnmute={call.allowSelfUnmute}
             focusMode={call.focusMode}
             getLevel={call.getLevel}
+            chatPanel={
+              call.kind === 'classroom' && target.classroomId !== '' ? (
+                <ChatConversationWithComposer
+                  classroomId={target.classroomId}
+                  variant="dock"
+                />
+              ) : undefined
+            }
             onToggleMute={call.toggleMute}
             onSendEmote={call.sendEmote}
             onLeave={() => void call.leave()}
@@ -115,7 +125,7 @@ function CallOverlay({
       aria-modal="true"
       aria-label={title}
       tabIndex={-1}
-      className="fixed inset-0 z-50 overflow-y-auto bg-background text-foreground outline-none"
+      className="fixed inset-0 z-50 overflow-y-auto bg-foreground text-background outline-none"
     >
       {children}
     </div>
