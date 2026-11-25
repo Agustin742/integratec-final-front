@@ -17,6 +17,16 @@ const place = (
 ): KitPlacement => ({ moduleId, position: [x, 0, z], rotationY });
 
 /**
+ * The door is centred in the back-wall entrance gap and drawn outside the
+ * batched kit (it fades when it hides the local avatar), so it is not part of
+ * `deriveInteractivePlacements`. `door.glb` faces +z with its pivot flush on
+ * the wall line, so it stands just outside the room. Pure.
+ */
+export function deriveDoorPlacement(layout: ClassroomLayout): KitPlacement {
+  return place('door', 0, layout.bounds.maxZ);
+}
+
+/**
  * Derives the interactive prop placements from the layout, following the
  * assembly contract in `docs/art/classroom-interactive.md` and
  * `docs/art/tutor-bot.md`. Positions come from `deriveClassroomPropSpecs`, the
@@ -45,7 +55,6 @@ export function deriveInteractivePlacements(
       specs.pet.position[0] + PET_BED_X_OFFSET,
       minZ + PET_BED_WALL_OFFSET,
     ),
-    place('door', specs.entrance.position[0], minZ),
     place(
       'bot-station',
       botStation.position[0],

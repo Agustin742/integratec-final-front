@@ -6,12 +6,8 @@ import {
   deriveDesks,
 } from './classroom-desks';
 
-/** Width of the back-wall cutaway gap (shell) that frames the spawn area. */
+/** Width of the back-wall entrance gap (shell); the door and exit target sit in it. */
 export const ENTRANCE_WIDTH = 2;
-/** `door.glb` is 1.44 m wide; the exit hit area matches it. */
-export const DOOR_WIDTH = 1.44;
-/** Door x on the front wall: the solid bay between the bookshelf and the board. */
-const DOOR_X = -4.65;
 
 export interface ClassroomPropSpec {
   readonly position: readonly [number, number, number];
@@ -92,17 +88,16 @@ export function deriveClassroomPropSpecs(
     botStation: {
       position: [-6.95, 0, 1.05],
       rotationY: Math.PI / 2,
-      interactablePosition: [-6.95, 0, 1.05],
-      footprint: [1.28, 1.53],
+      // Walk-up strip on the floor in front (+x) of the prop, not its centre.
+      interactablePosition: [-5.95, 0, 1.05],
+      footprint: [0.7, 1.53],
       beaconHeight: 1.6,
     },
-    // The exit is the door on the far wall: a 2.3 m door on the near (back)
-    // wall would hide avatars from the +x,+z camera.
     entrance: {
-      position: [DOOR_X, 0.012, frontZ + 0.6],
-      interactablePosition: [DOOR_X, 0, frontZ + 0.6],
-      footprint: [DOOR_WIDTH, 0.6],
-      beaconHeight: 2.5,
+      position: [0, 0.012, bounds.maxZ + 0.05],
+      interactablePosition: [0, 0, bounds.maxZ + 0.05],
+      footprint: [ENTRANCE_WIDTH, 0.6],
+      beaconHeight: 0.55,
     },
   };
 }

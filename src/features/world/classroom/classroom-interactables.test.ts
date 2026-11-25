@@ -198,7 +198,6 @@ describe('resolveInteractableHit', () => {
         ['classroom-shop', 'shop'],
         ['classroom-pet', 'pet'],
         ['classroom-tutor-bot', 'tutor-bot'],
-        ['classroom-bot-station', 'bot-station'],
       ] as const;
 
       for (const [objectName, expectedId] of placeholderNames) {
@@ -216,7 +215,15 @@ describe('resolveInteractableHit', () => {
         ).toBeLessThanOrEqual(0.2);
       }
 
-      // The door is drawn on the wall; the exit target is the floor 0.6 m in front.
+      const station = built.root.getObjectByName('classroom-bot-station')!;
+      expect(
+        resolveInteractableHit([{ object: station.children[0]! }], byId)?.id,
+      ).toBe('bot-station');
+      // Walk-up target is the floor in front of the prop, not its centre.
+      expect(byId.get('bot-station')!.worldPosition[0]).toBeGreaterThan(
+        station.position.x + 0.6,
+      );
+
       const door = built.root.getObjectByName('classroom-door')!;
       expect(
         resolveInteractableHit([{ object: door.children[0]! }], byId)?.id,
@@ -224,6 +231,11 @@ describe('resolveInteractableHit', () => {
       expect(door.position.x).toBeCloseTo(
         byId.get('entrance')!.worldPosition[0],
       );
+      expect(byId.get('entrance')!.worldPosition).toEqual([
+        0,
+        0,
+        CLASSROOM_LAYOUT.bounds.maxZ + 0.05,
+      ]);
 
       const entrance = built.root.getObjectByName('entrance')!;
       expect(resolveInteractableHit([{ object: entrance }], byId)?.id).toBe(

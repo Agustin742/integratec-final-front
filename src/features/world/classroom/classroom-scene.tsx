@@ -15,6 +15,7 @@ import {
 import { deriveFurniturePlacements } from './classroom-furniture-placements';
 import { deriveInteractivePlacements } from './classroom-interactive-placements';
 import { deriveShellPlacements } from './classroom-shell-placements';
+import { ClassroomDoor } from './classroom-door';
 import type { FloorClickEvent } from './floor-click';
 import { FollowCamera } from './follow-camera';
 import { InteractableHighlight } from './interactable-highlight';
@@ -194,6 +195,7 @@ export function ClassroomScene({
         onPointerOut={handlePointerOut}
       />
       <ClassroomKit placements={kitPlacements} scopeKey={scopeKey} />
+      <ClassroomDoor poseRef={controller.poseRef} scopeKey={scopeKey} />
       <InteractableHighlight
         interactablesById={interactablesById}
         highlightedId={

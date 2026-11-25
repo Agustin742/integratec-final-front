@@ -15,6 +15,7 @@ const nav = vi.hoisted(() => ({
   remoteUnmounts: 0,
   highlightProps: null as unknown,
   kitProps: null as unknown,
+  doorProps: null as unknown,
   trackerProps: null as unknown as {
     interactables: { id: string }[];
     onChange?: unknown;
@@ -64,6 +65,12 @@ vi.mock('./kit/classroom-kit', () => ({
     return <div data-testid="classroom-kit" />;
   },
 }));
+vi.mock('./classroom-door', () => ({
+  ClassroomDoor: (props: unknown) => {
+    nav.doorProps = props;
+    return <div data-testid="classroom-door" />;
+  },
+}));
 vi.mock('./interactable-highlight', () => ({
   InteractableHighlight: (props: unknown) => {
     nav.highlightProps = props;
@@ -87,6 +94,7 @@ beforeEach(() => {
   nav.clearDestination.mockClear();
   nav.highlightProps = null;
   nav.kitProps = null;
+  nav.doorProps = null;
   nav.trackerProps = null;
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -117,6 +125,24 @@ describe('ClassroomScene', () => {
       placements.filter((p) => p.moduleId === 'student-chair'),
     ).toHaveLength(12);
     expect(placements.some((p) => p.moduleId === 'teacher-desk')).toBe(true);
+  });
+
+  test('draws the door outside the kit batch, driven by the local pose', () => {
+    render(<ClassroomScene scopeKey="room-1" />);
+    expect(screen.getByTestId('classroom-door')).toBeInTheDocument();
+    const { placements } = nav.kitProps as {
+      placements: { moduleId: string }[];
+    };
+    expect(placements.some((p) => p.moduleId === 'door')).toBe(false);
+    const { poseRef, scopeKey } = nav.doorProps as {
+      poseRef: unknown;
+      scopeKey: string;
+    };
+    expect(scopeKey).toBe('room-1');
+    expect(poseRef).toBe(
+      (nav.localAvatarProps as { controller: { poseRef: unknown } }).controller
+        .poseRef,
+    );
   });
 
   test('still renders without a profile avatar', () => {

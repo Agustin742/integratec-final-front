@@ -97,7 +97,8 @@ describe('shell ownership', () => {
     const [entranceX, , entranceZ] =
       deriveClassroomPropSpecs(layout).entrance.interactablePosition;
     const raycaster = new Raycaster(
-      new Vector3(entranceX, 5, entranceZ),
+      // Beside the door proxy (|x| > 0.72) so the ray reaches the floor quad.
+      new Vector3(entranceX + 0.9, 5, entranceZ),
       new Vector3(0, -1, 0),
     );
     const entranceHits = raycaster.intersectObject(root, true);
@@ -203,7 +204,6 @@ describe('placeholders', () => {
     'classroom-shop': 'shop',
     'classroom-pet': 'pet',
     'classroom-tutor-bot': 'tutor-bot',
-    'classroom-door': 'entrance',
   } as const;
 
   test.each(Object.entries(expected))(
@@ -271,6 +271,17 @@ describe('placeholders', () => {
         expect((mesh.material as Material).visible, name).toBe(false);
       }
     }
+  });
+
+  test('the door proxy sits in the back-wall gap and is tagged as the entrance', () => {
+    const { root } = build();
+    const door = named(root, 'classroom-door');
+    expect(door.userData.placeholder).toBe('entrance');
+    const box = worldBox(door);
+    expect(box.min.x).toBeCloseTo(-0.72);
+    expect(box.max.x).toBeCloseTo(0.72);
+    expect(box.min.z).toBeCloseTo(layout.bounds.maxZ);
+    expect(box.max.y).toBeCloseTo(2.3);
   });
 
   test('the bot station is a free-standing prop that opens the bot panel and clears every desk', () => {

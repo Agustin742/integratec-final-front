@@ -3,8 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { CLASSROOM_LAYOUT } from '@/realtime';
 import { buildClassroomScene } from './build-classroom-scene';
 import { deriveFurniturePlacements } from './classroom-furniture-placements';
-import { deriveClassroomPropSpecs } from './classroom-interactables';
-import { deriveInteractivePlacements } from './classroom-interactive-placements';
+import {
+  ENTRANCE_WIDTH,
+  deriveClassroomPropSpecs,
+} from './classroom-interactables';
+import {
+  deriveDoorPlacement,
+  deriveInteractivePlacements,
+} from './classroom-interactive-placements';
 import { deriveShellPlacements } from './classroom-shell-placements';
 import {
   getKitModuleUrl,
@@ -30,7 +36,6 @@ const EXTENTS = {
   'shop-kiosk': [-0.98, 0.98, -0.34, 0.37],
   'pet-bed': [-0.52, 0.52, -0.4, 0.4],
   'bot-station': [-0.75, 0.79, -0.62, 0.66],
-  door: [-0.72, 0.72, 0, 0.24],
 } as const;
 type FloorProp = keyof typeof EXTENTS;
 const FLOOR_PROPS = Object.keys(EXTENTS) as FloorProp[];
@@ -59,7 +64,6 @@ describe('deriveInteractivePlacements', () => {
       'bulletin-board': 1,
       'shop-kiosk': 1,
       'pet-bed': 1,
-      door: 1,
       'bot-station': 1,
     });
   });
@@ -92,17 +96,34 @@ describe('deriveInteractivePlacements', () => {
     expect(only('pet-bed').position[2]).toBeCloseTo(bounds.minZ + 0.62);
   });
 
-  it('puts the door flush on the far (front) wall, away from the camera sight lines', () => {
-    expect(only('door')).toEqual({
+  it('centres the door in the back-wall entrance gap, outside the batched kit', () => {
+    expect(byModule.has('door')).toBe(false);
+    expect(deriveDoorPlacement(layout)).toEqual({
       moduleId: 'door',
-      position: [specs.entrance.position[0], 0, bounds.minZ],
+      position: [0, 0, bounds.maxZ],
       rotationY: 0,
     });
+    // door.glb is 1.44 m wide, z in [0, 0.24] from its wall-flush pivot: it
+    // fits the 2 m gap and clears the doorway posts at |x| = 1.08.
+    expect(1.44 / 2).toBeLessThan(ENTRANCE_WIDTH / 2);
+    expect(1.44 / 2).toBeLessThan(1.08);
   });
 
   it('puts the bot station under the left window bay facing into the room', () => {
     const station = only('bot-station');
     expect(station.position).toEqual(specs.botStation.position);
+    // The walk-up target is the floor in front (+x side) of the prop, not its centre.
+    const front = specs.botStation.interactablePosition;
+    expect(front[0]).toBeGreaterThan(rect('bot-station').maxX);
+    expect(front[2]).toBeCloseTo(specs.botStation.position[2]);
+    for (const obstacle of layout.obstacles) {
+      expect(
+        front[0] > obstacle.minX - 0.28 &&
+          front[0] < obstacle.maxX + 0.28 &&
+          front[2] > obstacle.minZ - 0.28 &&
+          front[2] < obstacle.maxZ + 0.28,
+      ).toBe(false);
+    }
     expect(station.rotationY).toBe(Math.PI / 2);
     expect(rect('bot-station').minX).toBeGreaterThanOrEqual(bounds.minX + 0.28);
   });
@@ -128,7 +149,6 @@ describe('deriveInteractivePlacements', () => {
     });
     // Cabinet: centre z = -1, 1.30 m long on the left wall; bookshelf: x = -6.7, 1.8 m wide.
     expect(rect('bot-station').minZ).toBeGreaterThan(-1 + 1.3 / 2);
-    expect(rect('door').minX).toBeGreaterThan(-6.7 + 1.8 / 2);
   });
 
   it('keeps shell + furniture + interactive kit and the scene within the draw-call ceiling', () => {
@@ -137,6 +157,10 @@ describe('deriveInteractivePlacements', () => {
       ...deriveFurniturePlacements(layout),
       ...interactive,
     ];
+    // The door is drawn outside the batch with its own materials.
+    const doorDrawCalls = glbMaterialNames(
+      getKitModuleUrl(deriveDoorPlacement(layout).moduleId),
+    ).length;
     const meshCounts = Object.fromEntries(
       [...groupPlacementsByModule(all).keys()].map((id) => [
         id,
@@ -152,6 +176,6 @@ describe('deriveInteractivePlacements', () => {
       primitive += 1;
     });
     scene.dispose();
-    expect(kit + primitive).toBeLessThanOrEqual(60);
+    expect(kit + doorDrawCalls + primitive).toBeLessThanOrEqual(60);
   });
 });

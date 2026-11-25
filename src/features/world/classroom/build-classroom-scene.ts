@@ -266,14 +266,11 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   const shop = prop('classroom-shop', 'shop', propSpecs.shop.position);
   proxy(shop, [1.96, 2.15, 0.28], [0, 1.075, 0.14]);
 
-  // Exit door (1.44 x 2.3 m) on the front wall: drawn by the kit; the
-  // `entrance` floor quad stays as the walk-up target in front of it.
-  const door = prop('classroom-door', 'entrance', [
-    propSpecs.entrance.position[0],
-    0,
-    bounds.minZ,
-  ]);
-  proxy(door, [1.44, 2.3, 0.28], [0, 1.15, 0.14]);
+  // Exit door (1.44 x 2.3 m) in the back-wall gap, drawn outside the batched
+  // kit (it fades over the local avatar); this proxy owns its hit box and stays
+  // pickable while it is faded. Local z points out of the room here.
+  const door = prop('classroom-door', 'entrance', [0, 0, bounds.maxZ]);
+  proxy(door, [1.44, 2.3, 0.24], [0, 1.15, 0.12]);
 
   // Tutor Corner station: a free-standing kit prop (1.28 x 1.35 x 1.53 m once
   // rotated); the proxy keeps its world-aligned hit box.
@@ -282,15 +279,7 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
     'bot-station',
     propSpecs.botStation.position,
   );
-  proxy(
-    station,
-    [
-      propSpecs.botStation.footprint[0],
-      1.35,
-      propSpecs.botStation.footprint[1],
-    ],
-    [0, 0.675, 0],
-  );
+  proxy(station, [1.28, 1.35, 1.53], [0, 0.675, 0]);
 
   // Pet corner (basket + green pet), front-right corner of the front wall.
   const pet = prop('classroom-pet', 'pet', propSpecs.pet.position);
