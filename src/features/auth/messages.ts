@@ -19,11 +19,17 @@ export const authMessages = {
         description:
           'Creás la escuela en la plataforma para organizar sus docentes y aulas.',
       },
-      INVITATION: {
-        title: 'Aceptar una invitación',
+      INVITEE: {
+        title: 'Estudiante o invitado',
         badge: 'Con código',
         description:
-          'Ya recibiste una invitación a una escuela o aula y querés sumarte desde ahí.',
+          'Creás tu cuenta para unirte a un aula o escuela con una invitación o código.',
+      },
+      INVITATION: {
+        title: 'Estudiante o invitado',
+        badge: 'Con código',
+        description:
+          'Creás tu cuenta para unirte a un aula o escuela con una invitación o código.',
       },
     },
   },
@@ -65,8 +71,8 @@ export const authMessages = {
       'El nombre de la escuela no puede superar los 150 caracteres.',
   },
   invitationNotice: {
-    heading: 'Usá tu enlace o código de invitación',
-    body: 'Para sumarte con una invitación no necesitás crear un espacio ni una escuela desde acá. Seguí al flujo dedicado para validar tu código o enlace.',
+    heading: 'Cuenta de estudiante o invitado',
+    body: 'Completá tus datos para registrarte y continuar directamente a tu invitación o código de aula.',
     cta: 'Ir a aceptar invitación',
   },
   actions: {

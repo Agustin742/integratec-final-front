@@ -1,4 +1,9 @@
-import { createBrowserRouter, type RouteObject } from 'react-router';
+import {
+  createBrowserRouter,
+  Navigate,
+  useLocation,
+  type RouteObject,
+} from 'react-router';
 import { PublicOnly, RequireAuth } from './guards';
 import { NotFoundPage } from '../pages/not-found-page';
 import { RootErrorBoundary, RouteErrorBoundary } from './error-boundaries';
@@ -12,6 +17,12 @@ import { RouterRoot } from './focus-on-navigation';
  * builds resolve the constant to false and drop the lazy chunk entirely.
  */
 export const showcaseEnabled = __UI_SHOWCASE__;
+
+function ResetPasswordRedirect() {
+  const location = useLocation();
+  const target = `/password-reset${location.search}${location.hash}`;
+  return <Navigate replace to={target} />;
+}
 
 // Gated on the build-time constant itself (not on a runtime option) so the
 // bundler can prove the dynamic import unreachable and drop the chunk. Built
@@ -90,6 +101,10 @@ export function createAppRoutes({
                       (await import('../pages/password-reset-page'))
                         .PasswordResetPage,
                   },
+                },
+                {
+                  path: 'reset-password',
+                  Component: ResetPasswordRedirect,
                 },
                 {
                   path: 'invitations/accept',

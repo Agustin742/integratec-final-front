@@ -78,6 +78,7 @@ export interface SessionController {
   refreshAccessToken(): Promise<string | undefined>;
   initialize(): Promise<void>;
   login(input: LoginInput): Promise<LoginResult>;
+  adoptSession(pair: TokenPair): Promise<LoginResult>;
   logout(): Promise<{ serverConfirmed: boolean; cleanupFailed: boolean }>;
 }
 export interface SessionService {
@@ -373,6 +374,39 @@ export function createSession(options: SessionOptions = {}): SessionService {
                   : {}),
               }
             : {}),
+        };
+      }
+    },
+    async adoptSession(pair) {
+      transition('initializing', true);
+      const expectedEpoch = epoch;
+      const transitionCleanupFailed = cleanupFailed;
+      try {
+        if (storageUnavailable) throw safeSessionError();
+        install(pair, expectedEpoch);
+        const verification = await verifySession(expectedEpoch, true);
+        if (verification.ok) {
+          return {
+            ok: true,
+            cleanupFailed: transitionCleanupFailed || cleanupFailed,
+          };
+        }
+        return {
+          ok: false,
+          cleanupFailed: transitionCleanupFailed || cleanupFailed,
+          reason: verification.reason,
+        };
+      } catch (error) {
+        if (epoch === expectedEpoch) {
+          transition(
+            storageUnavailable ? 'unable-to-verify' : 'unauthenticated',
+            true,
+          );
+        }
+        return {
+          ok: false,
+          cleanupFailed: transitionCleanupFailed || cleanupFailed,
+          reason: classifyLoginError(error),
         };
       }
     },

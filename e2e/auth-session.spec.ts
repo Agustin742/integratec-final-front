@@ -366,6 +366,7 @@ for (const width of [360, 1280]) {
       './login',
       './password-reset',
       './password-reset?token=preview-token-123',
+      './reset-password?token=preview-token-123',
     ]) {
       await page.goto(path);
       await expect(page.getByRole('main')).toBeVisible();
