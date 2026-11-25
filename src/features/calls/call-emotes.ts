@@ -10,11 +10,16 @@ export interface EmotePlan {
   readonly seconds: number;
 }
 
+/**
+ * Body clips per emote. Happy, Sad and Angry have none: their GLB clips only
+ * animate face morph weights, and playing one as the body clip would replace
+ * Idle and leave the skeleton in its bind (T) pose. The face morph shows them.
+ */
 const CLIPS: Readonly<Record<EmoteName, readonly string[]>> = {
   wave: ['Wave'],
-  happy: ['Happy'],
-  sad: ['Sad'],
-  angry: ['Angry'],
+  happy: [],
+  sad: [],
+  angry: [],
   think: ['Think', 'ThinkStart'],
   celebrate: ['Celebrate'],
 };

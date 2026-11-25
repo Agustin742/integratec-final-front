@@ -20,14 +20,17 @@ describe('planEmote', () => {
       morph: null,
       seconds: EMOTE_DURATION_SECONDS.wave,
     });
-    expect(planEmote('sad', MALE, false)?.clip).toBe('Sad');
     expect(planEmote('angry', MALE, false)?.morph).toBe('Angry');
     expect(planEmote('celebrate', MALE, false)?.morph).toBe('Happy');
   });
 
-  it('uses the shared male clips for a female body missing Happy/Sad/Angry', () => {
-    const merged = [...FEMALE_OWN, 'Happy', 'Sad', 'Angry'];
-    expect(planEmote('happy', merged, false)?.clip).toBe('Happy');
+  // Happy, Sad and Angry clips in the GLBs only animate face morph weights;
+  // playing one as the body clip drops Idle and leaves the skeleton in T-pose.
+  it('keeps the body on Idle for face-only emotes even when their clips exist', () => {
+    for (const emote of ['happy', 'sad', 'angry']) {
+      expect(planEmote(emote, MALE, false)?.clip).toBeNull();
+    }
+    expect(planEmote('sad', MALE, false)?.morph).toBe('Sad');
   });
 
   it('falls back to the face morph only when no clip exists anywhere', () => {

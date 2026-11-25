@@ -25,12 +25,18 @@ describe('useEmotePlayback', () => {
 
   it('plays the clip and face morph when the sequence changes, then returns to idle', () => {
     const { result, rerender } = setup({ emote: '', seq: 0 });
-    rerender({ emote: 'happy', seq: 1 });
-    expect(result.current).toEqual({ animation: 'Happy', morph: 'Happy' });
+    rerender({ emote: 'celebrate', seq: 1 });
+    expect(result.current).toEqual({ animation: 'Celebrate', morph: 'Happy' });
     act(() => {
       vi.advanceTimersByTime(3000);
     });
     expect(result.current).toEqual({ animation: 'Idle', morph: null });
+  });
+
+  it('keeps the body on Idle for a face-only emote', () => {
+    const { result, rerender } = setup({ emote: '', seq: 0 });
+    rerender({ emote: 'happy', seq: 1 });
+    expect(result.current).toEqual({ animation: 'Idle', morph: 'Happy' });
   });
 
   it('restarts when the same emote is sent again', () => {
