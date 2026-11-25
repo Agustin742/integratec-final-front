@@ -1,17 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { EMOTE_DURATION_SECONDS, emoteMorph, planEmote } from './call-emotes';
 
+// Clip names shipped in the body GLBs (develop #144). Happy/Angry are face-only.
 const MALE = [
   'Idle',
   'Wave',
   'Think',
   'ThinkStart',
-  'Celebrate',
-  'Happy',
+  'Cheer',
   'Sad',
+  'Happy',
   'Angry',
 ];
-const FEMALE_OWN = ['Idle', 'Wave', 'Think', 'Celebrate'];
+const FEMALE_OWN = ['Idle', 'Wave', 'Think', 'Cheer'];
 
 describe('planEmote', () => {
   it('plays the matching clip when the body has it', () => {
@@ -27,10 +28,18 @@ describe('planEmote', () => {
   // Happy, Sad and Angry clips in the GLBs only animate face morph weights;
   // playing one as the body clip drops Idle and leaves the skeleton in T-pose.
   it('keeps the body on Idle for face-only emotes even when their clips exist', () => {
-    for (const emote of ['happy', 'sad', 'angry']) {
+    for (const emote of ['happy', 'angry']) {
       expect(planEmote(emote, MALE, false)?.clip).toBeNull();
     }
-    expect(planEmote('sad', MALE, false)?.morph).toBe('Sad');
+    expect(planEmote('angry', MALE, false)?.morph).toBe('Angry');
+  });
+
+  it('plays the body clips shipped in the GLBs: Cheer for celebrate, Sad for sad', () => {
+    expect(planEmote('celebrate', MALE, false)?.clip).toBe('Cheer');
+    expect(planEmote('sad', MALE, false)).toMatchObject({
+      clip: 'Sad',
+      morph: 'Sad',
+    });
   });
 
   it('falls back to the face morph only when no clip exists anywhere', () => {

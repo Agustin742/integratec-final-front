@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEmotePlayback } from './use-emote-playback';
 
-const CLIPS = ['Idle', 'Wave', 'Happy', 'Think', 'Celebrate'];
+const CLIPS = ['Idle', 'Wave', 'Happy', 'Think', 'Cheer'];
 
 type Props = { emote: string; seq: number; reduced?: boolean };
 
@@ -26,7 +26,7 @@ describe('useEmotePlayback', () => {
   it('plays the clip and face morph when the sequence changes, then returns to idle', () => {
     const { result, rerender } = setup({ emote: '', seq: 0 });
     rerender({ emote: 'celebrate', seq: 1 });
-    expect(result.current).toEqual({ animation: 'Celebrate', morph: 'Happy' });
+    expect(result.current).toEqual({ animation: 'Cheer', morph: 'Happy' });
     act(() => {
       vi.advanceTimersByTime(3000);
     });
