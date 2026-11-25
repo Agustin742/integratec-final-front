@@ -10,9 +10,9 @@ import {
 describe('classroom kit manifest', () => {
   const entries = Object.entries(CLASSROOM_KIT_MANIFEST);
 
-  it('lists all 25 modules with unique URLs', () => {
-    expect(entries).toHaveLength(25);
-    expect(new Set(entries.map(([, url]) => url)).size).toBe(25);
+  it('lists all 27 modules with unique URLs', () => {
+    expect(entries).toHaveLength(27);
+    expect(new Set(entries.map(([, url]) => url)).size).toBe(27);
   });
 
   it('registers the interactive props and the bot station', () => {
@@ -23,8 +23,10 @@ describe('classroom kit manifest', () => {
       'board-collaborative',
       'bot-station',
       'bulletin-board',
+      'chat-computer',
       'door',
       'pet-bed',
+      'report-card-stand',
       'shop-kiosk',
     ]);
     expect(getKitModuleUrl('bot-station')).toBe('/models/bot/bot-station.glb');

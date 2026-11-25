@@ -42,6 +42,8 @@ export type PlaceholderKind =
   | 'pet'
   | 'tutor-bot'
   | 'bot-station'
+  | 'chat-computer'
+  | 'report-card-stand'
   | 'entrance';
 
 export interface ClassroomScene {
@@ -280,6 +282,23 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
     propSpecs.botStation.position,
   );
   proxy(station, [1.28, 1.35, 1.53], [0, 0.675, 0]);
+
+  // Report card stand (0.78 x 1.36 x 0.48 m) on the front wall: drawn by the kit.
+  const reportCards = prop(
+    'classroom-report-card-stand',
+    'report-card-stand',
+    propSpecs.reportCardStand.position,
+  );
+  proxy(reportCards, [0.78, 1.36, 0.48], [0, 0.68, 0.02]);
+
+  // Chat computer (0.88 x 1.24 x 0.55 m) on the left wall, facing +x.
+  const chatComputer = prop(
+    'classroom-chat-computer',
+    'chat-computer',
+    propSpecs.chatComputer.position,
+    propSpecs.chatComputer.rotationY ?? 0,
+  );
+  proxy(chatComputer, [0.88, 1.24, 0.55], [0, 0.62, 0]);
 
   // Pet corner (basket + green pet), front-right corner of the front wall.
   const pet = prop('classroom-pet', 'pet', propSpecs.pet.position);

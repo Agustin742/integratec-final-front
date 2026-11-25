@@ -39,7 +39,7 @@ vi.mock('../world', () => ({
 
 afterEach(() => vi.unstubAllGlobals());
 
-const PANEL_KEYS = ['activities', 'shop', 'grades', 'members'];
+const PANEL_KEYS = ['activities', 'shop', 'grades', 'members', 'chat'];
 const registry = PANEL_KEYS.map((key) => ({
   key,
   title: `Panel ${key}`,
@@ -262,6 +262,22 @@ describe('E key', () => {
       screen.queryByRole('dialog', { name: 'Panel activities' }),
     ).toBeNull();
   });
+});
+
+describe('chat computer and report card stand', () => {
+  test.each([
+    ['chat-computer', /Abrir el chat/, 'Panel chat'],
+    ['report-card-stand', /Abrir calificaciones/, 'Panel grades'],
+  ])(
+    '%s opens its panel with E, without an owned desk',
+    async (id, action, title) => {
+      renderStage();
+      await nearTo(id);
+      expect(screen.getByRole('button', { name: action })).toBeInTheDocument();
+      pressE();
+      expect(await screen.findByRole('dialog', { name: title })).toBeVisible();
+    },
+  );
 });
 
 describe('availability and highlight', () => {

@@ -102,6 +102,8 @@ export const classroomMessages = {
       shop: 'Abrir tienda',
       'tutor-bot': 'Abrir asistente de estudio',
       'bot-station': 'Abrir asistente de estudio',
+      'chat-computer': 'Abrir el chat',
+      'report-card-stand': 'Abrir calificaciones',
       'teacher-desk': 'Ver integrantes',
       'student-desk': 'Abrir calificaciones',
       entrance: 'Salir del aula',

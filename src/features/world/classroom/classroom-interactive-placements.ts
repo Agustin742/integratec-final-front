@@ -39,7 +39,7 @@ export function deriveInteractivePlacements(
 ): KitPlacement[] {
   const { minZ } = layout.bounds;
   const specs = deriveClassroomPropSpecs(layout);
-  const { bulletinBoard, botStation } = specs;
+  const { bulletinBoard, botStation, reportCardStand, chatComputer } = specs;
 
   return [
     place('board-collaborative', specs.board.position[0], minZ),
@@ -60,6 +60,17 @@ export function deriveInteractivePlacements(
       botStation.position[0],
       botStation.position[2],
       botStation.rotationY,
+    ),
+    place(
+      'report-card-stand',
+      reportCardStand.position[0],
+      reportCardStand.position[2],
+    ),
+    place(
+      'chat-computer',
+      chatComputer.position[0],
+      chatComputer.position[2],
+      chatComputer.rotationY,
     ),
   ];
 }

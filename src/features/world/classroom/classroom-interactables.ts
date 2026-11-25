@@ -25,6 +25,8 @@ export interface ClassroomPropSpecs {
   readonly pet: ClassroomPropSpec;
   readonly tutorBot: ClassroomPropSpec;
   readonly botStation: ClassroomPropSpec;
+  readonly reportCardStand: ClassroomPropSpec;
+  readonly chatComputer: ClassroomPropSpec;
   readonly entrance: ClassroomPropSpec;
 }
 
@@ -93,6 +95,23 @@ export function deriveClassroomPropSpecs(
       footprint: [0.7, 1.53],
       beaconHeight: 1.6,
     },
+    // Report card stand on the front wall between the board and the shop kiosk
+    // (`docs/art/classroom-interactive.md`); pivot at its footprint centre.
+    reportCardStand: {
+      position: [2.95, 0, frontZ + 0.32],
+      interactablePosition: [2.95, 0, frontZ + 0.95],
+      footprint: [0.78, 0.48],
+      beaconHeight: 1.6,
+    },
+    // Chat computer on the left wall, facing +x. The doc's right-wall spot would
+    // stand in front of the isometric camera, so it moves to the far wall.
+    chatComputer: {
+      position: [bounds.minX + 0.38, 0, -3],
+      rotationY: Math.PI / 2,
+      interactablePosition: [bounds.minX + 1.15, 0, -3],
+      footprint: [0.55, 0.88],
+      beaconHeight: 1.5,
+    },
     entrance: {
       position: [0, 0.012, bounds.maxZ + 0.05],
       interactablePosition: [0, 0, bounds.maxZ + 0.05],
@@ -113,12 +132,21 @@ export type ClassroomInteractableType =
   | 'pet'
   | 'tutor-bot'
   | 'bot-station'
+  | 'chat-computer'
+  | 'report-card-stand'
   | 'student-desk'
   | 'teacher-desk'
   | 'entrance';
 
 export type ClassroomInteractablePanelKey =
-  'activities' | 'material' | 'notices' | 'shop' | 'bot' | 'members' | 'grades';
+  | 'activities'
+  | 'material'
+  | 'notices'
+  | 'shop'
+  | 'bot'
+  | 'chat'
+  | 'members'
+  | 'grades';
 
 export interface ClassroomInteractable {
   readonly id: string;
@@ -160,6 +188,8 @@ const PLACEHOLDER_INTERACTABLE_IDS: ReadonlySet<PlaceholderKind> = new Set([
   'pet',
   'tutor-bot',
   'bot-station',
+  'chat-computer',
+  'report-card-stand',
   'entrance',
 ]);
 
@@ -238,6 +268,24 @@ export function deriveClassroomInteractables(
       worldPosition: specs.botStation.interactablePosition,
       footprint: specs.botStation.footprint,
       beaconHeight: specs.botStation.beaconHeight,
+    },
+    {
+      id: 'chat-computer',
+      type: 'chat-computer',
+      interactionClass: 'opens_panel',
+      panelKey: 'chat',
+      worldPosition: specs.chatComputer.interactablePosition,
+      footprint: specs.chatComputer.footprint,
+      beaconHeight: specs.chatComputer.beaconHeight,
+    },
+    {
+      id: 'report-card-stand',
+      type: 'report-card-stand',
+      interactionClass: 'opens_panel',
+      panelKey: 'grades',
+      worldPosition: specs.reportCardStand.interactablePosition,
+      footprint: specs.reportCardStand.footprint,
+      beaconHeight: specs.reportCardStand.beaconHeight,
     },
   ];
 

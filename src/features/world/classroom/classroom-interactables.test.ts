@@ -19,7 +19,7 @@ describe('deriveClassroomInteractables', () => {
   const byId = indexClassroomInteractables(interactables);
 
   test('covers all 3 interaction classes and maps each object to its intended target', () => {
-    expect(interactables).toHaveLength(21);
+    expect(interactables).toHaveLength(23);
     expect(byId.get('board')).toMatchObject({
       type: 'board',
       interactionClass: 'opens_panel',
@@ -50,6 +50,17 @@ describe('deriveClassroomInteractables', () => {
       interactionClass: 'opens_panel',
       panelKey: 'bot',
     });
+    expect(byId.get('chat-computer')).toMatchObject({
+      type: 'chat-computer',
+      interactionClass: 'opens_panel',
+      panelKey: 'chat',
+    });
+    expect(byId.get('report-card-stand')).toMatchObject({
+      type: 'report-card-stand',
+      interactionClass: 'opens_panel',
+      panelKey: 'grades',
+    });
+    expect(byId.get('report-card-stand')?.deskIndex).toBeUndefined();
     expect(byId.get('teacher-desk')).toMatchObject({
       type: 'teacher-desk',
       interactionClass: 'opens_panel',
@@ -111,6 +122,26 @@ describe('bot station', () => {
         byId,
       )?.id,
     ).toBe('bot-station');
+    built.dispose();
+  });
+});
+
+describe('chat computer and report card stand', () => {
+  test.each([
+    ['chat-computer', 'classroom-chat-computer'],
+    ['report-card-stand', 'classroom-report-card-stand'],
+  ])('resolves a hit on the %s proxy', (id, name) => {
+    const byId = indexClassroomInteractables(
+      deriveClassroomInteractables(CLASSROOM_LAYOUT),
+    );
+    const built = buildClassroomScene(CLASSROOM_LAYOUT);
+    const group = built.root.getObjectByName(name)!;
+    expect(
+      resolveInteractableHit(
+        [{ object: group.children[0] as unknown as InteractableObjectNode }],
+        byId,
+      )?.id,
+    ).toBe(id);
     built.dispose();
   });
 });

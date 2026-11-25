@@ -42,8 +42,10 @@ export const CLASSROOM_INTERACTIVE_MODULES = {
   'board-collaborative': `${INTERACTIVE_BASE}/board-collaborative.glb`,
   'bot-station': '/models/bot/bot-station.glb',
   'bulletin-board': `${INTERACTIVE_BASE}/bulletin-board.glb`,
+  'chat-computer': `${INTERACTIVE_BASE}/chat-computer.glb`,
   door: `${INTERACTIVE_BASE}/door.glb`,
   'pet-bed': `${INTERACTIVE_BASE}/pet-bed.glb`,
+  'report-card-stand': `${INTERACTIVE_BASE}/report-card-stand.glb`,
   'shop-kiosk': `${INTERACTIVE_BASE}/shop-kiosk.glb`,
 } as const;
 

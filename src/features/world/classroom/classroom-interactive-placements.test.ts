@@ -36,6 +36,8 @@ const EXTENTS = {
   'shop-kiosk': [-0.98, 0.98, -0.34, 0.37],
   'pet-bed': [-0.52, 0.52, -0.4, 0.4],
   'bot-station': [-0.75, 0.79, -0.62, 0.66],
+  'chat-computer': [-0.44, 0.44, -0.27, 0.28],
+  'report-card-stand': [-0.39, 0.39, -0.22, 0.26],
 } as const;
 type FloorProp = keyof typeof EXTENTS;
 const FLOOR_PROPS = Object.keys(EXTENTS) as FloorProp[];
@@ -65,6 +67,8 @@ describe('deriveInteractivePlacements', () => {
       'shop-kiosk': 1,
       'pet-bed': 1,
       'bot-station': 1,
+      'chat-computer': 1,
+      'report-card-stand': 1,
     });
   });
 
@@ -126,6 +130,45 @@ describe('deriveInteractivePlacements', () => {
     }
     expect(station.rotationY).toBe(Math.PI / 2);
     expect(rect('bot-station').minX).toBeGreaterThanOrEqual(bounds.minX + 0.28);
+  });
+
+  it('stands the report card stand against the front wall between the board and the kiosk', () => {
+    const stand = only('report-card-stand');
+    expect(stand.position).toEqual(specs.reportCardStand.position);
+    expect(stand.rotationY).toBe(0);
+    const r = rect('report-card-stand');
+    // Clear of the 0.066 m baseboard, board overlay (|x| <= 2.2) and kiosk.
+    expect(r.minZ).toBeGreaterThan(bounds.minZ + 0.066);
+    expect(r.minX).toBeGreaterThan(2.2);
+    expect(r.maxX).toBeLessThan(rect('shop-kiosk').minX);
+    expect(specs.reportCardStand.interactablePosition[2]).toBeGreaterThan(
+      r.maxZ,
+    );
+  });
+
+  it('stands the chat computer on the left wall facing into the room', () => {
+    const chat = only('chat-computer');
+    expect(chat.position).toEqual(specs.chatComputer.position);
+    expect(chat.rotationY).toBe(Math.PI / 2);
+    const r = rect('chat-computer');
+    expect(r.minX).toBeGreaterThan(bounds.minX + 0.066);
+    // Walk-up target on the floor in front (+x) of the prop; cabinet ends at z = -1.65.
+    expect(specs.chatComputer.interactablePosition[0]).toBeGreaterThan(r.maxX);
+    expect(r.maxZ).toBeLessThan(-1 - 1.3 / 2);
+  });
+
+  it('keeps the new interactable walk-up points off every desk', () => {
+    for (const spec of [specs.reportCardStand, specs.chatComputer]) {
+      const [x, , z] = spec.interactablePosition;
+      for (const obstacle of layout.obstacles) {
+        expect(
+          x > obstacle.minX - 0.28 &&
+            x < obstacle.maxX + 0.28 &&
+            z > obstacle.minZ - 0.28 &&
+            z < obstacle.maxZ + 0.28,
+        ).toBe(false);
+      }
+    }
   });
 
   it('keeps floor props inside the room and off every desk obstacle', () => {
