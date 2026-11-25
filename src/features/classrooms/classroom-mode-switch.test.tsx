@@ -8,6 +8,12 @@ import {
 import { createMemoryRouter, useOutletContext } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+
+const focus = vi.hoisted(() => ({ locked: false }));
+vi.mock('@/features/calls', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/calls')>()),
+  useWorldLocked: () => focus.locked,
+}));
 import { createApiClient } from '@/api/client';
 import { ApiQueryProvider, createAppQueryClient } from '@/api/query-client';
 import type { components } from '@/api/schema.generated';
@@ -531,6 +537,43 @@ describe('ClassroomWorkspace 3D / 2D Classic Mode switch (#34)', () => {
         level: 3,
         name: classroomMessages.viewMode.mode2dHeading,
       }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('ClassroomWorkspace focus mode (#141)', () => {
+  beforeEach(() => {
+    resetClassroomModeStore();
+    focus.locked = false;
+  });
+
+  test('does not mount the 3D world while focus mode locks it and shows a calm notice', async () => {
+    focus.locked = true;
+    const { container } = setupWorkspace({ path: '/test-classrooms/a' });
+    expect(
+      await screen.findByText('Tu profe activó el modo foco durante la clase'),
+    ).toBeVisible();
+    expect(container.querySelector('canvas')).toBeNull();
+    expect(
+      screen.queryByRole('button', {
+        name: classroomMessages.viewMode.switchTo3d,
+      }),
+    ).not.toBeInTheDocument();
+    // Classic panels stay usable.
+    expect(
+      screen.getByRole('heading', {
+        level: 3,
+        name: classroomMessages.viewMode.mode2dHeading,
+      }),
+    ).toBeVisible();
+  });
+
+  test('keeps the 3D world when focus mode is off', async () => {
+    const { container } = setupWorkspace({ path: '/test-classrooms/a' });
+    await screen.findByRole('heading', { level: 2, name: 'Aula a' });
+    expect(container.querySelector('canvas')).not.toBeNull();
+    expect(
+      screen.queryByText('Tu profe activó el modo foco durante la clase'),
     ).not.toBeInTheDocument();
   });
 });

@@ -1,5 +1,6 @@
 import type { KeyboardEvent, Ref } from 'react';
 import { Button } from '@/components/ui/button';
+import { ClassCallButton } from '@/features/calls';
 import { cn } from '@/lib/utils';
 import { ChatConversationWithComposer } from '../classrooms/chat/chat-conversation';
 import {
@@ -99,6 +100,12 @@ export function ChatDockWindow({
           {classroomName}
         </h2>
         {minimized ? <UnreadBadge count={unreadCount} /> : null}
+        {minimized ? null : (
+          <ClassCallButton
+            classroomId={classroomId}
+            classroomName={classroomName}
+          />
+        )}
         <Button
           type="button"
           variant="ghost"

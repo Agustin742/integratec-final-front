@@ -7,6 +7,7 @@ import {
   LoadingState,
 } from '@/components/feedback/states';
 import { Badge } from '@/components/ui/badge';
+import { DirectCallButton } from '@/features/calls';
 import { InitialsAvatar } from '@/components/ui/initials-avatar';
 import { useSessionService, useSessionSnapshot } from '@/session/provider';
 import type { ClassroomDirectoryMemberDto } from './activities/forum/forum-schema';
@@ -93,7 +94,9 @@ export function useClassroomDirectory(classroomId: string) {
 function MemberRow({
   member,
   isSelf,
+  classroomId,
 }: {
+  readonly classroomId: string;
   readonly member: ClassroomDirectoryMemberDto;
   readonly isSelf: boolean;
 }) {
@@ -107,6 +110,13 @@ function MemberRow({
       {member.role === 'TEACHER' ? (
         <Badge variant="secondary">{copy.roleLabels.TEACHER}</Badge>
       ) : null}
+      {isSelf ? null : (
+        <DirectCallButton
+          classroomId={classroomId}
+          peerUserId={member.userId}
+          peerName={member.displayName}
+        />
+      )}
     </li>
   );
 }
@@ -139,7 +149,9 @@ function MemberList({
   members,
   userId,
   label,
+  classroomId,
 }: {
+  readonly classroomId: string;
   readonly members: readonly ClassroomDirectoryMemberDto[];
   readonly userId: string | null;
   readonly label: string;
@@ -152,6 +164,7 @@ function MemberList({
       {members.map((member) => (
         <MemberRow
           key={member.userId}
+          classroomId={classroomId}
           member={member}
           isSelf={member.userId === userId}
         />
@@ -192,7 +205,9 @@ function DirectoryStatus({
 function TeachersGroup({
   teachers,
   userId,
+  classroomId,
 }: {
+  readonly classroomId: string;
   readonly teachers: readonly ClassroomDirectoryMemberDto[];
   readonly userId: string | null;
 }) {
@@ -202,6 +217,7 @@ function TeachersGroup({
         <p className="text-sm text-muted-foreground">{copy.teachersEmpty}</p>
       ) : (
         <MemberList
+          classroomId={classroomId}
           members={teachers}
           userId={userId}
           label={copy.teachersHeading}
@@ -231,7 +247,11 @@ export function ClassroomTeachersSection({
           isRetrying={query.isRefetching}
         />
       ) : (
-        <TeachersGroup teachers={teachers} userId={userId} />
+        <TeachersGroup
+          teachers={teachers}
+          userId={userId}
+          classroomId={classroomId}
+        />
       )}
     </div>
   );
@@ -270,7 +290,11 @@ export function ClassroomDirectoryPanel({
         />
       ) : (
         <>
-          <TeachersGroup teachers={teachers} userId={userId} />
+          <TeachersGroup
+            teachers={teachers}
+            userId={userId}
+            classroomId={classroomId}
+          />
           <DirectoryGroup title={copy.studentsHeading} count={students.length}>
             {students.length === 0 ? (
               <EmptyState
@@ -280,6 +304,7 @@ export function ClassroomDirectoryPanel({
               />
             ) : (
               <MemberList
+                classroomId={classroomId}
                 members={students}
                 userId={userId}
                 label={copy.studentsHeading}

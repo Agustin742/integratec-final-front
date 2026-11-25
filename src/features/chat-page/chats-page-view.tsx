@@ -7,6 +7,7 @@ import {
   LoadingState,
 } from '@/components/feedback/states';
 import { buttonStyles } from '@/components/ui/button';
+import { ClassCallButton } from '@/features/calls';
 import { cn } from '@/lib/utils';
 import { BackIcon } from '../chat-dock/chat-dock-icons';
 import { formatListTime, UnreadBadge } from '../chat-dock/chat-dock-list';
@@ -155,6 +156,10 @@ export function ChatsPageView({
             <h3 className="min-w-0 flex-1 truncate font-display text-base font-semibold">
               {selected.classroomName}
             </h3>
+            <ClassCallButton
+              classroomId={selected.classroomId}
+              classroomName={selected.classroomName}
+            />
           </header>
           <div className="min-h-0 flex-1 p-2">
             <ChatConversationWithComposer

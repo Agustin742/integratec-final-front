@@ -18,6 +18,12 @@ import { NotFoundPage } from '@/app/pages/not-found-page';
 import { useDocumentTitle } from '@/app/router/document-title';
 import { ErrorState, LoadingState } from '@/components/feedback/states';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  ClassroomCallBanner,
+  FocusModeNotice,
+  IncomingCallListener,
+  useWorldLocked,
+} from '@/features/calls';
 import { WalletIndicator } from '@/features/points/wallet-indicator';
 import { Button, buttonStyles } from '@/components/ui/button';
 import {
@@ -170,6 +176,12 @@ function WorkspaceContext({
   const isParent =
     context.status === 'ready' && context.classroom.myRole === 'PARENT';
   const modeToggleEnabled = context.status === 'ready' && !isParent;
+  // Teacher focus mode hides the 3D world from students (the server also
+  // rejects their movement); the canvas is not mounted while it is on.
+  const worldLocked = useWorldLocked(
+    modeToggleEnabled && !isRevoked ? classroomId : null,
+    context.status === 'ready' ? context.classroom.myRole : '',
+  );
   const handleLostAccess = useCallback(() => {
     if (scopeKey !== '') {
       setRevokedScopeKey(scopeKey);
@@ -296,7 +308,14 @@ function WorkspaceContext({
     Array.isArray(keys) && keys.every((key) => typeof key === 'string')
       ? { confirmed: true as const, keys }
       : { confirmed: false as const };
-  const immersive = !isParent && mode === '3d';
+  const immersive = !isParent && mode === '3d' && !worldLocked;
+  const callBanner = isParent ? null : (
+    <ClassroomCallBanner
+      classroomId={classroomId}
+      classroomName={classroom.name}
+      canStart={classroom.capabilities.includes('moderate_chat')}
+    />
+  );
   const joinAlert = joinOutcome && (
     <Alert
       variant={joinOutcome.alreadyMember ? 'info' : 'success'}
@@ -335,6 +354,7 @@ function WorkspaceContext({
         fallbackFocus={() => heading.current ?? safeFocus.current}
         immersive={immersive}
       >
+        {!isParent && <IncomingCallListener classroomId={classroomId} />}
         {immersive ? (
           <Classroom3DStage
             headingRef={activeViewHeadingRef}
@@ -373,6 +393,9 @@ function WorkspaceContext({
                     {joinAlert}
                   </div>
                 )}
+                <div className="pointer-events-auto w-full max-w-3xl empty:hidden">
+                  {callBanner}
+                </div>
                 {/* Sustained low fps shows a non-blocking offer (#56); the
                     app never switches modes without the user's choice. */}
                 <div className="pointer-events-auto w-full max-w-3xl empty:hidden">
@@ -428,7 +451,7 @@ function WorkspaceContext({
                     </p>
                   </div>
                 </div>
-                {!isParent && (
+                {!isParent && !worldLocked && (
                   <div className="flex flex-wrap items-center gap-2.5">
                     {/* Visual cue only: aria-keyshortcuts on the button already announces Alt+M. */}
                     <span
@@ -463,6 +486,8 @@ function WorkspaceContext({
               )}
             </header>
             {joinAlert}
+            {worldLocked && <FocusModeNotice />}
+            {callBanner}
             {!isParent && (
               <Classroom2DLayout
                 classroomId={classroomId}
