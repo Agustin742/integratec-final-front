@@ -1055,6 +1055,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/parent-links/{linkId}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List private messages for a parent-teacher thread
+         * @description Returns paginated visible messages for one active parent-child link, ordered chronologically (`createdAt ASC, id ASC`) for natural conversation reading. Accessible only to the linked parent and classroom staff (teacher, school admin, or school owner). Returns `404` for malformed UUIDs, inactive links, deleted classrooms/schools, removed students, or any other caller including the linked student (strict anti-enumeration), and `403` while the classroom is in adult education mode.
+         */
+        get: operations["ParentLinkMessagesController_listMessages"];
+        put?: never;
+        /**
+         * Send a private message in a parent-teacher thread
+         * @description Persists a new plain-text message bound to one active parent-child link (`classroomId: null`). Accessible only to the linked parent and classroom staff (teacher, school admin, or school owner). Returns `404` for malformed UUIDs, inactive links, deleted classrooms/schools, removed students, or any other caller including the linked student (strict anti-enumeration), and `403` while the classroom is in adult education mode.
+         */
+        post: operations["ParentLinkMessagesController_createMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/gamification/me": {
         parameters: {
             query?: never;
@@ -3009,6 +3033,53 @@ export interface components {
             total: number;
             /** @description Aggregated participation and grade progress totals for the linked child. */
             metrics: components["schemas"]["StudentParticipationSummaryDto"];
+        };
+        ParentLinkMessageDto: {
+            /**
+             * Format: uuid
+             * @description Message UUID.
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description ParentLink UUID this message belongs to.
+             */
+            parentLinkId: string;
+            /**
+             * Format: uuid
+             * @description Author user UUID.
+             */
+            authorId: string;
+            /** @description Current display name of the message author. */
+            authorDisplayName: string;
+            /**
+             * @description Whether the author is the linked parent (`PARENT`) or classroom staff (`STAFF`).
+             * @enum {string}
+             */
+            authorRole: "PARENT" | "STAFF";
+            /** @description Trimmed plain text message body, never interpreted as HTML. */
+            body: string;
+            /**
+             * Format: date-time
+             * @description Server-assigned UTC creation timestamp (ISO-8601).
+             */
+            createdAt: string;
+        };
+        ParentLinkMessagesResponseDto: {
+            /** @description Verified active parent-child link summary. */
+            link: components["schemas"]["FamilyLinkDto"];
+            /** @description Visible messages in this parent-link thread, ordered chronologically (`createdAt ASC, id ASC`). */
+            items: components["schemas"]["ParentLinkMessageDto"][];
+            /** @description Current 1-based page number. */
+            page: number;
+            /** @description Page size. */
+            pageSize: number;
+            /** @description Total number of visible messages in this thread. */
+            total: number;
+        };
+        CreateParentLinkMessageDto: {
+            /** @description Plain text message body; 1–2000 characters after trimming. Tabs and line breaks are allowed; NUL and unsafe C0/C1 control characters are rejected. Never interpreted as HTML. */
+            body: string;
         };
         StreakSummaryDto: {
             /** @description Consecutive qualifying local days whose chain is still alive (the last one is today or yesterday). A bare login never changes it. */
@@ -7170,6 +7241,133 @@ export interface operations {
                 };
             };
             /** @description Parent viewing is disabled while the classroom is in adult education mode. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Malformed, nonexistent, inactive, or inaccessible parent link. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ParentLinkMessagesController_listMessages: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Messages per page (1..50, default 30). */
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                /** @description ParentLink UUID */
+                linkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated chronological messages for the parent-teacher thread. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParentLinkMessagesResponseDto"];
+                };
+            };
+            /** @description Invalid pagination parameters (`page`, `pageSize`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Parent messaging is disabled while the classroom is in adult education mode. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Malformed, nonexistent, inactive, or inaccessible parent link. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ParentLinkMessagesController_createMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ParentLink UUID */
+                linkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateParentLinkMessageDto"];
+            };
+        };
+        responses: {
+            /** @description The newly created parent-teacher message. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParentLinkMessageDto"];
+                };
+            };
+            /** @description Invalid message body (empty, overlong, or unsafe control characters). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Parent messaging is disabled while the classroom is in adult education mode. */
             403: {
                 headers: {
                     [name: string]: unknown;

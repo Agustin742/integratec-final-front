@@ -1831,3 +1831,69 @@ export function createFamilyReportCardPredicate(
     );
   };
 }
+
+export interface ParentLinkMessagesQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+}
+
+export interface NormalizedParentLinkMessagesQueryParams {
+  readonly linkId: string;
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+/**
+ * Key of `GET /parent-links/{linkId}/messages`: paginated chronological
+ * private messages for one parent-teacher thread, scoped by `userId` and
+ * `linkedChildId` (`linkId`) so switching children, dialogs, or accounts reads
+ * an isolated cache entry (`rules/state-management.md`).
+ */
+export function parentLinkMessagesQueryKey(
+  userId: string,
+  linkId: string,
+  params: ParentLinkMessagesQueryParams = {},
+): ScopedQueryKey<NormalizedParentLinkMessagesQueryParams> {
+  const normalizedLinkId = normalizeRequiredText(linkId, 'linkId');
+  const normalizedParams = Object.freeze({
+    linkId: normalizedLinkId,
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 30, 1, 50),
+  });
+  return createScopedQueryKey(
+    { userId, linkedChildId: normalizedLinkId },
+    'family',
+    'messages',
+    normalizedParams,
+  );
+}
+
+/**
+ * Predicate matching every parent-link messages query entry owned by `userId`
+ * and `linkId`. Used on message creation, uncertain-write reconciliation, and
+ * terminal `403`/`404` cleanup.
+ */
+export function createParentLinkMessagesPredicate(
+  userId: string,
+  linkId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedLinkId = normalizeRequiredText(linkId, 'linkId');
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; linkedChildId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.linkedChildId === normalizedLinkId &&
+      segment.domain === 'family' &&
+      segment.resource === 'messages'
+    );
+  };
+}
