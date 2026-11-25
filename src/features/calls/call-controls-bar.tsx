@@ -10,7 +10,13 @@ import {
   CALL_EMOTES,
   type CallEmote,
 } from '@/realtime/call-contracts.generated';
-import { MicIcon, MicOffIcon, PhoneOffIcon, ReactionIcon } from './call-icons';
+import {
+  EmoteIcon,
+  MicIcon,
+  MicOffIcon,
+  PhoneOffIcon,
+  ReactionIcon,
+} from './call-icons';
 import { callMessages } from './call-messages';
 import type { CallSelfState } from './call-session';
 
@@ -81,7 +87,7 @@ export function CallControlsBar({
           <DropdownMenuContent align="center" side="top">
             {CALL_EMOTES.map((emote) => (
               <DropdownMenuItem key={emote} onSelect={() => onSendEmote(emote)}>
-                <span aria-hidden="true">{callMessages.emoteIcons[emote]}</span>
+                <EmoteIcon emote={emote} />
                 {callMessages.emoteLabels[emote]}
               </DropdownMenuItem>
             ))}

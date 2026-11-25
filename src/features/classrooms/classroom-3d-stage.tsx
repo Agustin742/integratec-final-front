@@ -61,6 +61,8 @@ export interface Classroom3DStageProps {
   readonly topSlot?: ReactNode;
   /** Floating content anchored at the bottom-left (compact presence). */
   readonly presenceSlot?: ReactNode;
+  /** Voice-call item for the side rail, beside the classroom features. */
+  readonly callAction?: ReactNode;
 }
 
 type ClearAssetCacheFn = (options?: {
@@ -137,6 +139,7 @@ export function Classroom3DStage({
   onSustainedLowFps,
   topSlot,
   presenceSlot,
+  callAction,
 }: Classroom3DStageProps) {
   const resolvedClassroomId = classroomId ?? scopeKey ?? '';
   return (
@@ -155,6 +158,7 @@ export function Classroom3DStage({
       onSustainedLowFps={onSustainedLowFps}
       topSlot={topSlot}
       presenceSlot={presenceSlot}
+      callAction={callAction}
     />
   );
 }
@@ -194,6 +198,7 @@ function Classroom3DStageContent({
   onSustainedLowFps,
   topSlot,
   presenceSlot,
+  callAction,
 }: {
   readonly headingRef?: RefObject<HTMLHeadingElement | null>;
   readonly scopeKey?: string;
@@ -209,6 +214,7 @@ function Classroom3DStageContent({
   readonly onSustainedLowFps?: () => void;
   readonly topSlot?: ReactNode;
   readonly presenceSlot?: ReactNode;
+  readonly callAction?: ReactNode;
 }) {
   useLockPageScroll();
   const [assetFailed, setAssetFailed] = useState(false);
@@ -525,6 +531,7 @@ function Classroom3DStageContent({
           canOpenPanel={canOpenPanel}
           onFocusInteractable={handleHoverInteractable}
           onOpenPanel={handleOpenPanel}
+          callAction={callAction}
         />
       </div>
       {/* Kept after the floating bar so heading levels stay in order, for screen readers and as the Alt+M focus target. */}

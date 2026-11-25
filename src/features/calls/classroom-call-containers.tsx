@@ -63,11 +63,12 @@ export function IncomingCallListener({
   );
 }
 
-/** Call action for the classroom and chat headers; moderators start, others join while it runs. */
+/** Call action for the classroom feature rail; moderators start, others join while it runs. */
 export function ClassCallButton(props: {
   readonly classroomId: string;
   readonly classroomName: string;
-  readonly compact?: boolean;
+  readonly appearance?: 'rail' | 'tile';
+  readonly className?: string;
 }) {
   const calls = useCalls();
   if (calls === null) return null;
@@ -78,12 +79,14 @@ function ClassCallButtonContent({
   calls,
   classroomId,
   classroomName,
-  compact,
+  appearance,
+  className,
 }: {
   readonly calls: NonNullable<ReturnType<typeof useCalls>>;
   readonly classroomId: string;
   readonly classroomName: string;
-  readonly compact?: boolean;
+  readonly appearance?: 'rail' | 'tile';
+  readonly className?: string;
 }) {
   const context = useClassroomContext(classroomId);
   const { classCallActive } = useClassroomCallSignals(classroomId);
@@ -95,7 +98,8 @@ function ClassCallButtonContent({
       canStart={canStart}
       active={classCallActive}
       inCall={calls.inCall}
-      compact={compact}
+      appearance={appearance}
+      className={className}
       onClick={() =>
         calls.start({ kind: 'classroom', classroomId }, classroomName)
       }

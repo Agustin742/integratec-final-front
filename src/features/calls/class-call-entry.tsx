@@ -10,38 +10,60 @@ export interface ClassCallButtonViewProps {
   readonly active: boolean;
   readonly inCall: boolean;
   readonly onClick: () => void;
-  /** Icon-only variant for the chat headers, like their sibling actions. */
-  readonly compact?: boolean;
+  /**
+   * Where the action lives: "rail" is a floating item of the 3D side rail and
+   * "tile" an item of the 2D features list; both match their sibling items.
+   */
+  readonly appearance?: 'rail' | 'tile';
+  /** Sibling-item classes supplied by the host rail. */
+  readonly className?: string;
 }
 
-/** Header call action: moderators start the class call, everybody else joins it while it runs. */
+/** Classroom call action: moderators start the class call, everybody else joins it while it runs. */
 export function ClassCallButtonView({
   canStart,
   active,
   inCall,
   onClick,
-  compact = false,
+  appearance = 'tile',
+  className,
 }: ClassCallButtonViewProps) {
   if (inCall || (!canStart && !active)) return null;
   const label = active ? copy.joinShort : copy.startClass;
-  if (compact) {
+  if (appearance === 'rail') {
     return (
-      <Button
+      <button
         type="button"
-        variant="ghost"
-        size="icon"
         aria-label={label}
         title={label}
+        className={className}
         onClick={onClick}
       >
         <PhoneIcon />
-      </Button>
+        <span className="max-sm:sr-only" aria-hidden="true">
+          {label}
+        </span>
+      </button>
     );
   }
   return (
-    <Button type="button" variant="outline" size="sm" onClick={onClick}>
-      <PhoneIcon />
-      {label}
+    <Button
+      type="button"
+      variant="outline"
+      aria-label={label}
+      className="h-auto min-h-11 w-full justify-between px-4 py-3 text-left"
+      onClick={onClick}
+    >
+      <span className="flex min-w-0 items-center gap-2 wrap-anywhere">
+        <PhoneIcon />
+        {label}
+      </span>
+      <span
+        aria-hidden="true"
+        className="shrink-0 text-xs font-medium text-muted-foreground"
+      >
+        {active ? copy.railJoin : copy.railStart}
+      </span>
     </Button>
   );
 }

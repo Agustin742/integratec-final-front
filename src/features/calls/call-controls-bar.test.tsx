@@ -73,8 +73,29 @@ describe('CallControlsBar', () => {
     setup();
     const button = screen.getByRole('button', { name: 'Reacción' });
     expect(button).toHaveAttribute('title', 'Reacción');
-    expect(button.textContent).not.toMatch(/[\u{1F300}-\u{1FAFF}]/u);
+    expect(button.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
     expect(button.querySelector('svg')).not.toBeNull();
+  });
+
+  it('shows each reaction with an svg icon and a Spanish label, no emoji', () => {
+    setup();
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Reacción' }), {
+      key: 'Enter',
+    });
+    const items = screen.getAllByRole('menuitem');
+    expect(items).toHaveLength(6);
+    for (const item of items) {
+      expect(item.querySelector('svg')).not.toBeNull();
+      expect(item.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
+    }
+    expect(items.map((item) => item.textContent)).toEqual([
+      'Saludar',
+      'Alegría',
+      'Tristeza',
+      'Enojo',
+      'Pensar',
+      'Celebrar',
+    ]);
   });
 
   it('gives every icon button a tooltip', () => {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { CallParticipantState } from './call-session';
 import { TeacherPanel, type TeacherPanelProps } from './teacher-panel';
@@ -73,8 +73,32 @@ describe('TeacherPanel', () => {
       action: 'mute',
       targetUserId: '00000000-0000-4000-8000-000000000003',
     });
-    expect(screen.getByText('(Se silenció solo)')).toBeInTheDocument();
-    expect(screen.getByText('(Silenciado por vos)')).toBeInTheDocument();
+    expect(screen.getByText('Se silenció solo')).toBeInTheDocument();
+    expect(screen.getByText('Silenciado por vos')).toBeInTheDocument();
+  });
+
+  it('groups the controls in Clase and Participantes sections', () => {
+    setup();
+    const clase = screen.getByRole('region', { name: 'Clase' });
+    expect(
+      within(clase).getByRole('button', { name: 'Silenciar a todos' }),
+    ).toBeInTheDocument();
+    expect(within(clase).getAllByRole('switch')).toHaveLength(2);
+    const participantes = screen.getByRole('region', { name: 'Participantes' });
+    expect(within(participantes).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(participantes).queryByRole('switch')).toBeNull();
+  });
+
+  it('shows an initial and the mic state of each participant', () => {
+    setup();
+    const rows = screen.getAllByRole('listitem');
+    expect(within(rows[0]!).getByText('A1')).toBeInTheDocument();
+    expect(within(rows[0]!).getByText('Micrófono activo')).toBeInTheDocument();
+    expect(
+      within(rows[1]!).getByText('Silenciado por vos'),
+    ).toBeInTheDocument();
+    expect(within(rows[2]!).getByText('Se silenció solo')).toBeInTheDocument();
+    expect(within(rows[0]!).getAllByRole('button')).toHaveLength(1);
   });
 
   it('mute all also forbids self-unmute', () => {

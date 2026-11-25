@@ -3,10 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { ClassCallButtonView, IncomingCallPrompt } from './class-call-entry';
 
 describe('ClassCallButtonView', () => {
-  it('renders the compact variant as an icon button with a tooltip', () => {
+  it('renders the rail variant like the other classroom features', () => {
     render(
       <ClassCallButtonView
-        compact
+        appearance="rail"
+        className="rail-item"
         canStart
         active={false}
         inCall={false}
@@ -18,6 +19,22 @@ describe('ClassCallButtonView', () => {
     });
     expect(button).toHaveAttribute('title', 'Iniciar clase en llamada');
     expect(button.querySelector('svg')).not.toBeNull();
+    expect(button).toHaveClass('rail-item');
+  });
+
+  it('renders the tile variant like the 2D panel buttons', () => {
+    render(
+      <ClassCallButtonView
+        appearance="tile"
+        canStart={false}
+        active
+        inCall={false}
+        onClick={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole('button', { name: 'Unirse a la llamada' }),
+    ).toHaveTextContent('Unirse');
   });
 
   it('starts for moderators and joins for students only when active', () => {

@@ -1,5 +1,5 @@
 import { QueryClientContext } from '@tanstack/react-query';
-import { useContext, type RefObject } from 'react';
+import { useContext, type ReactNode, type RefObject } from 'react';
 import { EmptyState } from '@/components/feedback/states';
 import { Button } from '@/components/ui/button';
 import { useChatInbox } from '@/features/chat-inbox/use-chat-inbox';
@@ -13,6 +13,8 @@ export interface Classroom2DLayoutProps {
   readonly classroomId?: string;
   readonly panels: readonly PanelDescriptor[];
   readonly headingRef?: RefObject<HTMLHeadingElement | null>;
+  /** Extra item of the features list (the voice call). */
+  readonly callAction?: ReactNode;
 }
 
 /**
@@ -32,6 +34,7 @@ export function Classroom2DLayout(props: Classroom2DLayoutProps) {
       classroomId={props.classroomId}
       panels={props.panels}
       headingRef={props.headingRef}
+      callAction={props.callAction}
     />
   );
 }
@@ -40,6 +43,7 @@ function Classroom2DLayoutWithInbox({
   classroomId,
   panels,
   headingRef,
+  callAction,
 }: Classroom2DLayoutProps & { readonly classroomId: string }) {
   const { inbox } = useChatInbox();
   const hideChat =
@@ -48,6 +52,7 @@ function Classroom2DLayoutWithInbox({
     <Classroom2DLayoutContent
       panels={panels}
       headingRef={headingRef}
+      callAction={callAction}
       hideChat={hideChat}
     />
   );
@@ -56,8 +61,9 @@ function Classroom2DLayoutWithInbox({
 function Classroom2DLayoutContent({
   panels,
   headingRef,
+  callAction,
   hideChat,
-}: Pick<Classroom2DLayoutProps, 'panels' | 'headingRef'> & {
+}: Pick<Classroom2DLayoutProps, 'panels' | 'headingRef' | 'callAction'> & {
   readonly hideChat: boolean;
 }) {
   const { canOpenPanel, openPanel } = useClassroomPanels();
@@ -112,6 +118,9 @@ function Classroom2DLayoutContent({
                 </Button>
               </li>
             ))}
+            {callAction ? (
+              <li className="min-w-0 empty:hidden">{callAction}</li>
+            ) : null}
           </ul>
         </nav>
       )}

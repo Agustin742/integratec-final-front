@@ -69,6 +69,21 @@ describe('CallView', () => {
     expect(screen.queryByText('CHAT BODY')).not.toBeInTheDocument();
   });
 
+  it('keeps the teacher panel collapsed by default and toggles it', () => {
+    render(<CallView {...base} isModerator />);
+    expect(screen.queryByText('Controles de la clase')).not.toBeInTheDocument();
+    const toggle = screen.getByRole('button', {
+      name: 'Abrir controles de la clase',
+    });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(toggle);
+    expect(screen.getByText('Controles de la clase')).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Cerrar controles de la clase' }),
+    );
+    expect(screen.queryByText('Controles de la clase')).not.toBeInTheDocument();
+  });
+
   it('has no chat toggle without a chat panel', () => {
     render(<CallView {...base} />);
     expect(
@@ -95,10 +110,13 @@ describe('CallView', () => {
 
   it('shows the teacher panel only to moderators of a class call', () => {
     const { rerender } = render(<CallView {...base} />);
-    expect(screen.queryByText('Controles de la clase')).not.toBeInTheDocument();
+    const open = { name: 'Abrir controles de la clase' };
+    expect(screen.queryByRole('button', open)).not.toBeInTheDocument();
     rerender(<CallView {...base} isModerator />);
+    fireEvent.click(screen.getByRole('button', open));
     expect(screen.getByText('Controles de la clase')).toBeInTheDocument();
     rerender(<CallView {...base} isModerator kind="direct" />);
+    expect(screen.queryByRole('button', open)).not.toBeInTheDocument();
     expect(screen.queryByText('Controles de la clase')).not.toBeInTheDocument();
   });
 });

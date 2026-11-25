@@ -13,7 +13,11 @@ import { usePrefersReducedMotion } from '@/features/world/use-prefers-reduced-mo
 import { createBlinkScheduler } from './blink-scheduler';
 import { createAvatarRig, type AvatarRig } from './call-avatar-rig';
 import type { TileRect } from './call-stage-layout';
-import { FRAME_CENTER_Y, FRAME_HALF } from './call-stage-framing';
+import {
+  DEFAULT_FRAME,
+  measureFrame,
+  type StageFrame,
+} from './call-stage-framing';
 import { roundedRectsPath, tileRadius } from './rounded-rects-path';
 import { useEmotePlayback } from './use-emote-playback';
 
@@ -54,10 +58,12 @@ function StageAvatar({
   tile,
   slot,
   getLevel,
+  onFrame,
 }: {
   readonly tile: StageTile;
   readonly slot: number;
   readonly getLevel: (sessionId: string) => number;
+  readonly onFrame: (sessionId: string, frame: StageFrame | null) => void;
 }) {
   const reduced = usePrefersReducedMotion();
   const [clipNames, setClipNames] = useState<readonly string[]>([]);
@@ -79,6 +85,8 @@ function StageAvatar({
   const onReady = ({ root, clipNames: names }: AvatarReadyInfo) => {
     rig.current = createAvatarRig(root);
     rig.current.setExpression(morphRef.current);
+    // Frame from the real model, not from assumed body heights.
+    onFrame(tile.sessionId, measureFrame(root, slot * SLOT_SPACING));
     setClipNames(names);
   };
 
@@ -135,17 +143,18 @@ function StageScene({
   getLevel,
 }: Pick<CallStageCanvasProps, 'tiles' | 'rects' | 'getLevel'>) {
   const camera = useMemo(
-    () =>
-      new OrthographicCamera(
-        -FRAME_HALF,
-        FRAME_HALF,
-        FRAME_HALF,
-        -FRAME_HALF,
-        0.1,
-        50,
-      ),
+    () => new OrthographicCamera(-0.5, 0.5, 0.5, -0.5, 0.1, 50),
     [],
   );
+  const frames = useRef(new Map<string, StageFrame>());
+  const onFrame = (sessionId: string, frame: StageFrame | null) => {
+    if (frame) frames.current.set(sessionId, frame);
+    else frames.current.delete(sessionId);
+  };
+  const tilesRef = useRef(tiles);
+  useEffect(() => {
+    tilesRef.current = tiles;
+  }, [tiles]);
   const rectsRef = useRef(rects);
   useEffect(() => {
     rectsRef.current = rects;
@@ -157,8 +166,18 @@ function StageScene({
       const y = size.height - rect.y - rect.size; // WebGL origin is bottom-left
       gl.setViewport(rect.x, y, rect.size, rect.size);
       gl.setScissor(rect.x, y, rect.size, rect.size);
-      camera.position.set(slot * SLOT_SPACING, FRAME_CENTER_Y, 10);
-      camera.lookAt(slot * SLOT_SPACING, FRAME_CENTER_Y, 0);
+      const sessionId = tilesRef.current[slot]?.sessionId;
+      const frame =
+        (sessionId !== undefined && frames.current.get(sessionId)) ||
+        DEFAULT_FRAME;
+      camera.left = -frame.half;
+      camera.right = frame.half;
+      camera.top = frame.half;
+      camera.bottom = -frame.half;
+      camera.updateProjectionMatrix();
+      const x = slot * SLOT_SPACING + frame.centerX;
+      camera.position.set(x, frame.centerY, 10);
+      camera.lookAt(x, frame.centerY, 0);
       camera.updateMatrixWorld(true);
       gl.render(scene, camera);
     });
@@ -176,6 +195,7 @@ function StageScene({
           tile={tile}
           slot={slot}
           getLevel={getLevel}
+          onFrame={onFrame}
         />
       ))}
     </>

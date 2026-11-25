@@ -34,6 +34,7 @@ import { useSessionCleanup, useSessionSnapshot } from '@/session/provider';
 import { BackToListLink } from './back-to-list-link';
 import { Classroom2DLayout } from './classroom-2d-layout';
 import { Classroom3DStage, clearLoadedWorldAssets } from './classroom-3d-stage';
+import { PANEL_BUTTON_CLASS } from './classroom-3d-hud';
 import { Classroom3DTopBar } from './classroom-3d-top-bar';
 import { useClassroomViewMode } from './classroom-mode-store';
 import { ClassroomPresenceBar } from './classroom-presence-bar';
@@ -309,8 +310,22 @@ function WorkspaceContext({
       ? { confirmed: true as const, keys }
       : { confirmed: false as const };
   const immersive = !isParent && mode === '3d' && !worldLocked;
-  const callAction = isParent ? null : (
-    <ClassCallButton classroomId={classroomId} classroomName={classroom.name} />
+  // The voice call is one more item of the classroom feature rail (3D) and
+  // features list (2D), styled like its siblings; never a navbar action.
+  const call3d = isParent ? null : (
+    <ClassCallButton
+      classroomId={classroomId}
+      classroomName={classroom.name}
+      appearance="rail"
+      className={PANEL_BUTTON_CLASS}
+    />
+  );
+  const call2d = isParent ? null : (
+    <ClassCallButton
+      classroomId={classroomId}
+      classroomName={classroom.name}
+      appearance="tile"
+    />
   );
   const joinAlert = joinOutcome && (
     <Alert
@@ -356,6 +371,7 @@ function WorkspaceContext({
             headingRef={activeViewHeadingRef}
             scopeKey={classroomId}
             classroomId={classroomId}
+            callAction={call3d}
             petName={classroom.pet?.name ?? null}
             selfPose={presence.selfPose}
             selfEquipped={presence.selfEquipped}
@@ -377,7 +393,6 @@ function WorkspaceContext({
                   classroomName={classroom.name}
                   roleLabel={messages.roles[classroom.myRole]}
                   headingRef={heading}
-                  callAction={callAction}
                   modeToggleLabel={messages.viewMode.switchTo2d}
                   onToggleMode={handleModeToggle}
                   wallet={
@@ -446,31 +461,26 @@ function WorkspaceContext({
                     </p>
                   </div>
                 </div>
-                {!isParent && (
+                {!isParent && !worldLocked && (
                   <div className="flex flex-wrap items-center gap-2.5">
-                    {callAction}
-                    {!worldLocked && (
-                      <>
-                        {/* Visual cue only: aria-keyshortcuts on the button already announces Alt+M. */}
-                        <span
-                          aria-hidden="true"
-                          className="hidden text-xs text-muted-foreground sm:inline"
-                        >
-                          {messages.viewMode.shortcutHint}
-                        </span>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          aria-keyshortcuts="Alt+M"
-                          onClick={handleModeToggle}
-                        >
-                          {mode === '3d'
-                            ? messages.viewMode.switchTo2d
-                            : messages.viewMode.switchTo3d}
-                        </Button>
-                      </>
-                    )}
+                    {/* Visual cue only: aria-keyshortcuts on the button already announces Alt+M. */}
+                    <span
+                      aria-hidden="true"
+                      className="hidden text-xs text-muted-foreground sm:inline"
+                    >
+                      {messages.viewMode.shortcutHint}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-keyshortcuts="Alt+M"
+                      onClick={handleModeToggle}
+                    >
+                      {mode === '3d'
+                        ? messages.viewMode.switchTo2d
+                        : messages.viewMode.switchTo3d}
+                    </Button>
                   </div>
                 )}
               </div>
@@ -490,6 +500,7 @@ function WorkspaceContext({
             {!isParent && (
               <Classroom2DLayout
                 classroomId={classroomId}
+                callAction={call2d}
                 panels={panels}
                 headingRef={activeViewHeadingRef}
               />

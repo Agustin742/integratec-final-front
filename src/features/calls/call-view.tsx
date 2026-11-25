@@ -7,7 +7,7 @@ import type {
   CallModerate,
 } from '@/realtime/call-contracts.generated';
 import { CallControlsBar } from './call-controls-bar';
-import { ChatIcon } from './call-icons';
+import { ChatIcon, ShieldIcon } from './call-icons';
 import { callMessages } from './call-messages';
 import { CallStage } from './call-stage';
 import type { CallParticipantState, CallSelfState } from './call-session';
@@ -41,10 +41,24 @@ export interface CallViewProps {
  * (teacher controls, chat) and the floating bottom controls bar.
  */
 export function CallView(props: CallViewProps) {
-  const [chatOpen, setChatOpen] = useState(false);
-  const showPanel = props.isModerator && props.kind === 'classroom';
+  const showPanelToggle = props.isModerator && props.kind === 'classroom';
   const hasChat = props.chatPanel !== undefined;
+  // One side panel at a time. Teacher controls start open on wide screens and
+  // collapsed on small ones; the chat always starts closed.
+  const [side, setSide] = useState<'teacher' | 'chat' | null>(() =>
+    showPanelToggle &&
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(min-width: 1024px)').matches
+      ? 'teacher'
+      : null,
+  );
+  const teacherOpen = showPanelToggle && side === 'teacher';
+  const chatOpen = hasChat && side === 'chat';
   const chatLabel = chatOpen ? callMessages.closeChat : callMessages.openChat;
+  const teacherLabel = teacherOpen
+    ? callMessages.closeTeacherPanel
+    : callMessages.openTeacherPanel;
 
   return (
     <div className="flex h-dvh min-h-0 flex-col gap-3 bg-foreground p-3 text-background sm:p-4">
@@ -55,6 +69,19 @@ export function CallView(props: CallViewProps) {
         <Badge variant="secondary">
           {callMessages.participantCount(props.participants.length)}
         </Badge>
+        {showPanelToggle && (
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            aria-label={teacherLabel}
+            title={teacherLabel}
+            aria-expanded={teacherOpen}
+            onClick={() => setSide(teacherOpen ? null : 'teacher')}
+          >
+            <ShieldIcon />
+          </Button>
+        )}
         {hasChat && (
           <Button
             type="button"
@@ -63,7 +90,7 @@ export function CallView(props: CallViewProps) {
             aria-label={chatLabel}
             title={chatLabel}
             aria-expanded={chatOpen}
-            onClick={() => setChatOpen((open) => !open)}
+            onClick={() => setSide(chatOpen ? null : 'chat')}
           >
             <ChatIcon />
           </Button>
@@ -93,8 +120,8 @@ export function CallView(props: CallViewProps) {
             getLevel={props.getLevel}
           />
         </div>
-        {showPanel && (
-          <aside className="max-h-60 shrink-0 overflow-y-auto rounded-3xl border border-edge bg-card p-4 text-card-foreground shadow-float lg:max-h-none lg:w-80">
+        {teacherOpen && (
+          <aside className="absolute inset-y-0 right-0 z-10 w-[min(22rem,100%)] overflow-y-auto rounded-3xl border border-edge bg-card p-3 text-card-foreground shadow-float lg:static lg:z-auto lg:w-80 lg:shrink-0">
             <TeacherPanel
               participants={props.participants}
               allowSelfUnmute={props.allowSelfUnmute}
@@ -103,7 +130,7 @@ export function CallView(props: CallViewProps) {
             />
           </aside>
         )}
-        {hasChat && chatOpen && (
+        {chatOpen && (
           <aside
             aria-label={callMessages.chatTitle}
             className="absolute inset-y-0 right-0 z-10 flex w-[min(22rem,100%)] flex-col overflow-hidden rounded-3xl border border-edge bg-card text-card-foreground shadow-float lg:static lg:z-auto lg:w-80 lg:shrink-0"
