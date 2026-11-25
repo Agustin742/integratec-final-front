@@ -1,5 +1,14 @@
 # Tracker — Alejo
 
+## 2026-11-24 — Section 3 Classroom Decoration pack (7 remaining wishlist items)
+
+- **Status:** completed (committed locally on `feat/environment-decor-assets` in `odd/worktrees/environment-decor-assets`; not pushed)
+- **Area / files:** `public/models/scenes/classroom/decoration/` (`7` new GLBs: `wall-clock`, `wall-map`, `globe`, `wall-posters`, `plants-and-pots`, `rug`, `garlands`), `assets/blender/environment/classroom-decoration/` (`7` new `.blend` masters), `scripts/assets/test-classroom-decoration.mjs`, `docs/art/classroom-decoration.md`, `docs/art/asset-wishlist.md`, `docs/assets/classroom-decoration/` (`7` new PNGs), `docs/ai-usage.md`, `changelogs/tracker-alejo.md`
+- **Change:** Delivered the 7 remaining Section 3 `Decoration` wishlist items (`Wall clock`, `Map`, `Globe`, `Wall posters`, `Plants and pots`, `Rug`, `Garlands`; `194,588` B / `190.0` KB total, `44,452` unique triangles; `384,104` B / `375.1` KB combined across all `10` decoration modules) without altering `christmas-tree`, `flag-argentina`, `flag-integrar`, `src/`, or `e2e/`. Assembled `ClassroomDecorationPack_Assembly` (`11` shell + `8` furniture + `11` interactive + `10` decoration GLBs + `2` reference avatars) and `ClassroomDecorationPack_ModularKit` in `odd/previews/classroom-decoration-pack-review.blend`, ticked all `8/8` Decoration items in `docs/art/asset-wishlist.md`, and extended `scripts/assets/test-classroom-decoration.mjs` to `10/10` modules.
+- **Reason:** Complete all Section 3 `Decoration` wishlist items on a dedicated branch/worktree off latest `origin/develop` (`566bd705`) with live Blender visual approval before moving to `Desk clutter`.
+- **Verification:** `node scripts/assets/test-classroom-decoration.mjs` (`10/10` PASS, `384,104` B total), `node scripts/assets/check-asset-budget.mjs` (`142` models within FD8 limits, `756.5 KB / 8.00 MB` scene total, `3` pre-existing `#91` avatar exceptions), Prettier & ESLint (`0` errors on touched `.mjs`/`.md` files), `scripts/ci/check_docs.py` (`114` files passed via Blender's Python 3), `git diff --check`, Cycles preview inspection (`7` PNGs), and live Blender Outliner visual approval (`ClassroomDecorationPack_ModularKit`). Disclosures: `src/` and `e2e/` are untouched, and full `tsc`/`vitest`/`e2e`/CI shell tests run in Ubuntu CI.
+- **Next step:** Proceed to Section 3 `Desk clutter` (`Notebooks`, `Pencil case`, `Pencils`, `Stacked books`, `Backpack on the floor`) on `feat/environment-decor-assets`.
+
 ## 2026-11-24 — Section 5 Tutor Bot 3D model, Bot Station & 2D icon
 
 - **Status:** completed (committed locally on `feat/interactive-objects-assets` in `odd/worktrees/interactive-objects-assets`; not pushed)

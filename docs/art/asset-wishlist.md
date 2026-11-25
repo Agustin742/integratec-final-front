@@ -205,14 +205,14 @@ Seasonal:
 
 ### Decoration
 
-- [ ] Wall clock
+- [x] Wall clock
 - [x] Flag
-- [ ] Map
-- [ ] Globe
-- [ ] Wall posters
-- [ ] Plants and pots
-- [ ] Rug
-- [ ] Garlands
+- [x] Map
+- [x] Globe
+- [x] Wall posters
+- [x] Plants and pots
+- [x] Rug
+- [x] Garlands
 
 ### Desk clutter
 
