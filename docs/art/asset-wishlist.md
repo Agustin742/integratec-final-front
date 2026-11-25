@@ -205,14 +205,14 @@ Seasonal:
 
 ### Decoration
 
-- [ ] Wall clock
+- [x] Wall clock
 - [x] Flag
-- [ ] Map
-- [ ] Globe
-- [ ] Wall posters
-- [ ] Plants and pots
-- [ ] Rug
-- [ ] Garlands
+- [x] Map
+- [x] Globe
+- [x] Wall posters
+- [x] Plants and pots
+- [x] Rug
+- [x] Garlands
 
 ### Desk clutter
 
@@ -264,10 +264,10 @@ Seasonal:
 ### Classroom pet (Michi, cat)
 
 - [x] Pet model
-- [ ] Animation: sleep
-- [ ] Animation: walk
-- [ ] Animation: meow
-- [ ] Animation: ask for pets
+- [x] Animation: sleep
+- [x] Animation: walk
+- [x] Animation: meow
+- [x] Animation: ask for pets
 - [ ] Accessory: scarf
 - [ ] Accessory: hat
 - [ ] Accessory: bow

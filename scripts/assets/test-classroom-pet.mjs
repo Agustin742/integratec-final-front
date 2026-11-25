@@ -111,7 +111,44 @@ assert.ok(
   g.extensionsUsed?.includes('KHR_draco_mesh_compression'),
   `${GLB_REL}: Draco compression required`,
 );
-assert.equal(g.animations?.length ?? 0, 0, `${GLB_REL}: zero animations`);
+const EXPECTED_ANIMATIONS = ['AskForPets', 'Meow', 'Sleep', 'Walk'];
+
+assert.equal(
+  g.animations?.length ?? 0,
+  EXPECTED_ANIMATIONS.length,
+  `${GLB_REL}: exact 4 animation clips`,
+);
+const actualAnimNames = (g.animations ?? []).map((a) => a.name).sort();
+assert.deepEqual(
+  actualAnimNames,
+  EXPECTED_ANIMATIONS,
+  `${GLB_REL}: expected clip names (Walk, Sleep, Meow, AskForPets)`,
+);
+for (const anim of g.animations) {
+  const channels = anim.channels ?? [];
+  assert.ok(channels.length > 0, `${GLB_REL}: ${anim.name} has channels`);
+  let maxTime = 0;
+  let hasBones = false;
+  const morphNodes = new Set();
+  for (const ch of channels) {
+    const path = ch.target?.path;
+    if (path === 'translation' || path === 'rotation') hasBones = true;
+    if (path === 'weights' && ch.target?.node !== undefined) {
+      morphNodes.add(g.nodes?.[ch.target.node]?.name);
+    }
+    const sampler = anim.samplers?.[ch.sampler];
+    const inputAcc = g.accessors?.[sampler?.input];
+    if (inputAcc?.max?.[0] !== undefined) {
+      maxTime = Math.max(maxTime, inputAcc.max[0]);
+    }
+  }
+  assert.ok(maxTime > 0.5, `${GLB_REL}: ${anim.name} positive duration`);
+  assert.ok(hasBones, `${GLB_REL}: ${anim.name} drives skeleton bones`);
+  assert.ok(
+    morphNodes.has('Pet_Eyes') && morphNodes.has('Pet_Mouth'),
+    `${GLB_REL}: ${anim.name} drives Pet_Eyes & Pet_Mouth morphs`,
+  );
+}
 assert.equal(g.cameras?.length ?? 0, 0, `${GLB_REL}: zero cameras`);
 assert.equal(
   g.extensions?.KHR_lights_punctual?.lights?.length ?? 0,
@@ -224,5 +261,5 @@ assert.ok(
 );
 
 console.log(
-  `[test-classroom-pet] PASS: ${GLB_REL} (${bytes} B, 12 meshes, 30 bones, 4 morph targets, 8 materials, height=${b.max[1].toFixed(3)}m)`,
+  `[test-classroom-pet] PASS: ${GLB_REL} (${bytes} B, 12 meshes, 30 bones, 4 morph targets, 4 clips [Walk, Sleep, Meow, AskForPets], 8 materials, height=${b.max[1].toFixed(3)}m)`,
 );
