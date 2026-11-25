@@ -37,6 +37,7 @@ export const shopMessages = {
   },
   kinds: {
     AVATAR_ACCESSORY: 'Accesorio de avatar',
+    AVATAR_STYLE: 'Peinados y ropa',
     DESK_UPGRADE: 'Mejora de escritorio',
     CLASSROOM_ITEM: 'Elemento del aula',
     PET_ACCESSORY: 'Accesorio de mascota',
@@ -78,6 +79,7 @@ export const shopMessages = {
     statusUnavailable: 'No disponible',
     insufficientBalanceHint: 'Saldo insuficiente según tu último saldo',
     classroomScopeHint: 'Se desbloquea para toda el aula',
+    avatarStyleHint: 'Se desbloquea en tu perfil, en todas tus aulas',
   },
   purchases: {
     loading: 'Cargando historial de compras…',

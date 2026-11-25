@@ -14,12 +14,9 @@ import {
   type BufferGeometry,
 } from 'three';
 import type { ClassroomLayout } from '@/realtime';
-import { CLASSROOM_WALL_HEIGHT } from '../camera';
 import { DESK_HEIGHT, deriveDesks } from './classroom-desks';
-import {
-  ENTRANCE_WIDTH,
-  deriveClassroomPropSpecs,
-} from './classroom-interactables';
+import { deriveClassroomPropSpecs } from './classroom-interactables';
+import type { ClassroomKitModuleId } from './kit/classroom-kit-manifest';
 
 /** Art-direction palette (`rules/art-direction.md`). */
 export const CLASSROOM_COLORS = {
@@ -49,13 +46,11 @@ export type PlaceholderKind =
 
 export interface ClassroomScene {
   readonly root: Group;
+  setFailedModules(ids: ReadonlySet<ClassroomKitModuleId>): void;
   /** Releases every geometry, material and instance buffer built here. */
   dispose(): void;
 }
 
-const WALL_THICKNESS = 0.2;
-const SKIRTING_HEIGHT = 0.15;
-const SKIRTING_THICKNESS = 0.1;
 const DESK_TOP_THICKNESS = 0.06;
 const LEG_SIZE = 0.06;
 const LEG_INSET = 0.05;
@@ -67,7 +62,10 @@ type Vec3 = readonly [number, number, number];
  * shared geometries and one matte material per colour. Desks come from the
  * layout obstacles, so what is drawn is exactly what collides. Front of the
  * room = negative z (board, shelf, shop, pet); the entrance is at the back.
- * The camera sits at +x,+z, so full-height walls exist only on the far sides.
+ * The shell and the furniture (desks, board, shelf) are the modular kit
+ * rendered by `<ClassroomKit>`; this scene keeps the invisible walkable-floor
+ * and entrance raycast planes, invisible picking proxies for desks, board and
+ * shelf, the teaching zone and the remaining prop placeholders.
  */
 export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   const { bounds } = layout;
@@ -87,6 +85,24 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
       materials.set(color, found);
     }
     return found;
+  };
+
+  // Furniture is drawn by the modular kit; these meshes only keep the picking
+  // contract (names, instance ids, placeholder tags), so their material is
+  // invisible yet still raycast.
+  const proxyMaterial = new MeshStandardMaterial({
+    color: CLASSROOM_COLORS.wood,
+    metalness: 0,
+    roughness: 0.88,
+    visible: false,
+  });
+  materials.set('picking-proxy', proxyMaterial);
+  const proxy = (parent: Object3D, size: Vec3, position: Vec3) => {
+    const mesh = new Mesh(box, proxyMaterial);
+    mesh.scale.set(...size);
+    mesh.position.set(...position);
+    parent.add(mesh);
+    return mesh;
   };
 
   const part = (
@@ -111,7 +127,14 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
     position: Vec3,
     interactive = false,
   ) => {
-    const mesh = new Mesh(plane, material(color));
+    // Interactive flats are raycast targets whose look comes from the modular
+    // kit (floor tiles, threshold): invisible material, still hit by rays.
+    const mesh = new Mesh(
+      plane,
+      interactive
+        ? new MeshStandardMaterial({ color, visible: false })
+        : material(color),
+    );
     mesh.scale.set(width, depth, 1);
     mesh.position.set(...position);
     mesh.rotation.x = -Math.PI / 2;
@@ -159,60 +182,6 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   entrance.userData.placeholder = 'entrance' satisfies PlaceholderKind;
   root.add(entrance);
 
-  // Far walls (x = minX and z = minZ) are full height; the corner belongs to
-  // the z wall. Both sit outside the layout bounds.
-  const farZ = block(
-    root,
-    CLASSROOM_COLORS.wall,
-    [width + WALL_THICKNESS, CLASSROOM_WALL_HEIGHT, WALL_THICKNESS],
-    [
-      centerX - WALL_THICKNESS / 2,
-      CLASSROOM_WALL_HEIGHT / 2,
-      bounds.minZ - WALL_THICKNESS / 2,
-    ],
-  );
-  farZ.name = 'wall-far-z';
-  const farX = block(
-    root,
-    CLASSROOM_COLORS.wall,
-    [WALL_THICKNESS, CLASSROOM_WALL_HEIGHT, depth],
-    [bounds.minX - WALL_THICKNESS / 2, CLASSROOM_WALL_HEIGHT / 2, centerZ],
-  );
-  farX.name = 'wall-far-x';
-
-  // Near sides (x = maxX and z = maxZ) are a low skirting so avatars stay
-  // visible; the back one leaves the entrance gap.
-  const skirting = new Group();
-  skirting.name = 'skirting-near';
-  const gapMin = -ENTRANCE_WIDTH / 2;
-  const gapMax = ENTRANCE_WIDTH / 2;
-  block(
-    skirting,
-    CLASSROOM_COLORS.wood,
-    [SKIRTING_THICKNESS, SKIRTING_HEIGHT, depth + SKIRTING_THICKNESS],
-    [
-      bounds.maxX + SKIRTING_THICKNESS / 2,
-      SKIRTING_HEIGHT / 2,
-      centerZ + SKIRTING_THICKNESS / 2,
-    ],
-  );
-  for (const [from, to] of [
-    [bounds.minX, gapMin],
-    [gapMax, bounds.maxX],
-  ] as const) {
-    block(
-      skirting,
-      CLASSROOM_COLORS.wood,
-      [to - from, SKIRTING_HEIGHT, SKIRTING_THICKNESS],
-      [
-        (from + to) / 2,
-        SKIRTING_HEIGHT / 2,
-        bounds.maxZ + SKIRTING_THICKNESS / 2,
-      ],
-    );
-  }
-  root.add(skirting);
-
   // Desks: one footprint per layout obstacle.
   const desks = deriveDesks(layout);
   const students = desks.filter((desk) => desk.kind === 'student');
@@ -220,11 +189,7 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   const topY = DESK_HEIGHT - DESK_TOP_THICKNESS / 2;
   const matrix = new Matrix4();
   const identity = new Quaternion();
-  const studentTops = new InstancedMesh(
-    box,
-    material(CLASSROOM_COLORS.butter),
-    students.length,
-  );
+  const studentTops = new InstancedMesh(box, proxyMaterial, students.length);
   studentTops.name = 'student-desks';
   students.forEach((desk, index) => {
     matrix.compose(
@@ -238,9 +203,8 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   root.add(studentTops);
 
   if (teacher) {
-    const top = block(
+    const top = proxy(
       root,
-      CLASSROOM_COLORS.butter,
       [teacher.width, DESK_TOP_THICKNESS, teacher.depth],
       [teacher.centerX, topY, teacher.centerZ],
     );
@@ -248,13 +212,13 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   }
 
   const legHeight = DESK_HEIGHT - DESK_TOP_THICKNESS;
-  const legs = new InstancedMesh(
-    box,
-    material(CLASSROOM_COLORS.wood),
-    desks.length * 4,
-  );
+  const legs = new InstancedMesh(box, proxyMaterial, students.length * 4);
   legs.name = 'desk-legs';
-  desks.forEach((desk, deskIndex) => {
+  legs.userData.deskKind = 'student';
+  const teacherLegs = new InstancedMesh(box, proxyMaterial, teacher ? 4 : 0);
+  teacherLegs.name = 'teacher-desk-legs';
+  teacherLegs.userData.deskKind = 'teacher';
+  desks.forEach((desk) => {
     const dx = desk.width / 2 - LEG_INSET - LEG_SIZE / 2;
     const dz = desk.depth / 2 - LEG_INSET - LEG_SIZE / 2;
     [
@@ -268,11 +232,14 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
         identity,
         new Vector3(LEG_SIZE, legHeight, LEG_SIZE),
       );
-      legs.setMatrixAt(deskIndex * 4 + corner, matrix);
+      const target = desk.kind === 'student' ? legs : teacherLegs;
+      const index = desk.kind === 'student' ? students.indexOf(desk) : 0;
+      target.setMatrixAt(index * 4 + corner, matrix);
     });
   });
   legs.instanceMatrix.needsUpdate = true;
-  root.add(legs);
+  root.add(legs, teacherLegs);
+  teacherLegs.instanceMatrix.needsUpdate = true;
 
   /**
    * A placeholder is its own group, tagged for #38. Local axes: x along the
@@ -294,30 +261,13 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
     return group;
   };
 
-  // Board on the front wall, above the teaching zone.
+  // Board and shelf: the kit models draw them; the groups keep an invisible
+  // hit box matching the kit dimensions (4.4 x 1.5 m; 1.8 x 1.54 m).
   const board = prop('classroom-board', 'board', propSpecs.board.position);
-  block(board, CLASSROOM_COLORS.turquoise, [4.4, 1.5, 0.08], [0, 1.55, 0.04]);
-  block(board, CLASSROOM_COLORS.boardGreen, [4, 1.1, 0.04], [0, 1.55, 0.1]);
-  block(board, CLASSROOM_COLORS.wood, [1.6, 0.05, 0.12], [0, 0.78, 0.06]);
+  proxy(board, [4.4, 1.5, 0.2], [0, 1.7, 0.1]);
 
-  // Shelf with muted books, front wall, left of the board.
   const shelf = prop('classroom-shelf', 'shelf', propSpecs.shelf.position);
-  block(shelf, CLASSROOM_COLORS.wood, [1.8, 1.5, 0.03], [0, 0.75, 0.015]);
-  for (const x of [-0.88, 0.88])
-    block(shelf, CLASSROOM_COLORS.wood, [0.04, 1.5, 0.28], [x, 0.75, 0.14]);
-  for (const y of [0.02, 0.5, 1.0, 1.48])
-    block(shelf, CLASSROOM_COLORS.wood, [1.72, 0.04, 0.28], [0, y, 0.14]);
-  (
-    [
-      [-0.55, 0.66, CLASSROOM_COLORS.bookSage],
-      [-0.4, 0.66, CLASSROOM_COLORS.bookClay],
-      [0.3, 0.66, CLASSROOM_COLORS.bookSlate],
-      [-0.2, 1.16, CLASSROOM_COLORS.bookClay],
-      [0.5, 1.16, CLASSROOM_COLORS.bookSage],
-    ] as const
-  ).forEach(([x, y, color]) =>
-    block(shelf, color, [0.1, 0.28, 0.2], [x, y, 0.14]),
-  );
+  proxy(shelf, [1.8, 1.54, 0.3], [0, 0.77, 0.15]);
 
   // Shop corner, front wall, right of the board.
   const shop = prop('classroom-shop', 'shop', propSpecs.shop.position);
@@ -390,9 +340,33 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
       owned.add(child.material as Material);
       if (child instanceof InstancedMesh) child.dispose();
     });
+    owned.add(proxyMaterial);
     geometries.forEach((geometry) => geometry.dispose());
     owned.forEach((item) => item.dispose());
   };
 
-  return { root, dispose };
+  // Each recoverable target owns a material: revealing one module must never
+  // reveal another module's proxy or mutate a cached GLB material.
+  const recoveryTargets = [
+    ['floor-tile', floor],
+    ['floor-threshold', entrance],
+    ['student-desk', studentTops],
+    ['student-desk', legs],
+    ['teacher-desk', teacherLegs],
+    ['teacher-desk', root.getObjectByName('teacher-desk')],
+    ['board', board.children[0]],
+    ['bookshelf', shelf.children[0]],
+  ] as const;
+  const setFailedModules = (ids: ReadonlySet<ClassroomKitModuleId>) => {
+    for (const [id, target] of recoveryTargets) {
+      if (!(target instanceof Mesh)) continue;
+      if (ids.has(id) && target.material === proxyMaterial) {
+        target.material = proxyMaterial.clone();
+      }
+      if (target.material !== proxyMaterial) {
+        (target.material as Material).visible = ids.has(id);
+      }
+    }
+  };
+  return { root, dispose, setFailedModules };
 }

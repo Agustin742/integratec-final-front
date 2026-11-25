@@ -48,12 +48,21 @@ export type RealtimeFailureReason =
   | 'invalid-classroom'
   | 'connection-error';
 
+/** Shop item codes worn on the avatar; `null` is an empty slot. */
+export interface RealtimeEquippedCodes {
+  readonly head: string | null;
+  readonly face: string | null;
+  readonly back: string | null;
+}
+
 export interface RealtimeAvatarAppearance {
   readonly bodyId: string;
   readonly hairId: string;
   readonly topId: string;
   readonly hairColor: string;
   readonly clothingColor: string;
+  /** Present only when at least one accessory slot is equipped. */
+  readonly equipped?: RealtimeEquippedCodes | undefined;
 }
 
 export interface RealtimeClassroomControls {
@@ -223,10 +232,38 @@ function readParticipantAppearance(
   if (typeof appearance !== 'object' || appearance === null) {
     return undefined;
   }
-  return (
+  const base =
     parseAppearanceFields(appearance) ??
-    parseAppearanceFields((appearance as { baseAvatar?: unknown }).baseAvatar)
+    parseAppearanceFields((appearance as { baseAvatar?: unknown }).baseAvatar);
+  if (!base) {
+    return undefined;
+  }
+  const equipped = parseEquippedCodes(
+    (appearance as { items?: unknown }).items,
   );
+  return equipped ? Object.freeze({ ...base, equipped }) : base;
+}
+
+function readItemCode(items: Record<string, unknown>, slot: string) {
+  const item = items[slot];
+  if (typeof item !== 'object' || item === null) {
+    return null;
+  }
+  const code = (item as { shopItemCode?: unknown }).shopItemCode;
+  return typeof code === 'string' && code !== '' ? code : null;
+}
+
+function parseEquippedCodes(items: unknown): RealtimeEquippedCodes | undefined {
+  if (typeof items !== 'object' || items === null) {
+    return undefined;
+  }
+  const record = items as Record<string, unknown>;
+  const equipped = Object.freeze({
+    head: readItemCode(record, 'head'),
+    face: readItemCode(record, 'face'),
+    back: readItemCode(record, 'back'),
+  });
+  return equipped.head || equipped.face || equipped.back ? equipped : undefined;
 }
 
 function toFiniteCoordinate(value: unknown, fallback = 0): number {

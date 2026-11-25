@@ -44,6 +44,21 @@ export const displayNameFormSchema = z.object({
 export type DisplayNameFormInput = z.input<typeof displayNameFormSchema>;
 export type DisplayNameFormOutput = z.output<typeof displayNameFormSchema>;
 
+/** `GET /users/me/avatar/styles`: availability of every hair and top style. */
+export const avatarStylesSchema = z.object({
+  items: z.array(
+    z.object({
+      styleType: z.enum(['hair', 'top']),
+      styleId: z.string().min(1),
+      free: z.boolean(),
+      owned: z.boolean(),
+      shopItemCode: z.string().nullable(),
+    }),
+  ),
+});
+
+export type AvatarStyles = z.infer<typeof avatarStylesSchema>;
+
 export const avatarFormSchema = avatarSchema.superRefine((value, ctx) => {
   const avatar: Avatar = value;
   if (!isHairAllowed(avatar)) {

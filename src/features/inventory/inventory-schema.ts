@@ -22,6 +22,7 @@ export const SLOT_NAMES: readonly EquippedSlotName[] = [
 export const shopItemKindSchema = z.enum([
   'CLASSROOM_ITEM',
   'AVATAR_ACCESSORY',
+  'AVATAR_STYLE',
   'DESK_UPGRADE',
   'PET_ACCESSORY',
 ]);

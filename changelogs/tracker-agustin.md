@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-24 — Modular avatar and classroom assets (#135, covers #58)
+
+- **Status:** completed (pending CI and merge of the PR)
+- **Area / files:** `src/features/world/avatar/` (part composer, accessory catalog, part plan, avatar model), `src/features/world/classroom/` (modular kit loader and material batching, shell and furniture placements, invisible picking proxies), `src/features/profile/` (new style catalog, locked paid styles), `src/features/shop/` ("Peinados y ropa"), `src/realtime/`, `src/api/schema.generated.ts`, `public/models/` (legacy avatar GLBs removed), `docs/classroom-workspace.md`
+- **Change:** The avatar is composed from body, hair, top and equipped head/face/back parts with fixed accessory colors, headwear-aware hair hiding and the back-tuck morph (`9f01a8b`, `51fe6a2`, `94e2195`); new hair/top catalog with free and shop-locked styles (`995c1f7`, `82915f8`); legacy avatar models removed (`9a696ae`). The classroom is assembled from Alejo's modular kit: shell (`ecb7611`) and furniture (`9c760fd`), batched by material so the kit costs 21 draw calls instead of 85 (`649630c`, `5db5ae0`, `22c3780`). Merged `develop` with the immersive 3D classroom (#128).
+- **Reason:** Use the assets merged in #132 and #134 in the running app for the demo; back counterpart integratec-final-back#145.
+- **Verification:** Per-task strict TDD on touched tests, lint and typecheck; once before the PR `--changed origin/develop` (only load timeouts in 3 untouched files, passing alone), build and `security:check`; native review approved on each task; visual approval by Agustin. E2E specs not run locally (CI).
+- **Next step:** CI green and merge.
+
 ## 2026-11-24 — UI polish pass for classroom panels (#131)
 
 - **Status:** completed (pending review and merge; stacked on PR #129)

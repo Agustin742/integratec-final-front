@@ -14,11 +14,17 @@ const nav = vi.hoisted(() => ({
   remoteMounts: 0,
   remoteUnmounts: 0,
   highlightProps: null as unknown,
+  kitProps: null as unknown,
   trackerProps: null as unknown as {
     interactables: { id: string }[];
     onChange?: unknown;
     onAnchor?: unknown;
   } | null,
+}));
+
+vi.mock('@react-three/fiber', () => ({
+  useThree: (select: (state: { invalidate: () => void }) => unknown) =>
+    select({ invalidate: vi.fn() }),
 }));
 
 vi.mock('./use-classroom-navigation', () => ({
@@ -57,6 +63,12 @@ vi.mock('./remote-avatar', () => ({
     return <div data-testid="remote-avatar" />;
   },
 }));
+vi.mock('./kit/classroom-kit', () => ({
+  ClassroomKit: (props: unknown) => {
+    nav.kitProps = props;
+    return <div data-testid="classroom-kit" />;
+  },
+}));
 vi.mock('./interactable-highlight', () => ({
   InteractableHighlight: (props: unknown) => {
     nav.highlightProps = props;
@@ -67,7 +79,7 @@ vi.mock('./interactable-highlight', () => ({
 const avatar: Avatar = {
   bodyId: 'female',
   hairId: 'afro',
-  topId: 'tshirt',
+  topId: 'basic-tshirt',
   hairColor: '#AF6D63',
   clothingColor: '#75B7DA',
 };
@@ -79,6 +91,7 @@ beforeEach(() => {
   nav.remoteUnmounts = 0;
   nav.clearDestination.mockClear();
   nav.highlightProps = null;
+  nav.kitProps = null;
   nav.trackerProps = null;
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -88,6 +101,27 @@ describe('ClassroomScene', () => {
     render(<ClassroomScene avatar={avatar} scopeKey="room-1" />);
     expect(screen.getByTestId('local-avatar')).toBeInTheDocument();
     expect(nav.localAvatarProps).toMatchObject({ avatar, scopeKey: 'room-1' });
+  });
+
+  test('mounts the modular shell kit with the derived placements and classroom scope', () => {
+    render(<ClassroomScene scopeKey="room-1" />);
+    expect(screen.getByTestId('classroom-kit')).toBeInTheDocument();
+    const { placements, scopeKey } = nav.kitProps as {
+      placements: { moduleId: string }[];
+      scopeKey: string;
+    };
+    expect(scopeKey).toBe('room-1');
+    expect(placements.filter((p) => p.moduleId === 'floor-tile')).toHaveLength(
+      192,
+    );
+    expect(placements.some((p) => p.moduleId === 'wall-solid')).toBe(true);
+    expect(
+      placements.filter((p) => p.moduleId === 'student-desk'),
+    ).toHaveLength(12);
+    expect(
+      placements.filter((p) => p.moduleId === 'student-chair'),
+    ).toHaveLength(12);
+    expect(placements.some((p) => p.moduleId === 'teacher-desk')).toBe(true);
   });
 
   test('still renders without a profile avatar', () => {

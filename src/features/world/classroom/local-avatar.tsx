@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Group, type Object3D } from 'three';
 import type { Avatar } from '@/features/profile/avatar-options';
 import { AvatarModel } from '../avatar/avatar-model';
+import type { AvatarEquipped } from '../avatar/avatar-part-plan';
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion';
 import type { Pose } from '../movement';
 import {
@@ -25,6 +26,8 @@ export interface LocalAvatarProps {
   marker: Object3D;
   /** Confirmed profile avatar; a capsule stands in while it is unknown. */
   avatar?: Avatar | undefined;
+  /** Accessory shop codes worn in this classroom. */
+  equipped?: AvatarEquipped | undefined;
   scopeKey?: string | undefined;
 }
 
@@ -46,6 +49,7 @@ export function LocalAvatar({
   controller,
   marker,
   avatar,
+  equipped,
   scopeKey,
 }: LocalAvatarProps) {
   const root = useMemo(() => {
@@ -99,6 +103,7 @@ export function LocalAvatar({
         {avatar ? (
           <AvatarModel
             avatar={avatar}
+            equipped={equipped}
             scopeKey={scopeKey}
             animation={animationFor(moving)}
             fallback={<PlaceholderBody />}

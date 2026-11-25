@@ -11,7 +11,7 @@ Derived only from the existing editable 760-vertex `Polo_Male_Shell` and `Polo_F
 - [Female export](../../public/models/avatars/female/top-basic-tshirt.glb): 38,784 bytes.
 - [Structural test](../../scripts/assets/test-basic-tshirt.mjs).
 
-Exports use strict active-scene selection of garment and canonical34 rig only, no animations, Draco generic precision 20, neutral white `AvatarTopTint`, roughness 0.85. Legacy `top-tshirt` is not replaced. Existing bodies, lower halves, polo files and original open review file were never saved over. Geometry/weight SHA256 comparisons of source shells and body-reference meshes remained equal during authoring (local `odd/artifacts/basic-tshirt-author.json`). This is not a complete bytewise audit of every source datablock.
+Exports use strict active-scene selection of garment and canonical34 rig only, no animations, Draco generic precision 20, neutral white `AvatarTopTint`, roughness 0.85. The legacy `top-tshirt` was removed; this export replaces it. Existing bodies, lower halves, polo files and original open review file were never saved over. Geometry/weight SHA256 comparisons of source shells and body-reference meshes remained equal during authoring (local `odd/artifacts/basic-tshirt-author.json`). This is not a complete bytewise audit of every source datablock.
 
 ## Observed checks
 
