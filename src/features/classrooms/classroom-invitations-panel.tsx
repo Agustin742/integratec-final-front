@@ -1,11 +1,16 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef, useState } from 'react';
+import { Controller, useWatch } from 'react-hook-form';
 import { useParams } from 'react-router';
 import { ApiError } from '@/api/errors';
 import {
   classroomDetailQueryKey,
   classroomInvitationsQueryKey,
+  classroomParentLinksQueryKey,
+  classroomRosterQueryKey,
   createClassroomInvitationsPredicate,
+  createClassroomParentLinksPredicate,
+  createClassroomRosterPredicate,
   type InvitationStateFilter,
 } from '@/api/query-keys';
 import {
@@ -29,14 +34,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
 import { formatInstant } from '@/lib/dates';
+import { cn } from '@/lib/utils';
 import { useSessionService, useSessionSnapshot } from '@/session/provider';
 import {
   INVITATION_EMAIL_MAX_LENGTH,
   generateJoinCodeFormSchema,
   sendInvitationFormSchema,
+  toCreateClassroomInvitationPayload,
   toCreateJoinCodePayload,
   type ClassroomInvitationDto,
+  type ClassroomParentLinkDto,
   type CreatedClassroomInvitationDto,
+  type EmailInvitationRole,
   type GenerateJoinCodeFormInput,
   type GenerateJoinCodeFormOutput,
   type InvitationState,
@@ -51,11 +60,20 @@ import {
   isAbortError,
   isUncertainWriteError,
   listClassroomInvitations,
+  listClassroomParentLinks,
+  removeClassroomParentLink,
   revokeClassroomInvitation,
   revokeClassroomJoinCode,
 } from './invitation-service';
 import { classroomMessages } from './messages';
-import { useClassroomCapabilities } from './use-classroom-capabilities';
+import { listClassroomRoster } from './roster-service';
+import { useClassroomContext } from './use-classroom-capabilities';
+
+const EMAIL_ROLE_OPTIONS: readonly EmailInvitationRole[] = [
+  'STUDENT',
+  'PARENT',
+];
+const MAX_GUARDIANS_PER_STUDENT = 2;
 
 const STATE_FILTER_OPTIONS: readonly InvitationStateFilter[] = [
   'PENDING',
@@ -113,6 +131,13 @@ function isBadRequestApiError(error: unknown): boolean {
   );
 }
 
+function isConflictApiError(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    (error.kind === 'conflict' || error.status === 409)
+  );
+}
+
 function buildInvitationAcceptUrl(token: string): string {
   const path = `/invitations/accept?token=${encodeURIComponent(token)}`;
   if (
@@ -165,7 +190,7 @@ export function ClassroomInvitationsPanel({
   const resolvedClassroomId = propClassroomId ?? params.classroomId ?? '';
   const snapshot = useSessionSnapshot();
   const userId = snapshot.status === 'authenticated' ? snapshot.user.id : null;
-  const capabilities = useClassroomCapabilities(resolvedClassroomId);
+  const context = useClassroomContext(resolvedClassroomId);
   const messages = classroomMessages.invitations;
 
   if (resolvedClassroomId.trim() === '' || userId === null) {
@@ -178,12 +203,12 @@ export function ClassroomInvitationsPanel({
     );
   }
 
-  if (capabilities.status === 'pending') {
+  if (context.status === 'pending') {
     return <LoadingState label={messages.list.loading} skeletonLines={3} />;
   }
 
-  if (capabilities.status === 'error') {
-    if (isNotFoundApiError(capabilities.error)) {
+  if (context.status === 'error') {
+    if (isNotFoundApiError(context.error)) {
       return (
         <ErrorState
           headingLevel="h3"
@@ -192,7 +217,7 @@ export function ClassroomInvitationsPanel({
         />
       );
     }
-    if (isForbiddenApiError(capabilities.error)) {
+    if (isForbiddenApiError(context.error)) {
       return (
         <ErrorState
           headingLevel="h3"
@@ -210,7 +235,7 @@ export function ClassroomInvitationsPanel({
     );
   }
 
-  if (!capabilities.can('invite_members')) {
+  if (!context.classroom.capabilities.includes('invite_members')) {
     return (
       <ErrorState
         headingLevel="h3"
@@ -225,6 +250,7 @@ export function ClassroomInvitationsPanel({
       key={`${userId}:${resolvedClassroomId}`}
       userId={userId}
       classroomId={resolvedClassroomId}
+      adultMode={context.classroom.adultMode}
     />
   );
 }
@@ -232,11 +258,13 @@ export function ClassroomInvitationsPanel({
 interface ClassroomInvitationsContentProps {
   readonly userId: string;
   readonly classroomId: string;
+  readonly adultMode: boolean;
 }
 
 function ClassroomInvitationsContent({
   userId,
   classroomId,
+  adultMode,
 }: ClassroomInvitationsContentProps) {
   const { client } = useSessionService();
   const queryClient = useQueryClient();
@@ -244,8 +272,10 @@ function ClassroomInvitationsContent({
 
   const joinCodeHeadingId = useId();
   const emailHeadingId = useId();
+  const emailRoleGroupId = useId();
   const listHeadingId = useId();
   const filterGroupLabelId = useId();
+  const parentLinksHeadingId = useId();
 
   // Join code local one-time state (never persisted outside component state).
   const [activeJoinCode, setActiveJoinCode] = useState<JoinCodeDto | null>(
@@ -273,15 +303,25 @@ function ClassroomInvitationsContent({
     string | null
   >(null);
 
+  // Parent links inline unlink state.
+  const [confirmUnlinkTarget, setConfirmUnlinkTarget] =
+    useState<ClassroomParentLinkDto | null>(null);
+  const [isUnlinkingParentLink, setIsUnlinkingParentLink] = useState(false);
+  const [unlinkParentLinkError, setUnlinkParentLinkError] = useState<
+    string | null
+  >(null);
+
   const [liveAnnouncement, setLiveAnnouncement] = useState('');
 
   const isMountedRef = useRef(true);
   const isRevokingCodeRef = useRef(false);
   const isRevokingInvitationRef = useRef(false);
+  const isUnlinkingParentLinkRef = useRef(false);
   const joinCodeAbortRef = useRef<AbortController | null>(null);
   const revokeCodeAbortRef = useRef<AbortController | null>(null);
   const createInviteAbortRef = useRef<AbortController | null>(null);
   const revokeInviteAbortRef = useRef<AbortController | null>(null);
+  const unlinkParentAbortRef = useRef<AbortController | null>(null);
   const reconciledContextErrorRef = useRef<unknown>(null);
 
   const generateButtonRef = useRef<HTMLButtonElement>(null);
@@ -293,6 +333,11 @@ function ClassroomInvitationsContent({
   const revokeButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const restoreRevokeTriggerIdRef = useRef<string | null>(null);
 
+  const parentLinksHeadingRef = useRef<HTMLHeadingElement>(null);
+  const confirmUnlinkHeadingRef = useRef<HTMLHeadingElement>(null);
+  const unlinkButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const restoreUnlinkTriggerIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -301,6 +346,7 @@ function ClassroomInvitationsContent({
       revokeCodeAbortRef.current?.abort();
       createInviteAbortRef.current?.abort();
       revokeInviteAbortRef.current?.abort();
+      unlinkParentAbortRef.current?.abort();
     };
   }, []);
 
@@ -327,6 +373,18 @@ function ClassroomInvitationsContent({
     }
   }, [confirmRevokeTarget]);
 
+  useEffect(() => {
+    if (confirmUnlinkTarget !== null) {
+      confirmUnlinkHeadingRef.current?.focus();
+      return;
+    }
+    const triggerId = restoreUnlinkTriggerIdRef.current;
+    if (triggerId !== null) {
+      restoreUnlinkTriggerIdRef.current = null;
+      unlinkButtonRefs.current.get(triggerId)?.focus();
+    }
+  }, [confirmUnlinkTarget]);
+
   const queryParams = {
     page,
     pageSize: DEFAULT_PAGE_SIZE,
@@ -337,6 +395,13 @@ function ClassroomInvitationsContent({
     queryKey: classroomInvitationsQueryKey(userId, classroomId, queryParams),
     queryFn: ({ signal }) =>
       listClassroomInvitations(client, classroomId, queryParams, { signal }),
+    staleTime: 0,
+  });
+
+  const parentLinksQuery = useQuery({
+    queryKey: classroomParentLinksQueryKey(userId, classroomId),
+    queryFn: ({ signal }) =>
+      listClassroomParentLinks(client, classroomId, { signal }),
     staleTime: 0,
   });
 
@@ -380,7 +445,42 @@ function ClassroomInvitationsContent({
     schema: sendInvitationFormSchema,
     defaultValues: {
       email: '',
+      role: 'STUDENT',
+      childId: '',
     },
+  });
+
+  const watchedEmailRole = useWatch({
+    control: emailForm.control,
+    name: 'role',
+  });
+  const effectiveEmailRole: EmailInvitationRole = adultMode
+    ? 'STUDENT'
+    : watchedEmailRole;
+
+  useEffect(() => {
+    if (adultMode && watchedEmailRole !== 'STUDENT') {
+      emailForm.setValue('role', 'STUDENT', { shouldDirty: false });
+      emailForm.setValue('childId', '', { shouldDirty: false });
+      emailForm.clearErrors('childId');
+    }
+  }, [adultMode, emailForm, watchedEmailRole]);
+
+  const activeStudentsQuery = useQuery({
+    queryKey: classroomRosterQueryKey(userId, classroomId, {
+      page: 1,
+      pageSize: 100,
+      state: 'ACTIVE',
+    }),
+    queryFn: ({ signal }) =>
+      listClassroomRoster(
+        client,
+        classroomId,
+        { page: 1, pageSize: 100, state: 'ACTIVE' },
+        { signal },
+      ),
+    enabled: !adultMode && effectiveEmailRole === 'PARENT',
+    staleTime: 0,
   });
 
   const hasKnownActiveJoinCode =
@@ -470,10 +570,13 @@ function ClassroomInvitationsContent({
         createInviteAbortRef.current = controller;
 
         try {
+          const payload = toCreateClassroomInvitationPayload(values, {
+            adultMode,
+          });
           const created = await createClassroomInvitation(
             client,
             classroomId,
-            values.email,
+            payload,
             { signal: controller.signal },
           );
           if (!isMountedRef.current || controller.signal.aborted) {
@@ -483,7 +586,11 @@ function ClassroomInvitationsContent({
           setLinkCopyFailed(false);
           setTokenCopyFailed(false);
           setCreatedInvitation(created);
-          emailForm.reset({ email: '' });
+          emailForm.reset({
+            email: '',
+            role: adultMode ? 'STUDENT' : values.role,
+            childId: '',
+          });
           setLiveAnnouncement(
             `${messages.email.createdTitle}. ${messages.email.createdDescription}`,
           );
@@ -506,6 +613,26 @@ function ClassroomInvitationsContent({
               queryKey: classroomDetailQueryKey(userId, classroomId),
               exact: true,
             });
+          } else if (isConflictApiError(error)) {
+            void queryClient.invalidateQueries({
+              queryKey: classroomDetailQueryKey(userId, classroomId),
+              exact: true,
+            });
+            void queryClient.invalidateQueries({
+              predicate: createClassroomInvitationsPredicate(
+                userId,
+                classroomId,
+              ),
+            });
+            void queryClient.invalidateQueries({
+              predicate: createClassroomParentLinksPredicate(
+                userId,
+                classroomId,
+              ),
+            });
+            void queryClient.invalidateQueries({
+              predicate: createClassroomRosterPredicate(userId, classroomId),
+            });
           } else if (isUncertainWriteError(error)) {
             void queryClient.invalidateQueries({
               predicate: createClassroomInvitationsPredicate(
@@ -521,7 +648,7 @@ function ClassroomInvitationsContent({
           }
         }
       },
-      { knownFields: ['email'] },
+      { knownFields: ['email', 'role', 'childId'] },
     );
 
   const handleRevokeJoinCode = async (): Promise<void> => {
@@ -763,6 +890,113 @@ function ClassroomInvitationsContent({
     }
   };
 
+  const setUnlinkButtonRef =
+    (linkId: string) =>
+    (node: HTMLButtonElement | null): void => {
+      if (node) {
+        unlinkButtonRefs.current.set(linkId, node);
+      } else {
+        unlinkButtonRefs.current.delete(linkId);
+      }
+    };
+
+  const handleOpenUnlinkConfirmation = (link: ClassroomParentLinkDto): void => {
+    if (isUnlinkingParentLinkRef.current) {
+      return;
+    }
+    restoreUnlinkTriggerIdRef.current = null;
+    setUnlinkParentLinkError(null);
+    setConfirmUnlinkTarget(link);
+  };
+
+  const handleCancelUnlinkConfirmation = (): void => {
+    if (isUnlinkingParentLinkRef.current || confirmUnlinkTarget === null) {
+      return;
+    }
+    restoreUnlinkTriggerIdRef.current = confirmUnlinkTarget.id;
+    setConfirmUnlinkTarget(null);
+    setUnlinkParentLinkError(null);
+  };
+
+  const handleConfirmUnlinkParentLink = async (): Promise<void> => {
+    if (isUnlinkingParentLinkRef.current || confirmUnlinkTarget === null) {
+      return;
+    }
+
+    const target = confirmUnlinkTarget;
+    isUnlinkingParentLinkRef.current = true;
+    setIsUnlinkingParentLink(true);
+    setUnlinkParentLinkError(null);
+
+    const controller = new AbortController();
+    unlinkParentAbortRef.current?.abort();
+    unlinkParentAbortRef.current = controller;
+
+    try {
+      await removeClassroomParentLink(client, classroomId, target.id, {
+        signal: controller.signal,
+      });
+      if (!isMountedRef.current || controller.signal.aborted) {
+        return;
+      }
+
+      restoreUnlinkTriggerIdRef.current = null;
+      setConfirmUnlinkTarget(null);
+      setUnlinkParentLinkError(null);
+      const description = messages.parentLinks.unlinkedDescription(
+        target.parentDisplayName,
+        target.childDisplayName,
+      );
+      setLiveAnnouncement(
+        `${messages.parentLinks.unlinkedTitle}: ${description}`,
+      );
+      toast.success(messages.parentLinks.unlinkedTitle, { description });
+      void queryClient.invalidateQueries({
+        predicate: createClassroomParentLinksPredicate(userId, classroomId),
+      });
+      void queryClient.invalidateQueries({
+        predicate: createClassroomRosterPredicate(userId, classroomId),
+      });
+      parentLinksHeadingRef.current?.focus();
+    } catch (error) {
+      if (
+        isAbortError(error) ||
+        controller.signal.aborted ||
+        !isMountedRef.current
+      ) {
+        return;
+      }
+
+      const errorMessage =
+        error instanceof ApiError
+          ? error.userMessage
+          : messages.parentLinks.unlinkUnexpected;
+      setUnlinkParentLinkError(errorMessage);
+
+      if (isNotFoundApiError(error)) {
+        void queryClient.invalidateQueries({
+          predicate: createClassroomParentLinksPredicate(userId, classroomId),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: classroomDetailQueryKey(userId, classroomId),
+          exact: true,
+        });
+      } else if (isForbiddenApiError(error) || isUncertainWriteError(error)) {
+        void queryClient.invalidateQueries({
+          predicate: createClassroomParentLinksPredicate(userId, classroomId),
+        });
+      }
+    } finally {
+      if (unlinkParentAbortRef.current === controller) {
+        unlinkParentAbortRef.current = null;
+      }
+      isUnlinkingParentLinkRef.current = false;
+      if (isMountedRef.current) {
+        setIsUnlinkingParentLink(false);
+      }
+    }
+  };
+
   const isListForbidden =
     invitationsQuery.isError && isForbiddenApiError(invitationsQuery.error);
   const isListNotFound =
@@ -773,6 +1007,44 @@ function ClassroomInvitationsContent({
     createdInvitation !== null
       ? buildInvitationAcceptUrl(createdInvitation.token)
       : null;
+
+  const isParentLinksForbidden =
+    parentLinksQuery.isError && isForbiddenApiError(parentLinksQuery.error);
+  const isParentLinksNotFound =
+    parentLinksQuery.isError && isNotFoundApiError(parentLinksQuery.error);
+  const isParentLinksRevoked = isParentLinksForbidden || isParentLinksNotFound;
+  const parentLinksData = isParentLinksRevoked
+    ? undefined
+    : parentLinksQuery.data;
+  const activeParentLinks =
+    parentLinksData?.items.filter((link) => link.state === 'ACTIVE') ?? [];
+
+  const activeGuardianCountByChildId = new Map<string, number>();
+  for (const link of activeParentLinks) {
+    activeGuardianCountByChildId.set(
+      link.childId,
+      (activeGuardianCountByChildId.get(link.childId) ?? 0) + 1,
+    );
+  }
+
+  const activeStudents = activeStudentsQuery.data?.items ?? [];
+  const getStudentGuardianCount = (
+    studentUserId: string,
+    fallbackGuardians: readonly { readonly state: 'ACTIVE' | 'INACTIVE' }[],
+  ): number => {
+    if (parentLinksData !== undefined) {
+      return activeGuardianCountByChildId.get(studentUserId) ?? 0;
+    }
+    return fallbackGuardians.filter((g) => g.state === 'ACTIVE').length;
+  };
+  const allStudentsAtGuardianCap =
+    activeStudents.length > 0 &&
+    activeStudents.every(
+      (student) =>
+        getStudentGuardianCount(student.userId, student.guardians) >=
+        MAX_GUARDIANS_PER_STUDENT,
+    );
+  const showParentLinksSection = !adultMode || activeParentLinks.length > 0;
 
   return (
     <div className="min-w-0 space-y-6 pt-2">
@@ -1031,31 +1303,190 @@ function ClassroomInvitationsContent({
             {messages.email.heading}
           </h3>
           <p className="text-sm text-pretty text-muted-foreground">
-            {messages.email.description}
+            {adultMode
+              ? messages.email.adultModeDescription
+              : messages.email.description}
           </p>
         </div>
 
-        <div className="min-w-0 space-y-2 rounded-xl bg-tray/50 p-3">
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="font-medium text-foreground">
-              {messages.email.roleLabel}:
-            </span>
-            <Badge variant="secondary">{messages.email.roleValue}</Badge>
+        {adultMode ? (
+          <div className="min-w-0 space-y-2 rounded-xl bg-tray/50 p-3">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="font-medium text-foreground">
+                {messages.email.roleLabel}:
+              </span>
+              <Badge variant="secondary">{messages.email.roleValue}</Badge>
+            </div>
+            <p className="text-xs text-pretty text-muted-foreground">
+              {messages.email.adultModeNotice}
+            </p>
+            <p className="text-xs text-pretty text-muted-foreground">
+              {messages.email.nonDisclosureNote}
+            </p>
           </div>
-          <p className="text-xs text-pretty text-muted-foreground">
-            {messages.email.nonDisclosureNote}
-          </p>
-        </div>
+        ) : (
+          <div className="min-w-0 space-y-2 rounded-xl bg-tray/50 p-3">
+            <p className="text-xs text-pretty text-muted-foreground">
+              {messages.email.nonDisclosureNote}
+            </p>
+          </div>
+        )}
 
         <form
           onSubmit={(event) => void handleEmailSubmit(event)}
           noValidate
           className="min-w-0 space-y-4"
         >
+          {!adultMode && (
+            <fieldset className="min-w-0 space-y-2">
+              <legend className="text-sm font-medium text-foreground">
+                {messages.email.roleLegend}
+              </legend>
+              <Controller
+                control={emailForm.control}
+                name="role"
+                render={({ field }) => (
+                  <div className="flex flex-wrap gap-2">
+                    {EMAIL_ROLE_OPTIONS.map((roleOption) => {
+                      const isSelected = field.value === roleOption;
+                      const radioId = `${emailRoleGroupId}-${roleOption}`;
+                      return (
+                        <div key={roleOption} className="relative">
+                          <input
+                            id={radioId}
+                            type="radio"
+                            name={field.name}
+                            value={roleOption}
+                            checked={isSelected}
+                            disabled={isSendingEmail}
+                            onBlur={field.onBlur}
+                            onChange={() => {
+                              field.onChange(roleOption);
+                              emailForm.clearErrors('root.serverError');
+                              if (roleOption === 'STUDENT') {
+                                emailForm.setValue('childId', '', {
+                                  shouldDirty: false,
+                                });
+                                emailForm.clearErrors('childId');
+                              }
+                            }}
+                            className="peer sr-only"
+                          />
+                          <label
+                            htmlFor={radioId}
+                            className={cn(
+                              'inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border-2 px-3.5 py-2 text-sm font-semibold motion-safe:transition-colors peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring peer-disabled:cursor-not-allowed peer-disabled:opacity-60',
+                              isSelected
+                                ? 'border-primary bg-tray/80 text-foreground'
+                                : 'border-edge bg-card text-muted-foreground hover:bg-tray/45',
+                            )}
+                          >
+                            {messages.email.roles[roleOption]}
+                          </label>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              />
+            </fieldset>
+          )}
+
+          {!adultMode && effectiveEmailRole === 'PARENT' && (
+            <div className="min-w-0 space-y-2">
+              {activeStudentsQuery.isPending && (
+                <p className="text-sm text-muted-foreground">
+                  {messages.email.childLoading}
+                </p>
+              )}
+
+              {activeStudentsQuery.isError && (
+                <Alert variant="destructive" role="alert">
+                  <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+                    <span>{messages.email.childError}</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void activeStudentsQuery.refetch()}
+                      className="min-h-11"
+                    >
+                      {messages.email.childRetry}
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {activeStudentsQuery.data !== undefined &&
+                activeStudents.length === 0 && (
+                  <Alert variant="info" role="status">
+                    <AlertDescription>
+                      {messages.email.childEmptyNotice}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+              {activeStudentsQuery.data !== undefined &&
+                activeStudents.length > 0 && (
+                  <>
+                    <FormField
+                      control={emailForm.control}
+                      name="childId"
+                      label={messages.email.childLabel}
+                      description={messages.email.childDescription}
+                    >
+                      {(fieldProps) => (
+                        <select
+                          {...fieldProps}
+                          disabled={isSendingEmail}
+                          className="flex min-h-11 w-full rounded-xl border border-edge bg-card px-3.5 py-2 text-base text-foreground shadow-inset focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <option value="">
+                            {messages.email.childPlaceholder}
+                          </option>
+                          {activeStudents.map((student) => {
+                            const guardianCount = getStudentGuardianCount(
+                              student.userId,
+                              student.guardians,
+                            );
+                            const atCap =
+                              guardianCount >= MAX_GUARDIANS_PER_STUDENT;
+                            return (
+                              <option
+                                key={student.userId}
+                                value={student.userId}
+                                disabled={atCap}
+                              >
+                                {messages.email.childOptionLabel(
+                                  student.displayName,
+                                  guardianCount,
+                                )}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      )}
+                    </FormField>
+                    {allStudentsAtGuardianCap && (
+                      <Alert variant="warning" role="status">
+                        <AlertDescription>
+                          {messages.email.childAllAtCapNotice}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </>
+                )}
+            </div>
+          )}
+
           <FormField
             control={emailForm.control}
             name="email"
-            label={messages.email.emailLabel}
+            label={
+              effectiveEmailRole === 'PARENT'
+                ? messages.email.parentEmailLabel
+                : messages.email.emailLabel
+            }
             description={messages.email.emailDescription}
           >
             {(fieldProps) => (
@@ -1064,7 +1495,11 @@ function ClassroomInvitationsContent({
                 type="email"
                 autoComplete="off"
                 maxLength={INVITATION_EMAIL_MAX_LENGTH}
-                placeholder={messages.email.emailPlaceholder}
+                placeholder={
+                  effectiveEmailRole === 'PARENT'
+                    ? messages.email.parentEmailPlaceholder
+                    : messages.email.emailPlaceholder
+                }
                 disabled={isSendingEmail}
               />
             )}
@@ -1079,7 +1514,12 @@ function ClassroomInvitationsContent({
           <Button
             type="submit"
             busy={isSendingEmail}
-            disabled={isSendingEmail}
+            disabled={
+              isSendingEmail ||
+              (effectiveEmailRole === 'PARENT' &&
+                activeStudentsQuery.data !== undefined &&
+                (activeStudents.length === 0 || allStudentsAtGuardianCap))
+            }
             className="min-h-11"
           >
             {isSendingEmail
@@ -1295,10 +1735,21 @@ function ClassroomInvitationsContent({
                         <Badge variant="outline">
                           {messages.list.kinds[invitation.kind]}
                         </Badge>
+                        <Badge variant="secondary">
+                          {messages.list.roles[invitation.role]}
+                        </Badge>
                       </div>
 
+                      {invitation.role === 'PARENT' &&
+                        invitation.childDisplayName !== null && (
+                          <p className="text-xs font-medium text-foreground">
+                            {messages.list.forStudentLabel(
+                              invitation.childDisplayName,
+                            )}
+                          </p>
+                        )}
+
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                        <span>{classroomMessages.roles[invitation.role]}</span>
                         <span>
                           {messages.list.usesLabel(
                             invitation.useCount,
@@ -1417,6 +1868,218 @@ function ClassroomInvitationsContent({
           />
         )}
       </section>
+
+      {/* Section 4: Active Guardian Links */}
+      {showParentLinksSection && (
+        <section
+          aria-labelledby={parentLinksHeadingId}
+          className="min-w-0 space-y-4"
+        >
+          <div className="min-w-0 space-y-1.5">
+            <h3
+              id={parentLinksHeadingId}
+              ref={parentLinksHeadingRef}
+              tabIndex={-1}
+              className="font-display text-lg font-semibold text-foreground outline-none"
+            >
+              {messages.parentLinks.heading}
+            </h3>
+            <p className="text-sm text-pretty text-muted-foreground">
+              {messages.parentLinks.description}
+            </p>
+            {adultMode && (
+              <p className="text-xs text-pretty text-muted-foreground">
+                {messages.parentLinks.adultModeNote}
+              </p>
+            )}
+          </div>
+
+          {parentLinksQuery.isPending && parentLinksData === undefined && (
+            <LoadingState
+              label={messages.parentLinks.loading}
+              skeletonLines={3}
+            />
+          )}
+
+          {isParentLinksForbidden && (
+            <ErrorState
+              headingLevel="h4"
+              title={messages.forbiddenTitle}
+              description={messages.forbiddenDescription}
+            />
+          )}
+
+          {isParentLinksNotFound && (
+            <ErrorState
+              headingLevel="h4"
+              title={messages.notFoundTitle}
+              description={messages.notFoundDescription}
+            />
+          )}
+
+          {parentLinksQuery.isError &&
+            !isParentLinksRevoked &&
+            parentLinksData === undefined && (
+              <ErrorState
+                headingLevel="h4"
+                title={messages.parentLinks.errorTitle}
+                description={messages.parentLinks.errorDescription}
+                onRetry={() => void parentLinksQuery.refetch()}
+                isRetrying={parentLinksQuery.isRefetching}
+              />
+            )}
+
+          {parentLinksQuery.isError &&
+            !isParentLinksRevoked &&
+            parentLinksData !== undefined && (
+              <StaleDataNotice
+                headingLevel="h4"
+                title={messages.parentLinks.staleTitle}
+                description={messages.parentLinks.staleDescription}
+                onRetry={() => void parentLinksQuery.refetch()}
+                isRetrying={parentLinksQuery.isRefetching}
+              />
+            )}
+
+          {parentLinksData !== undefined && activeParentLinks.length === 0 && (
+            <EmptyState
+              headingLevel="h4"
+              title={messages.parentLinks.emptyTitle}
+              description={messages.parentLinks.emptyDescription}
+            />
+          )}
+
+          {parentLinksData !== undefined && activeParentLinks.length > 0 && (
+            <ul
+              className="min-w-0 space-y-3"
+              aria-label={messages.parentLinks.heading}
+            >
+              {activeParentLinks.map((link) => {
+                const isConfirmingThis = confirmUnlinkTarget?.id === link.id;
+                const confirmHeadingId = `${parentLinksHeadingId}-confirm-${link.id}`;
+                const confirmDescId = `${parentLinksHeadingId}-desc-${link.id}`;
+
+                return (
+                  <li
+                    key={link.id}
+                    className="min-w-0 space-y-3 rounded-2xl border border-edge bg-card p-4 text-card-foreground shadow-panel"
+                  >
+                    <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-display text-base font-semibold text-foreground wrap-anywhere">
+                            {link.parentDisplayName}
+                          </span>
+                          <span
+                            aria-hidden="true"
+                            className="text-sm text-muted-foreground"
+                          >
+                            →
+                          </span>
+                          <span className="text-sm font-medium text-foreground wrap-anywhere">
+                            {link.childDisplayName}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                          <span>
+                            {messages.parentLinks.linkedToLabel(
+                              link.childDisplayName,
+                            )}
+                          </span>
+                          <span>
+                            {messages.parentLinks.createdAtLabel(
+                              formatTimestamp(link.createdAt),
+                            )}
+                          </span>
+                        </div>
+                      </div>
+
+                      <Button
+                        ref={setUnlinkButtonRef(link.id)}
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        aria-label={messages.parentLinks.unlinkAriaLabel(
+                          link.parentDisplayName,
+                          link.childDisplayName,
+                        )}
+                        aria-expanded={isConfirmingThis}
+                        disabled={isUnlinkingParentLink || isConfirmingThis}
+                        onClick={() => handleOpenUnlinkConfirmation(link)}
+                        className="min-h-11 shrink-0"
+                      >
+                        {messages.parentLinks.unlinkAction}
+                      </Button>
+                    </div>
+
+                    {isConfirmingThis && (
+                      <section
+                        aria-labelledby={confirmHeadingId}
+                        aria-describedby={confirmDescId}
+                        className="min-w-0 space-y-3 rounded-2xl border-2 border-destructive/40 bg-destructive/5 p-3.5"
+                      >
+                        <h4
+                          id={confirmHeadingId}
+                          ref={confirmUnlinkHeadingRef}
+                          tabIndex={-1}
+                          className="font-display text-base font-semibold text-foreground outline-none wrap-anywhere"
+                        >
+                          {messages.parentLinks.confirmUnlinkTitle(
+                            link.parentDisplayName,
+                            link.childDisplayName,
+                          )}
+                        </h4>
+                        <p
+                          id={confirmDescId}
+                          className="text-sm text-pretty text-muted-foreground"
+                        >
+                          {messages.parentLinks.confirmUnlinkDescription}
+                        </p>
+
+                        {unlinkParentLinkError !== null && (
+                          <Alert variant="destructive" role="alert">
+                            <AlertTitle>
+                              {messages.parentLinks.unlinkErrorTitle}
+                            </AlertTitle>
+                            <AlertDescription>
+                              {unlinkParentLinkError}
+                            </AlertDescription>
+                          </Alert>
+                        )}
+
+                        <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={isUnlinkingParentLink}
+                            onClick={handleCancelUnlinkConfirmation}
+                            className="min-h-11"
+                          >
+                            {messages.parentLinks.confirmUnlinkCancel}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            busy={isUnlinkingParentLink}
+                            onClick={() => void handleConfirmUnlinkParentLink()}
+                            className="min-h-11"
+                          >
+                            {isUnlinkingParentLink
+                              ? messages.parentLinks.confirmUnlinkPending
+                              : messages.parentLinks.confirmUnlinkSubmit}
+                          </Button>
+                        </div>
+                      </section>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      )}
     </div>
   );
 }

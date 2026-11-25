@@ -509,13 +509,39 @@ export const classroomMessages = {
     email: {
       heading: 'Invitaciones por correo electrónico',
       description:
+        'Enviá una invitación de un solo uso para sumar a un estudiante o a un padre o tutor por correo electrónico.',
+      adultModeDescription:
         'Enviá una invitación de un solo uso para sumar a un estudiante por correo electrónico.',
       roleLabel: 'Rol asignado',
       roleValue: 'Estudiante',
+      roleLegend: 'Rol de la invitación',
+      roles: {
+        STUDENT: 'Estudiante',
+        PARENT: 'Padre o tutor',
+      },
       nonDisclosureNote:
-        'Esta invitación solo permite sumar cuentas con rol Estudiante. Emitirla nunca revela si la dirección ya tiene una cuenta registrada.',
+        'Emitir una invitación nunca revela si la dirección de correo ya tiene una cuenta registrada.',
+      adultModeNotice:
+        'Esta aula funciona en modalidad de educación de adultos, por lo que no se ofrecen nuevas invitaciones para padres o tutores.',
+      childLabel: 'Estudiante a vincular',
+      childDescription:
+        'Elegí al estudiante activo que quedará vinculado a este padre o tutor (máximo 2 tutores activos por estudiante).',
+      childPlaceholder: 'Seleccioná un estudiante…',
+      childOptionLabel: (displayName: string, guardianCount: number) =>
+        guardianCount >= 2
+          ? `${displayName} (${guardianCount}/2 tutores — límite alcanzado)`
+          : `${displayName} (${guardianCount}/2 tutores)`,
+      childLoading: 'Cargando estudiantes activos del aula…',
+      childError: 'No pudimos cargar la lista de estudiantes activos del aula.',
+      childRetry: 'Reintentar',
+      childEmptyNotice:
+        'Todavía no hay estudiantes activos en esta aula. Primero tiene que sumarse al menos un estudiante para poder invitar a un padre o tutor.',
+      childAllAtCapNotice:
+        'Todos los estudiantes activos del aula ya alcanzaron el límite máximo de 2 tutores vinculados.',
       emailLabel: 'Correo electrónico del estudiante',
+      parentEmailLabel: 'Correo electrónico del padre o tutor',
       emailPlaceholder: 'estudiante@ejemplo.edu.ar',
+      parentEmailPlaceholder: 'tutor@ejemplo.edu.ar',
       emailDescription:
         'El destinatario recibirá un enlace de un solo uso y podrá aceptarlo tras iniciar sesión.',
       submitAction: 'Enviar invitación',
@@ -540,14 +566,22 @@ export const classroomMessages = {
         emailInvalid: 'Ingresá un correo electrónico válido.',
         emailControlChars:
           'El correo electrónico no puede incluir saltos de línea ni caracteres de control.',
+        childRequired:
+          'Seleccioná un estudiante para vincular al padre o tutor.',
       },
       errors: {
         createTitle: 'No pudimos enviar la invitación',
-        validationFailed:
-          'Revisá el correo electrónico ingresado antes de enviar.',
+        validationFailed: 'Revisá los datos de la invitación antes de enviar.',
         forbidden:
           'Tu rol actual no tiene permisos para enviar invitaciones en esta aula.',
-        notFound: 'No encontramos el aula indicada o ya no tenés acceso.',
+        notFound:
+          'No encontramos el aula o el estudiante indicado, o ya no tenés acceso.',
+        conflict:
+          'No pudimos enviar la invitación porque el aula está en modo adultos, el estudiante ya alcanzó el límite de 2 tutores o ya existe una invitación pendiente.',
+        adultModeConflict:
+          'Esta aula funciona en modalidad de educación de adultos y no admite nuevas invitaciones para padres o tutores.',
+        maxGuardiansConflict:
+          'Este estudiante ya alcanzó el máximo permitido de 2 tutores vinculados.',
         uncertain:
           'No pudimos confirmar si la invitación se emitió en el servidor. Actualizamos el listado para verificar el estado real antes de volver a intentar.',
         unexpected:
@@ -581,6 +615,15 @@ export const classroomMessages = {
         EMAIL: 'Por correo',
         JOIN_CODE: 'Código de aula',
       },
+      roles: {
+        OWNER: 'Titular de la escuela',
+        ADMIN: 'Administración escolar',
+        TEACHER: 'Docente',
+        STUDENT: 'Estudiante',
+        PARENT: 'Padre o tutor',
+      },
+      forStudentLabel: (studentName: string) =>
+        `Para el estudiante: ${studentName}`,
       emptyTitle: 'No hay invitaciones en este estado',
       emptyDescription:
         'Cuando emitas invitaciones por correo o códigos de aula, vas a poder consultar su estado acá.',
@@ -617,6 +660,48 @@ export const classroomMessages = {
         'No pudimos confirmar si la revocación se aplicó en el servidor. Actualizamos el listado para verificar el estado real antes de volver a intentar.',
       revokeUnexpected:
         'No pudimos revocar la invitación. Intentá nuevamente en unos segundos.',
+    },
+    parentLinks: {
+      heading: 'Tutores vinculados',
+      description:
+        'Vínculos activos entre padres o tutores y estudiantes de esta aula. Desvincular revoca el seguimiento conservando el historial.',
+      adultModeNote:
+        'El aula está en modo educación de adultos: los vínculos existentes conservan su historial con acciones parentales desactivadas.',
+      loading: 'Cargando tutores vinculados…',
+      errorTitle: 'No pudimos cargar los tutores vinculados',
+      errorDescription:
+        'Revisá tu conexión e intentá actualizar el listado de vínculos familiares.',
+      staleTitle: 'Tutores pendientes de sincronización',
+      staleDescription:
+        'Mostrando los últimos vínculos confirmados. Falló la actualización en segundo plano.',
+      emptyTitle: 'Todavía no hay tutores vinculados',
+      emptyDescription:
+        'Cuando un padre o tutor acepte una invitación, el vínculo activo va a aparecer acá.',
+      linkedToLabel: (childDisplayName: string) =>
+        `Estudiante vinculado: ${childDisplayName}`,
+      createdAtLabel: (formattedDate: string) => `Vinculado: ${formattedDate}`,
+      unlinkAction: 'Desvincular',
+      unlinkAriaLabel: (parentName: string, childName: string) =>
+        `Desvincular a ${parentName} de ${childName}`,
+      confirmUnlinkTitle: (parentName: string, childName: string) =>
+        `Confirmar desvinculación de «${parentName}» y «${childName}»`,
+      confirmUnlinkDescription:
+        'El padre o tutor dejará de ver las novedades y calificaciones de este estudiante en el aula. Los mensajes y registros históricos se conservan.',
+      confirmUnlinkSubmit: 'Confirmar desvinculación',
+      confirmUnlinkPending: 'Desvinculando…',
+      confirmUnlinkCancel: 'Cancelar',
+      unlinkedTitle: 'Tutor desvinculado',
+      unlinkedDescription: (parentName: string, childName: string) =>
+        `Confirmamos la desvinculación de «${parentName}» respecto de «${childName}».`,
+      unlinkErrorTitle: 'No pudimos desvincular al tutor',
+      unlinkForbidden:
+        'Tu rol actual no tiene permisos para desvincular tutores en esta aula.',
+      unlinkNotFound:
+        'No encontramos el vínculo familiar o el aula indicada, o ya no tenés acceso.',
+      unlinkUncertain:
+        'No pudimos confirmar si la desvinculación se aplicó en el servidor. Actualizamos el listado para verificar el estado real antes de volver a intentar.',
+      unlinkUnexpected:
+        'No pudimos completar la desvinculación. Intentá nuevamente en unos segundos.',
     },
   },
 } as const;

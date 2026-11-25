@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   requestApi,
+  requestApiVoid,
   type OpenApiFetchResult,
   type TypedApiClient,
 } from '@/api/client';
@@ -12,12 +13,15 @@ import {
   type ClassroomServiceOptions,
 } from './classroom-service';
 import {
+  classroomParentLinksResponseSchema,
   createdClassroomInvitationSchema,
   joinCodeResponseSchema,
   paginatedClassroomInvitationsSchema,
   revokeInvitationResponseSchema,
   revokeJoinCodeResponseSchema,
   type ClassroomInvitationDto,
+  type ClassroomParentLinkDto,
+  type ClassroomParentLinksResponseDto,
   type CreateClassroomInvitationDto,
   type CreateJoinCodeDto,
   type CreatedClassroomInvitationDto,
@@ -29,7 +33,7 @@ import {
 import { classroomMessages } from './messages';
 
 export { isAbortError };
-export type { ClassroomInvitationDto };
+export type { ClassroomInvitationDto, ClassroomParentLinkDto };
 
 const uncertainInvitationWriteErrors = new WeakSet<ApiError>();
 
@@ -132,6 +136,18 @@ function translateCreateInvitationError(baseError: ApiError): ApiError {
       status: baseError.status,
       code: baseError.code,
       userMessage: classroomMessages.invitations.email.errors.notFound,
+      details: baseError.details,
+      fieldErrors: {},
+      correlationId: baseError.correlationId,
+    });
+  }
+
+  if (baseError.kind === 'conflict' || baseError.status === 409) {
+    return new ApiError({
+      kind: 'conflict',
+      status: baseError.status,
+      code: baseError.code,
+      userMessage: classroomMessages.invitations.email.errors.conflict,
       details: baseError.details,
       fieldErrors: {},
       correlationId: baseError.correlationId,
@@ -401,19 +417,29 @@ export async function listClassroomInvitations(
 }
 
 /**
- * Issues a single-use `STUDENT` email invitation (`POST /classrooms/{id}/invitations`),
- * returning the one-time raw token on `201`. Never reveals account existence.
+ * Issues a single-use `STUDENT` or `PARENT` email invitation
+ * (`POST /classrooms/{id}/invitations`), returning the one-time raw token on
+ * `201`. Never reveals account existence.
  */
 export function createClassroomInvitation(
   client: TypedApiClient,
   classroomId: string,
-  email: string,
+  emailOrPayload: string | CreateClassroomInvitationDto,
   options: ClassroomServiceOptions = {},
 ): Promise<CreatedClassroomInvitationDto> {
-  const body: CreateClassroomInvitationDto = {
-    email,
-    role: 'STUDENT',
-  };
+  const body: CreateClassroomInvitationDto =
+    typeof emailOrPayload === 'string'
+      ? { email: emailOrPayload, role: 'STUDENT' }
+      : emailOrPayload.role === 'PARENT'
+        ? {
+            email: emailOrPayload.email,
+            role: 'PARENT',
+            childId: emailOrPayload.childId,
+          }
+        : {
+            email: emailOrPayload.email,
+            role: 'STUDENT',
+          };
 
   return executeValidatedWrite(
     () =>
@@ -490,4 +516,126 @@ export function revokeClassroomJoinCode(
     translateRevokeJoinCodeError,
     classroomMessages.invitations.joinCode.errors.uncertain,
   );
+}
+
+function translateRemoveParentLinkError(baseError: ApiError): ApiError {
+  if (baseError.kind === 'forbidden' || baseError.status === 403) {
+    return new ApiError({
+      kind: 'forbidden',
+      status: baseError.status,
+      code: baseError.code,
+      userMessage: classroomMessages.invitations.parentLinks.unlinkForbidden,
+      details: baseError.details,
+      fieldErrors: {},
+      correlationId: baseError.correlationId,
+    });
+  }
+
+  if (baseError.kind === 'not-found' || baseError.status === 404) {
+    return new ApiError({
+      kind: 'not-found',
+      status: baseError.status,
+      code: baseError.code,
+      userMessage: classroomMessages.invitations.parentLinks.unlinkNotFound,
+      details: baseError.details,
+      fieldErrors: {},
+      correlationId: baseError.correlationId,
+    });
+  }
+
+  if (
+    baseError.kind === 'network' ||
+    (baseError.status !== null && baseError.status >= 500) ||
+    baseError.code === 'INTERNAL_ERROR' ||
+    baseError.code === 'SERVICE_UNAVAILABLE'
+  ) {
+    return markUncertain(
+      new ApiError({
+        kind: baseError.kind,
+        status: baseError.status,
+        code: baseError.code,
+        userMessage: classroomMessages.invitations.parentLinks.unlinkUncertain,
+        details: baseError.details,
+        fieldErrors: {},
+        correlationId: baseError.correlationId,
+      }),
+    );
+  }
+
+  return new ApiError({
+    kind: baseError.kind,
+    status: baseError.status,
+    code: baseError.code,
+    userMessage: classroomMessages.invitations.parentLinks.unlinkUnexpected,
+    details: baseError.details,
+    fieldErrors: {},
+    correlationId: baseError.correlationId,
+  });
+}
+
+/**
+ * Fetches active parent-child guardian links for one classroom
+ * (`GET /classrooms/{id}/parent-links`) and validates the payload with a
+ * jitless Zod schema.
+ */
+export async function listClassroomParentLinks(
+  client: TypedApiClient,
+  classroomId: string,
+  options: ClassroomServiceOptions = {},
+): Promise<ClassroomParentLinksResponseDto> {
+  const payload: unknown = await requestApi(() =>
+    client.GET('/classrooms/{id}/parent-links', {
+      params: { path: { id: classroomId } },
+      signal: options.signal,
+    }),
+  );
+
+  const parsed = classroomParentLinksResponseSchema.safeParse(payload);
+  if (!parsed.success) {
+    throw new ApiError({
+      kind: 'unexpected',
+      status: 200,
+      code: null,
+      userMessage: classroomMessages.invitations.parentLinks.errorDescription,
+    });
+  }
+
+  return parsed.data;
+}
+
+/**
+ * Logically unlinks a guardian from a student in a classroom
+ * (`DELETE /classrooms/{id}/parent-links/{linkId}`), preserving historical
+ * records on the server.
+ */
+export async function removeClassroomParentLink(
+  client: TypedApiClient,
+  classroomId: string,
+  linkId: string,
+  options: ClassroomServiceOptions = {},
+): Promise<void> {
+  try {
+    await requestApiVoid(() =>
+      client.DELETE('/classrooms/{id}/parent-links/{linkId}', {
+        params: { path: { id: classroomId, linkId } },
+        signal: options.signal,
+      }),
+    );
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw error;
+    }
+    if (error instanceof ApiError) {
+      throw translateRemoveParentLinkError(error);
+    }
+    throw markUncertain(
+      new ApiError({
+        kind: 'network',
+        status: null,
+        code: null,
+        userMessage: classroomMessages.invitations.parentLinks.unlinkUncertain,
+        cause: error,
+      }),
+    );
+  }
 }
