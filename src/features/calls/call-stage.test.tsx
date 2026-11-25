@@ -20,8 +20,8 @@ import { CallStage } from './call-stage';
 
 const appearance = {
   bodyId: 'female',
-  hairId: 'afro',
-  topId: 'tshirt',
+  hairId: 'classic-short',
+  topId: 'basic-tshirt',
   hairColor: '#AF6D63',
   clothingColor: '#75B7DA',
   items: {},
