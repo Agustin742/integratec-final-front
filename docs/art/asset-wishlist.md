@@ -168,11 +168,16 @@ Seasonal:
 
 ### Hand items
 
-- [ ] Pencil
-- [ ] Book
-- [ ] Ruler
-- [ ] Mug
-- [ ] Phone
+- [x] Pencil
+- [x] Book
+- [x] Ruler
+- [x] Mug
+- [x] Phone
+- [x] Mate
+- [x] Magnifying glass
+- [x] Paintbrush
+- [x] Tablet
+- [x] Trophy
 
 ### Neck and ears
 

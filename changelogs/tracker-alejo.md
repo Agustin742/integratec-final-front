@@ -1,5 +1,13 @@
 # Tracker — Alejo
 
+## 2026-11-25 — Modular Hand Items (10) & Neck/Ears Accessories (9)
+
+- **Status:** in-progress (Hand items committed locally on `feat/tutor-bot-skins`; Neck/Ears batch next)
+- **Area / files:** `assets/blender/avatars/shared/{hand,neck}/`, `public/models/avatars/{shared,male,female}/`, `scripts/assets/test-{hand-items,neck-ears}.mjs`, `docs/art/{hand-items,neck-ears,asset-wishlist}.md`, `docs/3d-assets.md`, `docs/ai-usage.md`, `docs/assets/{hand-items,neck-ears}/`, `changelogs/tracker-alejo.md`
+- **Change:** Delivered and verified all 10 shared modular Hand items (`pencil`, `book`, `ruler`, `mug`, `phone`, `mate`, `magnifying-glass`, `paintbrush`, `tablet`, `trophy`; `167,748` B total across `10` Draco GLBs under `public/models/avatars/shared/hand-*.glb` + `10` `.blend` masters), `scripts/assets/test-hand-items.mjs`, `docs/art/hand-items.md`, `6` Cycles PNGs under `docs/assets/hand-items/`, and updated `docs/art/asset-wishlist.md`, `docs/3d-assets.md`, and `docs/ai-usage.md`; next up is the 9-item Neck & Ears batch.
+- **Reason:** Expand avatar customization coverage from `docs/art/asset-wishlist.md` with modular, canonical 34-bone wearables and extra project-aligned variety.
+- **Verification (Batch 1 Hand items):** Decoded GLB roundtrips (`odd/artifacts/hand-items-export.json`: `10/10` `0` head/body hits across `Idle 1/25`, `Walk 13`, `Sit 49`, `Wave 30` on Male & Female), `node scripts/assets/test-hand-items.mjs` (`10/10` PASS), `node scripts/assets/check-asset-budget.mjs`, Prettier/ESLint, `scripts/ci/check_docs.py`, and visual inspection of all `6` Cycles PNGs.
+
 ## 2026-11-25 — Modular split-body Tutor Bot skins (7 skins)
 
 - **Status:** completed (committed locally on `feat/tutor-bot-skins` in `odd/worktrees/tutor-bot-skins`; not pushed)
