@@ -224,13 +224,13 @@ Seasonal:
 
 ### Desk decor (shop)
 
-- [ ] Plant
-- [ ] Lamp
-- [ ] Photo frame
-- [ ] Puzzle cube
-- [ ] Figurine
-- [ ] Mug
-- [ ] Mini globe
+- [x] Plant
+- [x] Lamp
+- [x] Photo frame
+- [x] Puzzle cube
+- [x] Figurine
+- [x] Mug
+- [x] Mini globe
 
 ### Classroom themes
 
