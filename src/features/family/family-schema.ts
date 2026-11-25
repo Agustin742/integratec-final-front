@@ -10,6 +10,10 @@ export const PARENT_LINK_MESSAGE_MAX_LENGTH = 2000;
 export type FamilyLinkDto = components['schemas']['FamilyLinkDto'];
 export type FamilyLinksResponseDto =
   components['schemas']['FamilyLinksResponseDto'];
+export type StaffFamilyThreadDto =
+  components['schemas']['StaffFamilyThreadDto'];
+export type StaffFamilyThreadsResponseDto =
+  components['schemas']['StaffFamilyThreadsResponseDto'];
 export type ReportCardItemDto = components['schemas']['ReportCardItemDto'];
 export type ParentLinkMessageDto =
   components['schemas']['ParentLinkMessageDto'];
@@ -65,6 +69,25 @@ export const familyLinkSchema: z.ZodType<FamilyLinkDto> = z.object({
 export const familyLinksResponseSchema: z.ZodType<FamilyLinksResponseDto> =
   z.object({
     items: z.array(familyLinkSchema),
+  });
+
+export const staffFamilyThreadSchema: z.ZodType<StaffFamilyThreadDto> =
+  z.object({
+    id: z.string().uuid(),
+    classroomId: z.string().uuid(),
+    classroomName: nonBlankText,
+    parentId: z.string().uuid(),
+    parentDisplayName: nonBlankText,
+    childId: z.string().uuid(),
+    childDisplayName: nonBlankText,
+    lastMessageBody: z.string().nullable(),
+    lastMessageAt: isoInstant.nullable(),
+    lastMessageAuthorRole: z.enum(['PARENT', 'STAFF']).nullable(),
+  });
+
+export const staffFamilyThreadsResponseSchema: z.ZodType<StaffFamilyThreadsResponseDto> =
+  z.object({
+    items: z.array(staffFamilyThreadSchema),
   });
 
 export const familyReportCardItemSchema: z.ZodType<ReportCardItemDto> = z

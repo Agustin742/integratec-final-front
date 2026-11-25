@@ -4,6 +4,8 @@ import { useLocation } from 'react-router';
 import { cn } from '@/lib/utils';
 import { useSessionSnapshot } from '@/session/provider';
 import { useChatInbox } from '../chat-inbox/use-chat-inbox';
+import { useStaffFamilyThreads } from '../family/use-staff-family-threads';
+import { ChatDockFamilyWindow } from './chat-dock-family-window';
 import { ChatBubbleIcon, ChevronUpIcon } from './chat-dock-icons';
 import { ChatDockList, UnreadBadge } from './chat-dock-list';
 import { useChatDockState } from './chat-dock-state';
@@ -11,10 +13,10 @@ import { useDockPresence } from './use-dock-presence';
 import { ChatDockWindow } from './chat-dock-window';
 import { chatDockMessages as messages } from './messages';
 
-type FocusTarget = 'launcher' | 'list-item' | 'toggle';
+type FocusTarget = 'launcher' | 'list-item' | 'family-item' | 'toggle';
 interface FocusRequest {
   readonly target: FocusTarget;
-  readonly classroomId: string | null;
+  readonly itemId: string | null;
 }
 
 /**
@@ -38,12 +40,14 @@ export function ChatDock() {
 
 function ChatDockContent({ userId }: { readonly userId: string }) {
   const { inbox, totalUnread } = useChatInbox();
+  const { threads: familyThreads } = useStaffFamilyThreads();
   const [state, dispatch] = useChatDockState(userId);
   const listId = useId();
   const listPresence = useDockPresence(state.listOpen);
   const launcherRef = useRef<HTMLButtonElement | null>(null);
   const toggleRef = useRef<HTMLButtonElement | null>(null);
   const itemRefs = useRef(new Map<string, HTMLButtonElement>());
+  const familyItemRefs = useRef(new Map<string, HTMLButtonElement>());
   // Focus to apply once the next render has made its target exist.
   const focusRequestRef = useRef<FocusRequest | null>(null);
 
@@ -53,7 +57,13 @@ function ChatDockContent({ userId }: { readonly userId: string }) {
       ? null
       : (items.find((item) => item.classroomId === state.conversationId) ??
         null);
-  const conversationExpanded = conversation !== null && !state.minimized;
+  const familyThread =
+    conversation === null && state.familyLinkId !== null
+      ? (familyThreads.find((thread) => thread.id === state.familyLinkId) ??
+        null)
+      : null;
+  const conversationExpanded =
+    (conversation !== null || familyThread !== null) && !state.minimized;
 
   useEffect(() => {
     const request = focusRequestRef.current;
@@ -64,8 +74,11 @@ function ChatDockContent({ userId }: { readonly userId: string }) {
         ? launcherRef.current
         : request.target === 'toggle'
           ? toggleRef.current
-          : (itemRefs.current.get(request.classroomId ?? '') ??
-            launcherRef.current);
+          : request.target === 'family-item'
+            ? (familyItemRefs.current.get(request.itemId ?? '') ??
+              launcherRef.current)
+            : (itemRefs.current.get(request.itemId ?? '') ??
+              launcherRef.current);
     element?.focus();
   }, [state]);
 
@@ -80,7 +93,18 @@ function ChatDockContent({ userId }: { readonly userId: string }) {
     [],
   );
 
-  if (items.length === 0) {
+  const registerFamilyItem = useCallback(
+    (familyLinkId: string, element: HTMLButtonElement | null) => {
+      if (element === null) {
+        familyItemRefs.current.delete(familyLinkId);
+      } else {
+        familyItemRefs.current.set(familyLinkId, element);
+      }
+    },
+    [],
+  );
+
+  if (items.length === 0 && familyThreads.length === 0) {
     return null;
   }
 
@@ -100,7 +124,7 @@ function ChatDockContent({ userId }: { readonly userId: string }) {
           toggleRef={toggleRef}
           onMinimize={() => {
             dispatch({ type: 'minimize' });
-            focusRequestRef.current = { target: 'toggle', classroomId: null };
+            focusRequestRef.current = { target: 'toggle', itemId: null };
           }}
           onRestore={() => {
             dispatch({ type: 'restore' });
@@ -109,14 +133,43 @@ function ChatDockContent({ userId }: { readonly userId: string }) {
             dispatch({ type: 'closeConversation' });
             focusRequestRef.current = {
               target: state.listOpen ? 'list-item' : 'launcher',
-              classroomId: conversation.classroomId,
+              itemId: conversation.classroomId,
             };
           }}
           onBack={() => {
             dispatch({ type: 'backToList' });
             focusRequestRef.current = {
               target: 'list-item',
-              classroomId: conversation.classroomId,
+              itemId: conversation.classroomId,
+            };
+          }}
+        />
+      ) : familyThread !== null ? (
+        <ChatDockFamilyWindow
+          key={familyThread.id}
+          userId={userId}
+          thread={familyThread}
+          minimized={state.minimized}
+          toggleRef={toggleRef}
+          onMinimize={() => {
+            dispatch({ type: 'minimize' });
+            focusRequestRef.current = { target: 'toggle', itemId: null };
+          }}
+          onRestore={() => {
+            dispatch({ type: 'restore' });
+          }}
+          onClose={() => {
+            dispatch({ type: 'closeConversation' });
+            focusRequestRef.current = {
+              target: state.listOpen ? 'family-item' : 'launcher',
+              itemId: familyThread.id,
+            };
+          }}
+          onBack={() => {
+            dispatch({ type: 'backToList' });
+            focusRequestRef.current = {
+              target: 'family-item',
+              itemId: familyThread.id,
             };
           }}
         />
@@ -138,7 +191,7 @@ function ChatDockContent({ userId }: { readonly userId: string }) {
             dispatch({ type: 'closeList' });
             focusRequestRef.current = {
               target: 'launcher',
-              classroomId: null,
+              itemId: null,
             };
           }
         }}
@@ -180,19 +233,25 @@ function ChatDockContent({ userId }: { readonly userId: string }) {
             userId={userId}
             items={items}
             activeId={conversation?.classroomId ?? null}
+            familyThreads={familyThreads}
+            activeFamilyLinkId={familyThread?.id ?? null}
             covered={conversationExpanded}
             animated={listPresence.animated}
             closing={!state.listOpen}
             onAnimationEnd={listPresence.onAnimationEnd}
             registerItem={registerItem}
+            registerFamilyItem={registerFamilyItem}
             onSelect={(classroomId) => {
               dispatch({ type: 'openConversation', classroomId });
+            }}
+            onSelectFamilyThread={(familyLinkId) => {
+              dispatch({ type: 'openFamilyThread', familyLinkId });
             }}
             onClose={() => {
               dispatch({ type: 'closeList' });
               focusRequestRef.current = {
                 target: 'launcher',
-                classroomId: null,
+                itemId: null,
               };
             }}
           />

@@ -4,6 +4,7 @@ import {
   createParentLinkMessagesPredicate,
   familyLinksQueryKey,
   parentLinkMessagesQueryKey,
+  staffFamilyThreadsQueryKey,
 } from '@/api/query-keys';
 import {
   EmptyState,
@@ -189,6 +190,11 @@ export function ParentLinkMessagesThread({
           queryKey: familyLinksQueryKey(userId),
           exact: true,
         });
+      } else {
+        void queryClient.invalidateQueries({
+          queryKey: staffFamilyThreadsQueryKey(userId),
+          exact: true,
+        });
       }
     }
   }, [
@@ -259,6 +265,12 @@ export function ParentLinkMessagesThread({
         void queryClient.invalidateQueries({
           predicate: createParentLinkMessagesPredicate(userId, linkId),
         });
+        if (viewerRole === 'STAFF') {
+          void queryClient.invalidateQueries({
+            queryKey: staffFamilyThreadsQueryKey(userId),
+            exact: true,
+          });
+        }
       } catch (error) {
         if (
           isAbortError(error) ||
@@ -292,6 +304,12 @@ export function ParentLinkMessagesThread({
             void queryClient.invalidateQueries({
               predicate: createParentLinkMessagesPredicate(userId, linkId),
             });
+            if (viewerRole === 'STAFF') {
+              void queryClient.invalidateQueries({
+                queryKey: staffFamilyThreadsQueryKey(userId),
+                exact: true,
+              });
+            }
           }
           return;
         }

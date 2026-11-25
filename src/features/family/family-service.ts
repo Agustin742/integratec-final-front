@@ -5,11 +5,13 @@ import {
   familyReportCardResponseSchema,
   parentLinkMessageSchema,
   parentLinkMessagesResponseSchema,
+  staffFamilyThreadsResponseSchema,
   type CreateParentLinkMessageDto,
   type FamilyLinksResponseDto,
   type FamilyReportCardResponseDto,
   type ParentLinkMessageDto,
   type ParentLinkMessagesResponseDto,
+  type StaffFamilyThreadsResponseDto,
 } from './family-schema';
 import { familyMessages } from './messages';
 
@@ -140,6 +142,37 @@ export async function listFamilyLinks(
   }
 
   const parsed = familyLinksResponseSchema.safeParse(payload);
+  if (!parsed.success) {
+    throw toUnexpectedPayloadError();
+  }
+  return parsed.data;
+}
+
+/**
+ * `GET /me/family-threads`: lists active parent-teacher messaging threads
+ * across live, non-adult-mode classrooms where the authenticated user holds a
+ * staff role. Returns `{ items: [] }` without error for students, parents, or
+ * users without staff classrooms.
+ */
+export async function listStaffFamilyThreads(
+  client: TypedApiClient,
+  options: { readonly signal?: AbortSignal } = {},
+): Promise<StaffFamilyThreadsResponseDto> {
+  let payload: unknown;
+  try {
+    payload = await requestApi(() =>
+      client.GET('/me/family-threads', {
+        signal: options.signal,
+      }),
+    );
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw error;
+    }
+    throw mapFamilyReadError(error);
+  }
+
+  const parsed = staffFamilyThreadsResponseSchema.safeParse(payload);
   if (!parsed.success) {
     throw toUnexpectedPayloadError();
   }

@@ -6611,8 +6611,12 @@ export const defaultHandlers: readonly HttpHandler[] = [
   http.get(`${TEST_API_BASE_URL}/notifications`, () =>
     HttpResponse.json({ items: [], page: 1, pageSize: 20, total: 0 }),
   ),
-  // The chat dock polls the inbox from the app shell: quiet by default.
+  // The chat dock polls the inbox and staff family threads from the app shell:
+  // quiet by default.
   http.get(`${TEST_API_BASE_URL}/chats`, () =>
+    HttpResponse.json({ items: [] }),
+  ),
+  http.get(`${TEST_API_BASE_URL}/me/family-threads`, () =>
     HttpResponse.json({ items: [] }),
   ),
   createClassroomDesksHandler('*', {
@@ -9331,4 +9335,65 @@ export function createSendParentLinkMessageHandler(
       return HttpResponse.json(created, { status: 201 });
     },
   );
+}
+
+export interface StaffFamilyThreadPayload {
+  readonly id: string;
+  readonly classroomId: string;
+  readonly classroomName: string;
+  readonly parentId: string;
+  readonly parentDisplayName: string;
+  readonly childId: string;
+  readonly childDisplayName: string;
+  readonly lastMessageBody: string | null;
+  readonly lastMessageAt: string | null;
+  readonly lastMessageAuthorRole: 'PARENT' | 'STAFF' | null;
+}
+
+export interface StaffFamilyThreadsHandlerOptions {
+  readonly baseUrl?: string;
+  readonly items?:
+    | readonly StaffFamilyThreadPayload[]
+    | (() => readonly StaffFamilyThreadPayload[]);
+  readonly status?: number;
+  readonly delayMs?: number;
+  readonly onRequest?: (request: Request) => void;
+}
+
+export function createStaffFamilyThreadsHandler(
+  options: StaffFamilyThreadsHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = (options.baseUrl ?? TEST_API_BASE_URL).replace(/\/+$/, '');
+  const status = options.status ?? 200;
+
+  return http.get(`${baseUrl}/me/family-threads`, async ({ request }) => {
+    options.onRequest?.(request);
+
+    if (options.delayMs !== undefined && options.delayMs > 0) {
+      await delay(options.delayMs);
+    }
+
+    if (status === 401) {
+      return createErrorEnvelopeResponse(401, {
+        code: 'UNAUTHENTICATED',
+        message: 'Raw backend unauthenticated error for staff family threads',
+        correlationId: 'req-staff-family-threads-401',
+      });
+    }
+
+    if (status >= 400) {
+      return createErrorEnvelopeResponse(status, {
+        code: 'INTERNAL_ERROR',
+        message: 'Raw backend failure for staff family threads',
+        correlationId: `req-staff-family-threads-${status}`,
+      });
+    }
+
+    const items =
+      typeof options.items === 'function'
+        ? options.items()
+        : (options.items ?? []);
+
+    return HttpResponse.json({ items }, { status: 200 });
+  });
 }
