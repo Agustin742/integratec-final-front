@@ -1097,7 +1097,8 @@ export type MaterialStoreOp =
   | 'download'
   | 'remove'
   | 'botList'
-  | 'botToggle'
+  | 'botEnable'
+  | 'botDisable'
   | 'moduleList'
   | 'moduleCreate'
   | 'moduleUpdate'
@@ -1107,20 +1108,21 @@ export type MaterialStoreOp =
 export type MaterialStoreFailure =
   MswErrorResponseSpec | 'network' | 'drop-response';
 
-export interface BotMaterialStateEntry {
-  readonly materialId: string;
-  readonly classroomId: string;
-  readonly botEnabled: boolean;
-  readonly indexingStatus: 'disabled' | 'pending' | 'ready' | 'failed';
-  readonly indexingError?: string | null;
-  readonly updatedAt: string;
-}
+export type BotMaterialStateEntry = Omit<
+  components['schemas']['BotMaterialDto'],
+  'failureReason'
+> & { readonly failureReason: string | null };
+
+/** The back's fixed, non-diagnostic reason for a `FAILED` indexing. */
+export const BOT_INDEX_FAILURE_REASON =
+  'Indexing failed. The material stays available for the classroom; retry enabling it to index it again.';
 
 export interface ClassroomMaterialsStoreOptions {
   readonly baseUrl?: string;
   readonly classroomId?: string;
   readonly authorId?: string;
   readonly initialItems?: readonly ClassroomMaterialItem[];
+  /** Allowed-material rows; a material without a row is disabled. */
   readonly initialBotStates?: readonly BotMaterialStateEntry[];
   readonly initialModules?: readonly ClassroomMaterialModuleItem[];
   /** Writes answer 403 when false (a student session). Defaults to true. */
@@ -1138,13 +1140,16 @@ export interface ClassroomMaterialsStore {
   /** Number of `GET /materials` calls received per `moduleId` filter. */
   readonly listCalls: readonly (string | null)[];
   readBotStates(): readonly BotMaterialStateEntry[];
+  /** Changes the indexing outcome of an already allowed material. */
   setBotState(
     materialId: string,
-    state: Pick<
-      BotMaterialStateEntry,
-      'botEnabled' | 'indexingStatus' | 'indexingError'
-    >,
+    state: Pick<BotMaterialStateEntry, 'indexState'> &
+      Partial<Pick<BotMaterialStateEntry, 'failureReason'>>,
   ): void;
+  /** Outcome of the next indexings; images always fail, as on the server. */
+  setBotIndexOutcome(outcome: 'INDEXED' | 'FAILED'): void;
+  /** Page requested by each `GET /bot/materials` call. */
+  readonly botListCalls: readonly number[];
   failNext(op: MaterialStoreOp, failure: MaterialStoreFailure): void;
 }
 
@@ -1181,6 +1186,9 @@ export function createClassroomMaterialsStore(
   const moduleCap = options.moduleCap ?? 100;
   const listCalls: (string | null)[] = [];
   let seq = items.length + 1;
+  let botSeq = 1;
+  let botIndexOutcome: 'INDEXED' | 'FAILED' = 'INDEXED';
+  const botListCalls: number[] = [];
   let moduleSeq = modules.length + 1;
   const pending: Partial<Record<MaterialStoreOp, MaterialStoreFailure>> = {};
 
@@ -1238,15 +1246,18 @@ export function createClassroomMaterialsStore(
     read: () => [...items],
     readBotStates: () => [...botStates.values()],
     setBotState(materialId, state) {
+      const current = botStates.get(materialId);
+      if (!current) throw new Error('Material is not allowed for the bot.');
       botStates.set(materialId, {
-        materialId,
-        classroomId,
-        botEnabled: state.botEnabled,
-        indexingStatus: state.indexingStatus,
-        indexingError: state.indexingError ?? null,
-        updatedAt: '2026-11-19T01:30:00.000Z',
+        ...current,
+        indexState: state.indexState,
+        failureReason: state.failureReason ?? null,
       });
     },
+    setBotIndexOutcome(outcome) {
+      botIndexOutcome = outcome;
+    },
+    botListCalls,
     failNext(op, failure) {
       pending[op] = failure;
     },
@@ -1617,68 +1628,94 @@ export function createClassroomMaterialsStore(
           return new HttpResponse(null, { status: 204 });
         },
       ),
-      http.get(`${baseUrl}/classrooms/:id/bot/materials`, ({ params }) => {
-        const failure = pending.botList;
-        pending.botList = undefined;
-        if (failure !== undefined && failure !== 'drop-response') {
-          return fail(failure);
-        }
-        if (options.classroomId && params.id !== classroomId) {
-          return createErrorEnvelopeResponse(404, {
-            code: 'NOT_FOUND',
-            message: 'Classroom not found.',
-            correlationId: 'req-bot-materials-list-404',
-          });
-        }
-        return HttpResponse.json({
-          items: [...botStates.values()],
-        });
-      }),
-      http.put(
-        `${baseUrl}/classrooms/:id/bot/materials/:materialId`,
-        async ({ params, request }) => {
-          const failure = pending.botToggle;
-          pending.botToggle = undefined;
-          if (failure !== undefined && failure !== 'drop-response') {
-            return fail(failure);
-          }
+      http.get(
+        `${baseUrl}/classrooms/:id/bot/materials`,
+        ({ params, request }) => {
+          const failed = takeFailure('botList');
+          if (failed) return failed;
           if (options.classroomId && params.id !== classroomId) {
-            return createErrorEnvelopeResponse(404, {
-              code: 'NOT_FOUND',
-              message: 'Classroom not found.',
-              correlationId: 'req-bot-materials-toggle-404',
-            });
+            return notFound('Classroom not found.', 'bot-list');
           }
-          const materialId = String(params.materialId);
+          const query = new URL(request.url).searchParams;
+          const page = Number(query.get('page') ?? '1');
+          const pageSize = Number(query.get('pageSize') ?? '20');
+          if (page < 1 || pageSize < 1 || pageSize > 100) {
+            return badRequest('Invalid pagination.', 'bot-list');
+          }
+          botListCalls.push(page);
+          const rows = [...botStates.values()];
+          return HttpResponse.json({
+            items: rows.slice((page - 1) * pageSize, page * pageSize),
+            page,
+            pageSize,
+            total: rows.length,
+          });
+        },
+      ),
+      http.post(
+        `${baseUrl}/classrooms/:id/bot/materials`,
+        async ({ params, request }) => {
+          const failed = takeFailure('botEnable');
+          if (failed) return failed;
+          if (options.classroomId && params.id !== classroomId) {
+            return notFound('Classroom not found.', 'bot-enable');
+          }
+          const body = (await request.json().catch(() => null)) as Record<
+            string,
+            unknown
+          > | null;
+          const materialId = body?.materialId;
+          if (
+            !body ||
+            Object.keys(body).length !== 1 ||
+            typeof materialId !== 'string' ||
+            !UUID_PATTERN.test(materialId)
+          ) {
+            return badRequest('materialId must be a UUID.', 'bot-enable');
+          }
           const found = items.find((item) => item.id === materialId);
-          if (!found) {
-            return createErrorEnvelopeResponse(404, {
-              code: 'NOT_FOUND',
-              message: 'Material not found.',
-              correlationId: 'req-bot-materials-toggle-404',
-            });
-          }
-          const body = (await request.json().catch(() => null)) as {
-            enabled?: unknown;
-          } | null;
-          if (!body || typeof body.enabled !== 'boolean') {
-            return createErrorEnvelopeResponse(400, {
-              code: 'VALIDATION_FAILED',
-              message: 'enabled must be a boolean.',
-              correlationId: 'req-bot-materials-toggle-400',
-            });
-          }
-          seq += 1;
-          const nextEntry: BotMaterialStateEntry = {
-            materialId,
+          if (!found) return notFound('Material not found.', 'bot-enable');
+          // Text can never be extracted from an image.
+          const indexState = found.contentType.startsWith('image/')
+            ? 'FAILED'
+            : botIndexOutcome;
+          const entry: BotMaterialStateEntry = {
+            id:
+              botStates.get(materialId)?.id ??
+              `00000000-0000-4000-9000-${String(botSeq++).padStart(12, '0')}`,
             classroomId: found.classroomId,
-            botEnabled: body.enabled,
-            indexingStatus: body.enabled ? 'pending' : 'disabled',
-            indexingError: null,
-            updatedAt: '2026-11-19T01:30:00.000Z',
+            materialId,
+            filename: found.filename,
+            contentType:
+              found.contentType as BotMaterialStateEntry['contentType'],
+            sizeBytes: found.sizeBytes,
+            indexState,
+            failureReason:
+              indexState === 'FAILED' ? BOT_INDEX_FAILURE_REASON : null,
+            createdAt: '2026-11-19T01:30:00.000Z',
           };
-          botStates.set(materialId, nextEntry);
-          return HttpResponse.json(nextEntry);
+          botStates.set(materialId, entry);
+          return HttpResponse.json(entry, { status: 201 });
+        },
+      ),
+      http.delete(
+        `${baseUrl}/classrooms/:id/bot/materials/:materialId`,
+        ({ params }) => {
+          const materialId = String(params.materialId);
+          const failure = pending.botDisable;
+          // A 503 means "excluded, index cleanup pending": the row is gone.
+          if (typeof failure === 'object' && failure.status === 503) {
+            botStates.delete(materialId);
+          }
+          const failed = takeFailure('botDisable');
+          if (failed) return failed;
+          if (options.classroomId && params.id !== classroomId) {
+            return notFound('Classroom not found.', 'bot-disable');
+          }
+          if (!botStates.delete(materialId)) {
+            return notFound('Material not found.', 'bot-disable');
+          }
+          return new HttpResponse(null, { status: 204 });
         },
       ),
     ],
