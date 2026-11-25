@@ -1,6 +1,6 @@
 # Inventory Selector (`HU-ESP-004`, part 1/2)
 
-The 2D inventory selector lets enrolled students inspect their classroom-scoped purchased avatar accessories (`head`, `face`, `back`) and desk upgrades (`desk_decor`) and equip or unequip them per slot against the NestJS equipment endpoints.
+The 2D inventory selector lets enrolled students inspect their classroom-scoped purchased avatar accessories (`head`, `face`, `back`, `hand`, `neck`, `ears`) and desk upgrades (`desk_decor`) and equip or unequip them per slot against the NestJS equipment endpoints.
 
 ## Access points
 

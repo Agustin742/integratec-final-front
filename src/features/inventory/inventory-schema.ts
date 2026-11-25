@@ -7,17 +7,17 @@ export const equippedSlotNameSchema = z.enum([
   'head',
   'face',
   'back',
+  'hand',
+  'neck',
+  'ears',
   'desk_decor',
 ]);
 
 export type EquippedSlotName = z.infer<typeof equippedSlotNameSchema>;
 
-export const SLOT_NAMES: readonly EquippedSlotName[] = [
-  'head',
-  'face',
-  'back',
-  'desk_decor',
-];
+/** Display order of the inventory rows: avatar accessories first, then desk. */
+export const SLOT_NAMES: readonly EquippedSlotName[] =
+  equippedSlotNameSchema.options;
 
 export const shopItemKindSchema = z.enum([
   'CLASSROOM_ITEM',
@@ -56,7 +56,7 @@ export type EquipItemDto = z.infer<typeof equipItemDtoSchema>;
 /**
  * Resolves the slot an item must be equipped into from its catalog
  * `metadata.slot`, mirroring the back's `deriveSlotForItem`
- * (`AVATAR_ACCESSORY` -> `head`/`face`/`back`, `DESK_UPGRADE` -> `desk_decor`).
+ * (`DESK_UPGRADE` -> `desk_decor`, `AVATAR_ACCESSORY` -> every other slot).
  * Returns `null` when the slot is missing/invalid or does not fit the kind
  * (the back answers `409`), so the item must not be offered anywhere.
  */

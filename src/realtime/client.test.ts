@@ -1116,8 +1116,10 @@ describe('createClassroomRealtimeClient (#23)', () => {
         head: item('head', 'head_crown'),
         face: null,
         back: item('back', 'back_wings'),
-        neck: item('neck', 'neck_bandana'),
         desk_decor: item('desk_decor', 'desk_plant'),
+        hand: null,
+        neck: item('neck', 'neck_bandana'),
+        ears: null,
       },
     });
     sdk.setJoinHandler(async () => room);
@@ -1172,6 +1174,9 @@ describe('createClassroomRealtimeClient (#23)', () => {
         face: null,
         back: null,
         desk_decor: null,
+        hand: null,
+        neck: null,
+        ears: null,
       },
     });
     sdk.setJoinHandler(async () => room);

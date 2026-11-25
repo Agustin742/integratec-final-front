@@ -196,6 +196,9 @@ function InventoryPanelScoped({
       head: [],
       face: [],
       back: [],
+      hand: [],
+      neck: [],
+      ears: [],
       desk_decor: [],
     };
     for (const purchase of uniquePurchases) {

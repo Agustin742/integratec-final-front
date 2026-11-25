@@ -22,6 +22,9 @@ export const inventoryMessages = {
     head: 'Cabeza',
     face: 'Cara',
     back: 'Espalda',
+    hand: 'Mano',
+    neck: 'Cuello',
+    ears: 'Orejas',
     desk_decor: 'Decoración del escritorio',
   } as Readonly<Record<string, string>>,
   actions: {

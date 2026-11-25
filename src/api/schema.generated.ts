@@ -944,7 +944,7 @@ export interface paths {
         };
         /**
          * Read the authenticated student's classroom-scoped equipment state
-         * @description Returns one equipped purchase per slot (head, face, back, desk_decor) or null when the slot is empty. Classroom-scoped: purchases and equipment never cross classrooms.
+         * @description Returns one equipped purchase per slot (head, face, back, desk_decor, hand, neck, ears) or null when the slot is empty. Classroom-scoped: purchases and equipment never cross classrooms.
          */
         get: operations["EquipmentController_getEquipment"];
         put?: never;
@@ -2705,7 +2705,7 @@ export interface components {
             description?: string | null;
         };
         /** @enum {string} */
-        EquippedSlotName: "head" | "face" | "back" | "desk_decor";
+        EquippedSlotName: "head" | "face" | "back" | "desk_decor" | "hand" | "neck" | "ears";
         EquippedSlotDto: {
             slot: components["schemas"]["EquippedSlotName"];
             /** Format: uuid */
@@ -2727,7 +2727,10 @@ export interface components {
              *       "head": null,
              *       "face": null,
              *       "back": null,
-             *       "desk_decor": null
+             *       "desk_decor": null,
+             *       "hand": null,
+             *       "neck": null,
+             *       "ears": null
              *     }
              */
             slots: {

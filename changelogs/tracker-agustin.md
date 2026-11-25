@@ -1,12 +1,21 @@
 # Tracker — Agustin
 
+## 2026-11-25 — Equip hand, neck and ear accessories from the inventory (#149)
+
+- **Status:** completed
+- **Area / files:** `src/features/inventory/`, `src/api/schema.generated.ts`, `src/realtime/contracts.generated.ts`, `src/test/msw/handlers.ts`, appearance fixtures in `src/realtime/client.test.ts`, `src/features/classrooms/classroom-presence.test.tsx` and `e2e/inventory.spec.ts`, `docs/ui-inventory.md`
+- **Change:** The inventory offers `Mano`, `Cuello` and `Orejas` rows to equip and unequip; types were regenerated from back commit `cb46656` (`pnpm api:sync --backend-dir`), which also brings the already published `INVITEE` registration path.
+- **Reason:** Students could buy these accessories but not wear them; back counterpart integratec-final-back#154.
+- **Verification:** Strict TDD on the touched test files, lint and typecheck. Full suite, build, e2e and visual evidence not run.
+- **Next step:** Deploy together with the back API and realtime services; refresh inventory screenshots during visual review.
+
 ## 2026-11-25 — Hand, neck and ear accessories and shop 3D preview (#149)
 
-- **Status:** completed (equip and inventory UI pending)
+- **Status:** completed
 - **Area / files:** `src/features/world/avatar/`, `src/features/shop/`, `src/realtime/client.ts`, `src/features/classrooms/use-classroom-presence.ts`, `docs/art/{hand-items,neck-ears}.md`
 - **Change:** Added the `hand`, `neck` and `ears` slots to the avatar catalog (19 items, colors mirroring the shop seed), the part plan and the synced equipped codes; the shop preview now resolves every accessory from that catalog by shop code, tints only `AvatarAccessoryTint` and poses skinned meshes.
 - **Reason:** The merged assets are unused and shop accessory previews fail; back counterpart integratec-final-back#154.
-- **Next step:** Equip and inventory UI once the backend types are regenerated.
+- **Next step:** Equip and inventory UI (entry above).
 
 ## 2026-11-24 — Interactive props, decorations, pet and tutor bot routines (#138)
 

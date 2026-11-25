@@ -15,6 +15,7 @@ export type UserRole = 'TEACHER' | 'STUDENT' | 'PARENT' | 'SCHOOL_ADMIN';
 export const RegistrationPath = {
   INDEPENDENT_TEACHER: 'INDEPENDENT_TEACHER',
   SCHOOL: 'SCHOOL',
+  INVITEE: 'INVITEE',
 } as const;
 
 export type RegistrationPath = (typeof RegistrationPath)[keyof typeof RegistrationPath];
@@ -22,6 +23,7 @@ export type RegistrationPath = (typeof RegistrationPath)[keyof typeof Registrati
 export const REGISTRATION_PATHS = [
   RegistrationPath.INDEPENDENT_TEACHER,
   RegistrationPath.SCHOOL,
+  RegistrationPath.INVITEE,
 ] as const;
 
 /**
@@ -134,7 +136,15 @@ export type AvatarStatus = (typeof AVATAR_STATUSES)[number];
  * equipment URL slot names; duplicated here so the realtime service can validate the payload
  * without importing server code.
  */
-export const APPEARANCE_SLOT_NAMES = ['head', 'face', 'back', 'desk_decor'] as const;
+export const APPEARANCE_SLOT_NAMES = [
+  'head',
+  'face',
+  'back',
+  'desk_decor',
+  'hand',
+  'neck',
+  'ears',
+] as const;
 export type AppearanceSlotName = (typeof APPEARANCE_SLOT_NAMES)[number];
 
 /** Public projection of one equipped item: catalog fields only, no purchase or price data. */
@@ -165,6 +175,9 @@ export const memberAppearanceSchema = z
       face: equippedItemPayloadSchema.nullable(),
       back: equippedItemPayloadSchema.nullable(),
       desk_decor: equippedItemPayloadSchema.nullable(),
+      hand: equippedItemPayloadSchema.nullable(),
+      neck: equippedItemPayloadSchema.nullable(),
+      ears: equippedItemPayloadSchema.nullable(),
     }),
   })
   .refine(

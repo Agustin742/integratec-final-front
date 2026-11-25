@@ -8275,7 +8275,8 @@ export function createChatInboxStore(
   };
 }
 
-export type EquipmentSlotName = 'head' | 'face' | 'back' | 'desk_decor';
+export type EquipmentSlotName =
+  'head' | 'face' | 'back' | 'desk_decor' | 'hand' | 'neck' | 'ears';
 
 export interface EquipmentStoreSlotEntry {
   readonly slot: EquipmentSlotName;
@@ -8340,6 +8341,9 @@ const KNOWN_EQUIPMENT_SLOTS: readonly EquipmentSlotName[] = [
   'face',
   'back',
   'desk_decor',
+  'hand',
+  'neck',
+  'ears',
 ];
 
 function isValidEquipmentSlot(value: string): value is EquipmentSlotName {
@@ -8401,6 +8405,9 @@ export function createClassroomEquipmentStore(
     face: options.initialSlots?.face ?? null,
     back: options.initialSlots?.back ?? null,
     desk_decor: options.initialSlots?.desk_decor ?? null,
+    hand: options.initialSlots?.hand ?? null,
+    neck: options.initialSlots?.neck ?? null,
+    ears: options.initialSlots?.ears ?? null,
   };
 
   const pending: Partial<Record<EquipmentStoreOp, EquipmentStoreFailure>> = {};

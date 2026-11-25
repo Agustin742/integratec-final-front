@@ -399,7 +399,15 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
       shopItemName: shopItemCode,
       kind: 'AVATAR_ACCESSORY',
     });
-    const emptyItems = { head: null, face: null, back: null, desk_decor: null };
+    const emptyItems = {
+      head: null,
+      face: null,
+      back: null,
+      desk_decor: null,
+      hand: null,
+      neck: null,
+      ears: null,
+    };
 
     act(() => {
       room.setAvatar({
