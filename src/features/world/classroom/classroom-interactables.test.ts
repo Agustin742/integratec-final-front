@@ -192,10 +192,8 @@ describe('resolveInteractableHit', () => {
         'teacher-desk',
       );
 
-      const farWall = built.root.getObjectByName('wall-far-z')!;
-      expect(
-        resolveInteractableHit([{ object: farWall }], byId),
-      ).toBeUndefined();
+      const zone = built.root.getObjectByName('teaching-zone')!;
+      expect(resolveInteractableHit([{ object: zone }], byId)).toBeUndefined();
     } finally {
       built.dispose();
     }

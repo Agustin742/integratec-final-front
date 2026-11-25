@@ -13,6 +13,22 @@ const safeColor = (value: string, fallback: string): string =>
 const SKIN = '#F8C6AF';
 const INK = '#382F3F';
 
+type HairShape = 'afro' | 'dreads' | 'classic';
+type TopShape = 'tank' | 'tshirt' | 'hoodie';
+
+/** This flat preview only draws a few silhouettes; other styles use the closest one. */
+function hairShapeOf(hairId: Avatar['hairId']): HairShape {
+  if (hairId === 'afro' || hairId === 'afro-with-headband') return 'afro';
+  if (hairId === 'dreads' || hairId === 'box-braids') return 'dreads';
+  return 'classic';
+}
+
+function topShapeOf(topId: Avatar['topId']): TopShape {
+  if (topId === 'tank-top') return 'tank';
+  if (topId === 'hoodie') return 'hoodie';
+  return 'tshirt';
+}
+
 export interface AvatarPreviewProps {
   readonly avatar: Avatar;
   readonly className?: string;
@@ -28,6 +44,8 @@ export function AvatarPreview({ avatar, className }: AvatarPreviewProps) {
   const titleId = `${id}-title`;
   const volumeId = `${id}-volume`;
   const volume = `url(#${volumeId})`;
+  const hairShape = hairShapeOf(avatar.hairId);
+  const topShape = topShapeOf(avatar.topId);
   const hair = safeColor(avatar.hairColor, '#6C4D48');
   const clothing = safeColor(avatar.clothingColor, '#5B4F96');
   const shoulder = avatar.bodyId === 'male' ? 32 : 27;
@@ -60,7 +78,7 @@ export function AvatarPreview({ avatar, className }: AvatarPreviewProps) {
       <ellipse cx="80" cy="191" rx="38" ry="5" fill="#B5A7D6" opacity="0.25" />
 
       {/* Hair behind the face: each option has its own continuous silhouette. */}
-      {avatar.hairId === 'afro' && (
+      {hairShape === 'afro' && (
         <g fill={hair}>
           <path d="M39 64 Q29 54 36 43 Q27 29 41 22 Q39 10 54 12 Q61 1 74 9 Q88 1 98 11 Q114 6 119 21 Q133 24 127 39 Q137 51 124 63 L114 78 L44 78 Z" />
           <path
@@ -69,7 +87,7 @@ export function AvatarPreview({ avatar, className }: AvatarPreviewProps) {
           />
         </g>
       )}
-      {avatar.hairId === 'original' && (
+      {hairShape === 'classic' && (
         <g fill={hair}>
           <path d="M38 49 Q36 15 77 15 Q119 12 122 48 L124 92 Q113 99 102 91 L99 58 L60 58 L57 92 Q46 99 35 91 Z" />
           <path
@@ -78,7 +96,7 @@ export function AvatarPreview({ avatar, className }: AvatarPreviewProps) {
           />
         </g>
       )}
-      {avatar.hairId === 'dreads' && (
+      {hairShape === 'dreads' && (
         <g fill={hair}>
           <path d="M39 46 Q37 14 79 14 Q121 14 121 46 L117 77 L43 77 Z" />
           {[43, 55, 67, 81, 95, 107].map((x, index) => (
@@ -133,15 +151,15 @@ export function AvatarPreview({ avatar, className }: AvatarPreviewProps) {
           stroke={SKIN}
           strokeWidth="11"
         />
-        {avatar.topId !== 'tank' && (
+        {topShape !== 'tank' && (
           <>
             <path
-              d={`M${left + 3} 102 Q${left - 4} 113 ${left - 5} ${avatar.topId === 'hoodie' ? 139 : 116}`}
+              d={`M${left + 3} 102 Q${left - 4} 113 ${left - 5} ${topShape === 'hoodie' ? 139 : 116}`}
               stroke={clothing}
               strokeWidth="15"
             />
             <path
-              d={`M${right - 3} 102 Q${right + 4} 113 ${right + 5} ${avatar.topId === 'hoodie' ? 139 : 116}`}
+              d={`M${right - 3} 102 Q${right + 4} 113 ${right + 5} ${topShape === 'hoodie' ? 139 : 116}`}
               stroke={clothing}
               strokeWidth="15"
             />
@@ -152,10 +170,10 @@ export function AvatarPreview({ avatar, className }: AvatarPreviewProps) {
       <rect x="72" y="78" width="16" height="20" rx="6" fill={volume} />
       <path d={torso} fill={clothing} />
       <path d={torso} fill={volume} />
-      {avatar.topId === 'tank' && (
+      {topShape === 'tank' && (
         <path d="M68 92 Q80 113 92 92 L88 92 Q80 102 72 92 Z" fill={SKIN} />
       )}
-      {avatar.topId === 'tshirt' && (
+      {topShape === 'tshirt' && (
         <path
           d="M70 93 Q80 103 90 93"
           fill="none"
@@ -164,7 +182,7 @@ export function AvatarPreview({ avatar, className }: AvatarPreviewProps) {
           strokeWidth="3"
         />
       )}
-      {avatar.topId === 'hoodie' && (
+      {topShape === 'hoodie' && (
         <>
           <path
             d="M65 89 Q80 83 95 89 L102 99 Q94 109 80 101 Q66 109 58 99 Z"
@@ -207,7 +225,7 @@ export function AvatarPreview({ avatar, className }: AvatarPreviewProps) {
       />
 
       {/* Broad front hair masses leave the eyes unobstructed. */}
-      {avatar.hairId === 'original' && (
+      {hairShape === 'classic' && (
         <g fill={hair}>
           <path d="M43 47 Q39 21 75 20 Q111 15 117 47 Q96 44 84 31 Q70 46 43 47 Z" />
           <path
@@ -216,7 +234,7 @@ export function AvatarPreview({ avatar, className }: AvatarPreviewProps) {
           />
         </g>
       )}
-      {avatar.hairId === 'afro' && (
+      {hairShape === 'afro' && (
         <g fill={hair}>
           <path d="M42 45 Q34 32 48 29 Q48 18 62 23 Q72 14 82 23 Q96 15 102 27 Q119 23 119 43 Q108 48 99 37 Q89 45 80 36 Q69 45 61 36 Q52 47 42 45 Z" />
           <path
@@ -225,7 +243,7 @@ export function AvatarPreview({ avatar, className }: AvatarPreviewProps) {
           />
         </g>
       )}
-      {avatar.hairId === 'dreads' && (
+      {hairShape === 'dreads' && (
         <g fill={hair}>
           {[47, 60, 73, 86, 99].map((x, index) => (
             <g key={x} transform={`rotate(${(index - 2) * 5} ${x + 6} 24)`}>

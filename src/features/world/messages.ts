@@ -4,6 +4,8 @@ export const worldMessages = {
     'Prueba de cámara y escala: no es el aula ni un diseño terminado. Piso de 6 × 4 m y referencias de 1 y 2 m. Cámara fija, sin órbita.',
   canvas: 'Vista isométrica de referencia',
   loading: 'Preparando la vista 3D…',
+  classroomAssetError:
+    'No pudimos cargar algunos objetos del aula. Usamos reemplazos simples para el piso y los muebles esenciales. Podés seguir o cambiar al modo clásico 2D.',
   classroomControls:
     'Usá W, A, S, D o las flechas para moverte. Tocá o hacé clic en el piso para caminar hasta ahí, o elegí un objeto del aula para interactuar. Escape cancela el recorrido.',
   unavailable: 'La vista 3D no está disponible',

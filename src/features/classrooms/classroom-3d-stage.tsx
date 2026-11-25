@@ -12,7 +12,11 @@ import {
 } from 'react';
 import { useNavigate } from 'react-router';
 import { CLASSROOM_LAYOUT, type AvatarInput } from '@/realtime';
-import type { Pose, RemoteClassroomParticipant } from '../world';
+import type {
+  AvatarEquipped,
+  Pose,
+  RemoteClassroomParticipant,
+} from '../world';
 import {
   deriveClassroomInteractables,
   indexClassroomInteractables,
@@ -42,6 +46,7 @@ export interface Classroom3DStageProps {
   readonly classroomId?: string;
   readonly petName?: string | null;
   readonly selfPose?: Pose | undefined;
+  readonly selfEquipped?: AvatarEquipped | undefined;
   readonly connectionKey?: string | undefined;
   readonly frozen?: boolean | undefined;
   readonly remoteParticipants?:
@@ -124,6 +129,7 @@ export function Classroom3DStage({
   classroomId,
   petName,
   selfPose,
+  selfEquipped,
   connectionKey,
   frozen,
   remoteParticipants,
@@ -135,12 +141,13 @@ export function Classroom3DStage({
   const resolvedClassroomId = classroomId ?? scopeKey ?? '';
   return (
     <Classroom3DStageContent
-      key={resolvedClassroomId}
+      key={`${resolvedClassroomId}:${scopeKey ?? ''}`}
       headingRef={headingRef}
       scopeKey={scopeKey}
       classroomId={resolvedClassroomId}
       petName={petName}
       selfPose={selfPose}
+      selfEquipped={selfEquipped}
       connectionKey={connectionKey}
       frozen={frozen}
       remoteParticipants={remoteParticipants}
@@ -179,6 +186,7 @@ function Classroom3DStageContent({
   classroomId,
   petName,
   selfPose,
+  selfEquipped,
   connectionKey,
   frozen,
   remoteParticipants,
@@ -192,6 +200,7 @@ function Classroom3DStageContent({
   readonly classroomId: string;
   readonly petName?: string | null;
   readonly selfPose?: Pose | undefined;
+  readonly selfEquipped?: AvatarEquipped | undefined;
   readonly connectionKey?: string | undefined;
   readonly frozen?: boolean | undefined;
   readonly remoteParticipants?:
@@ -202,6 +211,8 @@ function Classroom3DStageContent({
   readonly presenceSlot?: ReactNode;
 }) {
   useLockPageScroll();
+  const [assetFailed, setAssetFailed] = useState(false);
+  const handleAssetError = useCallback(() => setAssetFailed(true), []);
   const [LazyClassroomWorld] = useState(() => lazy(loadClassroomWorld));
   const [LazyWorldProbe] = useState(() => lazy(loadWorldProbe));
   const supportsBrowserObservers = typeof ResizeObserver !== 'undefined';
@@ -437,9 +448,11 @@ function Classroom3DStageContent({
             >
               <LazyClassroomWorld
                 fill
+                onAssetError={handleAssetError}
                 label={classroomMessages.viewMode.canvasLabel}
                 scopeKey={scopeKey}
                 selfPose={selfPose}
+                selfEquipped={selfEquipped}
                 connectionKey={connectionKey}
                 frozen={frozen}
                 remoteParticipants={remoteParticipants}
@@ -480,6 +493,14 @@ function Classroom3DStageContent({
       <div className="pointer-events-none absolute inset-0 z-10">
         <div className="absolute inset-x-0 top-0 flex flex-col items-center gap-2 p-3 sm:p-4">
           {topSlot}
+          {assetFailed && (
+            <p
+              role="status"
+              className="max-w-xl rounded-xl bg-background p-3 text-sm shadow"
+            >
+              {worldMessages.classroomAssetError}
+            </p>
+          )}
         </div>
         <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4">
           {presenceSlot}

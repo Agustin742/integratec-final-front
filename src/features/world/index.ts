@@ -4,6 +4,7 @@ export {
   type PerformanceProbeProps,
 } from './performance-probe';
 export { PerformanceStatsOverlay } from './performance-stats-overlay';
+export type { AvatarEquipped } from './avatar/avatar-part-plan';
 export { ClassroomScene } from './classroom/classroom-scene';
 export {
   ClassroomWorld,

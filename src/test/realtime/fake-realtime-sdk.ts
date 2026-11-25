@@ -17,7 +17,11 @@ type LeaveListener = (code: number, reason?: string) => void;
 type ErrorListener = (code: number, message?: string) => void;
 
 export type FakeAvatarAppearance =
-  RealtimeAvatarAppearance | { readonly baseAvatar: RealtimeAvatarAppearance };
+  | RealtimeAvatarAppearance
+  | {
+      readonly baseAvatar: RealtimeAvatarAppearance;
+      readonly items?: Readonly<Record<string, unknown>>;
+    };
 
 export interface FakeAvatarSeed {
   readonly userId: string;
@@ -51,7 +55,10 @@ const CONTROL_KEYS = [
 
 function cloneAppearance(source: FakeAvatarAppearance): FakeAvatarAppearance {
   if ('baseAvatar' in source) {
-    return { baseAvatar: { ...source.baseAvatar } };
+    return {
+      baseAvatar: { ...source.baseAvatar },
+      ...(source.items ? { items: structuredClone(source.items) } : {}),
+    };
   }
   return { ...source };
 }
