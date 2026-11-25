@@ -1055,6 +1055,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/family-threads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List active parent-teacher messaging threads for staff classrooms
+         * @description Returns all active parent-child messaging threads across live, non-adult-mode classrooms where the authenticated user holds a staff role (`TEACHER`, `SCHOOL_OWNER`, or `SCHOOL_ADMIN`), including the latest visible message preview. Ordered by `lastMessageAt DESC NULLS LAST`, then `createdAt ASC`, then `id ASC`. Returns `{ items: [] }` without error for students, parents, or users without staff classrooms.
+         */
+        get: operations["FamilyController_listMyFamilyThreads"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/parent-links/{linkId}/messages": {
         parameters: {
             query?: never;
@@ -3033,6 +3053,50 @@ export interface components {
             total: number;
             /** @description Aggregated participation and grade progress totals for the linked child. */
             metrics: components["schemas"]["StudentParticipationSummaryDto"];
+        };
+        StaffFamilyThreadDto: {
+            /**
+             * Format: uuid
+             * @description ParentLink UUID.
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Classroom UUID.
+             */
+            classroomId: string;
+            /** @description Classroom display name. */
+            classroomName: string;
+            /**
+             * Format: uuid
+             * @description Linked parent user UUID.
+             */
+            parentId: string;
+            /** @description Current display name of the linked parent. */
+            parentDisplayName: string;
+            /**
+             * Format: uuid
+             * @description Linked student user UUID.
+             */
+            childId: string;
+            /** @description Current display name of the linked student. */
+            childDisplayName: string;
+            /** @description Latest visible message body in this thread, or null if no messages exist yet. */
+            lastMessageBody: string | null;
+            /**
+             * Format: date-time
+             * @description UTC ISO-8601 timestamp of the latest visible message, or null if none.
+             */
+            lastMessageAt: string | null;
+            /**
+             * @description Role of the author of the latest visible message (`PARENT` or `STAFF`), or null if none.
+             * @enum {string|null}
+             */
+            lastMessageAuthorRole: "PARENT" | "STAFF" | null;
+        };
+        StaffFamilyThreadsResponseDto: {
+            /** @description Active family threads ordered by `lastMessageAt DESC NULLS LAST`, then `createdAt ASC`, then `id ASC`. Empty when the authenticated user has no staff classrooms. */
+            items: components["schemas"]["StaffFamilyThreadDto"][];
         };
         ParentLinkMessageDto: {
             /**
@@ -7251,6 +7315,35 @@ export interface operations {
             };
             /** @description Malformed, nonexistent, inactive, or inaccessible parent link. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    FamilyController_listMyFamilyThreads: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active family messaging threads for the authenticated staff user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffFamilyThreadsResponseDto"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

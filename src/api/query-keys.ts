@@ -1779,6 +1779,15 @@ export function familyLinksQueryKey(userId: string): ScopedQueryKey {
 }
 
 /**
+ * Key of `GET /me/family-threads`: active parent-teacher messaging threads
+ * across staff classrooms for the authenticated user, scoped by `userId`
+ * (`rules/state-management.md`).
+ */
+export function staffFamilyThreadsQueryKey(userId: string): ScopedQueryKey {
+  return createScopedQueryKey({ userId }, 'family', 'staff-threads');
+}
+
+/**
  * Key of `GET /me/parent-links/{linkId}/report-card`: a linked child's
  * paginated report card and participation summary, scoped by `userId` and
  * `linkedChildId` (`linkId`) so switching children or accounts reads an
