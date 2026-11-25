@@ -198,7 +198,12 @@ export function createRegisterHandler(
       .json()) as Partial<RegisterRequestPayload>;
     await options.onRequest?.(request, body as RegisterRequestPayload);
 
-    const path = body.path === 'SCHOOL' ? 'SCHOOL' : 'INDEPENDENT_TEACHER';
+    const path =
+      body.path === 'SCHOOL'
+        ? 'SCHOOL'
+        : body.path === 'INVITEE'
+          ? 'INVITEE'
+          : 'INDEPENDENT_TEACHER';
     const defaultSchool =
       path === 'SCHOOL'
         ? {
@@ -208,6 +213,15 @@ export function createRegisterHandler(
             timeZone: 'America/Argentina/Buenos_Aires',
           }
         : undefined;
+    const defaultSession =
+      path === 'INVITEE'
+        ? {
+            accessToken: 'test-access-token',
+            refreshToken: 'test-refresh-token',
+            tokenType: 'Bearer' as const,
+            expiresIn: 900,
+          }
+        : undefined;
 
     const payload: RegisterResponsePayload = {
       id: 'user-test-1',
@@ -215,6 +229,7 @@ export function createRegisterHandler(
       displayName: body.displayName?.trim() || 'Docente Demo',
       path,
       ...(defaultSchool ? { school: defaultSchool } : {}),
+      ...(defaultSession ? { session: defaultSession } : {}),
       createdAt: '2026-11-14T12:00:00.000Z',
       ...options.response,
     };

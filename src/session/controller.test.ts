@@ -631,4 +631,20 @@ describe('session lifecycle public boundary', () => {
     expect(controller.getAccessToken()).toBeUndefined();
     expect(controller.getSnapshot()).toEqual({ status: 'unauthenticated' });
   });
+
+  test('adoptSession installs tokens and verifies profile without calling /auth/login', async () => {
+    const h = harness();
+    const { controller } = createSession(h);
+
+    const result = await controller.adoptSession(tokens);
+    expect(result).toMatchObject({ ok: true, cleanupFailed: false });
+    expect(controller.getSnapshot()).toEqual({
+      status: 'authenticated',
+      user: profile,
+    });
+    expect(h.storage.getItem(storageKey)).not.toBeNull();
+    expect(h.requests.map((r) => new URL(r.url).pathname)).toEqual([
+      '/users/me',
+    ]);
+  });
 });
