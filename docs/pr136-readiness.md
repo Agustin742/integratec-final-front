@@ -2,6 +2,8 @@
 
 The reconciled candidate passes Node 22 source checks and the complete hardware-browser suite (173 passed, one intentional skip). Recovery captures are recorded below. Live-backend integration, geometry-budget acceptance and representative school-device performance remain open; this is not merge or deployment approval.
 
+The four verified work units were published by authorized fast-forward to the existing PR branch at `c8a4cf0b`. [Frontend CI for that source revision](https://github.com/Agustin742/integratec-final-front/actions/runs/45546004463) passed, and GitHub reported the PR mergeable with no conflicts. This records publication, not approval or merge.
+
 ## Review the narrow changes first
 
 | Review surface                                                                                                                      | What to verify                                                                                                                                                                                       |
@@ -18,11 +20,11 @@ Both tracker histories were preserved with consent. An independent source review
 
 | Check                        | Observed result and boundary                                                                                                                                                                                                                                       |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Node 22.23.4                 | 2,019 unit tests across 187 files passed. Lint, types, build, security, format, docs (115 documents, including this guide) and whitespace checks passed on the reconciled candidate.                                                                                                     |
+| Node 22.23.4                 | 2,019 unit tests across 187 files passed. Lint, types, build, security, format, docs (115 documents, including this guide) and whitespace checks passed on the reconciled candidate.                                                                               |
 | Affected E2E                 | 42/42 desktop/mobile tests passed using real D3D11 on RTX 4070 SUPER, with the same assertions/timeouts and zero retries. This is not a full-suite pass.                                                                                                           |
 | Earlier default-renderer run | 35/42 passed, seven failed under SwiftShader. Hardware success is diagnostic evidence, not grounds to dismiss those failures unconditionally.                                                                                                                      |
 | Full hardware E2E            | 173 passed, one intentionally skipped, exit 0. The mobile reference-overlay measurement is desktop-only by existing test design; it was not newly disabled. Same assertions/timeouts/projects and zero retries.                                                    |
-| Python CI                    | 10 tests, 16 assertion failures involving stderr and missing `/tmp` pollution under Git Bash. These failures remain disclosed, not counted as passes.                                                                                                              |
+| Python CI                    | The local Git Bash run had 16 stderr assertions fail across 10 tests because of missing `/tmp`. All 10 CI-tooling tests subsequently passed in the Linux CI run linked above. The local environment failure is not retroactively counted as a local pass.          |
 | Windows default `pnpm e2e`   | Preview startup fed `pnpm.exe` to Node and failed. Tests used an explicit preview-server workaround, not the broken default launcher.                                                                                                                              |
 | Visual evidence              | Four actual built-showcase captures: normal/combined failure at 1280px/360px. All completed on D3D11 with no document overflow. Recovery status and retained furniture were visually inspected. Diagnostic overlay and framing limitations remain, as noted below. |
 
