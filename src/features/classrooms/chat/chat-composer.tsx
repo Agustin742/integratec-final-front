@@ -61,6 +61,11 @@ const MENTION_QUERY_DEBOUNCE_MS = 200;
 /** Cooldown after a `429` whose `Retry-After` header is not exposed. */
 const RATE_LIMIT_FALLBACK_COOLDOWN_SECONDS = 5;
 const RATE_LIMIT_MAX_COOLDOWN_SECONDS = 60;
+/** Lines the draft grows to before it scrolls inside. */
+const MAX_DRAFT_LINES = 4;
+/** Used when the computed line height is `normal`. */
+const FALLBACK_LINE_HEIGHT_PX = 20;
+
 /** Tolerated difference between the browser clock and the server `createdAt`. */
 const CLOCK_SKEW_TOLERANCE_MS = 5_000;
 /** The character counter only appears once the draft is this close to the limit. */
@@ -212,16 +217,65 @@ function ChatComposerForm({
   const abortControllerRef = useRef<AbortController | null>(null);
   const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Auto-grow: one row at rest, up to about five rows (the CSS max height),
-  // then the textarea scrolls. Skipped where layout is unavailable.
-  useLayoutEffect(() => {
+  // The muted state is server-owned context (`chatMuted` on the classroom
+  // detail): while muted, only students lose the send path (S11). The
+  // disabled control is never the enforcement; a send that still reaches the
+  // server is rejected and that outcome is presented below.
+  const isMutedForMe = chatMuted && myRole === 'STUDENT';
+  const hasMentionPicker = canListDirectory && !isMutedForMe;
+
+  const syncHeight = useCallback(() => {
     const element = textareaRef.current;
     if (element === null) return;
+    const savedScrollTop = element.scrollTop;
     element.style.height = 'auto';
-    if (element.scrollHeight > 0) {
-      element.style.height = `${String(element.scrollHeight)}px`;
+    if (element.scrollHeight <= 0) return; // no layout available
+    const style = window.getComputedStyle(element);
+    const px = (value: string) => Number.parseFloat(value) || 0;
+    const lineHeight = px(style.lineHeight) || FALLBACK_LINE_HEIGHT_PX;
+    // `scrollHeight` excludes borders, which `border-box` height includes.
+    const chrome =
+      px(style.paddingTop) +
+      px(style.paddingBottom) +
+      px(style.borderTopWidth) +
+      px(style.borderBottomWidth);
+    const maxHeight = MAX_DRAFT_LINES * lineHeight + chrome;
+    const wanted =
+      element.scrollHeight +
+      px(style.borderTopWidth) +
+      px(style.borderBottomWidth);
+    element.style.height = `${String(Math.min(wanted, maxHeight))}px`;
+    element.style.overflowY = wanted > maxHeight ? 'auto' : 'hidden';
+    element.scrollTop = savedScrollTop;
+  }, []);
+
+  // Auto-grow: one line at rest, up to MAX_DRAFT_LINES lines, then the
+  // textarea scrolls inside. Measured in JS (no `field-sizing`: not universal).
+  // Runs on every value/mute transition and width resize.
+  useLayoutEffect(() => {
+    syncHeight();
+  }, [bodyValue, isMutedForMe, syncHeight]);
+
+  useEffect(() => {
+    const element = textareaRef.current;
+    if (
+      element === null ||
+      isMutedForMe ||
+      typeof ResizeObserver === 'undefined'
+    ) {
+      return;
     }
-  }, [bodyValue]);
+    let lastWidth = element.clientWidth;
+    const observer = new ResizeObserver((entries) => {
+      const nextWidth = entries[0]?.contentRect.width ?? element.clientWidth;
+      if (nextWidth !== lastWidth) {
+        lastWidth = nextWidth;
+        syncHeight();
+      }
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [isMutedForMe, syncHeight]);
 
   useEffect(() => {
     if (focusOnMount) {
@@ -239,13 +293,6 @@ function ChatComposerForm({
       }
     };
   }, []);
-
-  // The muted state is server-owned context (`chatMuted` on the classroom
-  // detail): while muted, only students lose the send path (S11). The
-  // disabled control is never the enforcement; a send that still reaches the
-  // server is rejected and that outcome is presented below.
-  const isMutedForMe = chatMuted && myRole === 'STUDENT';
-  const hasMentionPicker = canListDirectory && !isMutedForMe;
 
   const rawMentionQuery = activeMention?.query ?? null;
 
@@ -691,7 +738,7 @@ function ChatComposerForm({
                   }}
                   onKeyDown={handleKeyDown}
                   className={cn(
-                    'max-h-[7.5rem] min-w-0 flex-1 resize-none overflow-y-auto rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground shadow-xs transition-colors',
+                    'min-h-11 min-w-0 flex-1 resize-none overflow-y-hidden rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground shadow-xs transition-colors',
                     'placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     'disabled:cursor-not-allowed disabled:opacity-50',
                     isSubmitting && 'opacity-70',

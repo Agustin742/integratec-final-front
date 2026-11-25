@@ -99,7 +99,13 @@ describe('classroomMaterialsQueryKey', () => {
       page: 1,
       pageSize: 100,
       sort: '-createdAt',
+      moduleId: null,
     });
+    expect(
+      classroomMaterialsQueryKey('user-1', 'class-1', {
+        moduleId: 'unassigned',
+      })[0].params.moduleId,
+    ).toBe('unassigned');
     expect(keyA).not.toEqual(keyB);
     expect(keyA).not.toEqual(keyC);
 

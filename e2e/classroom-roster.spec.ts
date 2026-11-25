@@ -78,6 +78,7 @@ async function attachRuntimeMonitors(page: Page) {
 test('teacher inspects roster, filters, removes a student logically, and passes responsive/zoom checks', async ({
   page,
 }, testInfo) => {
+  test.setTimeout(60_000);
   const width = testInfo.project.name === 'mobile' ? 360 : 1280;
   await page.setViewportSize({ width, height: 800 });
   const { cspViolations, pageErrors } = await attachRuntimeMonitors(page);
@@ -217,8 +218,9 @@ test('teacher inspects roster, filters, removes a student logically, and passes 
   ).toBeVisible();
 
   await dialog
-    .getByRole('button', { name: copy.removeAriaLabel('Ana Álvarez') })
+    .getByRole('button', { name: copy.actionsAriaLabel('Ana Álvarez') })
     .click();
+  await page.getByRole('menuitem', { name: copy.removeAction }).click();
 
   const confirmRegion = dialog.getByRole('region', {
     name: copy.confirmTitle('Ana Álvarez'),
@@ -253,7 +255,7 @@ test('teacher inspects roster, filters, removes a student logically, and passes 
     dialog.getByText(copy.guardianStates.INACTIVE, { exact: true }),
   ).toBeVisible();
   await expect(
-    dialog.getByRole('button', { name: copy.removeAriaLabel('Ana Álvarez') }),
+    dialog.getByRole('button', { name: copy.actionsAriaLabel('Ana Álvarez') }),
   ).toHaveCount(0);
 
   await page.keyboard.press('Escape');

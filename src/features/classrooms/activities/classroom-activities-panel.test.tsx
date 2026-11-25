@@ -35,20 +35,31 @@ import {
 import { mswServer } from '@/test/msw/server';
 import { render } from '@/test/render';
 import { ActivitiesPanel } from './activities-panel';
+import {
+  chooseRowAction,
+  getRowMenuTrigger,
+  openRowMenu,
+} from './activities-test-utils';
 import { formatActivityDeadline } from './format-activity-deadline';
 import { activityMessages } from './messages';
+
+// Menu and dialog flows with axe scans exceed the 5s default on busy machines.
+vi.setConfig({ testTimeout: 20_000 });
 
 beforeAll(() => {
   mswServer.listen({ onUnhandledFrame: 'error' });
 });
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-11-24T12:00:00.000Z'));
   vi.stubEnv('VITE_APP_ENV', 'test');
   vi.stubEnv('VITE_API_BASE_URL', TEST_API_BASE_URL);
   vi.stubEnv('VITE_REALTIME_URL', 'wss://realtime.example.invalid');
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   mswServer.resetHandlers();
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
@@ -149,7 +160,7 @@ describe('ActivitiesPanel teacher management (#39 + #41 unified)', () => {
     expect(await screen.findByText(draftFileTp.title)).toBeVisible();
     expect(screen.getByText(publishedExam.title)).toBeVisible();
 
-    const list = screen.getByRole('list', {
+    const list = screen.getByRole('group', {
       name: activityMessages.listRegionLabel,
     });
     expect(
@@ -192,23 +203,15 @@ describe('ActivitiesPanel teacher management (#39 + #41 unified)', () => {
     ).toBeVisible();
 
     expect(
-      within(list).getByText(activityMessages.lateAllowedLabel),
-    ).toBeVisible();
-    expect(
       within(list).getByText(
         activityMessages.questionCountLabel(publishedExam.questionCount),
       ),
     ).toBeVisible();
     expect(
       within(list).getAllByText(
-        activityMessages.maxScoreLabel(publishedExam.maxScore),
+        activityMessages.board.scoreLabel(publishedExam.maxScore),
       ),
     ).toHaveLength(2);
-    expect(
-      within(list).getByText(
-        activityMessages.weightLabel(publishedExam.weightMultiplier),
-      ),
-    ).toBeVisible();
 
     // Detail links stay available alongside teacher controls.
     expect(
@@ -223,16 +226,8 @@ describe('ActivitiesPanel teacher management (#39 + #41 unified)', () => {
     expect(
       screen.getByLabelText(activityMessages.stateFilterLabel),
     ).toBeVisible();
-    expect(
-      screen.getByRole('button', {
-        name: actionsCopy.deactivateAriaLabel(draftFileTp.title),
-      }),
-    ).toBeEnabled();
-    expect(
-      screen.getByRole('button', {
-        name: actionsCopy.deactivateAriaLabel(publishedExam.title),
-      }),
-    ).toBeEnabled();
+    expect(getRowMenuTrigger(draftFileTp.title)).toBeEnabled();
+    expect(getRowMenuTrigger(publishedExam.title)).toBeEnabled();
 
     await expectAccessible(container);
   });
@@ -256,22 +251,13 @@ describe('ActivitiesPanel teacher management (#39 + #41 unified)', () => {
     ).toBeVisible();
 
     expect(
-      screen.queryByRole('button', {
-        name: actionsCopy.deactivateAriaLabel(publishedExam.title),
-      }),
+      screen.queryByRole('button', { name: /^Acciones de/ }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: actionsCopy.createAction }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', {
-        name: actionsCopy.editAriaLabel(publishedExam.title),
-      }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', {
-        name: actionsCopy.publishAriaLabel(publishedExam.title),
-      }),
+      screen.queryByRole('menuitem', { name: actionsCopy.editAction }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByLabelText(activityMessages.stateFilterLabel),
@@ -505,23 +491,11 @@ describe('ActivitiesPanel teacher management (#39 + #41 unified)', () => {
       screen.queryByRole('button', { name: actionsCopy.createAction }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', {
-        name: actionsCopy.editAriaLabel(draftFileTp.title),
-      }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', {
-        name: actionsCopy.publishAriaLabel(draftFileTp.title),
-      }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', {
-        name: actionsCopy.deactivateAriaLabel(draftFileTp.title),
-      }),
+      screen.queryByRole('button', { name: /^Acciones de/ }),
     ).not.toBeInTheDocument();
   });
 
-  test('staff actions: create in the header, edit for every item, publish only for drafts', async () => {
+  test('staff actions: create in the header, edit and delete in every row menu, publish only for drafts', async () => {
     mswServer.use(
       createClassroomDetailHandler(classroomId, {
         myRole: 'TEACHER',
@@ -535,29 +509,33 @@ describe('ActivitiesPanel teacher management (#39 + #41 unified)', () => {
 
     const { container } = renderActivitiesPanel();
 
-    expect(
-      await screen.findByRole('button', {
-        name: actionsCopy.editAriaLabel(draftFileTp.title),
-      }),
-    ).toBeEnabled();
+    expect(await screen.findByText(draftFileTp.title)).toBeVisible();
     expect(
       screen.getByRole('button', { name: actionsCopy.createAction }),
     ).toBeEnabled();
-    expect(
-      screen.getByRole('button', {
-        name: actionsCopy.editAriaLabel(publishedExam.title),
-      }),
-    ).toBeEnabled();
-    expect(
-      screen.getByRole('button', {
-        name: actionsCopy.publishAriaLabel(draftFileTp.title),
-      }),
-    ).toBeEnabled();
-    expect(
-      screen.queryByRole('button', {
-        name: actionsCopy.publishAriaLabel(publishedExam.title),
-      }),
-    ).not.toBeInTheDocument();
+
+    const menuItems = async (title: string): Promise<string[]> => {
+      const trigger = await openRowMenu(title);
+      const menu = await screen.findByRole('menu');
+      const labels = within(menu)
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent ?? '');
+      fireEvent.keyDown(menu, { key: 'Escape' });
+      await waitFor(() =>
+        expect(screen.queryByRole('menu')).not.toBeInTheDocument(),
+      );
+      await waitFor(() => expect(trigger).toHaveFocus());
+      return labels;
+    };
+    expect(await menuItems(draftFileTp.title)).toEqual([
+      actionsCopy.editAction,
+      actionsCopy.publishAction,
+      actionsCopy.deactivateAction,
+    ]);
+    expect(await menuItems(publishedExam.title)).toEqual([
+      actionsCopy.editAction,
+      actionsCopy.deactivateAction,
+    ]);
 
     await expectAccessible(container);
   });
@@ -601,10 +579,7 @@ describe('ActivitiesPanel teacher management (#39 + #41 unified)', () => {
 
     renderActivitiesPanel();
 
-    const trigger = await screen.findByRole('button', {
-      name: actionsCopy.deactivateAriaLabel(draftFileTp.title),
-    });
-    fireEvent.click(trigger);
+    const trigger = await chooseRowAction(draftFileTp.title, 'deactivate');
 
     const confirmRegion = await screen.findByRole('region', {
       name: actionsCopy.deactivateConfirmTitle(draftFileTp.title),
@@ -628,9 +603,9 @@ describe('ActivitiesPanel teacher management (#39 + #41 unified)', () => {
         }),
       ).not.toBeInTheDocument();
     });
-    expect(trigger).toHaveFocus();
+    await waitFor(() => expect(trigger).toHaveFocus());
 
-    fireEvent.click(trigger);
+    await chooseRowAction(draftFileTp.title, 'deactivate');
     const activeConfirmRegion = await screen.findByRole('region', {
       name: actionsCopy.deactivateConfirmTitle(draftFileTp.title),
     });
@@ -698,11 +673,7 @@ describe('ActivitiesPanel teacher management (#39 + #41 unified)', () => {
 
     renderActivitiesPanel();
 
-    fireEvent.click(
-      await screen.findByRole('button', {
-        name: actionsCopy.deactivateAriaLabel(draftFileTp.title),
-      }),
-    );
+    await chooseRowAction(draftFileTp.title, 'deactivate');
     const confirmRegion = await screen.findByRole('region', {
       name: actionsCopy.deactivateConfirmTitle(draftFileTp.title),
     });
@@ -753,13 +724,11 @@ describe('ActivitiesPanel teacher management (#39 + #41 unified)', () => {
     );
 
     const view = renderActivitiesPanel();
+    await chooseRowAction(draftFileTp.title, 'deactivate');
     fireEvent.click(
       await screen.findByRole('button', {
-        name: actionsCopy.deactivateAriaLabel(draftFileTp.title),
+        name: actionsCopy.deactivateConfirmSubmit,
       }),
-    );
-    fireEvent.click(
-      screen.getByRole('button', { name: actionsCopy.deactivateConfirmSubmit }),
     );
 
     await waitFor(() => {

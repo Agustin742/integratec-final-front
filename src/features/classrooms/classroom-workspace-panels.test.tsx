@@ -227,7 +227,6 @@ function setup(
     },
   };
 }
-const pendingCatalogCases = [['settings', 'Configuración']] as const;
 
 test('default catalog opens activities by URL with ActivitiesPanel and closes cleanly', async () => {
   const view = setup(['activities'], '/classrooms/a/panels/activities', true);
@@ -318,24 +317,21 @@ test('default catalog opens grades by URL with the GradesPanel teacher view', as
   expect(document.activeElement).toHaveTextContent('Classroom a');
 });
 
-test.each(pendingCatalogCases)(
-  'default catalog opens %s by URL with honest pending content and no action capabilities',
-  async (key, title) => {
-    const view = setup([key], `/classrooms/a/panels/${key}`, true);
-    const dialog = await screen.findByRole('dialog', { name: title });
-    expect(dialog).toHaveTextContent('Funcionalidad pendiente');
-    expect(dialog).toHaveTextContent(
-      'Este panel todavía no incluye su contenido. Podés cerrarlo y volver al aula.',
-    );
-    expect(dialog).not.toHaveTextContent('Synthetic');
-    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
-    await screen.findByRole('button', { name: 'Open grades' });
-    expect(view.router.state.location.pathname).toBe('/classrooms/a');
-    expect(view.router.state.historyAction).toBe('REPLACE');
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(document.activeElement).toHaveTextContent('Classroom a');
-  },
-);
+test('default catalog opens settings by URL with the settings panel, gated by capabilities', async () => {
+  const view = setup(['settings'], '/classrooms/a/panels/settings', true);
+  const dialog = await screen.findByRole('dialog', { name: 'Configuración' });
+  expect(
+    await within(dialog).findByText('Sin permisos para configurar el aula'),
+  ).toBeVisible();
+  expect(dialog).not.toHaveTextContent('Funcionalidad pendiente');
+  expect(dialog).not.toHaveTextContent('Synthetic');
+  fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+  await screen.findByRole('button', { name: 'Open grades' });
+  expect(view.router.state.location.pathname).toBe('/classrooms/a');
+  expect(view.router.state.historyAction).toBe('REPLACE');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(document.activeElement).toHaveTextContent('Classroom a');
+});
 
 test('default catalog opens chat by URL with the chat history panel and closes cleanly', async () => {
   const view = setup(['chat'], '/classrooms/a/panels/chat', true);

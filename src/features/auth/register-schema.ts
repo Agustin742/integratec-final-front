@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { components } from '@/api/schema.generated';
+import { tokenPairSchema } from '@/session/storage';
 import { authMessages } from './messages';
 import {
   createNormalizedEmailSchema,
@@ -25,7 +26,7 @@ export const SCHOOL_NAME_MAX_LENGTH = 150;
 export const REGISTRATION_CHOICES = [
   'INDEPENDENT_TEACHER',
   'SCHOOL',
-  'INVITATION',
+  'INVITEE',
 ] as const;
 
 export type RegistrationChoice = (typeof REGISTRATION_CHOICES)[number];
@@ -62,15 +63,6 @@ export const registerFormSchema = z
     schoolName: z.string(),
   })
   .superRefine((data, ctx) => {
-    if (data.path === 'INVITATION') {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['path'],
-        message: authMessages.validation.pathRequired,
-      });
-      return;
-    }
-
     if (data.path === 'SCHOOL') {
       const trimmedSchoolName = data.schoolName.trim();
       if (trimmedSchoolName.length === 0) {
@@ -94,15 +86,11 @@ export type RegisterFormOutput = z.output<typeof registerFormSchema>;
 
 /**
  * Maps validated registration form values into `RegisterRequestDto`,
- * omitting `schoolName` when registering as an independent teacher.
+ * omitting `schoolName` when registering as an independent teacher or invitee.
  */
 export function toRegisterRequestDto(
   values: RegisterFormOutput,
 ): RegisterRequestDto {
-  if (values.path === 'INVITATION') {
-    throw new Error('Cannot build RegisterRequestDto for INVITATION path.');
-  }
-
   if (values.path === 'SCHOOL') {
     return {
       email: values.email,
@@ -110,6 +98,15 @@ export function toRegisterRequestDto(
       displayName: values.displayName,
       path: 'SCHOOL',
       schoolName: values.schoolName.trim(),
+    };
+  }
+
+  if (values.path === 'INVITEE') {
+    return {
+      email: values.email,
+      password: values.password,
+      displayName: values.displayName,
+      path: 'INVITEE',
     };
   }
 
@@ -133,9 +130,10 @@ export const registerResponseSchema: z.ZodType<RegisterResponseDto> = z
     id: z.string().min(1),
     email: z.email(),
     displayName: z.string().min(1),
-    path: z.enum(['INDEPENDENT_TEACHER', 'SCHOOL']),
+    path: z.enum(['INDEPENDENT_TEACHER', 'SCHOOL', 'INVITEE']),
     school: schoolSummarySchema.optional(),
     createdAt: z.string().min(1),
+    session: tokenPairSchema.optional(),
   })
   .superRefine((value, ctx) => {
     if (value.path === 'SCHOOL' && value.school === undefined) {

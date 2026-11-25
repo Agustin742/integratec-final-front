@@ -63,8 +63,40 @@ export const activityMessages = {
     count === 1 ? '1 pregunta' : `${count} preguntas`,
   openDetailLabel: 'Ver actividad',
   listRegionLabel: 'Actividades del aula',
+  board: {
+    groupLabels: {
+      drafts: 'Borradores',
+      published: 'Publicadas',
+      closed: 'Vencidas',
+      todo: 'Pendientes',
+      done: 'Entregadas',
+    },
+    groupHints: {
+      drafts: 'Solo las ves vos hasta que las publiques.',
+      published: 'Visibles para el aula y con entrega abierta.',
+      closed: 'Ya pasó la fecha límite.',
+      todo: 'Lo que todavía tenés que entregar.',
+      done: 'Lo que ya entregaste o te corrigieron.',
+    },
+    teacherStatus: {
+      DRAFT: 'Borrador',
+      PUBLISHED: 'Publicada',
+      closed: 'Vencida',
+    },
+    workStatus: {
+      pending: 'Pendiente',
+      overdue: 'Atrasada',
+      submitted: 'Entregada',
+      graded: 'Calificada',
+    },
+    summary: (count: number) =>
+      count === 1 ? '1 actividad' : `${count} actividades`,
+    scoreLabel: (maxScore: number) => `${maxScore} pts`,
+    moreActionsAriaLabel: (title: string) => `Acciones de «${title}»`,
+    emptyAction: 'Crear la primera actividad',
+  },
   actions: {
-    createAction: 'Crear actividad',
+    createAction: 'Nueva actividad',
     editAction: 'Editar',
     editAriaLabel: (title: string) => `Editar «${title}»`,
     publishAction: 'Publicar',

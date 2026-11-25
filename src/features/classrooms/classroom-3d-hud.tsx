@@ -22,7 +22,14 @@ export interface ClassroomWorldHudProps {
 }
 
 type FloatingPanelKey =
-  'activities' | 'material' | 'grades' | 'notices' | 'members' | 'bot' | 'shop';
+  | 'activities'
+  | 'material'
+  | 'grades'
+  | 'notices'
+  | 'members'
+  | 'bot'
+  | 'shop'
+  | 'settings';
 
 interface FloatingPanelItem {
   readonly key: FloatingPanelKey;
@@ -37,6 +44,7 @@ const ICON_PATHS: Record<FloatingPanelKey, readonly string[]> = {
   notices: ['M3 4h18v16H3z', 'M7 9h4v4H7zM14 9h3M14 13h3'],
   members: ['M2 7h20v4H2z', 'M4 11v8M20 11v8M14 11v5h6'],
   bot: ['M5 7h14v11H5z', 'M12 3v4M9 12h.01M15 12h.01M9 15h6'],
+  settings: ['M3 6h18M3 12h18M3 18h18', 'M9 4v4M15 10v4M7 16v4'],
   shop: [
     'M4 10h16v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-9Z',
     'M3 10l1.5-5h15L21 10M9 10v2a3 3 0 0 0 6 0v-2',
@@ -74,6 +82,7 @@ const RIGHT_PANELS: readonly FloatingPanelItem[] = [
   { key: 'members', targetId: 'teacher-desk' },
   { key: 'bot', targetId: 'bot-station' },
   { key: 'shop', targetId: 'shop' },
+  { key: 'settings', targetId: undefined },
 ];
 
 // Each panel button is its own floating card, so it reads as a button at rest.

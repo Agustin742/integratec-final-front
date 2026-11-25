@@ -327,12 +327,15 @@ export interface MaterialListQueryParams {
   readonly page?: number;
   readonly pageSize?: number;
   readonly sort?: MaterialSortOrder;
+  /** A module UUID of the classroom, or `unassigned`; omitted lists every file. */
+  readonly moduleId?: string;
 }
 
 export interface NormalizedMaterialListQueryParams {
   readonly page: number;
   readonly pageSize: number;
   readonly sort: MaterialSortOrder;
+  readonly moduleId: string | null;
 }
 
 /**
@@ -349,12 +352,29 @@ export function classroomMaterialsQueryKey(
     page: clampListParam(params.page, 1, 1, 10_000),
     pageSize: clampListParam(params.pageSize, 20, 1, 100),
     sort: params.sort ?? '-createdAt',
+    moduleId: params.moduleId ?? null,
   });
   return createScopedQueryKey(
     { userId, classroomId },
     'materials',
     'list',
     normalizedParams,
+  );
+}
+
+/**
+ * Key of `GET /classrooms/{id}/material-modules`: the ordered module list with
+ * per-module file counts, scoped by both `userId` and `classroomId`.
+ */
+export function classroomMaterialModulesQueryKey(
+  userId: string,
+  classroomId: string,
+): ScopedQueryKey<undefined> {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'materials',
+    'modules',
+    undefined,
   );
 }
 

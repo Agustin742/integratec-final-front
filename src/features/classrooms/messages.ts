@@ -308,6 +308,12 @@ export const classroomMessages = {
     guardianHistoricalNote: 'Estado histórico del vínculo familiar',
     removeAction: 'Dar de baja',
     removeAriaLabel: (name: string) => `Dar de baja a ${name}`,
+    actionsAriaLabel: (name: string) => `Acciones para ${name}`,
+    studentsHeading: 'Alumnos',
+    studentCount: (count: number) =>
+      count === 1 ? '1 estudiante' : `${count} estudiantes`,
+    guardianCount: (count: number) =>
+      count === 1 ? '1 adulto responsable' : `${count} adultos responsables`,
     confirmTitle: (name: string) => `Confirmar baja lógica de «${name}»`,
     confirmDescription:
       'El estudiante perderá el acceso al aula, se liberará su pupitre y se desactivarán sus vínculos familiares activos. Su historial académico (entregas, calificaciones y actividad previa) se conserva.',
@@ -331,6 +337,24 @@ export const classroomMessages = {
     tabsLabel: 'Secciones de integrantes',
     rosterTab: 'Nómina',
     invitationsTab: 'Invitaciones y código',
+    directoryHeading: 'Integrantes del aula',
+    directorySubtitle:
+      'Docentes y compañeros que comparten esta aula. Solo ves nombres y roles.',
+    directoryLoading: 'Cargando integrantes del aula…',
+    directoryErrorTitle: 'No pudimos cargar los integrantes',
+    directoryErrorDescription:
+      'Revisá tu conexión e intentá actualizar el listado.',
+    directoryRetry: 'Reintentar',
+    teachersHeading: 'Docentes',
+    studentsHeading: 'Alumnos',
+    teachersEmpty: 'Todavía no hay docentes visibles en esta aula.',
+    studentsEmptyTitle: 'Todavía no hay alumnos en el aula',
+    studentsEmptyDescription: 'Cuando se sumen compañeros, van a aparecer acá.',
+    selfBadge: 'Vos',
+    roleLabels: {
+      TEACHER: 'Docente',
+      STUDENT: 'Alumno',
+    },
   },
   chat: {
     heading: 'Chat del aula',

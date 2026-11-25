@@ -93,6 +93,11 @@ const syntheticPanels = [
     title: 'Calificaciones',
     component: () => <p>Contenido calificaciones</p>,
   },
+  {
+    key: 'settings',
+    title: 'Configuración',
+    component: () => <p>Contenido configuración</p>,
+  },
 ] as const;
 
 interface SetupOptions {
@@ -568,6 +573,28 @@ describe('Immersive 3D classroom layout (#128)', () => {
       name: classroomMessages.viewMode.immersive.workPanelsLabel,
     });
     expect(buttonNames(left)).toEqual(['Actividades']);
+  });
+
+  test('offers Configuración last in the community group only when the server makes it available', async () => {
+    const view = setup({ availablePanels: [...allPanels, 'settings'] });
+    await screen.findByTestId('world-mock');
+
+    const right = screen.getByRole('navigation', {
+      name: classroomMessages.viewMode.immersive.communityPanelsLabel,
+    });
+    expect(buttonNames(right)).toEqual([
+      'Integrantes',
+      'Asistente de estudio',
+      'Tienda',
+      'Configuración',
+    ]);
+    view.unmount();
+
+    setup({ availablePanels: allPanels });
+    await screen.findByTestId('world-mock');
+    expect(
+      screen.queryByRole('button', { name: 'Configuración' }),
+    ).not.toBeInTheDocument();
   });
 
   test('leaves chat to the global dock: no Chat button even when the server offers it', async () => {

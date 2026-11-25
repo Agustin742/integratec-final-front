@@ -15,6 +15,7 @@ import { render } from '@/test/render';
 import { messages } from '../messages';
 import { fakeSession } from './fake-session';
 import { createAppRoutes } from './routes';
+import { waitForRoute } from './wait-for-route.test-helper';
 
 /** Signed out by default; the protected home needs an authenticated session. */
 async function renderAt(
@@ -267,5 +268,24 @@ test('does not register the showcase route when it is disabled', async () => {
   ).not.toBeInTheDocument();
   expect(
     screen.queryByRole('link', { name: messages.showcase.title }),
+  ).not.toBeInTheDocument();
+});
+
+test('redirects /reset-password to /password-reset preserving query string and token', async () => {
+  const { router } = await renderAt(
+    '/reset-password?token=secret-token-123&next=%2F',
+  );
+
+  await act(async () => {
+    await waitForRoute(router, '/password-reset');
+  });
+
+  expect(router.state.location.pathname).toBe('/password-reset');
+  // PasswordResetForm scrubs the token immediately, preserving safe params like ?next=
+  await waitFor(() => {
+    expect(router.state.location.search).toBe('?next=%2F');
+  });
+  expect(
+    screen.queryByRole('heading', { name: messages.pages.notFound.title }),
   ).not.toBeInTheDocument();
 });

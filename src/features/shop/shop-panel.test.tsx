@@ -7,7 +7,15 @@ import {
 } from '@testing-library/react';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { createApiClient } from '@/api/client';
 import { ApiQueryProvider, createAppQueryClient } from '@/api/query-client';
 import { ownAvatarStylesQueryKey } from '@/api/query-keys';
@@ -25,6 +33,12 @@ import {
 import { mswServer } from '@/test/msw/server';
 import { render } from '@/test/render';
 import { ShopPanel } from './shop-panel';
+
+vi.mock('./item-preview-renderer', () => ({
+  renderGlbThumbnail: vi.fn(() =>
+    Promise.resolve('data:image/png;base64,AAAA'),
+  ),
+}));
 
 const CLASSROOM_ID = '00000000-0000-4000-8000-000000000048';
 const ITEM_CAP_ID = '00000000-0000-4000-8000-000000001001';
@@ -454,5 +468,38 @@ describe('ShopPanel (#48)', () => {
     const view = renderShopRoute({ role: 'STUDENT' });
     expect(await screen.findByText('Gorra clásica')).toBeVisible();
     await expectAccessible(view.container);
+  });
+  it('shows what each item is: a rendered preview for accessories and an illustration otherwise, with the price as a card', async () => {
+    const store = createClassroomShopStore({
+      classroomId: CLASSROOM_ID,
+      initialBalance: 250,
+      initialItems: [
+        makeItem({ metadata: { slot: 'head', assetId: 'cap' } }),
+        makeItem({
+          id: ITEM_LAMP_ID,
+          code: 'desk-lamp',
+          name: 'Lámpara de escritorio',
+          kind: 'DESK_UPGRADE',
+          price: 180,
+          metadata: { assetId: 'desk_lamp' },
+        }),
+      ],
+    });
+    mswServer.use(...store.handlers);
+
+    renderShopRoute({ role: 'STUDENT' });
+
+    expect(
+      await screen.findByRole('img', { name: 'Vista previa de Gorra clásica' }),
+    ).toHaveAttribute('src', 'data:image/png;base64,AAAA');
+    expect(
+      screen.getByRole('img', { name: 'Ilustración de Lámpara de escritorio' }),
+    ).toBeInTheDocument();
+    const cards = screen.getAllByRole('listitem');
+    expect(cards).toHaveLength(2);
+    expect(within(cards[0]).getByText('100 puntos')).toBeVisible();
+    expect(
+      within(cards[0]).getByRole('button', { name: 'Comprar' }),
+    ).toBeVisible();
   });
 });

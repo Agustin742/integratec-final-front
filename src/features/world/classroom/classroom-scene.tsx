@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useThree } from '@react-three/fiber';
 import type { Avatar } from '@/features/profile/avatar-options';
 import { CLASSROOM_LAYOUT, type AvatarInput } from '@/realtime';
 import type { AvatarEquipped } from '../avatar/avatar-part-plan';
@@ -33,6 +34,7 @@ import type { FloorClickEvent } from './floor-click';
 import { FollowCamera } from './follow-camera';
 import { InteractableHighlight } from './interactable-highlight';
 import { ClassroomKit } from './kit/classroom-kit';
+import type { ClassroomKitModuleId } from './kit/classroom-kit-manifest';
 import { LocalAvatar } from './local-avatar';
 import { createNpcLivePositions } from './npc-live-position';
 import { ProximityTracker, type ProximityAnchor } from './proximity-tracker';
@@ -40,6 +42,7 @@ import { RemoteAvatar, type RemoteClassroomParticipant } from './remote-avatar';
 import { useClassroomNavigation } from './use-classroom-navigation';
 
 export interface ClassroomSceneProps {
+  onAssetError?: (() => void) | undefined;
   /** Confirmed profile avatar; the scene works without it. */
   avatar?: Avatar | undefined;
   /** Classroom id: scopes avatar assets and resets the local avatar. */
@@ -98,6 +101,7 @@ type ScenePointerEvent = FloorClickEvent & InteractablePointerEvent;
 export function ClassroomScene({
   avatar,
   scopeKey,
+  onAssetError,
   selfPose,
   selfEquipped,
   connectionKey,
@@ -117,7 +121,27 @@ export function ClassroomScene({
   onNpcSpeech,
   onNpcSpeechAnchor,
 }: ClassroomSceneProps) {
-  const scene = useMemo(() => buildClassroomScene(CLASSROOM_LAYOUT), []);
+  const invalidate = useThree((state) => state.invalidate);
+  const { resource: scene } = useMemo(
+    () => ({ scopeKey, resource: buildClassroomScene(CLASSROOM_LAYOUT) }),
+    [scopeKey],
+  );
+  const failedModules = useRef({
+    scene,
+    ids: new Set<ClassroomKitModuleId>(),
+  });
+  const handleModuleError = useCallback(
+    (id: ClassroomKitModuleId) => {
+      if (failedModules.current.scene !== scene) {
+        failedModules.current = { scene, ids: new Set() };
+      }
+      failedModules.current.ids.add(id);
+      scene.setFailedModules(failedModules.current.ids);
+      invalidate();
+      onAssetError?.();
+    },
+    [scene, onAssetError, invalidate],
+  );
   useEffect(() => () => scene.dispose(), [scene]);
   const kitPlacements = useMemo(
     () => [
@@ -241,7 +265,12 @@ export function ClassroomScene({
           onSpeechAnchor={onNpcSpeechAnchor}
         />
       </primitive>
-      <ClassroomKit placements={kitPlacements} scopeKey={scopeKey} />
+      <ClassroomKit
+        key={scopeKey}
+        placements={kitPlacements}
+        scopeKey={scopeKey}
+        onModuleError={handleModuleError}
+      />
       <ClassroomDoor poseRef={controller.poseRef} scopeKey={scopeKey} />
       <InteractableHighlight
         interactablesById={interactablesById}

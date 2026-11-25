@@ -83,36 +83,38 @@ describe('checkAssetBudgets', () => {
     });
   });
 
-  it('passes public/models with recorded #91 exceptions and zero unexempted failures', () => {
+  it('passes public/models within FD8 limits and zero exceptions', () => {
     const result = checkAssetBudgets();
     expect(result.ok).toBe(true);
+    expect(Object.keys(BUDGET_EXCEPTIONS)).toHaveLength(0);
     const exceptionItems = result.items.filter(
       (item) => item.status === 'EXCEPTION',
     );
-    expect(exceptionItems.map((item) => item.path).sort()).toEqual(
-      Object.keys(BUDGET_EXCEPTIONS).sort(),
-    );
+    expect(exceptionItems).toHaveLength(0);
 
     const report = formatAssetBudgetReport(result);
-    for (const exceptionPath of Object.keys(BUDGET_EXCEPTIONS)) {
-      expect(report).toContain(
-        `[assets:check] EXCEPTION (avatar) ${exceptionPath}:`,
-      );
-      expect(report).toContain('(tracked in #91)');
-    }
+    expect(report).toContain('within FD8 limits.');
   });
 
   it('fails if an exempted file grows past its recorded ceiling or exceptions are disabled', () => {
     const dir = makeTempModelsDir();
     mkdirSync(join(dir, 'avatars', 'female'), { recursive: true });
+    const ceiling = AVATAR_GLB_MAX_BYTES + 256;
+    const syntheticExceptions = {
+      'avatars/female/body.glb': {
+        path: 'avatars/female/body.glb',
+        issue: '#91',
+        maxBytes: ceiling,
+      },
+    };
     writeFileSync(
       join(dir, 'avatars', 'female', 'body.glb'),
-      Buffer.alloc(BUDGET_EXCEPTIONS['avatars/female/body.glb'].maxBytes + 1),
+      Buffer.alloc(ceiling + 1),
     );
 
     const bloatedResult = checkAssetBudgets({
       modelsDir: dir,
-      exceptions: BUDGET_EXCEPTIONS,
+      exceptions: syntheticExceptions,
     });
     expect(bloatedResult.ok).toBe(false);
     expect(bloatedResult.items[0]?.status).toBe('FAIL');
@@ -120,19 +122,25 @@ describe('checkAssetBudgets', () => {
       'FAIL (avatar) avatars/female/body.glb',
     );
 
-    const unexemptedDefault = checkAssetBudgets({ exceptions: {} });
-    expect(unexemptedDefault.ok).toBe(false);
-
-    const customDirWithoutExceptions = makeTempModelsDir();
-    mkdirSync(join(customDirWithoutExceptions, 'avatars', 'female'), {
-      recursive: true,
+    const withinException = checkAssetBudgets({
+      modelsDir: dir,
+      exceptions: syntheticExceptions,
     });
+    // Still fails above ceiling; verify a size at exact ceiling passes with EXCEPTION
     writeFileSync(
-      join(customDirWithoutExceptions, 'avatars', 'female', 'body.glb'),
-      Buffer.alloc(AVATAR_GLB_MAX_BYTES + 1),
+      join(dir, 'avatars', 'female', 'body.glb'),
+      Buffer.alloc(ceiling),
     );
-    expect(
-      checkAssetBudgets({ modelsDir: customDirWithoutExceptions }).ok,
-    ).toBe(false);
+    const exempted = checkAssetBudgets({
+      modelsDir: dir,
+      exceptions: syntheticExceptions,
+    });
+    expect(exempted.ok).toBe(true);
+    expect(exempted.items[0]?.status).toBe('EXCEPTION');
+    expect(formatAssetBudgetReport(exempted)).toContain('(tracked in #91)');
+
+    const unexempted = checkAssetBudgets({ modelsDir: dir, exceptions: {} });
+    expect(unexempted.ok).toBe(false);
+    expect(withinException.ok).toBe(false);
   });
 });

@@ -6,22 +6,10 @@ export const AVATAR_GLB_MAX_BYTES = 1024 * 1024; // 1 MiB (FD8)
 export const SCENE_GLB_MAX_BYTES = 8 * 1024 * 1024; // 8 MiB (FD8)
 
 /**
- * Recorded FD8 budget exceptions for pre-existing uncompressed avatar GLBs
- * committed before the asset pipeline (#25). Ceilings match committed sizes
- * with zero slack so any growth still fails CI until compressed in #91.
+ * Recorded FD8 budget exceptions (none currently active; pre-existing #91
+ * male/female body.glb exceptions were retired via Draco + animation optimization).
  */
-export const BUDGET_EXCEPTIONS = Object.freeze({
-  'avatars/female/body.glb': Object.freeze({
-    path: 'avatars/female/body.glb',
-    issue: '#91',
-    maxBytes: 3_804_416,
-  }),
-  'avatars/male/body.glb': Object.freeze({
-    path: 'avatars/male/body.glb',
-    issue: '#91',
-    maxBytes: 2_740_644,
-  }),
-});
+export const BUDGET_EXCEPTIONS = Object.freeze({});
 
 function isGlbFile(filename) {
   return filename.toLowerCase().endsWith('.glb');

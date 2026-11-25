@@ -11,22 +11,22 @@ Planned art for the classroom world. Tick an item when its GLB (or texture/mater
 
 ### Animations
 
-- [ ] Idle
-- [ ] Walk
-- [ ] Run
-- [ ] Sit
-- [ ] Sit and write
-- [ ] Raise hand
-- [ ] Wave
-- [ ] Cheer
-- [ ] Clap
-- [ ] Think
-- [ ] Nod
-- [ ] Shake head
-- [ ] Sad / frustrated
-- [ ] Dance
-- [ ] Teacher: explain at the board
-- [ ] Teacher: point
+- [x] Idle
+- [x] Walk
+- [x] Run
+- [x] Sit
+- [x] Sit and write
+- [x] Raise hand
+- [x] Wave
+- [x] Cheer
+- [x] Clap
+- [x] Think
+- [x] Nod
+- [x] Shake head
+- [x] Sad / frustrated
+- [x] Dance
+- [x] Teacher: explain at the board
+- [x] Teacher: point
 
 ### Face expressions
 
@@ -168,18 +168,28 @@ Seasonal:
 
 ### Hand items
 
-- [ ] Pencil
-- [ ] Book
-- [ ] Ruler
-- [ ] Mug
-- [ ] Phone
+- [x] Pencil
+- [x] Book
+- [x] Ruler
+- [x] Mug
+- [x] Phone
+- [x] Mate
+- [x] Magnifying glass
+- [x] Paintbrush
+- [x] Tablet
+- [x] Trophy
 
 ### Neck and ears
 
-- [ ] Scarf
-- [ ] Necklace
-- [ ] Earrings
-- [ ] Bow tie
+- [x] Scarf ([neck-scarf.glb](../../public/models/avatars/male/neck-scarf.glb) · [female](../../public/models/avatars/female/neck-scarf.glb) — [neck and ears guide](neck-ears.md))
+- [x] Necklace ([neck-necklace.glb](../../public/models/avatars/male/neck-necklace.glb) · [female](../../public/models/avatars/female/neck-necklace.glb) — [neck and ears guide](neck-ears.md))
+- [x] Earrings ([neck-earrings.glb](../../public/models/avatars/shared/neck-earrings.glb) — [neck and ears guide](neck-ears.md))
+- [x] Bow tie ([neck-bow-tie.glb](../../public/models/avatars/male/neck-bow-tie.glb) · [female](../../public/models/avatars/female/neck-bow-tie.glb) — [neck and ears guide](neck-ears.md))
+- [x] Lanyard badge _(extra)_ ([neck-lanyard-badge.glb](../../public/models/avatars/male/neck-lanyard-badge.glb) · [female](../../public/models/avatars/female/neck-lanyard-badge.glb) — [neck and ears guide](neck-ears.md))
+- [x] Bandana _(extra)_ ([neck-bandana.glb](../../public/models/avatars/male/neck-bandana.glb) · [female](../../public/models/avatars/female/neck-bandana.glb) — [neck and ears guide](neck-ears.md))
+- [x] Achievement medal _(extra)_ ([neck-achievement-medal.glb](../../public/models/avatars/male/neck-achievement-medal.glb) · [female](../../public/models/avatars/female/neck-achievement-medal.glb) — [neck and ears guide](neck-ears.md))
+- [x] Star earrings _(extra)_ ([neck-star-earrings.glb](../../public/models/avatars/shared/neck-star-earrings.glb) — [neck and ears guide](neck-ears.md))
+- [x] Ear cuffs _(extra)_ ([neck-ear-cuffs.glb](../../public/models/avatars/shared/neck-ear-cuffs.glb) — [neck and ears guide](neck-ears.md))
 
 ## 3. Environment objects
 
@@ -205,69 +215,69 @@ Seasonal:
 
 ### Decoration
 
-- [ ] Wall clock
-- [ ] Flag
-- [ ] Map
-- [ ] Globe
-- [ ] Wall posters
-- [ ] Plants and pots
-- [ ] Rug
-- [ ] Garlands
+- [x] Wall clock
+- [x] Flag
+- [x] Map
+- [x] Globe
+- [x] Wall posters
+- [x] Plants and pots
+- [x] Rug
+- [x] Garlands
 
 ### Desk clutter
 
-- [ ] Notebooks
-- [ ] Pencil case
-- [ ] Pencils
-- [ ] Stacked books
-- [ ] Backpack on the floor
+- [x] Notebooks
+- [x] Pencil case
+- [x] Pencils
+- [x] Stacked books
+- [x] Backpack on the floor
 
 ### Desk decor (shop)
 
-- [ ] Plant
-- [ ] Lamp
-- [ ] Photo frame
-- [ ] Puzzle cube
-- [ ] Figurine
-- [ ] Mug
-- [ ] Mini globe
+- [x] Plant
+- [x] Lamp
+- [x] Photo frame
+- [x] Puzzle cube
+- [x] Figurine
+- [x] Mug
+- [x] Mini globe
 
 ### Classroom themes
 
-- [ ] Warm
-- [ ] Night
-- [ ] Space
-- [ ] Forest
-- [ ] Holiday
+- [x] Warm
+- [x] Night
+- [x] Space
+- [x] Forest
+- [x] Holiday
 
 ### Other spaces (if more than one room)
 
-- [ ] Hallway
-- [ ] Schoolyard
-- [ ] Library
-- [ ] Lab
+- [x] Hallway
+- [x] Schoolyard
+- [x] Library
+- [x] Lab
 
 ## 4. Interactive objects
 
-- [ ] Own student desk: Pending activities
-- [ ] Teacher desk: Classroom controls
-- [ ] Board: Collaborative tool / announcements
-- [ ] Door: Move to another classroom
-- [ ] Shop kiosk: Shop
-- [ ] Bulletin board: Forum and notices
-- [ ] Report card: Grades
-- [ ] Mailbox or computer: Chat
-- [ ] Game console / arcade: Minigames
-- [ ] Pet bed / corner: Pet interaction
-- [ ] Trophy shelf / chest: Achievements and streaks
+- [x] Own student desk: Pending activities
+- [x] Teacher desk: Classroom controls
+- [x] Board: Collaborative tool / announcements
+- [x] Door: Move to another classroom
+- [x] Shop kiosk: Shop
+- [x] Bulletin board: Forum and notices
+- [x] Report card: Grades
+- [x] Mailbox or computer: Chat
+- [x] Game console / arcade: Minigames
+- [x] Pet bed / corner: Pet interaction
+- [x] Trophy shelf / chest: Achievements and streaks
 
 ### Classroom pet (Michi, cat)
 
-- [ ] Pet model
-- [ ] Animation: sleep
-- [ ] Animation: walk
-- [ ] Animation: meow
-- [ ] Animation: ask for pets
+- [x] Pet model
+- [x] Animation: sleep
+- [x] Animation: walk
+- [x] Animation: meow
+- [x] Animation: ask for pets
 - [ ] Accessory: scarf
 - [ ] Accessory: hat
 - [ ] Accessory: bow
@@ -275,18 +285,18 @@ Seasonal:
 
 ## 5. The bot
 
-- [ ] Tutor bot 3D model (friendly robot in the classroom palette)
-- [ ] Bot station / fixed corner in the classroom
-- [ ] Animation: idle hover
-- [ ] Animation: wave
-- [ ] Animation: talk
-- [ ] Animation: think
-- [ ] Animation: celebrate a right answer
-- [ ] Animation: encourage after a mistake
-- [ ] Face / screen: happy
-- [ ] Face / screen: thinking
-- [ ] Face / screen: talking
-- [ ] Face / screen: surprised
-- [ ] Face / screen: sleeping
-- [ ] 2D bot icon for the study panel and the daily review
-- [ ] Color or accessory variants (future shop items)
+- [x] Tutor bot 3D model (friendly robot in the classroom palette)
+- [x] Bot station / fixed corner in the classroom
+- [x] Animation: idle hover
+- [x] Animation: wave
+- [x] Animation: talk
+- [x] Animation: think
+- [x] Animation: celebrate a right answer
+- [x] Animation: encourage after a mistake
+- [x] Face / screen: happy
+- [x] Face / screen: thinking
+- [x] Face / screen: talking
+- [x] Face / screen: surprised
+- [x] Face / screen: sleeping
+- [x] 2D bot icon for the study panel and the daily review
+- [x] Color or accessory variants (future shop items)

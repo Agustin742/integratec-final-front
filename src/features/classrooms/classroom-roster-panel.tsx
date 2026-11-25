@@ -19,7 +19,14 @@ import { DEFAULT_PAGE_SIZE } from '@/components/pagination/pagination';
 import { PaginationControls } from '@/components/pagination/pagination-controls';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonStyles } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { InitialsAvatar } from '@/components/ui/initials-avatar';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/toast';
@@ -109,6 +116,7 @@ export function ClassroomRosterPanel({
   const isRemovingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const reconciledContextErrorRef = useRef<unknown>(null);
+  const pendingMenuActionRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -347,14 +355,21 @@ export function ClassroomRosterPanel({
       className="min-w-0 space-y-5 pt-2"
     >
       <div className="min-w-0 space-y-1">
-        <h3
-          id={rosterHeadingId}
-          ref={rosterHeadingRef}
-          tabIndex={-1}
-          className="font-display text-lg font-semibold text-foreground outline-none"
-        >
-          {messages.heading}
-        </h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <h3
+            id={rosterHeadingId}
+            ref={rosterHeadingRef}
+            tabIndex={-1}
+            className="font-display text-lg font-semibold text-foreground outline-none"
+          >
+            {messages.heading}
+          </h3>
+          {data !== undefined && data.total > 0 ? (
+            <Badge variant="secondary">
+              {messages.studentCount(data.total)}
+            </Badge>
+          ) : null}
+        </div>
         <p className="text-sm text-pretty text-muted-foreground">
           {messages.subtitle}
         </p>
@@ -363,8 +378,8 @@ export function ClassroomRosterPanel({
       <LiveRegion message={liveAnnouncement} visuallyHidden />
 
       {!isRevokedAccess && (
-        <div className="min-w-0 space-y-3 rounded-2xl border border-edge bg-tray/40 p-3.5">
-          <div className="min-w-0 space-y-1.5">
+        <div className="flex min-w-0 flex-wrap items-end gap-x-4 gap-y-3 rounded-2xl border border-edge bg-tray/40 p-3.5">
+          <div className="min-w-0 flex-1 basis-60 space-y-1.5">
             <Label htmlFor={searchInputId}>{messages.searchLabel}</Label>
             <div className="flex flex-wrap items-center gap-2">
               <Input
@@ -499,7 +514,10 @@ export function ClassroomRosterPanel({
       )}
 
       {data !== undefined && data.items.length > 0 && (
-        <ul className="min-w-0 space-y-3" aria-label={messages.heading}>
+        <ul
+          className="min-w-0 divide-y divide-edge/60 overflow-hidden rounded-2xl border border-edge bg-card text-card-foreground shadow-panel"
+          aria-label={messages.heading}
+        >
           {data.items.map((student) => {
             const isActive = student.state === 'ACTIVE';
             const isConfirmingThis = confirmTarget?.userId === student.userId;
@@ -509,10 +527,11 @@ export function ClassroomRosterPanel({
             return (
               <li
                 key={student.membershipId}
-                className="min-w-0 space-y-3 rounded-2xl border border-edge bg-card p-4 text-card-foreground shadow-panel"
+                className="min-w-0 space-y-2.5 px-3 py-3"
               >
-                <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1 space-y-1.5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <InitialsAvatar name={student.displayName} />
+                  <div className="min-w-0 flex-1 space-y-0.5">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-display text-base font-semibold text-foreground wrap-anywhere">
                         {student.displayName}
@@ -531,23 +550,58 @@ export function ClassroomRosterPanel({
                   </div>
 
                   {isActive && (
-                    <Button
-                      ref={setRemoveButtonRef(student.userId)}
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      aria-label={messages.removeAriaLabel(student.displayName)}
-                      aria-expanded={isConfirmingThis}
-                      disabled={isRemoving || isConfirmingThis}
-                      onClick={() => handleOpenConfirmation(student)}
-                      className="min-h-11 shrink-0"
-                    >
-                      {messages.removeAction}
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          ref={setRemoveButtonRef(student.userId)}
+                          type="button"
+                          disabled={isRemoving || isConfirmingThis}
+                          aria-label={messages.actionsAriaLabel(
+                            student.displayName,
+                          )}
+                          className={buttonStyles({
+                            variant: 'outline',
+                            size: 'icon',
+                            disabled: isRemoving || isConfirmingThis,
+                          })}
+                        >
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 24 24"
+                            className="size-5"
+                            fill="currentColor"
+                          >
+                            <circle cx="5" cy="12" r="1.8" />
+                            <circle cx="12" cy="12" r="1.8" />
+                            <circle cx="19" cy="12" r="1.8" />
+                          </svg>
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        onCloseAutoFocus={(event) => {
+                          const pending = pendingMenuActionRef.current;
+                          if (pending) {
+                            pendingMenuActionRef.current = null;
+                            event.preventDefault();
+                            pending();
+                          }
+                        }}
+                      >
+                        <DropdownMenuItem
+                          tone="destructive"
+                          onSelect={() => {
+                            pendingMenuActionRef.current = () =>
+                              handleOpenConfirmation(student);
+                          }}
+                        >
+                          {messages.removeAction}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
                 </div>
 
-                <div className="min-w-0 space-y-1.5 border-t border-edge/60 pt-2.5">
+                <div className="min-w-0 space-y-1.5 sm:pl-[3.25rem]">
                   <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                     {messages.guardiansHeading}
                   </p>
@@ -556,11 +610,11 @@ export function ClassroomRosterPanel({
                       {messages.guardiansEmpty}
                     </p>
                   ) : (
-                    <ul className="min-w-0 space-y-1.5">
+                    <ul className="flex min-w-0 flex-wrap gap-2">
                       {student.guardians.map((guardian) => (
                         <li
                           key={guardian.id}
-                          className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl bg-tray/45 px-3 py-2 text-sm"
+                          className="flex min-w-0 items-center gap-2 rounded-full bg-tray/60 py-1 pr-1 pl-3 text-sm"
                         >
                           <span className="min-w-0 font-medium text-foreground wrap-anywhere">
                             {guardian.displayName}

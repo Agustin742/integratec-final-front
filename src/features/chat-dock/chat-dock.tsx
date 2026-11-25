@@ -7,6 +7,7 @@ import { useChatInbox } from '../chat-inbox/use-chat-inbox';
 import { ChatBubbleIcon, ChevronUpIcon } from './chat-dock-icons';
 import { ChatDockList, UnreadBadge } from './chat-dock-list';
 import { useChatDockState } from './chat-dock-state';
+import { useDockPresence } from './use-dock-presence';
 import { ChatDockWindow } from './chat-dock-window';
 import { chatDockMessages as messages } from './messages';
 
@@ -39,6 +40,7 @@ function ChatDockContent({ userId }: { readonly userId: string }) {
   const { inbox, totalUnread } = useChatInbox();
   const [state, dispatch] = useChatDockState(userId);
   const listId = useId();
+  const listPresence = useDockPresence(state.listOpen);
   const launcherRef = useRef<HTMLButtonElement | null>(null);
   const toggleRef = useRef<HTMLButtonElement | null>(null);
   const itemRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -120,27 +122,28 @@ function ChatDockContent({ userId }: { readonly userId: string }) {
         />
       ) : null}
 
-      <div className="pointer-events-none flex w-64 flex-col max-sm:w-auto max-sm:items-end">
-        {state.listOpen ? (
-          <ChatDockList
-            id={listId}
-            userId={userId}
-            items={items}
-            activeId={conversation?.classroomId ?? null}
-            covered={conversationExpanded}
-            registerItem={registerItem}
-            onSelect={(classroomId) => {
-              dispatch({ type: 'openConversation', classroomId });
-            }}
-            onClose={() => {
-              dispatch({ type: 'closeList' });
-              focusRequestRef.current = {
-                target: 'launcher',
-                classroomId: null,
-              };
-            }}
-          />
-        ) : null}
+      {/* One continuous surface: the launcher is the header of the open list
+          (same background, radius and border, no gap), so the dock reads as a
+          single panel that expands from its toggle. */}
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+      <div
+        data-chat-dock-surface=""
+        onKeyDown={(event) => {
+          if (
+            state.listOpen &&
+            event.key === 'Escape' &&
+            !event.defaultPrevented
+          ) {
+            event.preventDefault();
+            dispatch({ type: 'closeList' });
+            focusRequestRef.current = {
+              target: 'launcher',
+              classroomId: null,
+            };
+          }
+        }}
+        className="pointer-events-none flex w-64 flex-col max-sm:w-auto max-sm:items-end sm:pointer-events-auto sm:overflow-hidden sm:rounded-t-2xl sm:border sm:border-b-0 sm:border-edge sm:bg-card sm:shadow-float"
+      >
         <button
           type="button"
           ref={launcherRef}
@@ -151,9 +154,10 @@ function ChatDockContent({ userId }: { readonly userId: string }) {
             dispatch({ type: 'toggleList' });
           }}
           className={cn(
-            'pointer-events-auto flex min-h-12 w-full cursor-pointer items-center gap-2 rounded-t-2xl border border-b-0 border-edge bg-card px-3 text-card-foreground shadow-float',
-            'hover:bg-tray focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring',
-            'max-sm:w-auto max-sm:rounded-full max-sm:border-b',
+            'pointer-events-auto flex min-h-12 w-full cursor-pointer items-center gap-2 bg-card px-3 text-card-foreground',
+            'hover:bg-tray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+            'max-sm:w-auto max-sm:rounded-full max-sm:border max-sm:border-edge max-sm:shadow-float',
+            state.listOpen && 'sm:border-b sm:border-edge',
           )}
         >
           <ChatBubbleIcon />
@@ -170,6 +174,29 @@ function ChatDockContent({ userId }: { readonly userId: string }) {
             <ChevronUpIcon />
           </span>
         </button>
+        {listPresence.mounted ? (
+          <ChatDockList
+            id={listId}
+            userId={userId}
+            items={items}
+            activeId={conversation?.classroomId ?? null}
+            covered={conversationExpanded}
+            animated={listPresence.animated}
+            closing={!state.listOpen}
+            onAnimationEnd={listPresence.onAnimationEnd}
+            registerItem={registerItem}
+            onSelect={(classroomId) => {
+              dispatch({ type: 'openConversation', classroomId });
+            }}
+            onClose={() => {
+              dispatch({ type: 'closeList' });
+              focusRequestRef.current = {
+                target: 'launcher',
+                classroomId: null,
+              };
+            }}
+          />
+        ) : null}
       </div>
     </div>
   );

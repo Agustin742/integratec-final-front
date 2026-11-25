@@ -15,6 +15,7 @@ import {
 import type { ClassroomLayout } from '@/realtime';
 import { DESK_HEIGHT, deriveDesks } from './classroom-desks';
 import { deriveClassroomPropSpecs } from './classroom-interactables';
+import type { ClassroomKitModuleId } from './kit/classroom-kit-manifest';
 
 /** Art-direction palette (`rules/art-direction.md`). */
 export const CLASSROOM_COLORS = {
@@ -46,6 +47,7 @@ export type PlaceholderKind =
 
 export interface ClassroomScene {
   readonly root: Group;
+  setFailedModules(ids: ReadonlySet<ClassroomKitModuleId>): void;
   /** Releases every geometry, material and instance buffer built here. */
   dispose(): void;
 }
@@ -197,9 +199,13 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   }
 
   const legHeight = DESK_HEIGHT - DESK_TOP_THICKNESS;
-  const legs = new InstancedMesh(box, proxyMaterial, desks.length * 4);
+  const legs = new InstancedMesh(box, proxyMaterial, students.length * 4);
   legs.name = 'desk-legs';
-  desks.forEach((desk, deskIndex) => {
+  legs.userData.deskKind = 'student';
+  const teacherLegs = new InstancedMesh(box, proxyMaterial, teacher ? 4 : 0);
+  teacherLegs.name = 'teacher-desk-legs';
+  teacherLegs.userData.deskKind = 'teacher';
+  desks.forEach((desk) => {
     const dx = desk.width / 2 - LEG_INSET - LEG_SIZE / 2;
     const dz = desk.depth / 2 - LEG_INSET - LEG_SIZE / 2;
     [
@@ -213,11 +219,14 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
         identity,
         new Vector3(LEG_SIZE, legHeight, LEG_SIZE),
       );
-      legs.setMatrixAt(deskIndex * 4 + corner, matrix);
+      const target = desk.kind === 'student' ? legs : teacherLegs;
+      const index = desk.kind === 'student' ? students.indexOf(desk) : 0;
+      target.setMatrixAt(index * 4 + corner, matrix);
     });
   });
   legs.instanceMatrix.needsUpdate = true;
-  root.add(legs);
+  root.add(legs, teacherLegs);
+  teacherLegs.instanceMatrix.needsUpdate = true;
 
   /**
    * A placeholder is its own group, tagged for #38. Local axes: x along the
@@ -301,9 +310,33 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
       owned.add(child.material as Material);
       if (child instanceof InstancedMesh) child.dispose();
     });
+    owned.add(proxyMaterial);
     geometries.forEach((geometry) => geometry.dispose());
     owned.forEach((item) => item.dispose());
   };
 
-  return { root, dispose };
+  // Each recoverable target owns a material: revealing one module must never
+  // reveal another module's proxy or mutate a cached GLB material.
+  const recoveryTargets = [
+    ['floor-tile', floor],
+    ['floor-threshold', entrance],
+    ['student-desk', studentTops],
+    ['student-desk', legs],
+    ['teacher-desk', teacherLegs],
+    ['teacher-desk', root.getObjectByName('teacher-desk')],
+    ['board', board.children[0]],
+    ['bookshelf', shelf.children[0]],
+  ] as const;
+  const setFailedModules = (ids: ReadonlySet<ClassroomKitModuleId>) => {
+    for (const [id, target] of recoveryTargets) {
+      if (!(target instanceof Mesh)) continue;
+      if (ids.has(id) && target.material === proxyMaterial) {
+        target.material = proxyMaterial.clone();
+      }
+      if (target.material !== proxyMaterial) {
+        (target.material as Material).visible = ids.has(id);
+      }
+    }
+  };
+  return { root, dispose, setFailedModules };
 }

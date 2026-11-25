@@ -26,6 +26,11 @@ const nav = vi.hoisted(() => ({
   } | null,
 }));
 
+vi.mock('@react-three/fiber', () => ({
+  useThree: (select: (state: { invalidate: () => void }) => unknown) =>
+    select({ invalidate: vi.fn() }),
+}));
+
 vi.mock('./use-classroom-navigation', () => ({
   useClassroomNavigation: (options: unknown) => {
     nav.options = options;
