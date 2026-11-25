@@ -86,7 +86,6 @@ const rootActionClass =
  */
 export function RootErrorBoundary() {
   useDocumentTitle(messages.errors.root.title);
-  const ciDebugError = useRouteError();
 
   return (
     <main className="grid min-h-dvh place-items-center bg-background px-4 py-8 text-foreground">
@@ -103,7 +102,6 @@ export function RootErrorBoundary() {
           </h2>
           <p className="text-pretty text-muted-foreground">
             {messages.errors.root.description}
-            <code data-ci-debug>{String((ciDebugError as Error)?.stack ?? ciDebugError).slice(0, 1500)}</code>
           </p>
           <div className="flex flex-wrap justify-center gap-3 pt-2">
             <button

@@ -281,7 +281,6 @@ function readSnapshot(state: CallState): CallStateSnapshot {
 export function createCallRoomClient(
   options: CreateCallRoomClientOptions,
 ): CallRoomClient {
-  const endpoint = options.realtimeUrl ?? getPublicConfig().realtimeUrl;
   const createSdk = options.createSdkClient ?? createDefaultSdkClient;
   const { auth } = options;
 
@@ -289,7 +288,9 @@ export function createCallRoomClient(
     token: string,
     joinOptions: CallJoinOptions,
   ): Promise<RealtimeRoomLike<CallState>> {
-    const sdk = createSdk(endpoint);
+    // Read the config on join, not on creation: the call client is built on
+    // every app-shell render, long before (and whether or not) a call starts.
+    const sdk = createSdk(options.realtimeUrl ?? getPublicConfig().realtimeUrl);
     sdk.auth.token = token;
     return sdk.joinOrCreate(CALL_ROOM_NAME, joinOptions);
   }

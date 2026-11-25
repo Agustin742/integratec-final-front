@@ -573,4 +573,4 @@ test('marks the shell header inert and aria-hidden while ClaimedNotificationCent
     expect(shellHeader).not.toHaveAttribute('aria-hidden');
   });
   expect(screen.getByRole('banner')).toBe(shellHeader);
-}, 15_000);
+});

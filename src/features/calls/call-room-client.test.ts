@@ -259,3 +259,24 @@ describe('createCallRoomClient live room (#141)', () => {
     expect(vi.isMockFunction(sdk.lastRoom.leave)).toBe(true);
   });
 });
+
+describe('createCallRoomClient config', () => {
+  it('does not read the public config until a call is joined', () => {
+    vi.stubEnv('VITE_REALTIME_URL', '');
+    try {
+      expect(() =>
+        createCallRoomClient({
+          auth: {
+            getAccessToken: () => null,
+            refreshAccessToken: async () => null,
+          } as unknown as RealtimeAuthPort,
+        }),
+      ).not.toThrow();
+    } finally {
+      vi.unstubAllEnvs();
+      vi.stubEnv('VITE_APP_ENV', 'test');
+      vi.stubEnv('VITE_API_BASE_URL', 'https://api.example.invalid');
+      vi.stubEnv('VITE_REALTIME_URL', 'wss://realtime.example.invalid');
+    }
+  });
+});
