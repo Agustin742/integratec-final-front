@@ -283,6 +283,15 @@ export function resolveInteractableHit(
     return interactablesById.get(`student-desk:${instanceId + 1}`);
   }
 
+  if (instanceId !== undefined && object.userData.deskKind === 'student') {
+    return interactablesById.get(
+      `student-desk:${Math.floor(instanceId / 4) + 1}`,
+    );
+  }
+  if (instanceId !== undefined && object.userData.deskKind === 'teacher') {
+    return interactablesById.get('teacher-desk');
+  }
+
   if (object.name === 'desk-legs' && instanceId !== undefined) {
     const deskIdx = Math.floor(instanceId / 4);
     if (deskIdx === TEACHER_DESK_INDEX) {

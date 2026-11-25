@@ -12,6 +12,7 @@ import { ApiError } from '@/api/errors';
 import {
   classroomDetailQueryKey,
   createClassroomShopPredicate,
+  ownAvatarStylesQueryKey,
   shopItemsQueryKey,
   shopPurchasesQueryKey,
   studentWalletQueryKey,
@@ -271,6 +272,10 @@ function ShopPanelScoped({ classroomId, userId }: ShopPanelScopedProps) {
           predicate: createClassroomShopPredicate(userId, classroomId),
         }),
         invalidateStudentWallet(queryClient, { userId, classroomId }),
+        queryClient.invalidateQueries({
+          queryKey: ownAvatarStylesQueryKey(userId),
+          exact: true,
+        }),
         invalidateClassroomContext
           ? queryClient.invalidateQueries({
               queryKey: classroomDetailQueryKey(userId, classroomId),
@@ -316,6 +321,11 @@ function ShopPanelScoped({ classroomId, userId }: ShopPanelScopedProps) {
       predicate: createClassroomShopPredicate(userId, classroomId),
     });
     void invalidateStudentWallet(queryClient, { userId, classroomId });
+    // Bought styles unlock in the profile editor, whatever the classroom.
+    void queryClient.invalidateQueries({
+      queryKey: ownAvatarStylesQueryKey(userId),
+      exact: true,
+    });
   }, [classroomId, queryClient, userId]);
 
   if (context.status === 'pending') {
@@ -446,6 +456,7 @@ function ShopPanelScoped({ classroomId, userId }: ShopPanelScopedProps) {
                   setKindFilter(
                     next === 'CLASSROOM_ITEM' ||
                       next === 'AVATAR_ACCESSORY' ||
+                      next === 'AVATAR_STYLE' ||
                       next === 'DESK_UPGRADE' ||
                       next === 'PET_ACCESSORY'
                       ? next
@@ -458,6 +469,9 @@ function ShopPanelScoped({ classroomId, userId }: ShopPanelScopedProps) {
                 <option value="">{filterMessages.kindAll}</option>
                 <option value="AVATAR_ACCESSORY">
                   {shopMessages.kinds.AVATAR_ACCESSORY}
+                </option>
+                <option value="AVATAR_STYLE">
+                  {shopMessages.kinds.AVATAR_STYLE}
                 </option>
                 <option value="DESK_UPGRADE">
                   {shopMessages.kinds.DESK_UPGRADE}
@@ -666,6 +680,13 @@ function ShopPanelScoped({ classroomId, userId }: ShopPanelScopedProps) {
                           item.isPurchasable ? (
                             <p className="text-xs text-muted-foreground">
                               {catalogMessages.classroomScopeHint}
+                            </p>
+                          ) : null}
+                          {item.kind === 'AVATAR_STYLE' &&
+                          item.isPurchasable &&
+                          !item.ownedByStudent ? (
+                            <p className="text-xs text-muted-foreground">
+                              {catalogMessages.avatarStyleHint}
                             </p>
                           ) : null}
                           {seemsInsufficient ? (

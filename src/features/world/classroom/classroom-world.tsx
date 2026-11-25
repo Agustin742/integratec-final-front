@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { AvatarInput } from '@/realtime';
 import { useOwnProfile } from '@/features/profile/use-own-profile';
 import { worldMessages } from '../messages';
+import type { AvatarEquipped } from '../avatar/avatar-part-plan';
 import type { Pose } from '../movement';
 import { WorldCanvas, type WorldCanvasProps } from '../world-canvas';
 import type { ClassroomInteractable } from './classroom-interactables';
@@ -15,6 +16,8 @@ export interface ClassroomWorldProps extends Pick<
 > {
   /** Authoritative pose from the room for the local user (#37). */
   selfPose?: Pose | undefined;
+  onAssetError?: (() => void) | undefined;
+  selfEquipped?: AvatarEquipped | undefined;
   /** Connection epoch key that changes on join, reconnect, or drop (#37). */
   connectionKey?: string | undefined;
   /** True while the classroom freeze lock is active (#37). */
@@ -51,7 +54,9 @@ export interface ClassroomWorldProps extends Pick<
 export function ClassroomWorld({
   label,
   scopeKey,
+  onAssetError,
   selfPose,
+  selfEquipped,
   connectionKey,
   frozen,
   remoteParticipants,
@@ -90,9 +95,11 @@ export function ClassroomWorld({
       })}
     >
       <ClassroomScene
+        onAssetError={onAssetError}
         avatar={query.data?.avatar}
         scopeKey={scopeKey}
         selfPose={selfPose}
+        selfEquipped={selfEquipped}
         connectionKey={connectionKey}
         frozen={frozen}
         remoteParticipants={remoteParticipants}

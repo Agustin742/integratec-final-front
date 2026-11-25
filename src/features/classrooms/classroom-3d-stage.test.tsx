@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -12,6 +12,7 @@ import {
   type Classroom3DStageProps,
 } from './classroom-3d-stage';
 import { classroomMessages } from './messages';
+import { worldMessages } from '../world/messages';
 import { ClassroomPanelsProvider } from './panels/classroom-panels';
 
 const world = vi.hoisted(() => ({
@@ -154,6 +155,27 @@ test('mounts the lazy classroom world with the stage label, scope, presence prop
   expect(
     screen.queryByRole('button', { name: 'Michi' }),
   ).not.toBeInTheDocument();
+});
+
+test('announces partial asset failure outside the canvas while retaining the scene', async () => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+  renderStage('aula-7');
+  await screen.findByTestId('scene-host');
+  act(() => {
+    (world.props.onAssetError as () => void)();
+  });
+  expect(screen.getByText(worldMessages.classroomAssetError)).toHaveAttribute(
+    'role',
+    'status',
+  );
+  expect(screen.getByTestId('scene-host')).toBeInTheDocument();
 });
 
 test('centers the StageBoundary fallback inside a padded wrapper below the floating top bar', async () => {

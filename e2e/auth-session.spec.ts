@@ -71,7 +71,7 @@ test('signs in, reloads authenticated home screen, and clears protected state on
         displayName: 'Ana Pérez',
         avatar: {
           bodyId: 'female',
-          hairId: 'original',
+          hairId: 'classic-short',
           topId: 'hoodie',
           hairColor: '#6C4D48',
           clothingColor: '#5B4F96',
@@ -245,7 +245,7 @@ for (const signedIn of [false, true]) {
             displayName: 'Synthetic Learner',
             avatar: {
               bodyId: 'female',
-              hairId: 'original',
+              hairId: 'classic-short',
               topId: 'hoodie',
               hairColor: '#6C4D48',
               clothingColor: '#5B4F96',

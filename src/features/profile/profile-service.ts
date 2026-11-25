@@ -3,7 +3,11 @@ import { ApiError, mapNetworkError } from '@/api/errors';
 import { avatarSchema, profileSchema } from '@/session/transport';
 import type { Avatar } from './avatar-options';
 import { profileMessages } from './messages';
-import type { OwnProfileDto } from './profile-schema';
+import {
+  avatarStylesSchema,
+  type AvatarStyles,
+  type OwnProfileDto,
+} from './profile-schema';
 
 export interface ProfileRequestOptions {
   readonly signal?: AbortSignal;
@@ -46,12 +50,15 @@ const uncertainWriteError = (cause?: unknown): ApiError =>
     cause,
   });
 
-function translateWriteError(error: ApiError): ApiError {
+function translateWriteError(
+  error: ApiError,
+  forbiddenMessage: string = profileMessages.errors.forbidden,
+): ApiError {
   if (error.kind === 'network') {
     return copyError(error, profileMessages.errors.networkUncertain, false);
   }
   if (error.kind === 'forbidden') {
-    return copyError(error, profileMessages.errors.forbidden, false);
+    return copyError(error, forbiddenMessage, false);
   }
   if (error.kind === 'validation') {
     return copyError(error, profileMessages.errors.validation);
@@ -64,13 +71,16 @@ function translateWriteError(error: ApiError): ApiError {
 
 async function writeRequest<TData>(
   execute: () => Promise<TData>,
+  forbiddenMessage?: string,
 ): Promise<TData> {
   try {
     return await execute();
   } catch (cause) {
     if (isAbortError(cause)) throw cause;
-    if (cause instanceof ApiError) throw translateWriteError(cause);
-    throw translateWriteError(mapNetworkError(cause));
+    if (cause instanceof ApiError) {
+      throw translateWriteError(cause, forbiddenMessage);
+    }
+    throw translateWriteError(mapNetworkError(cause), forbiddenMessage);
   }
 }
 
@@ -83,6 +93,26 @@ export async function fetchOwnProfile(
     client.GET('/users/me', { signal: options.signal }),
   );
   const parsed = profileSchema.safeParse(payload);
+  if (!parsed.success) {
+    throw new ApiError({
+      kind: 'unexpected',
+      status: null,
+      code: null,
+      userMessage: profileMessages.errors.invalidResponse,
+    });
+  }
+  return parsed.data;
+}
+
+/** `GET /users/me/avatar/styles`: which hair and top styles the user owns. */
+export async function fetchAvatarStyles(
+  client: TypedApiClient,
+  options: ProfileRequestOptions = {},
+): Promise<AvatarStyles> {
+  const payload: unknown = await requestApi(() =>
+    client.GET('/users/me/avatar/styles', { signal: options.signal }),
+  );
+  const parsed = avatarStylesSchema.safeParse(payload);
   if (!parsed.success) {
     throw new ApiError({
       kind: 'unexpected',
@@ -129,5 +159,5 @@ export function saveAvatar(
     const parsed = avatarSchema.safeParse(payload);
     if (!parsed.success) throw uncertainWriteError();
     return parsed.data;
-  });
+  }, profileMessages.avatar.errors.styleLocked);
 }

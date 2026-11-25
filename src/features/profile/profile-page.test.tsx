@@ -22,6 +22,7 @@ import {
   createLoginHandler,
   createLogoutHandler,
   createOwnProfileStore,
+  DEFAULT_OWN_AVATAR,
   createOwnStreakAndBadgesHandler,
   type OwnProfileStore,
 } from '@/test/msw/handlers';
@@ -115,6 +116,11 @@ async function waitForProfile() {
   await screen.findByRole('region', { name: copy.avatar.heading });
 }
 
+/** Paid styles read as locked until the availability request settles. */
+async function waitForStyles() {
+  await waitFor(() => expect(radio('Peinado', 'Rastas')).toBeEnabled());
+}
+
 function selectChoice(groupName: string, label: string) {
   fireEvent.click(radio(groupName, label));
 }
@@ -134,8 +140,8 @@ describe('Profile page (/profile)', () => {
         email: 'sofia@ejemplo.com',
         avatar: {
           bodyId: 'female',
-          hairId: 'original',
-          topId: 'tshirt',
+          hairId: 'classic-short',
+          topId: 'basic-tshirt',
           hairColor: '#E5AD58',
           clothingColor: '#75B7DA',
         },
@@ -149,13 +155,13 @@ describe('Profile page (/profile)', () => {
     expect(nameInput()).toHaveValue('Sofía Martínez');
     expect(screen.getByText('sofia@ejemplo.com')).toBeInTheDocument();
     expect(radio(copy.avatar.groups.bodyId, 'Femenino')).toBeChecked();
-    expect(radio(copy.avatar.groups.hairId, 'Clásico')).toBeChecked();
-    expect(radio(copy.avatar.groups.topId, 'Remera')).toBeChecked();
+    expect(radio(copy.avatar.groups.hairId, 'Corto clásico')).toBeChecked();
+    expect(radio(copy.avatar.groups.topId, 'Remera básica')).toBeChecked();
     expect(radio(copy.avatar.groups.hairColor, 'Rubio')).toBeChecked();
     expect(radio(copy.avatar.groups.clothingColor, 'Celeste')).toBeChecked();
     expect(
       screen.getByRole('img', {
-        name: /Femenino, Clásico, Rubio, Remera, Celeste/,
+        name: /Femenino, Corto clásico, Rubio, Remera básica, Celeste/,
       }),
     ).toBeInTheDocument();
     expect(saveStatus(nameSection())).toBe('saved');
@@ -168,20 +174,18 @@ describe('Profile page (/profile)', () => {
     await renderProfile(createOwnProfileStore());
     await waitForProfile();
 
-    // male: afro/dreads and hoodie/tank
-    expect(within(group('Peinado')).getAllByRole('radio')).toHaveLength(2);
+    // Hair and tops fit both bodies: the whole catalog is offered.
+    expect(within(group('Peinado')).getAllByRole('radio')).toHaveLength(23);
     expect(within(group('Prenda superior')).getAllByRole('radio')).toHaveLength(
-      2,
+      15,
     );
     selectChoice('Cuerpo', 'Femenino');
+    expect(within(group('Peinado')).getAllByRole('radio')).toHaveLength(23);
     expect(
-      within(group('Peinado')).getByRole('radio', { name: 'Clásico' }),
+      within(group('Peinado')).getByRole('radio', { name: 'Rastas' }),
     ).toBeInTheDocument();
-    expect(
-      within(group('Peinado')).queryByRole('radio', { name: 'Rastas' }),
-    ).not.toBeInTheDocument();
     expect(within(group('Prenda superior')).getAllByRole('radio')).toHaveLength(
-      3,
+      15,
     );
   });
 
@@ -285,16 +289,16 @@ describe('Profile page (/profile)', () => {
     await waitForProfile();
 
     selectChoice('Cuerpo', 'Femenino');
-    selectChoice('Peinado', 'Clásico');
+    selectChoice('Peinado', 'Corto clásico');
     selectChoice('Color de pelo', 'Rosa');
-    selectChoice('Prenda superior', 'Remera');
+    selectChoice('Prenda superior', 'Remera básica');
     selectChoice('Color de la prenda', 'Verde');
 
     expect(saveStatus(avatarSection())).toBe('unsaved');
     expect(screen.getByText(copy.avatar.previewDraft)).toBeInTheDocument();
     expect(
       screen.getByRole('img', {
-        name: /Femenino, Clásico, Rosa, Remera, Verde/,
+        name: /Femenino, Corto clásico, Rosa, Remera básica, Verde/,
       }),
     ).toBeInTheDocument();
 
@@ -304,8 +308,8 @@ describe('Profile page (/profile)', () => {
     expect(requests).toEqual([
       {
         bodyId: 'female',
-        hairId: 'original',
-        topId: 'tshirt',
+        hairId: 'classic-short',
+        topId: 'basic-tshirt',
         hairColor: '#C77DAA',
         clothingColor: '#7EBA8B',
       },
@@ -315,15 +319,148 @@ describe('Profile page (/profile)', () => {
     expect(avatarSection()).toHaveTextContent(copy.avatar.confirmed);
   });
 
-  test('adjusts hair and top when the body makes them unavailable and says so', async () => {
+  test('keeps hair and top when the body changes, since every style fits both bodies', async () => {
     await renderProfile(createOwnProfileStore());
     await waitForProfile();
+    await waitForStyles();
 
     selectChoice('Peinado', 'Rastas');
     selectChoice('Cuerpo', 'Femenino');
 
-    expect(radio('Peinado', 'Afro')).toBeChecked();
-    expect(screen.getByText(copy.avatar.adjusted)).toBeVisible();
+    expect(radio('Peinado', 'Rastas')).toBeChecked();
+    expect(screen.queryByText(copy.avatar.adjusted)).not.toBeInTheDocument();
+  });
+
+  describe('avatar style availability', () => {
+    const LOCKED = copy.avatar.styleLockedLabel;
+    const ownedDreads = [{ styleType: 'hair', styleId: 'dreads' }] as const;
+
+    test('locks paid styles that are not owned and keeps free and owned ones selectable', async () => {
+      const store = createOwnProfileStore({
+        initial: {
+          avatar: {
+            bodyId: 'male',
+            hairId: 'afro',
+            topId: 'basic-tshirt',
+            hairColor: '#6C4D48',
+            clothingColor: '#5B4F96',
+          },
+        },
+        ownedPaidStyles: ownedDreads,
+      });
+      const { container } = await renderProfile(store);
+      await waitForProfile();
+
+      const lockedMohawk = await within(group('Peinado')).findByRole('radio', {
+        name: `Mohicano suave, ${LOCKED}`,
+      });
+      expect(lockedMohawk).toBeDisabled();
+      // Free and owned paid styles are plain, selectable choices.
+      expect(radio('Peinado', 'Carré')).toBeEnabled();
+      expect(radio('Peinado', 'Rastas')).toBeEnabled();
+      expect(radio('Prenda superior', 'Remera básica')).toBeEnabled();
+      expect(
+        within(group('Prenda superior')).getByRole('radio', {
+          name: `Buzo con capucha, ${LOCKED}`,
+        }),
+      ).toBeDisabled();
+      // Prices are per classroom: the profile never shows one.
+      expect(avatarSection()).not.toHaveTextContent(/puntos/i);
+      expect(avatarSection()).toHaveTextContent(copy.avatar.styleLockedHint);
+      await expectAccessible(container);
+    });
+
+    test('an owned paid style can be picked and saved', async () => {
+      const store = createOwnProfileStore({
+        initial: {
+          avatar: {
+            ...DEFAULT_OWN_AVATAR,
+            hairId: 'afro',
+            topId: 'basic-tshirt',
+          },
+        },
+        ownedPaidStyles: ownedDreads,
+      });
+      await renderProfile(store);
+      await waitForProfile();
+      await within(group('Peinado')).findByRole('radio', {
+        name: `Mohicano suave, ${LOCKED}`,
+      });
+
+      selectChoice('Peinado', 'Rastas');
+      fireEvent.click(screen.getByRole('button', { name: copy.avatar.submit }));
+      await waitFor(() => expect(saveStatus(avatarSection())).toBe('saved'));
+      expect(store.read().avatar.hairId).toBe('dreads');
+    });
+
+    test('when availability fails to load, free styles stay selectable and paid ones stay locked with a notice', async () => {
+      const store = createOwnProfileStore({
+        initial: {
+          avatar: {
+            bodyId: 'male',
+            hairId: 'afro',
+            topId: 'basic-tshirt',
+            hairColor: '#6C4D48',
+            clothingColor: '#5B4F96',
+          },
+        },
+      });
+      store.failNextStyles({
+        status: 500,
+        body: { code: 'INTERNAL_ERROR', message: 'boom', correlationId: 'c-1' },
+      });
+      await renderProfile(store);
+      await waitForProfile();
+
+      expect(
+        await within(avatarSection()).findByText(copy.avatar.stylesUnavailable),
+      ).toBeInTheDocument();
+      expect(radio('Peinado', 'Carré')).toBeEnabled();
+      expect(radio('Peinado', 'Afro')).toBeChecked();
+      expect(
+        within(group('Peinado')).getByRole('radio', {
+          name: `Rastas, ${LOCKED}`,
+        }),
+      ).toBeDisabled();
+    });
+
+    test('keeps the saved paid style selected and enabled even if availability fails', async () => {
+      const store = createOwnProfileStore({
+        initial: { avatar: { ...DEFAULT_OWN_AVATAR, hairId: 'dreads' } },
+      });
+      store.failNextStyles('network');
+      await renderProfile(store);
+      await waitForProfile();
+
+      await within(avatarSection()).findByText(copy.avatar.stylesUnavailable);
+      expect(radio('Peinado', 'Rastas')).toBeChecked();
+      expect(radio('Peinado', 'Rastas')).toBeEnabled();
+    });
+
+    test('a 403 on save explains the style is locked and refreshes availability', async () => {
+      const store = createOwnProfileStore({
+        initial: { avatar: { ...DEFAULT_OWN_AVATAR, hairId: 'afro' } },
+        ownedPaidStyles: ownedDreads,
+      });
+      await renderProfile(store);
+      await waitForProfile();
+      await within(group('Peinado')).findByRole('radio', {
+        name: `Mohicano suave, ${LOCKED}`,
+      });
+      const before = store.stylesRequests();
+
+      selectChoice('Peinado', 'Rastas');
+      // Ownership changes elsewhere before the save reaches the server.
+      store.revokeStyle({ styleType: 'hair', styleId: 'dreads' });
+      fireEvent.click(screen.getByRole('button', { name: copy.avatar.submit }));
+
+      const alert = await within(avatarSection()).findByRole('alert');
+      expect(alert).toHaveTextContent(copy.avatar.errors.styleLocked);
+      await waitFor(() =>
+        expect(store.stylesRequests()).toBeGreaterThan(before),
+      );
+      expect(store.read().avatar.hairId).toBe('afro');
+    });
   });
 
   test('discarding a draft restores the saved avatar without reporting a failure', async () => {
@@ -358,7 +495,7 @@ describe('Profile page (/profile)', () => {
     fireEvent.click(screen.getByRole('button', { name: copy.avatar.submit }));
 
     const alert = await within(avatarSection()).findByRole('alert');
-    expect(alert).toHaveTextContent(copy.errors.forbidden);
+    expect(alert).toHaveTextContent(copy.avatar.errors.styleLocked);
     expect(alert).not.toHaveTextContent('adapter');
     expect(radio('Color de la prenda', 'Amarillo')).toBeChecked();
     expect(saveStatus(avatarSection())).toBe('failed');
@@ -370,6 +507,7 @@ describe('Profile page (/profile)', () => {
     const store = createOwnProfileStore();
     await renderProfile(store);
     await waitForProfile();
+    await waitForStyles();
     store.failNext('avatar', { status: 400, body: validationDetail('hairId') });
 
     selectChoice('Peinado', 'Rastas');

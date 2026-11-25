@@ -21,11 +21,6 @@ export const BUDGET_EXCEPTIONS = Object.freeze({
     issue: '#91',
     maxBytes: 2_740_644,
   }),
-  'character.glb': Object.freeze({
-    path: 'character.glb',
-    issue: '#91',
-    maxBytes: 2_707_884,
-  }),
 });
 
 function isGlbFile(filename) {

@@ -19,8 +19,8 @@ const profile: components['schemas']['OwnProfileDto'] = {
   displayName: 'Prof. Ana García',
   avatar: {
     bodyId: 'female',
-    hairId: 'original',
-    topId: 'tshirt',
+    hairId: 'classic-short',
+    topId: 'basic-tshirt',
     hairColor: '#6C4D48',
     clothingColor: '#5B4F96',
   },

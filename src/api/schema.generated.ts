@@ -183,6 +183,26 @@ export interface paths {
         patch: operations["UsersController_updateProfile"];
         trace?: never;
     };
+    "/users/me/avatar/styles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List avatar style availability
+         * @description Every hair and top id with `free`, `owned` and the code of the shop item that sells it. Free styles are always owned. A paid style is owned once the user bought it in any classroom, even if the shop item was later deactivated.
+         */
+        get: operations["UsersController_listAvatarStyles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users/me/avatar": {
         parameters: {
             query?: never;
@@ -198,7 +218,7 @@ export interface paths {
         head?: never;
         /**
          * Replace own base avatar
-         * @description Uses the global SessionAuthGuard identity with one session verification. All five fields required, not a partial merge. Replaces stored base-only appearance, including unsupported legacy values. Body, hair and ordinary tops are free. Accessories and uniforms are not supported.
+         * @description Uses the global SessionAuthGuard identity with one session verification. All five fields required, not a partial merge. Replaces stored base-only appearance, including unsupported legacy values. Body, free hair and free tops need no purchase; paid hair and tops require a shop purchase made in any classroom. Accessories and uniforms are not supported.
          */
         patch: operations["UsersController_updateAvatar"];
         trace?: never;
@@ -1583,17 +1603,17 @@ export interface components {
              */
             bodyId: "male" | "female";
             /**
-             * @description male: afro/dreads; female: afro/original.
-             * @example afro
+             * @description Allowed for both bodies. Some styles are unlocked through the shop.
+             * @example classic-short
              * @enum {string}
              */
-            hairId: "afro" | "dreads" | "original";
+            hairId: "afro" | "afro-with-headband" | "bob" | "box-braids" | "braid" | "bun" | "buzz-cut" | "classic-short" | "dreads" | "fringe" | "half-up" | "long-curls" | "long-straight" | "long-wavy" | "messy" | "middle-part" | "ponytail" | "short-curls" | "side-part" | "soft-mohawk" | "two-braids" | "two-pigtails" | "wavy";
             /**
-             * @description male: hoodie/tank; female: hoodie/tank/tshirt. Uniforms excluded.
-             * @example hoodie
+             * @description Allowed for both bodies. Some styles are unlocked through the shop.
+             * @example school-sweatshirt
              * @enum {string}
              */
-            topId: "hoodie" | "tank" | "tshirt";
+            topId: "basic-tshirt" | "denim-jacket" | "flannel-shirt" | "holiday-sweater" | "hoodie" | "national-team-jersey" | "school-polo" | "school-smock" | "school-sweatshirt" | "shirt-and-tie" | "sweater" | "tank-top" | "track-jacket" | "vest" | "winter-coat";
             /**
              * @description Case-insensitive; returned uppercase.
              * @example #6C4D48
@@ -1622,6 +1642,31 @@ export interface components {
              * @example Prof. Ana
              */
             displayName: string;
+        };
+        AvatarStyleAvailabilityDto: {
+            /**
+             * @example hair
+             * @enum {string}
+             */
+            styleType: "hair" | "top";
+            /**
+             * @description Catalog id used in `hairId` or `topId`.
+             * @example dreads
+             */
+            styleId: string;
+            /** @description Free styles never need a purchase. */
+            free: boolean;
+            /** @description True for free styles and for paid styles the user bought in any classroom. Ownership is global to the user. */
+            owned: boolean;
+            /**
+             * @description Code of the shop item that sells the style, or null for free styles and styles not yet on sale. Buy it through the classroom shop.
+             * @example hair_dreads
+             */
+            shopItemCode: string | null;
+        };
+        AvatarStylesDto: {
+            /** @description Every hair id followed by every top id, alphabetical within each type. */
+            items: components["schemas"]["AvatarStyleAvailabilityDto"][];
         };
         CreateClassroomDto: {
             /**
@@ -2399,7 +2444,7 @@ export interface components {
             total: number;
         };
         /** @enum {string} */
-        ShopItemKind: "CLASSROOM_ITEM" | "AVATAR_ACCESSORY" | "DESK_UPGRADE" | "PET_ACCESSORY";
+        ShopItemKind: "CLASSROOM_ITEM" | "AVATAR_ACCESSORY" | "DESK_UPGRADE" | "PET_ACCESSORY" | "AVATAR_STYLE";
         ShopCatalogItemDto: {
             /** Format: uuid */
             id: string;
@@ -3664,6 +3709,34 @@ export interface operations {
             };
         };
     };
+    UsersController_listAvatarStyles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvatarStylesDto"];
+                };
+            };
+            /** @description Missing, malformed, expired or revoked session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
     UsersController_updateAvatar: {
         parameters: {
             query?: never;
@@ -3703,7 +3776,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Avatar access adapter denied use. */
+            /** @description FORBIDDEN when hairId or topId is a paid style the user has not unlocked in the shop, or the avatar access adapter denied use. */
             403: {
                 headers: {
                     [name: string]: unknown;

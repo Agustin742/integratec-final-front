@@ -33,7 +33,7 @@ vi.mock('@/features/world', () => ({
 const avatar: Avatar = {
   bodyId: 'female',
   hairId: 'afro',
-  topId: 'tshirt',
+  topId: 'basic-tshirt',
   hairColor: '#AF6D63',
   clothingColor: '#75B7DA',
 };
@@ -60,7 +60,7 @@ test('shows the draft avatar in a 3D host named like the 2D preview', async () =
 test('follows the draft as the user changes options', async () => {
   const { rerender } = render(<AvatarPreviewView avatar={avatar} />);
   await screen.findByTestId('canvas-3d');
-  const next = { ...avatar, hairId: 'original' as const };
+  const next = { ...avatar, hairId: 'classic-short' as const };
   rerender(<AvatarPreviewView avatar={next} />);
   expect(world.model).toMatchObject({ avatar: next });
   expect(screen.getByTestId('canvas-3d')).toHaveAccessibleName(
@@ -99,7 +99,7 @@ test('falls back to the 2D preview when the body model fails, and retries 3D for
   expect(container.querySelector('[data-avatar-preview]')).not.toBeNull();
   rerender(
     <AvatarPreviewView
-      avatar={{ ...avatar, bodyId: 'male', hairId: 'afro', topId: 'tank' }}
+      avatar={{ ...avatar, bodyId: 'male', hairId: 'afro', topId: 'tank-top' }}
     />,
   );
   expect(await screen.findByTestId('canvas-3d')).toBeInTheDocument();

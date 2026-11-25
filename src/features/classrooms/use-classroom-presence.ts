@@ -21,6 +21,7 @@ import {
   type AvatarInput,
   type RealtimeConnectionStatus,
   type RealtimeFailureReason,
+  type RealtimeEquippedCodes,
   type RealtimeParticipant,
 } from '@/realtime';
 import { useSessionService } from '@/session/provider';
@@ -61,6 +62,8 @@ export interface ClassroomPresence {
   readonly frozen: boolean;
   readonly connectionKey: string | undefined;
   readonly selfPose: Pose | undefined;
+  /** Accessory codes the room reports for the local member. */
+  readonly selfEquipped: RealtimeEquippedCodes | undefined;
   readonly participants: readonly RealtimeParticipant[];
   readonly remoteParticipants: readonly RemoteClassroomParticipant[];
   readonly reconnect: () => Promise<boolean>;
@@ -414,6 +417,17 @@ export function useClassroomPresence({
     return { x: selfX, z: selfZ, rotation: selfRotation };
   }, [selfRotation, selfX, selfZ]);
 
+  const selfHead = selfParticipant?.avatar?.equipped?.head ?? null;
+  const selfFace = selfParticipant?.avatar?.equipped?.face ?? null;
+  const selfBack = selfParticipant?.avatar?.equipped?.back ?? null;
+  const selfEquipped = useMemo<RealtimeEquippedCodes | undefined>(
+    () =>
+      selfHead || selfFace || selfBack
+        ? { head: selfHead, face: selfFace, back: selfBack }
+        : undefined,
+    [selfHead, selfFace, selfBack],
+  );
+
   const remoteParticipants = useMemo(() => {
     if (!hasPresenceParticipants) {
       return EMPTY_REMOTE_PARTICIPANTS;
@@ -436,6 +450,7 @@ export function useClassroomPresence({
         z: participant.z,
         rotation: participant.rotation,
         avatar: resolvedAvatar,
+        equipped: participant.avatar?.equipped,
       });
     });
     return remotes;
@@ -520,6 +535,7 @@ export function useClassroomPresence({
     frozen,
     connectionKey,
     selfPose,
+    selfEquipped,
     participants,
     remoteParticipants,
     reconnect: realtime.reconnect,

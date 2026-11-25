@@ -15,7 +15,7 @@
 
 - [Standalone structural test](../../scripts/assets/test-face-accessories.mjs).
 - Ignored animated scenes: `odd/previews/face-accessories-review.blend` (`REVIEW_Face*_{Male,Female}`) and `odd/previews/face-accessories-probador.blend` (`PROBADOR_Face_{Female,Male}`, toggle all `6` Face accessories × all `23` hairstyles across Idle `1–49`, Walk `50–74`, Sit `75–171`, Wave `172–231`; never included in masters or GLBs).
-- Legacy `public/models/avatars/female/accessory-glasses.glb` and `public/models/avatars/male/accessory-{round,square}-glasses.glb` remain untouched until runtime integration.
+- The legacy per-body glasses files (`accessory-glasses.glb`, `accessory-{round,square}-glasses.glb`) were removed; these shared face accessories replace them.
 
 ## Previews (Male and Female)
 

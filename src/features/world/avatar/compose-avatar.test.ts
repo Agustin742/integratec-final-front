@@ -9,7 +9,7 @@ import {
   type Object3D,
 } from 'three';
 import { describe, expect, it, vi } from 'vitest';
-import { composeAvatar } from './compose-avatar';
+import { composeAvatar, type AvatarPartKind } from './compose-avatar';
 
 interface Rig {
   readonly scene: Group;
@@ -273,5 +273,152 @@ describe('composeAvatar', () => {
     expect(bodySkeletonDispose).toHaveBeenCalledTimes(1);
     expect(geometryDispose).not.toHaveBeenCalled();
     shared.forEach((spy) => expect(spy).not.toHaveBeenCalled());
+  });
+
+  describe('generic parts', () => {
+    const attach = (key: AvatarPartKind, rig: Rig, extra = {}) => ({
+      key,
+      scene: rig.scene,
+      ...extra,
+    });
+
+    it('composes any number of parts in order', () => {
+      const body = makeRig(BONES, 'skin', 'Body');
+      const head = makeRig(BONES, 'AvatarAccessoryTint', 'Cap');
+      const face = makeRig(BONES, 'AvatarDetail', 'Mask');
+      const back = makeRig([...BONES, 'tail'], 'AvatarDetail', 'Pack');
+
+      const avatar = composeAvatar({
+        body: body.scene,
+        parts: [
+          attach('head', head),
+          attach('face', face),
+          attach('back', back),
+        ],
+      });
+
+      expect(skinnedMeshes(avatar.root).map((mesh) => mesh.name)).toEqual([
+        'Body',
+        'Cap',
+        'Mask',
+      ]);
+      expect(avatar.skippedParts).toEqual(['back']);
+    });
+
+    it('tints each material by name and never mutates the source', () => {
+      const body = makeRig(BONES, 'skin', 'Body');
+      const head = makeRig(BONES, 'AvatarAccessoryTint', 'Cap');
+      const avatar = composeAvatar({
+        body: body.scene,
+        parts: [
+          attach('head', head, {
+            tints: { AvatarAccessoryTint: '#00FF00', Unrelated: '#123456' },
+          }),
+        ],
+      });
+      const cap = skinnedMeshes(avatar.root)[1];
+
+      expect(cap.material).not.toBe(head.material);
+      expect(colorOf(cap.material)).toBe('#00FF00');
+      expect(colorOf(head.material)).toBe('#FFFFFF');
+    });
+
+    it('ignores an invalid tint value', () => {
+      const body = makeRig(BONES, 'skin', 'Body');
+      const head = makeRig(BONES, 'AvatarAccessoryTint', 'Cap');
+      const avatar = composeAvatar({
+        body: body.scene,
+        parts: [
+          attach('head', head, { tints: { AvatarAccessoryTint: 'red' } }),
+        ],
+      });
+
+      expect(skinnedMeshes(avatar.root)[1].material).toBe(head.material);
+    });
+
+    it('hides named meshes and their subtree on the clone only', () => {
+      const body = makeRig(BONES, 'skin', 'Body');
+      const head = makeRig(BONES, 'AvatarAccessoryTint', 'Cap');
+      const group = new Group();
+      group.name = 'Visor';
+      const lens = new Mesh(new BufferGeometry(), new MeshStandardMaterial());
+      lens.name = 'VisorLens';
+      group.add(lens);
+      head.scene.add(group);
+      head.scene.updateMatrixWorld(true);
+
+      const avatar = composeAvatar({
+        body: body.scene,
+        parts: [attach('head', head, { hiddenMeshes: ['Cap', 'Visor'] })],
+      });
+      const visible = new Map<string, boolean>();
+      avatar.root.traverse((node) => visible.set(node.name, node.visible));
+
+      expect(visible.get('Cap')).toBe(false);
+      expect(visible.get('VisorLens')).toBe(false);
+      expect(visible.get('Body')).toBe(true);
+      expect(head.mesh.visible).toBe(true);
+      expect(lens.visible).toBe(true);
+    });
+
+    it('sets morph influences by name on the clone and ignores missing ones', () => {
+      const body = makeRig(BONES, 'skin', 'Body');
+      const back = makeRig(BONES, 'AvatarDetail', 'Pack');
+      back.mesh.morphTargetDictionary = { BackTuck: 1 };
+      back.mesh.morphTargetInfluences = [0, 0];
+
+      const avatar = composeAvatar({
+        body: body.scene,
+        parts: [attach('back', back, { morphs: { BackTuck: 1, Missing: 1 } })],
+      });
+      const pack = skinnedMeshes(avatar.root)[1];
+
+      expect(pack.morphTargetInfluences).toEqual([0, 1]);
+      expect(back.mesh.morphTargetInfluences).toEqual([0, 0]);
+    });
+
+    it('draws AvatarGlass translucent, without depth writes, after opaque parts', () => {
+      const body = makeRig(BONES, 'skin', 'Body');
+      const face = makeRig(BONES, 'AvatarGlass', 'Lenses');
+      const avatar = composeAvatar({
+        body: body.scene,
+        parts: [attach('face', face)],
+      });
+      const [bodyMesh, lenses] = skinnedMeshes(avatar.root);
+      const material = lenses.material as MeshStandardMaterial;
+
+      expect(material).not.toBe(face.material);
+      expect(material.transparent).toBe(true);
+      expect(material.depthWrite).toBe(false);
+      expect(lenses.renderOrder).toBeGreaterThan(bodyMesh.renderOrder);
+      expect(face.material.transparent).toBe(false);
+      expect(face.material.depthWrite).toBe(true);
+      expect(face.mesh.renderOrder).toBe(0);
+    });
+
+    it('disposes every cloned material, including glass', () => {
+      const body = makeRig(BONES, 'skin', 'Body');
+      const head = makeRig(BONES, 'AvatarAccessoryTint', 'Cap');
+      const face = makeRig(BONES, 'AvatarGlass', 'Lenses');
+      const avatar = composeAvatar({
+        body: body.scene,
+        parts: [
+          attach('head', head, { tints: { AvatarAccessoryTint: '#00FF00' } }),
+          attach('face', face),
+        ],
+      });
+      const [, cap, lenses] = skinnedMeshes(avatar.root);
+      const spies = [cap, lenses].map((mesh) =>
+        vi.spyOn(mesh.material as MeshStandardMaterial, 'dispose'),
+      );
+      const shared = [head.material, face.material].map((material) =>
+        vi.spyOn(material, 'dispose'),
+      );
+
+      avatar.dispose();
+
+      spies.forEach((spy) => expect(spy).toHaveBeenCalledTimes(1));
+      shared.forEach((spy) => expect(spy).not.toHaveBeenCalled());
+    });
   });
 });
