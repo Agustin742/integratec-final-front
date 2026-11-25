@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-25 — Desk decor on each student's desk (#149)
+
+- **Status:** completed (not visually checked)
+- **Area / files:** `src/features/world/classroom/` (`desk-decor.ts`, kit manifest, scene), `src/features/classrooms/` (desk map schema, presence, 3D stage), `src/realtime/client.ts`, `src/features/shop/item-preview-source.ts`, `src/test/msw/handlers.ts`, `docs/art/classroom-desk-decor.md`
+- **Change:** Each desk shows the student's equipped `desk_decor` item (synced value first, desk map otherwise) and the shop previews the same seven models.
+- **Reason:** Desk upgrades were not visible anywhere; back counterpart integratec-final-back#154.
+- **Verification:** Strict TDD on the touched test files, lint and typecheck. Full suite, build, e2e and visual review not run.
+- **Next step:** Visual review; run `pnpm api:sync` to replace the local `deskDecor` type extension.
+
 ## 2026-11-25 — Equip hand, neck and ear accessories from the inventory (#149)
 
 - **Status:** completed

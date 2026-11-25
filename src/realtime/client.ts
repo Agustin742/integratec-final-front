@@ -73,6 +73,8 @@ export interface RealtimeAvatarAppearance {
   readonly clothingColor: string;
   /** Present only when at least one accessory slot is equipped. */
   readonly equipped?: RealtimeEquippedCodes | undefined;
+  /** Shop item code of the `desk_decor` slot, present only when equipped. */
+  readonly deskDecorCode?: string | undefined;
 }
 
 export interface RealtimeClassroomControls {
@@ -261,10 +263,20 @@ function readParticipantAppearance(
   if (!base) {
     return undefined;
   }
-  const equipped = parseEquippedCodes(
-    (appearance as { items?: unknown }).items,
-  );
-  return equipped ? Object.freeze({ ...base, equipped }) : base;
+  const items = (appearance as { items?: unknown }).items;
+  const equipped = parseEquippedCodes(items);
+  const deskDecorCode =
+    typeof items === 'object' && items !== null
+      ? readItemCode(items as Record<string, unknown>, 'desk_decor')
+      : null;
+  if (!equipped && !deskDecorCode) {
+    return base;
+  }
+  return Object.freeze({
+    ...base,
+    ...(equipped ? { equipped } : {}),
+    ...(deskDecorCode ? { deskDecorCode } : {}),
+  });
 }
 
 /** Reads one slot from a synced `MapSchema`/`Map` (`get`) or a plain record. */

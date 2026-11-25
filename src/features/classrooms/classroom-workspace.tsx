@@ -344,6 +344,7 @@ function WorkspaceContext({
             petName={classroom.pet?.name ?? null}
             selfPose={presence.selfPose}
             selfEquipped={presence.selfEquipped}
+            liveDeskDecor={presence.liveDeskDecor}
             connectionKey={presence.connectionKey}
             frozen={presence.frozen}
             remoteParticipants={presence.remoteParticipants}

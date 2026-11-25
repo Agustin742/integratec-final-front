@@ -38,12 +38,33 @@ describe('resolveItemPreview', () => {
     });
   });
 
+  it.each([
+    ['desk_mug', 'mug'],
+    ['desk_plant', 'plant'],
+    ['desk_photo_frame', 'photo-frame'],
+    ['desk_puzzle_cube', 'puzzle-cube'],
+    ['desk_mini_globe', 'mini-globe'],
+    ['desk_lamp', 'lamp'],
+    ['desk_figurine', 'figurine'],
+  ])('previews %s with its desk decor model, untinted', (code, assetId) => {
+    const source = resolveItemPreview({
+      kind: 'DESK_UPGRADE',
+      code,
+      metadata: { assetId, slot: 'desk_decor' },
+    });
+    const url = `/models/scenes/classroom/desk-decor/${assetId}.glb`;
+    expect(source).toEqual({ type: 'glb', url });
+    expect(existsSync(resolve(process.cwd(), 'public', url.slice(1)))).toBe(
+      true,
+    );
+  });
+
   it('falls back to an illustration without a model', () => {
     expect(
       resolveItemPreview({
         kind: 'DESK_UPGRADE',
-        code: 'desk_plant',
-        metadata: { assetId: 'desk_plant' },
+        code: 'desk_mystery',
+        metadata: {},
       }),
     ).toEqual({ type: 'illustration' });
     expect(

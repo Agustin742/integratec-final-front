@@ -19,6 +19,10 @@ All seven Section 3 **Desk decor (shop)** items from the [asset wishlist](asset-
 
 - Standalone structural test: [`scripts/assets/test-classroom-desk-decor.mjs`](../../scripts/assets/test-classroom-desk-decor.mjs).
 
+## Runtime placement
+
+Each student desk shows the one item its student equipped in `desk_decor`, matched by shop code (`desk_mug` -> `mug.glb`, and so on) in [`desk-decor.ts`](../../src/features/world/classroom/desk-decor.ts). The value synced by the room (`appearance.items.desk_decor`, empty included) wins for connected students; otherwise `GET /classrooms/{id}/desks` provides `deskDecor`, so offline changes show on the next read. The object sits on the far corner of the top (`dx = 0.5 m`, `dz = -0.2 m`), away from the seated character, and all decor shares one batch separate from the room kit. Unknown codes render nothing and a model that fails to load is left out. The same models drive the shop preview.
+
 ## Visual Previews
 
 ### Modular Kit Showcase & Close-ups (`1280×960`)

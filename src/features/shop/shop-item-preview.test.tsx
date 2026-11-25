@@ -87,20 +87,41 @@ describe('ShopItemPreview', () => {
     ).toBeInTheDocument();
   });
 
-  it('uses an illustration directly for items without a model', () => {
+  it('renders the model of a desk decor item', async () => {
+    renderGlbThumbnail.mockResolvedValue('data:image/png;base64,DDDD');
     render(
       <ShopItemPreview
         item={makeItem({
           kind: 'DESK_UPGRADE',
           code: 'desk_plant',
           name: 'Planta de escritorio',
-          metadata: { assetId: 'desk_plant' },
+          metadata: { assetId: 'plant', slot: 'desk_decor' },
+        })}
+      />,
+    );
+    await screen.findByRole('img', {
+      name: 'Vista previa de Planta de escritorio',
+    });
+    expect(renderGlbThumbnail).toHaveBeenCalledWith(
+      '/models/scenes/classroom/desk-decor/plant.glb',
+      undefined,
+    );
+  });
+
+  it('uses an illustration directly for items without a model', () => {
+    render(
+      <ShopItemPreview
+        item={makeItem({
+          kind: 'DESK_UPGRADE',
+          code: 'desk_mystery',
+          name: 'Adorno de escritorio',
+          metadata: {},
         })}
       />,
     );
     expect(renderGlbThumbnail).not.toHaveBeenCalled();
     expect(
-      screen.getByRole('img', { name: 'Ilustración de Planta de escritorio' }),
+      screen.getByRole('img', { name: 'Ilustración de Adorno de escritorio' }),
     ).toBeInTheDocument();
   });
 

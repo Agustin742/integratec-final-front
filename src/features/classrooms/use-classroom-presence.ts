@@ -66,6 +66,8 @@ export interface ClassroomPresence {
   readonly selfPose: Pose | undefined;
   /** Accessory codes the room reports for the local member. */
   readonly selfEquipped: RealtimeEquippedCodes | undefined;
+  /** Synced desk decor code per connected member, `null` when empty. */
+  readonly liveDeskDecor: ReadonlyMap<string, string | null>;
   readonly participants: readonly RealtimeParticipant[];
   readonly remoteParticipants: readonly RemoteClassroomParticipant[];
   /** Synced pet and tutor bot; empty without a live connection. */
@@ -441,6 +443,21 @@ export function useClassroomPresence({
     return Object.values(codes).some(Boolean) ? codes : undefined;
   }, [selfHead, selfFace, selfBack, selfHand, selfNeck, selfEars]);
 
+  // Keyed by content: participants change on every movement patch.
+  const liveDeskDecorKey = JSON.stringify(
+    hasPresenceParticipants
+      ? Array.from(realtime.participants.values()).flatMap((participant) =>
+          participant.avatar
+            ? [[participant.userId, participant.avatar.deskDecorCode ?? null]]
+            : [],
+        )
+      : [],
+  );
+  const liveDeskDecor = useMemo(
+    () => new Map(JSON.parse(liveDeskDecorKey) as [string, string | null][]),
+    [liveDeskDecorKey],
+  );
+
   const remoteParticipants = useMemo(() => {
     if (!hasPresenceParticipants) {
       return EMPTY_REMOTE_PARTICIPANTS;
@@ -562,6 +579,7 @@ export function useClassroomPresence({
     connectionKey,
     selfPose,
     selfEquipped,
+    liveDeskDecor,
     participants,
     remoteParticipants,
     reconnect: realtime.reconnect,

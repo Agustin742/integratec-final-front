@@ -13,9 +13,12 @@ export type ClassroomDetailPayload =
   components['schemas']['ClassroomDetailResponseDto'];
 export type ClassroomContextPayload =
   components['schemas']['ClassroomContextResponseDto'];
-export type ClassroomDeskPayload = components['schemas']['ClassroomDeskDto'];
-export type ClassroomDeskMapPayload =
-  components['schemas']['ClassroomDeskMapDto'];
+export type ClassroomDeskPayload = components['schemas']['ClassroomDeskDto'] & {
+  readonly deskDecor?: components['schemas']['EquippedSlotDto'] | null;
+};
+export type ClassroomDeskMapPayload = {
+  readonly items: ClassroomDeskPayload[];
+};
 export type AcceptInvitationPayload =
   components['schemas']['AcceptInvitationDto'];
 export type JoinClassroomWithCodePayload =
@@ -3216,6 +3219,7 @@ export function createClassroomDesksHandler(
                 ? '00000000-0000-4000-8000-00000000m001'
                 : null,
               userId: isAssigned ? assignedUserId : null,
+              deskDecor: null,
             };
           });
 

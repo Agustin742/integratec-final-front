@@ -18,6 +18,10 @@ import type {
   RemoteClassroomParticipant,
 } from '../world';
 import {
+  resolveDeskDecor,
+  type LiveDeskDecor,
+} from '../world/classroom/desk-decor';
+import {
   deriveClassroomInteractables,
   indexClassroomInteractables,
   type ClassroomInteractable,
@@ -49,6 +53,8 @@ export interface Classroom3DStageProps {
   readonly petName?: string | null;
   readonly selfPose?: Pose | undefined;
   readonly selfEquipped?: AvatarEquipped | undefined;
+  /** Synced desk decor of connected members; wins over the desk map. */
+  readonly liveDeskDecor?: LiveDeskDecor | undefined;
   readonly connectionKey?: string | undefined;
   readonly frozen?: boolean | undefined;
   readonly remoteParticipants?:
@@ -142,6 +148,7 @@ export function Classroom3DStage({
   petName,
   selfPose,
   selfEquipped,
+  liveDeskDecor,
   connectionKey,
   frozen,
   remoteParticipants,
@@ -163,6 +170,7 @@ export function Classroom3DStage({
       petName={petName}
       selfPose={selfPose}
       selfEquipped={selfEquipped}
+      liveDeskDecor={liveDeskDecor}
       connectionKey={connectionKey}
       frozen={frozen}
       remoteParticipants={remoteParticipants}
@@ -208,6 +216,7 @@ function Classroom3DStageContent({
   petName,
   selfPose,
   selfEquipped,
+  liveDeskDecor,
   connectionKey,
   frozen,
   remoteParticipants,
@@ -225,6 +234,8 @@ function Classroom3DStageContent({
   readonly petName?: string | null;
   readonly selfPose?: Pose | undefined;
   readonly selfEquipped?: AvatarEquipped | undefined;
+  /** Synced desk decor of connected members; wins over the desk map. */
+  readonly liveDeskDecor?: LiveDeskDecor | undefined;
   readonly connectionKey?: string | undefined;
   readonly frozen?: boolean | undefined;
   readonly remoteParticipants?:
@@ -249,6 +260,10 @@ function Classroom3DStageContent({
   const navigate = useNavigate();
   const panels = useOptionalClassroomPanels();
   const desks = useClassroomDesks(classroomId, classroomId.trim().length > 0);
+  const deskDecor = useMemo(
+    () => resolveDeskDecor(desks.items, liveDeskDecor),
+    [desks.items, liveDeskDecor],
+  );
 
   const [highlightedId, setHighlightedId] = useState<string | undefined>(
     undefined,
@@ -487,6 +502,7 @@ function Classroom3DStageContent({
                 scopeKey={scopeKey}
                 selfPose={selfPose}
                 selfEquipped={selfEquipped}
+                deskDecor={deskDecor}
                 connectionKey={connectionKey}
                 frozen={frozen}
                 remoteParticipants={remoteParticipants}

@@ -39,6 +39,10 @@ import { LocalAvatar } from './local-avatar';
 import { createNpcLivePositions } from './npc-live-position';
 import { ProximityTracker, type ProximityAnchor } from './proximity-tracker';
 import { RemoteAvatar, type RemoteClassroomParticipant } from './remote-avatar';
+import {
+  planDeskDecorPlacements,
+  type DeskDecorAssignment,
+} from './desk-decor';
 import { useClassroomNavigation } from './use-classroom-navigation';
 
 export interface ClassroomSceneProps {
@@ -51,6 +55,8 @@ export interface ClassroomSceneProps {
   selfPose?: Pose | undefined;
   /** Accessory shop codes the local member wears in this classroom. */
   selfEquipped?: AvatarEquipped | undefined;
+  /** Decor shown on each student desk. */
+  deskDecor?: readonly DeskDecorAssignment[] | undefined;
   /** Connection epoch key that changes on join/reconnect/drop (#37). */
   connectionKey?: string | undefined;
   /** True while the classroom freeze lock is active (#37). */
@@ -104,6 +110,7 @@ export function ClassroomScene({
   onAssetError,
   selfPose,
   selfEquipped,
+  deskDecor,
   connectionKey,
   frozen = false,
   remoteParticipants = [],
@@ -151,6 +158,10 @@ export function ClassroomScene({
       ...deriveDecorationPlacements(CLASSROOM_LAYOUT),
     ],
     [],
+  );
+  const deskDecorPlacements = useMemo(
+    () => planDeskDecorPlacements(CLASSROOM_LAYOUT, deskDecor ?? []),
+    [deskDecor],
   );
   const interactablesById = useMemo(
     () =>
@@ -271,6 +282,15 @@ export function ClassroomScene({
         scopeKey={scopeKey}
         onModuleError={handleModuleError}
       />
+      {/* Its own batch, so equipping an item never rebuilds the room. */}
+      {deskDecorPlacements.length > 0 && (
+        <ClassroomKit
+          key={`desk-decor:${scopeKey ?? ''}`}
+          placements={deskDecorPlacements}
+          scopeKey={scopeKey}
+          onModuleError={onAssetError}
+        />
+      )}
       <ClassroomDoor poseRef={controller.poseRef} scopeKey={scopeKey} />
       <InteractableHighlight
         interactablesById={interactablesById}

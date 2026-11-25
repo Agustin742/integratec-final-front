@@ -14,14 +14,39 @@ import { classroomMessages } from '../messages';
 // Keep Zod v4 compatible with the strict Content-Security-Policy (FD1).
 z.config({ jitless: true });
 
-export type ClassroomDeskDto = components['schemas']['ClassroomDeskDto'];
-export type ClassroomDeskMapDto = components['schemas']['ClassroomDeskMapDto'];
+/**
+ * `deskDecor` is not in the generated contract yet; drop this extension after
+ * the next `pnpm api:sync`.
+ */
+export type ClassroomDeskDto = components['schemas']['ClassroomDeskDto'] & {
+  readonly deskDecor?:
+    components['schemas']['EquippedSlotDto'] | null | undefined;
+};
+export type ClassroomDeskMapDto = Omit<
+  components['schemas']['ClassroomDeskMapDto'],
+  'items'
+> & { items: ClassroomDeskDto[] };
+
+const deskDecorSchema = z.object({
+  slot: z.literal('desk_decor'),
+  shopItemId: z.string().min(1),
+  shopItemCode: z.string().min(1),
+  shopItemName: z.string().min(1),
+  kind: z.enum([
+    'CLASSROOM_ITEM',
+    'AVATAR_ACCESSORY',
+    'AVATAR_STYLE',
+    'DESK_UPGRADE',
+    'PET_ACCESSORY',
+  ]),
+});
 
 const classroomDeskSchema: z.ZodType<ClassroomDeskDto> = z.object({
   id: z.string().min(1),
   deskIndex: z.number().int().min(1),
   membershipId: z.string().min(1).nullable(),
   userId: z.string().min(1).nullable(),
+  deskDecor: deskDecorSchema.nullable().optional(),
 });
 
 export const classroomDeskMapSchema: z.ZodType<ClassroomDeskMapDto> = z.object({

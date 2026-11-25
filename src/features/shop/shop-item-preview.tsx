@@ -139,10 +139,10 @@ export interface ShopItemPreviewProps {
 }
 
 /**
- * Square preview of what a shop item actually is. Avatar accessories render
- * their real GLB once into a static `<img>` (single shared offscreen renderer,
- * lazily, only when the card is near the viewport); other kinds and render
- * failures show a category illustration.
+ * Square preview of what a shop item actually is. Avatar accessories and desk
+ * decor render their real GLB once into a static `<img>` (single shared
+ * offscreen renderer, lazily, only when the card is near the viewport); other
+ * kinds and render failures show a category illustration.
  */
 export function ShopItemPreview({ item, className }: ShopItemPreviewProps) {
   const source = resolveItemPreview(item);

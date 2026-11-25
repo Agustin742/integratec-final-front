@@ -1140,6 +1140,10 @@ describe('createClassroomRealtimeClient (#23)', () => {
       neck: 'neck_bandana',
       ears: null,
     });
+    expect(
+      client.getSnapshot().participants.get('equipped-user')?.avatar
+        ?.deskDecorCode,
+    ).toBe('desk_plant');
 
     client.dispose();
   });

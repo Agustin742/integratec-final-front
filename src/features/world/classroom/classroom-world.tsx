@@ -8,6 +8,7 @@ import { WorldCanvas, type WorldCanvasProps } from '../world-canvas';
 import type { NpcSpeech, NpcView, NpcViews } from '../npc/npc-view';
 import type { ClassroomInteractable } from './classroom-interactables';
 import { ClassroomScene } from './classroom-scene';
+import type { DeskDecorAssignment } from './desk-decor';
 import type { ProximityAnchor } from './proximity-tracker';
 import type { RemoteClassroomParticipant } from './remote-avatar';
 
@@ -19,6 +20,8 @@ export interface ClassroomWorldProps extends Pick<
   selfPose?: Pose | undefined;
   onAssetError?: (() => void) | undefined;
   selfEquipped?: AvatarEquipped | undefined;
+  /** Decor shown on each student desk. */
+  deskDecor?: readonly DeskDecorAssignment[] | undefined;
   /** Connection epoch key that changes on join, reconnect, or drop (#37). */
   connectionKey?: string | undefined;
   /** True while the classroom freeze lock is active (#37). */
@@ -62,6 +65,7 @@ export function ClassroomWorld({
   onAssetError,
   selfPose,
   selfEquipped,
+  deskDecor,
   connectionKey,
   frozen,
   remoteParticipants,
@@ -108,6 +112,7 @@ export function ClassroomWorld({
         scopeKey={scopeKey}
         selfPose={selfPose}
         selfEquipped={selfEquipped}
+        deskDecor={deskDecor}
         connectionKey={connectionKey}
         frozen={frozen}
         remoteParticipants={remoteParticipants}

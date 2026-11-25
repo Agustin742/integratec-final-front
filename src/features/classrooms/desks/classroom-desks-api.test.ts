@@ -63,6 +63,26 @@ describe('classroomDeskMapSchema and fetchClassroomDesks', () => {
     );
   });
 
+  test('keeps the equipped desk decor of each desk', () => {
+    const [first, second] = makeDesksPayload().items;
+    const decor = {
+      slot: 'desk_decor',
+      shopItemId: '00000000-0000-4000-8000-000000000301',
+      shopItemCode: 'desk_mug',
+      shopItemName: 'Taza de escritorio',
+      kind: 'DESK_UPGRADE',
+    };
+
+    const parsed = classroomDeskMapSchema.parse({
+      items: [
+        { ...first, deskDecor: decor },
+        { ...second, deskDecor: null },
+      ],
+    });
+
+    expect(parsed.items.map((item) => item.deskDecor)).toEqual([decor, null]);
+  });
+
   test('forwards AbortSignal cleanly without swallowing AbortError', async () => {
     const controller = new AbortController();
     const client = createApiClient({

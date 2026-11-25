@@ -416,7 +416,11 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
         role: 'STUDENT',
         appearance: {
           baseAvatar,
-          items: { ...emptyItems, face: item('face', 'face_sunglasses') },
+          items: {
+            ...emptyItems,
+            face: item('face', 'face_sunglasses'),
+            desk_decor: item('desk_decor', 'desk_mug'),
+          },
         },
       });
       room.setAvatar({
@@ -456,6 +460,12 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
         neck: null,
         ears: null,
       });
+      expect(stage.props?.liveDeskDecor).toEqual(
+        new Map([
+          [profile.id, 'desk_mug'],
+          [REMOTE_STUDENT_ID, null],
+        ]),
+      );
     });
   });
 
