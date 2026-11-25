@@ -251,6 +251,19 @@ describe('ClassroomPet with the GLB clips', () => {
     fade.mockRestore();
   });
 
+  it('keeps a clip playing when it is requested again during its own fade-out', async () => {
+    const { ui, handle } = await setup(home);
+    ui.rerender(<ClassroomPet npc={view({ state: 'walking' })} />);
+    ui.rerender(<ClassroomPet npc={view({ state: 'idle' })} />);
+    tick(0.1);
+    ui.rerender(<ClassroomPet npc={view({ state: 'walking' })} />);
+    const stop = vi.spyOn(AnimationAction.prototype, 'stop');
+    run(1);
+    expect(stop).not.toHaveBeenCalled();
+    expect(handle.group.userData.activeClip).toBe('Walk');
+    stop.mockRestore();
+  });
+
   it('keeps the idle pet still under reduced motion', async () => {
     frame.reduced = true;
     const { handle } = await setup(home);

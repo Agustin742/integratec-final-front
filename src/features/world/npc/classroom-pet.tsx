@@ -116,6 +116,8 @@ function playClip(
   const clip = visual.clips.find((item) => item.name === resolved.clip);
   if (!clip) return;
   const next = visual.mixer.clipAction(clip);
+  // Re-requested while blending out: cancel its pending stop.
+  visual.fading = visual.fading.filter((item) => item.action !== next);
   next.reset();
   next.setLoop(
     resolved.loop ? LoopRepeat : LoopOnce,
