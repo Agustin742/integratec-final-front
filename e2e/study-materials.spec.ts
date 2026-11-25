@@ -480,39 +480,40 @@ test('teacher toggles study material for the Study Guide Bot and captures respon
   );
   await routeMaterialApi(page, state);
 
-  let botEntry: {
-    materialId: string;
-    classroomId: string;
-    botEnabled: boolean;
-    indexingStatus: 'disabled' | 'pending' | 'ready' | 'failed';
-    indexingError: string | null;
-    updatedAt: string;
-  } | null = null;
+  let botEntry: components['schemas']['BotMaterialDto'] | null = null;
 
+  // `GET` carries pagination query parameters; `POST` does not.
   await page.route(
-    `${apiOrigin}/classrooms/${classroomId}/bot/materials`,
-    (route) =>
-      route.fulfill({
-        json: {
-          items: botEntry ? [botEntry] : [],
-        },
-      }),
+    (url) =>
+      url.origin === apiOrigin &&
+      url.pathname === `/classrooms/${classroomId}/bot/materials`,
+    async (route) => {
+      if (route.request().method() === 'POST') {
+        botEntry = {
+          id: '00000000-0000-4000-8000-000000009001',
+          classroomId,
+          materialId: initialMaterialId,
+          filename: 'programa-anual.pdf',
+          contentType: 'application/pdf',
+          sizeBytes: 4096,
+          indexState: 'INDEXED',
+          createdAt: '2026-11-19T01:30:00.000Z',
+        };
+        await route.fulfill({ status: 201, json: botEntry });
+        return;
+      }
+      const items = botEntry ? [botEntry] : [];
+      await route.fulfill({
+        json: { items, page: 1, pageSize: 100, total: items.length },
+      });
+    },
   );
 
   await page.route(
     `${apiOrigin}/classrooms/${classroomId}/bot/materials/${initialMaterialId}`,
     async (route) => {
-      const payload = route.request().postDataJSON() as { enabled?: boolean };
-      const enabled = Boolean(payload.enabled);
-      botEntry = {
-        materialId: initialMaterialId,
-        classroomId,
-        botEnabled: enabled,
-        indexingStatus: enabled ? 'ready' : 'disabled',
-        indexingError: null,
-        updatedAt: '2026-11-19T01:30:00.000Z',
-      };
-      await route.fulfill({ json: botEntry });
+      botEntry = null;
+      await route.fulfill({ status: 204 });
     },
   );
 
