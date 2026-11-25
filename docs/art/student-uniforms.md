@@ -9,7 +9,7 @@ This document describes the two base avatar bodies (`public/models/avatars/{male
 | Male | `34` joints | `public/models/avatars/male/body.glb` |
 | Female | `41` joints | `public/models/avatars/female/body.glb` |
 
-Both bodies keep their built-in `Pants` and `boots` from the waist down, include the `Idle`, `Walk` and `Sit` animation clips, and remain recorded budget exceptions tracked in `#91` (see [3D assets](../3d-assets.md)). Wearables bind to the matching canonical skeleton; see [modular avatar assets](../../rules/modular-avatar-assets.md).
+Both bodies keep their built-in `Pants` and `boots` from the waist down, ship Draco-compressed within the `<= 1 MB` FD8 avatar budget (retiring the legacy `#91` exceptions), and include all `16` canonical animation clips plus `4` transition clips (see [avatar animations](avatar-animations.md) and [3D assets](../3d-assets.md)). Wearables bind to the matching canonical skeleton; see [modular avatar assets](../../rules/modular-avatar-assets.md).
 
 ## Verification
 

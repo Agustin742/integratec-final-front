@@ -11,22 +11,22 @@ Planned art for the classroom world. Tick an item when its GLB (or texture/mater
 
 ### Animations
 
-- [ ] Idle
-- [ ] Walk
-- [ ] Run
-- [ ] Sit
-- [ ] Sit and write
-- [ ] Raise hand
-- [ ] Wave
-- [ ] Cheer
-- [ ] Clap
-- [ ] Think
-- [ ] Nod
-- [ ] Shake head
-- [ ] Sad / frustrated
-- [ ] Dance
-- [ ] Teacher: explain at the board
-- [ ] Teacher: point
+- [x] Idle
+- [x] Walk
+- [x] Run
+- [x] Sit
+- [x] Sit and write
+- [x] Raise hand
+- [x] Wave
+- [x] Cheer
+- [x] Clap
+- [x] Think
+- [x] Nod
+- [x] Shake head
+- [x] Sad / frustrated
+- [x] Dance
+- [x] Teacher: explain at the board
+- [x] Teacher: point
 
 ### Face expressions
 
