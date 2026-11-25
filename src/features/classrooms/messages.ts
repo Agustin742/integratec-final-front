@@ -341,6 +341,7 @@ export const classroomMessages = {
     tabsLabel: 'Secciones de integrantes',
     rosterTab: 'Nómina',
     invitationsTab: 'Invitaciones y código',
+    familiesTab: 'Familias',
     directoryHeading: 'Integrantes del aula',
     directorySubtitle:
       'Docentes y compañeros que comparten esta aula. Solo ves nombres y roles.',
@@ -672,6 +673,7 @@ export const classroomMessages = {
       heading: 'Tutores vinculados',
       description:
         'Vínculos activos entre padres o tutores y estudiantes de esta aula. Desvincular revoca el seguimiento conservando el historial.',
+      adultModeTitle: 'Modo educación de adultos',
       adultModeNote:
         'El aula está en modo educación de adultos: los vínculos existentes conservan su historial con acciones parentales desactivadas.',
       loading: 'Cargando tutores vinculados…',

@@ -31,15 +31,8 @@ import { PaginationControls } from '@/components/pagination/pagination-controls'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
-import { ParentLinkMessagesThread } from '@/features/family/parent-link-messages-thread';
 import { formatInstant } from '@/lib/dates';
 import { cn } from '@/lib/utils';
 import { useSessionService, useSessionSnapshot } from '@/session/provider';
@@ -50,7 +43,6 @@ import {
   toCreateClassroomInvitationPayload,
   toCreateJoinCodePayload,
   type ClassroomInvitationDto,
-  type ClassroomParentLinkDto,
   type CreatedClassroomInvitationDto,
   type EmailInvitationRole,
   type GenerateJoinCodeFormInput,
@@ -68,7 +60,6 @@ import {
   isUncertainWriteError,
   listClassroomInvitations,
   listClassroomParentLinks,
-  removeClassroomParentLink,
   revokeClassroomInvitation,
   revokeClassroomJoinCode,
 } from './invitation-service';
@@ -282,7 +273,6 @@ function ClassroomInvitationsContent({
   const emailRoleGroupId = useId();
   const listHeadingId = useId();
   const filterGroupLabelId = useId();
-  const parentLinksHeadingId = useId();
 
   // Join code local one-time state (never persisted outside component state).
   const [activeJoinCode, setActiveJoinCode] = useState<JoinCodeDto | null>(
@@ -310,27 +300,15 @@ function ClassroomInvitationsContent({
     string | null
   >(null);
 
-  // Parent links inline unlink & messaging dialog state.
-  const [confirmUnlinkTarget, setConfirmUnlinkTarget] =
-    useState<ClassroomParentLinkDto | null>(null);
-  const [activeMessageLink, setActiveMessageLink] =
-    useState<ClassroomParentLinkDto | null>(null);
-  const [isUnlinkingParentLink, setIsUnlinkingParentLink] = useState(false);
-  const [unlinkParentLinkError, setUnlinkParentLinkError] = useState<
-    string | null
-  >(null);
-
   const [liveAnnouncement, setLiveAnnouncement] = useState('');
 
   const isMountedRef = useRef(true);
   const isRevokingCodeRef = useRef(false);
   const isRevokingInvitationRef = useRef(false);
-  const isUnlinkingParentLinkRef = useRef(false);
   const joinCodeAbortRef = useRef<AbortController | null>(null);
   const revokeCodeAbortRef = useRef<AbortController | null>(null);
   const createInviteAbortRef = useRef<AbortController | null>(null);
   const revokeInviteAbortRef = useRef<AbortController | null>(null);
-  const unlinkParentAbortRef = useRef<AbortController | null>(null);
   const reconciledContextErrorRef = useRef<unknown>(null);
 
   const generateButtonRef = useRef<HTMLButtonElement>(null);
@@ -342,11 +320,6 @@ function ClassroomInvitationsContent({
   const revokeButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const restoreRevokeTriggerIdRef = useRef<string | null>(null);
 
-  const parentLinksHeadingRef = useRef<HTMLHeadingElement>(null);
-  const confirmUnlinkHeadingRef = useRef<HTMLHeadingElement>(null);
-  const unlinkButtonRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
-  const restoreUnlinkTriggerIdRef = useRef<string | null>(null);
-
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -355,7 +328,6 @@ function ClassroomInvitationsContent({
       revokeCodeAbortRef.current?.abort();
       createInviteAbortRef.current?.abort();
       revokeInviteAbortRef.current?.abort();
-      unlinkParentAbortRef.current?.abort();
     };
   }, []);
 
@@ -381,18 +353,6 @@ function ClassroomInvitationsContent({
       revokeButtonRefs.current.get(triggerId)?.focus();
     }
   }, [confirmRevokeTarget]);
-
-  useEffect(() => {
-    if (confirmUnlinkTarget !== null) {
-      confirmUnlinkHeadingRef.current?.focus();
-      return;
-    }
-    const triggerId = restoreUnlinkTriggerIdRef.current;
-    if (triggerId !== null) {
-      restoreUnlinkTriggerIdRef.current = null;
-      unlinkButtonRefs.current.get(triggerId)?.focus();
-    }
-  }, [confirmUnlinkTarget]);
 
   const queryParams = {
     page,
@@ -899,116 +859,6 @@ function ClassroomInvitationsContent({
     }
   };
 
-  const setUnlinkButtonRef =
-    (linkId: string) =>
-    (node: HTMLButtonElement | null): void => {
-      if (node) {
-        unlinkButtonRefs.current.set(linkId, node);
-      } else {
-        unlinkButtonRefs.current.delete(linkId);
-      }
-    };
-
-  const handleOpenUnlinkConfirmation = (link: ClassroomParentLinkDto): void => {
-    if (isUnlinkingParentLinkRef.current) {
-      return;
-    }
-    restoreUnlinkTriggerIdRef.current = null;
-    setUnlinkParentLinkError(null);
-    setConfirmUnlinkTarget(link);
-  };
-
-  const handleCancelUnlinkConfirmation = (): void => {
-    if (isUnlinkingParentLinkRef.current || confirmUnlinkTarget === null) {
-      return;
-    }
-    restoreUnlinkTriggerIdRef.current = confirmUnlinkTarget.id;
-    setConfirmUnlinkTarget(null);
-    setUnlinkParentLinkError(null);
-  };
-
-  const handleConfirmUnlinkParentLink = async (): Promise<void> => {
-    if (isUnlinkingParentLinkRef.current || confirmUnlinkTarget === null) {
-      return;
-    }
-
-    const target = confirmUnlinkTarget;
-    isUnlinkingParentLinkRef.current = true;
-    setIsUnlinkingParentLink(true);
-    setUnlinkParentLinkError(null);
-
-    const controller = new AbortController();
-    unlinkParentAbortRef.current?.abort();
-    unlinkParentAbortRef.current = controller;
-
-    try {
-      await removeClassroomParentLink(client, classroomId, target.id, {
-        signal: controller.signal,
-      });
-      if (!isMountedRef.current || controller.signal.aborted) {
-        return;
-      }
-
-      restoreUnlinkTriggerIdRef.current = null;
-      setConfirmUnlinkTarget(null);
-      setActiveMessageLink((current) =>
-        current?.id === target.id ? null : current,
-      );
-      setUnlinkParentLinkError(null);
-      const description = messages.parentLinks.unlinkedDescription(
-        target.parentDisplayName,
-        target.childDisplayName,
-      );
-      setLiveAnnouncement(
-        `${messages.parentLinks.unlinkedTitle}: ${description}`,
-      );
-      toast.success(messages.parentLinks.unlinkedTitle, { description });
-      void queryClient.invalidateQueries({
-        predicate: createClassroomParentLinksPredicate(userId, classroomId),
-      });
-      void queryClient.invalidateQueries({
-        predicate: createClassroomRosterPredicate(userId, classroomId),
-      });
-      parentLinksHeadingRef.current?.focus();
-    } catch (error) {
-      if (
-        isAbortError(error) ||
-        controller.signal.aborted ||
-        !isMountedRef.current
-      ) {
-        return;
-      }
-
-      const errorMessage =
-        error instanceof ApiError
-          ? error.userMessage
-          : messages.parentLinks.unlinkUnexpected;
-      setUnlinkParentLinkError(errorMessage);
-
-      if (isNotFoundApiError(error)) {
-        void queryClient.invalidateQueries({
-          predicate: createClassroomParentLinksPredicate(userId, classroomId),
-        });
-        void queryClient.invalidateQueries({
-          queryKey: classroomDetailQueryKey(userId, classroomId),
-          exact: true,
-        });
-      } else if (isForbiddenApiError(error) || isUncertainWriteError(error)) {
-        void queryClient.invalidateQueries({
-          predicate: createClassroomParentLinksPredicate(userId, classroomId),
-        });
-      }
-    } finally {
-      if (unlinkParentAbortRef.current === controller) {
-        unlinkParentAbortRef.current = null;
-      }
-      isUnlinkingParentLinkRef.current = false;
-      if (isMountedRef.current) {
-        setIsUnlinkingParentLink(false);
-      }
-    }
-  };
-
   const isListForbidden =
     invitationsQuery.isError && isForbiddenApiError(invitationsQuery.error);
   const isListNotFound =
@@ -1056,7 +906,6 @@ function ClassroomInvitationsContent({
         getStudentGuardianCount(student.userId, student.guardians) >=
         MAX_GUARDIANS_PER_STUDENT,
     );
-  const showParentLinksSection = !adultMode || activeParentLinks.length > 0;
 
   return (
     <div className="min-w-0 space-y-6 pt-2">
@@ -1880,272 +1729,6 @@ function ClassroomInvitationsContent({
           />
         )}
       </section>
-
-      {/* Section 4: Active Guardian Links */}
-      {showParentLinksSection && (
-        <section
-          aria-labelledby={parentLinksHeadingId}
-          className="min-w-0 space-y-4"
-        >
-          <div className="min-w-0 space-y-1.5">
-            <h3
-              id={parentLinksHeadingId}
-              ref={parentLinksHeadingRef}
-              tabIndex={-1}
-              className="font-display text-lg font-semibold text-foreground outline-none"
-            >
-              {messages.parentLinks.heading}
-            </h3>
-            <p className="text-sm text-pretty text-muted-foreground">
-              {messages.parentLinks.description}
-            </p>
-            {adultMode && (
-              <p className="text-xs text-pretty text-muted-foreground">
-                {messages.parentLinks.adultModeNote}
-              </p>
-            )}
-          </div>
-
-          {parentLinksQuery.isPending && parentLinksData === undefined && (
-            <LoadingState
-              label={messages.parentLinks.loading}
-              skeletonLines={3}
-            />
-          )}
-
-          {isParentLinksForbidden && (
-            <ErrorState
-              headingLevel="h4"
-              title={messages.forbiddenTitle}
-              description={messages.forbiddenDescription}
-            />
-          )}
-
-          {isParentLinksNotFound && (
-            <ErrorState
-              headingLevel="h4"
-              title={messages.notFoundTitle}
-              description={messages.notFoundDescription}
-            />
-          )}
-
-          {parentLinksQuery.isError &&
-            !isParentLinksRevoked &&
-            parentLinksData === undefined && (
-              <ErrorState
-                headingLevel="h4"
-                title={messages.parentLinks.errorTitle}
-                description={messages.parentLinks.errorDescription}
-                onRetry={() => void parentLinksQuery.refetch()}
-                isRetrying={parentLinksQuery.isRefetching}
-              />
-            )}
-
-          {parentLinksQuery.isError &&
-            !isParentLinksRevoked &&
-            parentLinksData !== undefined && (
-              <StaleDataNotice
-                headingLevel="h4"
-                title={messages.parentLinks.staleTitle}
-                description={messages.parentLinks.staleDescription}
-                onRetry={() => void parentLinksQuery.refetch()}
-                isRetrying={parentLinksQuery.isRefetching}
-              />
-            )}
-
-          {parentLinksData !== undefined && activeParentLinks.length === 0 && (
-            <EmptyState
-              headingLevel="h4"
-              title={messages.parentLinks.emptyTitle}
-              description={messages.parentLinks.emptyDescription}
-            />
-          )}
-
-          {parentLinksData !== undefined && activeParentLinks.length > 0 && (
-            <ul
-              className="min-w-0 space-y-3"
-              aria-label={messages.parentLinks.heading}
-            >
-              {activeParentLinks.map((link) => {
-                const isConfirmingThis = confirmUnlinkTarget?.id === link.id;
-                const confirmHeadingId = `${parentLinksHeadingId}-confirm-${link.id}`;
-                const confirmDescId = `${parentLinksHeadingId}-desc-${link.id}`;
-
-                return (
-                  <li
-                    key={link.id}
-                    className="min-w-0 space-y-3 rounded-2xl border border-edge bg-card p-4 text-card-foreground shadow-panel"
-                  >
-                    <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-display text-base font-semibold text-foreground wrap-anywhere">
-                            {link.parentDisplayName}
-                          </span>
-                          <span
-                            aria-hidden="true"
-                            className="text-sm text-muted-foreground"
-                          >
-                            →
-                          </span>
-                          <span className="text-sm font-medium text-foreground wrap-anywhere">
-                            {link.childDisplayName}
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                          <span>
-                            {messages.parentLinks.linkedToLabel(
-                              link.childDisplayName,
-                            )}
-                          </span>
-                          <span>
-                            {messages.parentLinks.createdAtLabel(
-                              formatTimestamp(link.createdAt),
-                            )}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex shrink-0 flex-wrap items-center gap-2">
-                        {!adultMode && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            aria-label={messages.parentLinks.messagesAriaLabel(
-                              link.parentDisplayName,
-                              link.childDisplayName,
-                            )}
-                            disabled={isUnlinkingParentLink}
-                            onClick={() => setActiveMessageLink(link)}
-                            className="min-h-11 shrink-0"
-                          >
-                            {messages.parentLinks.messagesAction}
-                          </Button>
-                        )}
-                        <Button
-                          ref={setUnlinkButtonRef(link.id)}
-                          type="button"
-                          variant="destructive"
-                          size="sm"
-                          aria-label={messages.parentLinks.unlinkAriaLabel(
-                            link.parentDisplayName,
-                            link.childDisplayName,
-                          )}
-                          aria-expanded={isConfirmingThis}
-                          disabled={isUnlinkingParentLink || isConfirmingThis}
-                          onClick={() => handleOpenUnlinkConfirmation(link)}
-                          className="min-h-11 shrink-0"
-                        >
-                          {messages.parentLinks.unlinkAction}
-                        </Button>
-                      </div>
-                    </div>
-
-                    {isConfirmingThis && (
-                      <section
-                        aria-labelledby={confirmHeadingId}
-                        aria-describedby={confirmDescId}
-                        className="min-w-0 space-y-3 rounded-2xl border-2 border-destructive/40 bg-destructive/5 p-3.5"
-                      >
-                        <h4
-                          id={confirmHeadingId}
-                          ref={confirmUnlinkHeadingRef}
-                          tabIndex={-1}
-                          className="font-display text-base font-semibold text-foreground outline-none wrap-anywhere"
-                        >
-                          {messages.parentLinks.confirmUnlinkTitle(
-                            link.parentDisplayName,
-                            link.childDisplayName,
-                          )}
-                        </h4>
-                        <p
-                          id={confirmDescId}
-                          className="text-sm text-pretty text-muted-foreground"
-                        >
-                          {messages.parentLinks.confirmUnlinkDescription}
-                        </p>
-
-                        {unlinkParentLinkError !== null && (
-                          <Alert variant="destructive" role="alert">
-                            <AlertTitle>
-                              {messages.parentLinks.unlinkErrorTitle}
-                            </AlertTitle>
-                            <AlertDescription>
-                              {unlinkParentLinkError}
-                            </AlertDescription>
-                          </Alert>
-                        )}
-
-                        <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={isUnlinkingParentLink}
-                            onClick={handleCancelUnlinkConfirmation}
-                            className="min-h-11"
-                          >
-                            {messages.parentLinks.confirmUnlinkCancel}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            busy={isUnlinkingParentLink}
-                            onClick={() => void handleConfirmUnlinkParentLink()}
-                            className="min-h-11"
-                          >
-                            {isUnlinkingParentLink
-                              ? messages.parentLinks.confirmUnlinkPending
-                              : messages.parentLinks.confirmUnlinkSubmit}
-                          </Button>
-                        </div>
-                      </section>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
-      )}
-
-      <Dialog
-        open={!adultMode && activeMessageLink !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setActiveMessageLink(null);
-          }
-        }}
-      >
-        <DialogContent className="w-[calc(100%-2rem)] max-w-xl">
-          {!adultMode && activeMessageLink !== null && (
-            <div className="min-w-0 space-y-4">
-              <div className="min-w-0 space-y-1">
-                <DialogTitle className="wrap-anywhere">
-                  {messages.parentLinks.messagesDialogTitle(
-                    activeMessageLink.parentDisplayName,
-                  )}
-                </DialogTitle>
-                <DialogDescription className="wrap-anywhere">
-                  {messages.parentLinks.messagesDialogDescription(
-                    activeMessageLink.childDisplayName,
-                  )}
-                </DialogDescription>
-              </div>
-              <ParentLinkMessagesThread
-                key={`${userId}:${activeMessageLink.id}`}
-                userId={userId}
-                linkId={activeMessageLink.id}
-                viewerRole="STAFF"
-                headingLevel="h3"
-                hideHeader
-              />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

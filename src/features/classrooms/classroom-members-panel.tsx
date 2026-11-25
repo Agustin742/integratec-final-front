@@ -5,6 +5,7 @@ import {
   ClassroomDirectoryPanel,
   ClassroomTeachersSection,
 } from './classroom-directory';
+import { ClassroomFamiliesPanel } from './classroom-families-panel';
 import { ClassroomInvitationsPanel } from './classroom-invitations-panel';
 import { ClassroomRosterPanel } from './classroom-roster-panel';
 import { classroomMessages } from './messages';
@@ -56,6 +57,9 @@ export function ClassroomMembersPanel({
         <TabsTrigger value="invitations" className="min-h-11">
           {classroomMessages.members.invitationsTab}
         </TabsTrigger>
+        <TabsTrigger value="families" className="min-h-11">
+          {classroomMessages.members.familiesTab}
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="roster" className="min-w-0 space-y-2">
@@ -66,6 +70,9 @@ export function ClassroomMembersPanel({
       </TabsContent>
       <TabsContent value="invitations">
         <ClassroomInvitationsPanel classroomId={resolvedClassroomId} />
+      </TabsContent>
+      <TabsContent value="families">
+        <ClassroomFamiliesPanel classroomId={resolvedClassroomId} />
       </TabsContent>
     </Tabs>
   );
