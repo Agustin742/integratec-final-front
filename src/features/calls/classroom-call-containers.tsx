@@ -1,0 +1,165 @@
+import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui/toast';
+import { useClassroomContext } from '@/features/classrooms/use-classroom-capabilities';
+import { useCalls } from './call-provider';
+import { callMessages } from './call-messages';
+import {
+  ClassCallBanner,
+  ClassCallButtonView,
+  IncomingCallPrompt,
+} from './class-call-entry';
+import { isWorldLocked } from './focus-mode';
+import {
+  useClassroomCallSignals,
+  type IncomingCall,
+} from './use-classroom-call-signals';
+
+/**
+ * Rings for direct calls and caller-side decline feedback. Mount it once per
+ * classroom: rings travel over the classroom connection.
+ */
+export function IncomingCallListener({
+  classroomId,
+}: {
+  readonly classroomId: string;
+}) {
+  const calls = useCalls();
+  const signals = useClassroomCallSignals(classroomId);
+  const { incomingCalls, declinedByUserId, dismissDeclined, declineCall } =
+    signals;
+  // Accepted callers stay in `incomingCalls` until the server cancels the ring.
+  const [accepted, setAccepted] = useState<readonly string[]>([]);
+
+  const stillRinging = accepted.filter((id) =>
+    incomingCalls.some((call) => call.callerUserId === id),
+  );
+  if (stillRinging.length !== accepted.length) setAccepted(stillRinging);
+
+  useEffect(() => {
+    if (declinedByUserId === null) return;
+    toast(callMessages.ended.declined, { id: 'call-ended' });
+    dismissDeclined();
+  }, [declinedByUserId, dismissDeclined]);
+
+  if (calls === null || calls.inCall) return null;
+  const ringing = incomingCalls.filter(
+    (call) => !accepted.includes(call.callerUserId),
+  );
+  const accept = (call: IncomingCall) => {
+    setAccepted((current) => [...current, call.callerUserId]);
+    calls.start(
+      {
+        kind: 'direct',
+        classroomId,
+        peerUserId: call.callerUserId,
+      },
+      call.callerDisplayName,
+    );
+  };
+  return (
+    <IncomingCallPrompt
+      calls={ringing}
+      onAccept={accept}
+      onDecline={(call) => void declineCall(call.callerUserId)}
+    />
+  );
+}
+
+/** Classroom entry point: moderators start the class call, students join it. */
+export function ClassroomCallBanner({
+  classroomId,
+  classroomName,
+  canStart,
+}: {
+  readonly classroomId: string;
+  readonly classroomName: string;
+  readonly canStart: boolean;
+}) {
+  const calls = useCalls();
+  const { classCallActive } = useClassroomCallSignals(classroomId);
+  if (calls === null) return null;
+  const start = () =>
+    calls.start({ kind: 'classroom', classroomId }, classroomName);
+  return (
+    <ClassCallBanner
+      canStart={canStart}
+      active={classCallActive}
+      inCall={calls.inCall}
+      onStart={start}
+      onJoin={start}
+    />
+  );
+}
+
+/** Button for the chat headers (dock and chats page); same rules as the banner. */
+export function ClassCallButton(props: {
+  readonly classroomId: string;
+  readonly classroomName: string;
+}) {
+  const calls = useCalls();
+  if (calls === null) return null;
+  return <ClassCallButtonContent calls={calls} {...props} />;
+}
+
+function ClassCallButtonContent({
+  calls,
+  classroomId,
+  classroomName,
+}: {
+  readonly calls: NonNullable<ReturnType<typeof useCalls>>;
+  readonly classroomId: string;
+  readonly classroomName: string;
+}) {
+  const context = useClassroomContext(classroomId);
+  const { classCallActive } = useClassroomCallSignals(classroomId);
+  const canStart =
+    context.status === 'ready' &&
+    context.classroom.capabilities.includes('moderate_chat');
+  return (
+    <ClassCallButtonView
+      canStart={canStart}
+      active={classCallActive}
+      inCall={calls.inCall}
+      onClick={() =>
+        calls.start({ kind: 'classroom', classroomId }, classroomName)
+      }
+    />
+  );
+}
+
+/** True while a teacher's focus mode hides the 3D world from this student. */
+export function useWorldLocked(
+  classroomId: string | null,
+  myRole: string,
+): boolean {
+  const { focusMode } = useClassroomCallSignals(classroomId);
+  return isWorldLocked(myRole, focusMode);
+}
+
+/** "Llamar" action for a classroom member row (direct 1:1 call). */
+export function DirectCallButton({
+  classroomId,
+  peerUserId,
+  peerName,
+}: {
+  readonly classroomId: string;
+  readonly peerUserId: string;
+  readonly peerName: string;
+}) {
+  const calls = useCalls();
+  if (calls === null || calls.inCall) return null;
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      aria-label={callMessages.entry.callMember(peerName)}
+      onClick={() =>
+        calls.start({ kind: 'direct', classroomId, peerUserId }, peerName)
+      }
+    >
+      {callMessages.entry.callAction}
+    </Button>
+  );
+}

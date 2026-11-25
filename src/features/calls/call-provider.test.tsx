@@ -1,0 +1,128 @@
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { UseCallSessionResult } from './use-call-session';
+
+const toastMock = vi.hoisted(() => ({ toast: vi.fn() }));
+vi.mock('@/components/ui/toast', () => ({
+  toast: Object.assign(toastMock.toast, {
+    info: toastMock.toast,
+    error: toastMock.toast,
+  }),
+}));
+
+let session: Partial<UseCallSessionResult>;
+vi.mock('./use-call-session', () => ({
+  useCallSession: () => session,
+}));
+vi.mock('./call-stage', () => ({
+  CallStage: () => <div data-testid="stage" />,
+}));
+
+import { CallProvider, useCalls } from './call-provider';
+
+const CLASSROOM = '11111111-1111-4111-8111-111111111111';
+
+function Starter() {
+  const calls = useCalls();
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        calls?.start(
+          { kind: 'classroom', classroomId: CLASSROOM },
+          'Matemática',
+        )
+      }
+    >
+      start
+    </button>
+  );
+}
+
+function makeSession(overrides: Partial<UseCallSessionResult> = {}) {
+  session = {
+    status: 'idle',
+    endReason: null,
+    micError: null,
+    participants: [],
+    self: {
+      muted: false,
+      forcedMuted: false,
+      canUnmute: true,
+      hasMicrophone: true,
+    },
+    focusMode: false,
+    allowSelfUnmute: false,
+    isModerator: false,
+    needsAudioUnlock: false,
+    kind: null,
+    join: vi.fn().mockResolvedValue(undefined),
+    leave: vi.fn().mockResolvedValue(undefined),
+    toggleMute: vi.fn(),
+    sendEmote: vi.fn(),
+    moderate: vi.fn(),
+    endCall: vi.fn(),
+    resumeAudio: vi.fn().mockResolvedValue(undefined),
+    getLevel: () => 0,
+    ...overrides,
+  };
+}
+
+describe('CallProvider', () => {
+  beforeEach(() => {
+    toastMock.toast.mockClear();
+    makeSession();
+  });
+
+  it('joins from the click that starts the call', () => {
+    const { rerender } = render(
+      <CallProvider>
+        <Starter />
+      </CallProvider>,
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'start' }));
+    expect(session.join).toHaveBeenCalledWith({
+      kind: 'classroom',
+      classroomId: CLASSROOM,
+    });
+    makeSession({ status: 'connected', kind: 'classroom' });
+    rerender(
+      <CallProvider>
+        <Starter />
+      </CallProvider>,
+    );
+    expect(
+      screen.getByRole('dialog', { name: 'Clase en llamada: Matemática' }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Salir de la llamada' }),
+    );
+    expect(session.leave).toHaveBeenCalledOnce();
+  });
+
+  it('announces the end reason in Spanish', () => {
+    const { rerender } = render(
+      <CallProvider>
+        <Starter />
+      </CallProvider>,
+    );
+    makeSession({ status: 'ended', endReason: 'moderator_ended' });
+    act(() => {
+      rerender(
+        <CallProvider>
+          <Starter />
+        </CallProvider>,
+      );
+    });
+    expect(toastMock.toast).toHaveBeenCalledWith(
+      'La clase en llamada terminó.',
+      expect.anything(),
+    );
+  });
+
+  it('useCalls is null without a provider', () => {
+    render(<Starter />);
+    expect(screen.getByRole('button', { name: 'start' })).toBeInTheDocument();
+  });
+});

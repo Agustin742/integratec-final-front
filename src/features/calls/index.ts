@@ -24,3 +24,12 @@ export {
 } from './use-classroom-call-signals';
 export { CallStage, type CallStageProps } from './call-stage';
 export { computeStageLayout, MAX_STAGE_TILES } from './call-stage-layout';
+export { CallProvider, useCalls, type CallsController } from './call-provider';
+export {
+  ClassCallButton,
+  ClassroomCallBanner,
+  DirectCallButton,
+  IncomingCallListener,
+  useWorldLocked,
+} from './classroom-call-containers';
+export { FocusModeNotice } from './focus-mode';
