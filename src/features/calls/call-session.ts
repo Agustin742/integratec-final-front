@@ -228,10 +228,18 @@ export function createCallSession(deps: CallSessionDeps): CallSession {
     }
     for (const [id, participant] of next.participants) {
       if (id === selfId) {
+        const wasMuted = mic?.getState().effectiveMuted ?? true;
         mic?.applyServer({
           forcedMuted: participant.forcedMuted,
           allowSelfUnmute: next.allowSelfUnmute,
         });
+        if (
+          wasMuted &&
+          mic?.getState().effectiveMuted === false &&
+          localDetector?.isSpeaking()
+        ) {
+          connection?.sendSelf({ speaking: true });
+        }
       } else {
         sink?.setMuted(id, participant.selfMuted || participant.forcedMuted);
       }
@@ -323,7 +331,12 @@ export function createCallSession(deps: CallSessionDeps): CallSession {
   function setMuted(muted: boolean): 'ok' | 'refused' {
     if (!mic) return 'refused';
     const result = mic.setMuted(muted);
-    if (result === 'ok') connection?.sendSelf({ muted });
+    if (result === 'ok') {
+      // The server clears speaking on mute and the detector only reports
+      // changes, so an unmute while still talking must restate it.
+      const speaking = !muted && localDetector?.isSpeaking() === true;
+      connection?.sendSelf(speaking ? { muted, speaking } : { muted });
+    }
     publish();
     return result;
   }
@@ -352,16 +365,21 @@ export function createCallSession(deps: CallSessionDeps): CallSession {
       status = 'joining';
       publish();
 
+      let captured: MediaStream | null = null;
+      let captureError: MicCaptureErrorCode | null = null;
       try {
-        localStream = await deps.captureMic();
+        captured = await deps.captureMic();
       } catch (error) {
-        micError = error instanceof MicCaptureError ? error.code : 'unknown';
-        localStream = null;
+        captureError =
+          error instanceof MicCaptureError ? error.code : 'unknown';
       }
+      // A newer join or a leave owns the shared state now: only release our stream.
       if (epoch !== myEpoch) {
-        for (const track of localStream?.getTracks() ?? []) track.stop();
+        for (const track of captured?.getTracks() ?? []) track.stop();
         return;
       }
+      localStream = captured;
+      micError = captureError;
       mic = createLocalMicControl({ stream: localStream });
       if (localStream && audioContext) {
         localDetector = createVoiceActivityDetector({

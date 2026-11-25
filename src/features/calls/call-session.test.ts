@@ -17,13 +17,19 @@ const CLASSROOM = '7b1f3c52-8d1e-4f0a-9a57-2c6f5e8d9a10';
 const JOIN = { kind: 'classroom', classroomId: CLASSROOM } as const;
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-function setup(options: { mic?: 'ok' | MicCaptureError } = {}) {
+function setup(
+  options: {
+    mic?: 'ok' | MicCaptureError;
+    captureMic?: () => Promise<MediaStream>;
+  } = {},
+) {
   const sdk = createFakeCallSdk();
   const peers = createFakePeerFactory();
   const audioContexts: FakeAudioContext[] = [];
   const elements: FakeAudioElement[] = [];
   const localStream = new FakeStream();
   const captureMic = vi.fn(async () => {
+    if (options.captureMic) return options.captureMic();
     if (options.mic instanceof MicCaptureError) throw options.mic;
     return asStream(localStream);
   });
@@ -229,6 +235,64 @@ describe('createCallSession receiver-side mute (#141)', () => {
     await ctx.session.resumeAudio();
     expect(ctx.session.getSnapshot().needsAudioUnlock).toBe(false);
     expect(ctx.audioContexts[0]!.resume).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('createCallSession stale joins and speaking resync (#141)', () => {
+  it('a stale join resolving its microphone late does not stop the current call mic', async () => {
+    const stale = new FakeStream();
+    const current = new FakeStream();
+    let resolveStale: (stream: MediaStream) => void = () => undefined;
+    const queue = [
+      () => new Promise<MediaStream>((resolve) => (resolveStale = resolve)),
+      () => Promise.resolve(asStream(current)),
+    ];
+    const { session, sdk, pc } = setup({
+      captureMic: () => queue.shift()!(),
+    });
+    void session.join(JOIN);
+    await session.leave();
+    await session.join(JOIN);
+    resolveStale(asStream(stale));
+    await flush();
+    expect(stale.tracks[0]!.stop).toHaveBeenCalled();
+    expect(current.tracks[0]!.stop).not.toHaveBeenCalled();
+    expect(session.getSnapshot().status).toBe('connected');
+    expect(session.getSnapshot().self.hasMicrophone).toBe(true);
+    // A rejoin rebuilds the mesh from the shared local stream.
+    sdk.lastRoom.emitLeave(1006);
+    await flush();
+    sdk.lastRoom.setParticipant({ sessionId: 'S-peer' });
+    expect(pc(0).addedTracks).toEqual([current.tracks[0]]);
+  });
+
+  it('re-sends the current speaking state when unmuting while still talking', async () => {
+    vi.useFakeTimers();
+    const { session, audioContexts, sends } = setup();
+    await session.join(JOIN);
+    audioContexts[0]!.analysers[0]!.amplitude = 0.1;
+    await vi.advanceTimersByTimeAsync(300);
+    session.setMuted(true);
+    await vi.advanceTimersByTimeAsync(50);
+    session.setMuted(false);
+    expect(sends('call:self').at(-1)).toEqual([
+      'call:self',
+      { muted: false, speaking: true },
+    ]);
+  });
+
+  it('re-sends speaking when a moderator unmute clears the forced mute', async () => {
+    vi.useFakeTimers();
+    const { session, sdk, audioContexts, sends } = setup();
+    await session.join(JOIN);
+    audioContexts[0]!.analysers[0]!.amplitude = 0.1;
+    sdk.lastRoom.setParticipant({ sessionId: 'S-self', forcedMuted: true });
+    await vi.advanceTimersByTimeAsync(300);
+    sdk.lastRoom.setParticipant({ sessionId: 'S-self', forcedMuted: false });
+    expect(sends('call:self').at(-1)).toEqual([
+      'call:self',
+      { speaking: true },
+    ]);
   });
 });
 
