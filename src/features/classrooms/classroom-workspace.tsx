@@ -480,7 +480,26 @@ function WorkspaceContext({
               )}
             </header>
             {joinAlert}
-            {!isParent && (
+            {isParent ? (
+              <div className="min-w-0 space-y-4 rounded-2xl border border-edge bg-card p-5 text-card-foreground shadow-panel">
+                <div className="space-y-1.5">
+                  <h3 className="font-display text-lg font-semibold text-foreground">
+                    {messages.parentRedirect.title}
+                  </h3>
+                  <p className="max-w-prose text-sm text-pretty text-muted-foreground">
+                    {messages.parentRedirect.description}
+                  </p>
+                </div>
+                <div>
+                  <Link
+                    to={`/family?classroomId=${encodeURIComponent(classroomId)}`}
+                    className={buttonStyles({ variant: 'default' })}
+                  >
+                    {messages.parentRedirect.action}
+                  </Link>
+                </div>
+              </div>
+            ) : (
               <Classroom2DLayout
                 classroomId={classroomId}
                 panels={panels}

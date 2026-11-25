@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { ApiError } from '@/api/errors';
 import {
   classroomActivityMetricsQueryKey,
@@ -20,7 +20,7 @@ import {
 import { DEFAULT_PAGE_SIZE } from '@/components/pagination/pagination';
 import { PaginationControls } from '@/components/pagination/pagination-controls';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonStyles } from '@/components/ui/button';
 import { InitialsAvatar } from '@/components/ui/initials-avatar';
 import { formatDateOnly, formatInstant } from '@/lib/dates';
 import { WalletPanel } from '@/features/points/wallet-panel';
@@ -106,6 +106,11 @@ function GradesPanelContent({ classroomId }: { classroomId: string }) {
         headingLevel="h3"
         title={messages.parent.title}
         description={messages.parent.description}
+        action={
+          <Link to="/family" className={buttonStyles({ variant: 'default' })}>
+            {messages.parent.ctaLabel}
+          </Link>
+        }
       />
     );
   }

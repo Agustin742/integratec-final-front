@@ -19,6 +19,12 @@ export const classroomMessages = {
   },
   role: 'Tu rol en esta aula',
   backToList: 'Volver a mis aulas',
+  parentRedirect: {
+    title: 'Seguimiento desde el área familiar',
+    description:
+      'El rol familiar no ingresa al aula 3D ni a los paneles del aula. Consultá las calificaciones y la participación de tus hijos desde el área familiar.',
+    action: 'Ir al área familiar',
+  },
   errorTitle: 'No pudimos cargar el aula',
   errorDescription: 'Revisá tu conexión e intentá de nuevo.',
   roles: {
@@ -139,6 +145,7 @@ export const classroomMessages = {
     createFirstAction: 'Crear mi primera aula',
     joinWithCodeAction: 'Unirme con un código',
     enterAction: 'Entrar al aula',
+    openFamilyAreaAction: 'Abrir área familiar',
     configureAction: 'Configurar aula',
     noSubject: 'Sin materia ni descripción cargada',
     paths: {

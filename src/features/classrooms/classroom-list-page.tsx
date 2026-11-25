@@ -607,10 +607,16 @@ function ClassroomListWorkspace({
 
                     <div className="flex flex-wrap items-center gap-3 pt-1">
                       <Link
-                        to={`/classrooms/${encodeURIComponent(classroom.id)}`}
+                        to={
+                          classroom.myRole === 'PARENT'
+                            ? `/family?classroomId=${encodeURIComponent(classroom.id)}`
+                            : `/classrooms/${encodeURIComponent(classroom.id)}`
+                        }
                         className={cn(primaryEntryLinkClass)}
                       >
-                        {classroomMessages.list.enterAction}
+                        {classroom.myRole === 'PARENT'
+                          ? classroomMessages.list.openFamilyAreaAction
+                          : classroomMessages.list.enterAction}
                       </Link>
                       {canConfigure && (
                         <Button

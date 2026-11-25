@@ -654,7 +654,7 @@ describe('InvitationAcceptPage (/invitations/accept)', () => {
       within(outcome).getByRole('link', {
         name: joinMessages.outcome.parentContinueCta,
       }),
-    ).toHaveAttribute('href', '/');
+    ).toHaveAttribute('href', '/family/6e5f6a7b-0000-4000-8000-000000000001');
 
     await expectAccessible(container);
   });

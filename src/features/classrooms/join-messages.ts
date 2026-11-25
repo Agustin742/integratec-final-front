@@ -88,7 +88,7 @@ export const joinMessages = {
     parentAlreadyMemberTitle: 'El vínculo familiar ya estaba activo',
     parentAlreadyMemberBody:
       'Tu cuenta ya estaba vinculada como padre o tutor para este estudiante. Conservamos tu vínculo existente sin duplicarlo.',
-    parentContinueCta: 'Ir al inicio',
+    parentContinueCta: 'Ir al área familiar',
     formatAssignedDesk: (deskIndex: number) =>
       `Pupitre asignado: #${deskIndex}.`,
     noDeskAssigned: 'Tu inscripción quedó activa en el aula.',

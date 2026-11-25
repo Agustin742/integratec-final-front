@@ -536,7 +536,15 @@ describe('ClassroomListPage (/)', () => {
 
     expect(
       screen.getAllByRole('link', { name: classroomMessages.list.enterAction }),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
+    const familyLinks = screen.getAllByRole('link', {
+      name: classroomMessages.list.openFamilyAreaAction,
+    });
+    expect(familyLinks).toHaveLength(1);
+    expect(familyLinks[0]).toHaveAttribute(
+      'href',
+      `/family?classroomId=${encodeURIComponent(parentClassroom.id)}`,
+    );
     await expectAccessible(container);
   });
 

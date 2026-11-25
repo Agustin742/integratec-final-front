@@ -246,7 +246,7 @@ function InvitationTokenSection({
           predicate: (query) => {
             if (!matchesUser(query)) return false;
             const first = query.queryKey[0] as { domain?: unknown } | undefined;
-            return first?.domain === 'classrooms';
+            return first?.domain === 'classrooms' || first?.domain === 'family';
           },
         });
         setParentConfirmation(result);
@@ -308,7 +308,14 @@ function InvitationTokenSection({
             </p>
           </div>
 
-          <Link to="/" className={primaryCtaLinkClass}>
+          <Link
+            to={
+              parentConfirmation.parentLinkId
+                ? `/family/${encodeURIComponent(parentConfirmation.parentLinkId)}`
+                : '/family'
+            }
+            className={primaryCtaLinkClass}
+          >
             {joinMessages.outcome.parentContinueCta}
           </Link>
         </div>
