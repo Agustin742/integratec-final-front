@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-25 — Study guide bot material contract fix
+
+- **Status:** completed (pending push, CI and review)
+- **Area / files:** `src/features/classrooms/materials/` (bot schema, service, toggle, panel, copy), `src/test/msw/handlers.ts`, `e2e/study-materials.spec.ts`, `docs/threat-model.md`
+- **Change:** The material switch uses the published back contract (paginated GET reading all pages, POST `{materialId}`, DELETE) with generated types; adds a retry action for failed indexing, a pending-cleanup message for 503, and MSW handlers that follow the contract.
+- **Reason:** Enabling a material failed with 404 because the front still used a provisional `PUT` contract.
+- **Verification:** Tests written first and seen failing; the five material test files (50 tests), lint and typecheck pass. Full suite, build and E2E not run locally.
+- **Next step:** Review, push and CI. Images (PNG/JPEG) can never be indexed by the back.
+
 ## 2026-11-24 — Modular avatar and classroom assets (#135, covers #58)
 
 - **Status:** completed (pending CI and merge of the PR)

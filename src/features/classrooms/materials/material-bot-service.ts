@@ -1,12 +1,10 @@
-import type { Client } from 'openapi-fetch';
-import { requestApi, type TypedApiClient } from '@/api/client';
+import { requestApi, requestApiVoid, type TypedApiClient } from '@/api/client';
 import { ApiError, mapApiError } from '@/api/errors';
 import {
   botAllowedMaterialDtoSchema,
-  botAllowedMaterialListSchema,
+  botAllowedMaterialPageSchema,
   type BotAllowedMaterialDto,
   type BotAllowedMaterialListDto,
-  type SetBotMaterialEnabledInput,
 } from './material-bot-schema';
 import { materialMessages } from './messages';
 
@@ -14,55 +12,14 @@ export interface BotMaterialServiceOptions {
   readonly signal?: AbortSignal;
 }
 
-/**
- * Provisional OpenAPI path shape for `HU-BOT-001` until
- * `Agustin742/integratec-final-back#40` lands in `src/api/schema.generated.ts`.
- */
-interface BotMaterialsPaths {
-  '/classrooms/{id}/bot/materials': {
-    get: {
-      parameters: {
-        path: { id: string };
-      };
-      responses: {
-        200: {
-          content: {
-            'application/json': BotAllowedMaterialListDto;
-          };
-        };
-      };
-    };
-  };
-  '/classrooms/{id}/bot/materials/{materialId}': {
-    put: {
-      parameters: {
-        path: { id: string; materialId: string };
-      };
-      requestBody: {
-        content: {
-          'application/json': SetBotMaterialEnabledInput;
-        };
-      };
-      responses: {
-        200: {
-          content: {
-            'application/json': BotAllowedMaterialDto;
-          };
-        };
-      };
-    };
-  };
-}
-
-function asBotClient(client: TypedApiClient): Client<BotMaterialsPaths> {
-  return client as unknown as Client<BotMaterialsPaths>;
-}
+/** The server's maximum page size. */
+const LIST_PAGE_SIZE = 100;
 
 const uncertainBotMaterialErrors = new WeakSet<ApiError>();
 
 /**
  * Returns `true` when a bot-material toggle failed with an outcome-uncertain
- * result (`5xx`, transport/network failure, or malformed `200`).
+ * result (`5xx`, transport/network failure, or malformed success body).
  */
 export function isUncertainBotMaterialError(error: unknown): boolean {
   if (!(error instanceof ApiError)) {
@@ -134,9 +91,13 @@ function translateBotToggleError(baseError: ApiError): ApiError {
   });
 }
 
+function toToggleError(error: unknown): unknown {
+  return error instanceof ApiError ? translateBotToggleError(error) : error;
+}
+
 /**
- * Fetches the confirmed Study Guide Bot material configuration and indexing
- * state for a classroom (`HU-BOT-001`). Call only for staff with
+ * Fetches every material allowed for the Study Guide Bot with its indexing
+ * state (`HU-BOT-001`), reading all pages. Call only for staff with
  * `configure_bot`.
  */
 export async function listClassroomBotMaterials(
@@ -144,60 +105,64 @@ export async function listClassroomBotMaterials(
   classroomId: string,
   options: BotMaterialServiceOptions = {},
 ): Promise<BotAllowedMaterialListDto> {
-  const botClient = asBotClient(client);
-  const raw = await requestApi(() =>
-    botClient.GET('/classrooms/{id}/bot/materials', {
-      params: { path: { id: classroomId } },
-      signal: options.signal,
-    }),
-  );
-
-  const parsed = botAllowedMaterialListSchema.safeParse(raw);
-  if (!parsed.success) {
-    throw mapApiError(
-      {
-        code: 'INVALID_RESPONSE',
-        message: 'Unexpected bot material list response shape.',
-      },
-      new Response(null, { status: 500 }),
+  // Keyed by material so a row shifting between pages is not listed twice.
+  const items = new Map<string, BotAllowedMaterialDto>();
+  for (let page = 1; ; page += 1) {
+    const raw = await requestApi(() =>
+      client.GET('/classrooms/{id}/bot/materials', {
+        params: {
+          path: { id: classroomId },
+          // Oldest first: rows allowed meanwhile land on the last page.
+          query: { page, pageSize: LIST_PAGE_SIZE, sort: 'createdAt' },
+        },
+        signal: options.signal,
+      }),
     );
+
+    const parsed = botAllowedMaterialPageSchema.safeParse(raw);
+    if (!parsed.success) {
+      throw mapApiError(
+        {
+          code: 'INVALID_RESPONSE',
+          message: 'Unexpected bot material list response shape.',
+        },
+        new Response(null, { status: 500 }),
+      );
+    }
+    for (const entry of parsed.data.items) {
+      items.set(entry.materialId, entry);
+    }
+    if (
+      parsed.data.items.length === 0 ||
+      page * LIST_PAGE_SIZE >= parsed.data.total
+    ) {
+      return { items: [...items.values()] };
+    }
   }
-  return parsed.data;
 }
 
 /**
- * Enables or disables a classroom study material for the Study Guide Bot
- * (`HU-BOT-001`). Returns the server-confirmed configuration and indexing
- * state; never mutates state client-side before confirmation.
+ * Allows a study material for the Study Guide Bot, or re-indexes an already
+ * allowed one. Indexing is synchronous and can take many seconds; a `FAILED`
+ * `indexState` is a successful response that can be retried.
  */
-export async function setClassroomBotMaterialEnabled(
+export async function enableClassroomBotMaterial(
   client: TypedApiClient,
   classroomId: string,
   materialId: string,
-  input: SetBotMaterialEnabledInput,
   options: BotMaterialServiceOptions = {},
 ): Promise<BotAllowedMaterialDto> {
-  const botClient = asBotClient(client);
   let raw: unknown;
   try {
     raw = await requestApi(() =>
-      botClient.PUT('/classrooms/{id}/bot/materials/{materialId}', {
-        params: { path: { id: classroomId, materialId } },
-        body: { enabled: input.enabled },
+      client.POST('/classrooms/{id}/bot/materials', {
+        params: { path: { id: classroomId } },
+        body: { materialId },
         signal: options.signal,
       }),
     );
   } catch (error) {
-    if (
-      (error instanceof Error || error instanceof DOMException) &&
-      error.name === 'AbortError'
-    ) {
-      throw error;
-    }
-    if (error instanceof ApiError) {
-      throw translateBotToggleError(error);
-    }
-    throw error;
+    throw toToggleError(error);
   }
 
   const parsed = botAllowedMaterialDtoSchema.safeParse(raw);
@@ -218,4 +183,41 @@ export async function setClassroomBotMaterialEnabled(
     );
   }
   return parsed.data;
+}
+
+/**
+ * Removes a study material from the Study Guide Bot. A `503` means the material
+ * is already excluded and only the index cleanup is pending.
+ */
+export async function disableClassroomBotMaterial(
+  client: TypedApiClient,
+  classroomId: string,
+  materialId: string,
+  options: BotMaterialServiceOptions = {},
+): Promise<void> {
+  try {
+    await requestApiVoid(() =>
+      client.DELETE('/classrooms/{id}/bot/materials/{materialId}', {
+        params: { path: { id: classroomId, materialId } },
+        signal: options.signal,
+      }),
+    );
+  } catch (error) {
+    if (
+      error instanceof ApiError &&
+      error.status === 503 &&
+      error.code === 'SERVICE_UNAVAILABLE'
+    ) {
+      throw markUncertain(
+        new ApiError({
+          kind: error.kind,
+          status: error.status,
+          code: error.code,
+          userMessage: materialMessages.list.bot.toggleErrors.cleanupPending,
+          correlationId: error.correlationId,
+        }),
+      );
+    }
+    throw toToggleError(error);
+  }
 }
