@@ -138,17 +138,30 @@ describe('desks', () => {
 
   test('legs sit inside their desk footprint, four per desk', () => {
     const { root } = build();
-    const legs = named(root, 'desk-legs') as InstancedMesh;
-    const desks = deriveDesks(layout);
-    expect(legs.count).toBe(desks.length * 4);
-    instanceBoxes(legs).forEach((leg, index) => {
-      const obstacle = layout.obstacles[Math.floor(index / 4)]!;
-      expect(leg.min.x).toBeGreaterThanOrEqual(obstacle.minX - 1e-6);
-      expect(leg.max.x).toBeLessThanOrEqual(obstacle.maxX + 1e-6);
-      expect(leg.min.z).toBeGreaterThanOrEqual(obstacle.minZ - 1e-6);
-      expect(leg.max.z).toBeLessThanOrEqual(obstacle.maxZ + 1e-6);
-      expect(leg.min.y).toBeCloseTo(0);
-    });
+    for (const kind of ['student', 'teacher'] as const) {
+      const legs = named(
+        root,
+        kind === 'student' ? 'desk-legs' : 'teacher-desk-legs',
+      ) as InstancedMesh;
+      const desks = deriveDesks(layout).filter((desk) => desk.kind === kind);
+      expect(legs.count).toBe(desks.length * 4);
+      instanceBoxes(legs).forEach((leg, index) => {
+        const desk = desks[Math.floor(index / 4)]!;
+        expect(leg.min.x).toBeGreaterThanOrEqual(
+          desk.centerX - desk.width / 2 - 1e-6,
+        );
+        expect(leg.max.x).toBeLessThanOrEqual(
+          desk.centerX + desk.width / 2 + 1e-6,
+        );
+        expect(leg.min.z).toBeGreaterThanOrEqual(
+          desk.centerZ - desk.depth / 2 - 1e-6,
+        );
+        expect(leg.max.z).toBeLessThanOrEqual(
+          desk.centerZ + desk.depth / 2 + 1e-6,
+        );
+        expect(leg.min.y).toBeCloseTo(0);
+      });
+    }
   });
 });
 
