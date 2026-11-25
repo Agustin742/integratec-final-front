@@ -535,6 +535,54 @@ export function createClassroomInvitationsPredicate(
   };
 }
 
+/**
+ * Key of `GET /classrooms/{id}/parent-links`: active parent-child guardian
+ * links for one classroom, scoped by `userId` and `classroomId`
+ * (`rules/state-management.md`).
+ */
+export function classroomParentLinksQueryKey(
+  userId: string,
+  classroomId: string,
+): ScopedQueryKey {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'classrooms',
+    'parent-links',
+  );
+}
+
+/**
+ * Predicate matching every classroom parent-links query entry owned by
+ * `userId` and `classroomId`.
+ */
+export function createClassroomParentLinksPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'classrooms' &&
+      segment.resource === 'parent-links'
+    );
+  };
+}
+
 export type ActivitySortOrder = 'dueAt' | 'createdAt' | '-dueAt' | '-createdAt';
 export type ActivityStateFilter = 'DRAFT' | 'PUBLISHED';
 

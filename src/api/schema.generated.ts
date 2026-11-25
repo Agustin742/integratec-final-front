@@ -306,7 +306,7 @@ export interface paths {
         put?: never;
         /**
          * Issue an email invitation to join a classroom
-         * @description Issues a single-use email invitation for the specified classroom and schedules asynchronous email delivery via the transactional outbox. Restricted to teaching staff (School Owner/Admin or the classroom Teacher). Completely preserves non-disclosure (never reveals whether the email exists).
+         * @description Issues a single-use email invitation (STUDENT or PARENT) for the specified classroom and schedules asynchronous email delivery via the transactional outbox. Parent invitations require childId of an active student, are rejected when adultMode is enabled, and enforce the maximum of 2 active guardians per student. Restricted to teaching staff (School Owner/Admin or the classroom Teacher). Completely preserves non-disclosure (never reveals whether the email exists).
          */
         post: operations["ClassroomsController_createInvitation"];
         delete?: never;
@@ -359,6 +359,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/classrooms/{id}/parent-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List active parent-child guardian links for a classroom
+         * @description Returns all active ParentLink records for the specified classroom. Restricted to classroom staff (School Owner/Admin or the classroom Teacher).
+         */
+        get: operations["ClassroomsController_listParentLinks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/parent-links/{linkId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Logically unlink a guardian from a student in a classroom
+         * @description Marks the ParentLink as INACTIVE while preserving historical messages and records. Idempotent if already inactive. Restricted to classroom staff.
+         */
+        delete: operations["ClassroomsController_unlinkParentLink"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/classrooms": {
         parameters: {
             query?: never;
@@ -389,8 +429,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Accept an email invitation to join a classroom
-         * @description Atomically binds the authenticated user account to the classroom specified in the email invitation and assigns an available desk. Idempotent: re-accepting by an already enrolled student succeeds and returns the existing desk without error.
+         * Accept an email invitation to join a classroom as student or guardian
+         * @description Atomically accepts a single-use STUDENT or PARENT email invitation. For STUDENT invitations, creates/reactivates classroom membership and assigns an available desk. For PARENT invitations, verifies adultMode is off, student is active, self-link is prevented, and the 2-guardian cap is respected, then creates/reactivates a ParentLink without creating a classroom membership or desk. Idempotent for already-active members and guardians.
          */
         post: operations["InvitationsController_accept"];
         delete?: never;
@@ -2041,11 +2081,17 @@ export interface components {
              */
             email: string;
             /**
-             * @description Classroom role for the invitee. Only STUDENT is supported; teacher invitations are out of scope for classroom invitations.
+             * @description Classroom role for the invitee (STUDENT or PARENT). Teacher invitations belong to the school-teacher invitation flow.
              * @default STUDENT
              * @enum {string}
              */
-            role: "STUDENT";
+            role: "STUDENT" | "PARENT";
+            /**
+             * Format: uuid
+             * @description UUID of the enrolled student to link when role is PARENT. Must be omitted when role is STUDENT.
+             * @example 4e5f6a7b-0000-4000-8000-000000000009
+             */
+            childId?: string;
         };
         CreatedClassroomInvitationResponseDto: {
             /** @description Invitation UUID */
@@ -2061,7 +2107,14 @@ export interface components {
              * @description Assigned role upon joining
              * @enum {string}
              */
-            role: "OWNER" | "ADMIN" | "TEACHER" | "STUDENT";
+            role: "OWNER" | "ADMIN" | "TEACHER" | "STUDENT" | "PARENT";
+            /**
+             * Format: uuid
+             * @description Linked student user UUID when role is PARENT, null otherwise
+             */
+            childId?: Record<string, never> | null;
+            /** @description Linked student display name when role is PARENT, null otherwise */
+            childDisplayName?: Record<string, never> | null;
             /** @description Maximum allowed uses, null if unlimited */
             maxUses?: Record<string, never> | null;
             /** @description Number of times this invitation has been used */
@@ -2101,7 +2154,14 @@ export interface components {
              * @description Assigned role upon joining
              * @enum {string}
              */
-            role: "OWNER" | "ADMIN" | "TEACHER" | "STUDENT";
+            role: "OWNER" | "ADMIN" | "TEACHER" | "STUDENT" | "PARENT";
+            /**
+             * Format: uuid
+             * @description Linked student user UUID when role is PARENT, null otherwise
+             */
+            childId?: Record<string, never> | null;
+            /** @description Linked student display name when role is PARENT, null otherwise */
+            childDisplayName?: Record<string, never> | null;
             /** @description Maximum allowed uses, null if unlimited */
             maxUses?: Record<string, never> | null;
             /** @description Number of times this invitation has been used */
@@ -2149,7 +2209,7 @@ export interface components {
              * @default STUDENT
              * @enum {string}
              */
-            role: "OWNER" | "ADMIN" | "TEACHER" | "STUDENT";
+            role: "OWNER" | "ADMIN" | "TEACHER" | "STUDENT" | "PARENT";
             /** @description Maximum uses, null if unlimited */
             maxUses?: Record<string, never> | null;
             /**
@@ -2173,12 +2233,77 @@ export interface components {
              */
             createdAt: string;
         };
+        ClassroomParentLinkDto: {
+            /**
+             * Format: uuid
+             * @description ParentLink UUID
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Guardian user UUID
+             */
+            parentId: string;
+            /** @description Guardian display name */
+            parentDisplayName: string;
+            /**
+             * Format: uuid
+             * @description Linked student user UUID
+             */
+            childId: string;
+            /** @description Linked student display name */
+            childDisplayName: string;
+            /**
+             * @description Current link state
+             * @enum {string}
+             */
+            state: "ACTIVE" | "INACTIVE";
+            /**
+             * Format: date-time
+             * @description Creation timestamp
+             */
+            createdAt: string;
+        };
+        ClassroomParentLinksResponseDto: {
+            /** @description Active parent links for the classroom */
+            items: components["schemas"]["ClassroomParentLinkDto"][];
+        };
         AcceptInvitationDto: {
             /**
              * @description Opaque token received via invitation email
              * @example 4f7e2d9a8c1b3e5f7a9d0c2e4b6a8f1d3c5e7b9a0c2e4f6a8b0d2e4f6a8b0c2e
              */
             token: string;
+        };
+        AcceptInvitationResponseDto: {
+            /** @description Classroom UUID */
+            classroomId: string;
+            /**
+             * Format: uuid
+             * @description Created or existing classroom membership UUID (null for PARENT invitations)
+             */
+            membershipId: Record<string, never> | null;
+            /**
+             * @description Role granted by the accepted invitation
+             * @enum {string}
+             */
+            role: "STUDENT" | "PARENT";
+            /** @description Assigned desk for STUDENT invitations; null for PARENT invitations */
+            desk: components["schemas"]["AssignedDeskDto"] | null;
+            /** @description 1-based index of the assigned desk for STUDENT invitations; null for PARENT invitations */
+            deskIndex: Record<string, never> | null;
+            /**
+             * Format: uuid
+             * @description Linked student user UUID for PARENT invitations; null for STUDENT invitations
+             */
+            childId: Record<string, never> | null;
+            /**
+             * Format: uuid
+             * @description Created or existing ParentLink UUID for PARENT invitations; null for STUDENT invitations
+             */
+            parentLinkId: Record<string, never> | null;
+            /** @description True if the caller already held an active membership or parent link (idempotent retry) */
+            alreadyMember: boolean;
         };
         NotificationDto: {
             /** Format: uuid */
@@ -4182,7 +4307,7 @@ export interface operations {
                     "application/json": components["schemas"]["CreatedClassroomInvitationResponseDto"];
                 };
             };
-            /** @description Validation failed on email or role. */
+            /** @description Validation failed on email, role, or childId. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -4209,8 +4334,17 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Classroom does not exist or caller has no relationship with it. */
+            /** @description Classroom does not exist, caller has no relationship with it, or target student is not active in this classroom. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Classroom is in adult education mode, student already has 2 active guardians, or a duplicate pending parent invitation already exists. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4390,6 +4524,106 @@ export interface operations {
             };
         };
     };
+    ClassroomsController_listParentLinks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active parent-child guardian links in the classroom. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassroomParentLinksResponseDto"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Caller is a student or parent without classroom staff authority. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Classroom does not exist or caller has no relationship with it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ClassroomsController_unlinkParentLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description ParentLink UUID to deactivate */
+                linkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Parent link deactivated (or already inactive); no response body. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Caller is a student or parent without classroom staff authority. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Classroom or parent link does not exist in this classroom. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
     MeClassroomsController_listMyClassrooms: {
         parameters: {
             query?: {
@@ -4459,16 +4693,16 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Classroom membership established and desk assigned. */
+            /** @description Classroom membership (STUDENT) or guardian link (PARENT) established. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JoinClassroomResponseDto"];
+                    "application/json": components["schemas"]["AcceptInvitationResponseDto"];
                 };
             };
-            /** @description Invitation token is malformed, expired, or already used. */
+            /** @description Invitation token is malformed, expired, revoked, or already used. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -4495,7 +4729,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Concurrent invitation acceptance conflict. */
+            /** @description Adult mode enabled, student no longer enrolled, self-link attempted, 2-guardian cap reached, or concurrent invitation acceptance conflict. */
             409: {
                 headers: {
                     [name: string]: unknown;
