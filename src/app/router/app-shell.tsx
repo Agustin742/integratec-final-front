@@ -4,7 +4,7 @@ import { LoadingState } from '@/components/feedback/states';
 import { BaseLayout } from '@/components/layout/base-layout';
 import { Button } from '@/components/ui/button';
 import { Toast, toast } from '@/components/ui/toast';
-import { CallProvider } from '@/features/calls';
+import { CallProvider } from '@/features/calls/call-provider';
 import { ChatDock } from '@/features/chat-dock/chat-dock';
 import { ChatsNavLink } from '@/features/chat-page/chats-nav-link';
 import { resetClassroomModeStore } from '@/features/classrooms/classroom-mode-store';

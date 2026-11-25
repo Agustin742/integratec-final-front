@@ -1,5 +1,7 @@
 import {
+  Suspense,
   createContext,
+  lazy,
   useContext,
   useEffect,
   useMemo,
@@ -9,9 +11,7 @@ import {
 } from 'react';
 import { toast } from '@/components/ui/toast';
 import type { CallJoinOptions } from '@/realtime/call-contracts.generated';
-import { ChatConversationWithComposer } from '@/features/classrooms/chat/chat-conversation';
 import { callMessages, endReasonMessage } from './call-messages';
-import { CallView } from './call-view';
 import { useCallSession } from './use-call-session';
 
 export interface CallsController {
@@ -20,6 +20,17 @@ export interface CallsController {
   /** A call is joining, running or reconnecting. */
   readonly inCall: boolean;
 }
+
+// The call screen pulls in three.js and the chat; load it only when a call
+// starts so the app shell stays light.
+const CallView = lazy(() =>
+  import('./call-view').then((m) => ({ default: m.CallView })),
+);
+const ChatConversationWithComposer = lazy(() =>
+  import('@/features/classrooms/chat/chat-conversation').then((m) => ({
+    default: m.ChatConversationWithComposer,
+  })),
+);
 
 const CallsContext = createContext<CallsController | null>(null);
 
@@ -70,32 +81,34 @@ export function CallProvider({ children }: { readonly children: ReactNode }) {
       {children}
       {inCall && (
         <CallOverlay title={title}>
-          <CallView
-            title={title}
-            participants={call.participants}
-            self={call.self}
-            micError={call.micError}
-            needsAudioUnlock={call.needsAudioUnlock}
-            isModerator={call.isModerator}
-            kind={call.kind}
-            allowSelfUnmute={call.allowSelfUnmute}
-            focusMode={call.focusMode}
-            getLevel={call.getLevel}
-            chatPanel={
-              call.kind === 'classroom' && target.classroomId !== '' ? (
-                <ChatConversationWithComposer
-                  classroomId={target.classroomId}
-                  variant="dock"
-                />
-              ) : undefined
-            }
-            onToggleMute={call.toggleMute}
-            onSendEmote={call.sendEmote}
-            onLeave={() => void call.leave()}
-            onEndCall={call.endCall}
-            onResumeAudio={() => void call.resumeAudio()}
-            onModerate={call.moderate}
-          />
+          <Suspense fallback={null}>
+            <CallView
+              title={title}
+              participants={call.participants}
+              self={call.self}
+              micError={call.micError}
+              needsAudioUnlock={call.needsAudioUnlock}
+              isModerator={call.isModerator}
+              kind={call.kind}
+              allowSelfUnmute={call.allowSelfUnmute}
+              focusMode={call.focusMode}
+              getLevel={call.getLevel}
+              chatPanel={
+                call.kind === 'classroom' && target.classroomId !== '' ? (
+                  <ChatConversationWithComposer
+                    classroomId={target.classroomId}
+                    variant="dock"
+                  />
+                ) : undefined
+              }
+              onToggleMute={call.toggleMute}
+              onSendEmote={call.sendEmote}
+              onLeave={() => void call.leave()}
+              onEndCall={call.endCall}
+              onResumeAudio={() => void call.resumeAudio()}
+              onModerate={call.moderate}
+            />
+          </Suspense>
         </CallOverlay>
       )}
     </CallsContext.Provider>

@@ -83,7 +83,7 @@ describe('CallProvider', () => {
     makeSession();
   });
 
-  it('joins from the click that starts the call', () => {
+  it('joins from the click that starts the call', async () => {
     const { rerender } = render(
       <CallProvider>
         <Starter />
@@ -105,7 +105,7 @@ describe('CallProvider', () => {
       screen.getByRole('dialog', { name: 'Clase en llamada: Matemática' }),
     ).toBeInTheDocument();
     fireEvent.click(
-      screen.getByRole('button', { name: 'Salir de la llamada' }),
+      await screen.findByRole('button', { name: 'Salir de la llamada' }),
     );
     expect(session.leave).toHaveBeenCalledOnce();
   });
