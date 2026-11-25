@@ -1,0 +1,175 @@
+{
+  "kind": "synthetic-built-preview-not-live-integration",
+  "origin": "http://127.0.0.1:4196",
+  "node": "v22.23.4",
+  "runs": [
+    {
+      "width": 1280,
+      "scenario": "normal",
+      "loaded": [
+        "/models/avatars/male/body.glb",
+        "/models/avatars/shared/hair-afro.glb",
+        "/models/avatars/male/top-hoodie.glb",
+        "/models/scenes/classroom/shell/floor-tile.glb",
+        "/models/scenes/classroom/shell/floor-threshold.glb",
+        "/models/scenes/classroom/shell/wall-solid.glb",
+        "/models/scenes/classroom/shell/baseboard-wall.glb",
+        "/models/scenes/classroom/shell/wall-window.glb",
+        "/models/scenes/classroom/shell/window.glb",
+        "/models/scenes/classroom/shell/window-curtains.glb",
+        "/models/scenes/classroom/shell/wall-corner.glb",
+        "/models/scenes/classroom/shell/baseboard-cutaway.glb",
+        "/models/scenes/classroom/shell/baseboard-doorway-post.glb",
+        "/models/scenes/classroom/shell/ceiling-light.glb",
+        "/models/scenes/classroom/furniture/teacher-desk.glb",
+        "/models/scenes/classroom/furniture/student-desk.glb",
+        "/models/scenes/classroom/furniture/student-chair.glb",
+        "/models/scenes/classroom/furniture/board.glb",
+        "/models/scenes/classroom/furniture/bookshelf.glb",
+        "/models/scenes/classroom/furniture/cabinet.glb",
+        "/models/scenes/classroom/furniture/coat-rack.glb",
+        "/models/scenes/classroom/furniture/trash-bin.glb"
+      ],
+      "blocked": [],
+      "errors": [
+        "Failed to load resource: net::ERR_FAILED"
+      ],
+      "completed": true,
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "status": [
+        "",
+        ""
+      ],
+      "overflow": false,
+      "file": "normal-1280.png"
+    },
+    {
+      "width": 1280,
+      "scenario": "combined",
+      "loaded": [
+        "/models/avatars/shared/hair-afro.glb",
+        "/models/avatars/male/body.glb",
+        "/models/avatars/male/top-hoodie.glb",
+        "/models/scenes/classroom/shell/floor-threshold.glb",
+        "/models/scenes/classroom/shell/wall-solid.glb",
+        "/models/scenes/classroom/shell/baseboard-wall.glb",
+        "/models/scenes/classroom/shell/wall-window.glb",
+        "/models/scenes/classroom/shell/window.glb",
+        "/models/scenes/classroom/shell/window-curtains.glb",
+        "/models/scenes/classroom/shell/wall-corner.glb",
+        "/models/scenes/classroom/shell/baseboard-cutaway.glb",
+        "/models/scenes/classroom/shell/baseboard-doorway-post.glb",
+        "/models/scenes/classroom/shell/ceiling-light.glb",
+        "/models/scenes/classroom/furniture/teacher-desk.glb",
+        "/models/scenes/classroom/furniture/student-chair.glb",
+        "/models/scenes/classroom/furniture/board.glb",
+        "/models/scenes/classroom/furniture/bookshelf.glb",
+        "/models/scenes/classroom/furniture/cabinet.glb",
+        "/models/scenes/classroom/furniture/coat-rack.glb",
+        "/models/scenes/classroom/furniture/trash-bin.glb"
+      ],
+      "blocked": [
+        "/models/scenes/classroom/shell/floor-tile.glb",
+        "/models/scenes/classroom/furniture/student-desk.glb"
+      ],
+      "errors": [
+        "Failed to load resource: net::ERR_FAILED",
+        "Failed to load resource: net::ERR_FAILED",
+        "Failed to load resource: net::ERR_FAILED"
+      ],
+      "completed": true,
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "status": [
+        "No pudimos cargar algunos objetos del aula. Usamos reemplazos simples para el piso y los muebles esenciales. Podés seguir o cambiar al modo clásico 2D.",
+        "",
+        ""
+      ],
+      "overflow": false,
+      "file": "combined-1280.png"
+    },
+    {
+      "width": 360,
+      "scenario": "normal",
+      "loaded": [
+        "/models/avatars/male/body.glb",
+        "/models/avatars/shared/hair-afro.glb",
+        "/models/avatars/male/top-hoodie.glb",
+        "/models/scenes/classroom/shell/floor-tile.glb",
+        "/models/scenes/classroom/shell/floor-threshold.glb",
+        "/models/scenes/classroom/shell/wall-solid.glb",
+        "/models/scenes/classroom/shell/baseboard-wall.glb",
+        "/models/scenes/classroom/shell/window.glb",
+        "/models/scenes/classroom/shell/wall-window.glb",
+        "/models/scenes/classroom/shell/window-curtains.glb",
+        "/models/scenes/classroom/shell/wall-corner.glb",
+        "/models/scenes/classroom/shell/baseboard-cutaway.glb",
+        "/models/scenes/classroom/shell/ceiling-light.glb",
+        "/models/scenes/classroom/furniture/teacher-desk.glb",
+        "/models/scenes/classroom/shell/baseboard-doorway-post.glb",
+        "/models/scenes/classroom/furniture/student-desk.glb",
+        "/models/scenes/classroom/furniture/student-chair.glb",
+        "/models/scenes/classroom/furniture/board.glb",
+        "/models/scenes/classroom/furniture/bookshelf.glb",
+        "/models/scenes/classroom/furniture/cabinet.glb",
+        "/models/scenes/classroom/furniture/coat-rack.glb",
+        "/models/scenes/classroom/furniture/trash-bin.glb"
+      ],
+      "blocked": [],
+      "errors": [
+        "Failed to load resource: net::ERR_FAILED"
+      ],
+      "completed": true,
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "status": [
+        "",
+        ""
+      ],
+      "overflow": false,
+      "file": "normal-360.png"
+    },
+    {
+      "width": 360,
+      "scenario": "combined",
+      "loaded": [
+        "/models/avatars/male/body.glb",
+        "/models/avatars/shared/hair-afro.glb",
+        "/models/avatars/male/top-hoodie.glb",
+        "/models/scenes/classroom/shell/floor-threshold.glb",
+        "/models/scenes/classroom/shell/wall-solid.glb",
+        "/models/scenes/classroom/shell/baseboard-wall.glb",
+        "/models/scenes/classroom/shell/wall-window.glb",
+        "/models/scenes/classroom/shell/window.glb",
+        "/models/scenes/classroom/shell/window-curtains.glb",
+        "/models/scenes/classroom/shell/wall-corner.glb",
+        "/models/scenes/classroom/shell/baseboard-cutaway.glb",
+        "/models/scenes/classroom/shell/baseboard-doorway-post.glb",
+        "/models/scenes/classroom/shell/ceiling-light.glb",
+        "/models/scenes/classroom/furniture/teacher-desk.glb",
+        "/models/scenes/classroom/furniture/student-chair.glb",
+        "/models/scenes/classroom/furniture/board.glb",
+        "/models/scenes/classroom/furniture/bookshelf.glb",
+        "/models/scenes/classroom/furniture/cabinet.glb",
+        "/models/scenes/classroom/furniture/coat-rack.glb",
+        "/models/scenes/classroom/furniture/trash-bin.glb"
+      ],
+      "blocked": [
+        "/models/scenes/classroom/shell/floor-tile.glb",
+        "/models/scenes/classroom/furniture/student-desk.glb"
+      ],
+      "errors": [
+        "Failed to load resource: net::ERR_FAILED",
+        "Failed to load resource: net::ERR_FAILED",
+        "Failed to load resource: net::ERR_FAILED"
+      ],
+      "completed": true,
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 SUPER (0x00002783) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "status": [
+        "No pudimos cargar algunos objetos del aula. Usamos reemplazos simples para el piso y los muebles esenciales. Podés seguir o cambiar al modo clásico 2D.",
+        "",
+        ""
+      ],
+      "overflow": false,
+      "file": "combined-360.png"
+    }
+  ]
+}

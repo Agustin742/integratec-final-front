@@ -6,6 +6,7 @@ z.config({ jitless: true });
 export const shopItemKindSchema = z.enum([
   'CLASSROOM_ITEM',
   'AVATAR_ACCESSORY',
+  'AVATAR_STYLE',
   'DESK_UPGRADE',
   'PET_ACCESSORY',
 ]);

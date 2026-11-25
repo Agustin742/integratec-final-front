@@ -128,8 +128,8 @@ async function interceptForumApi(
             state.role === 'TEACHER' ? 'Prof. Ana García' : 'Sofía Martínez',
           avatar: {
             bodyId: 'female',
-            hairId: 'original',
-            topId: 'tshirt',
+            hairId: 'classic-short',
+            topId: 'basic-tshirt',
             hairColor: '#6C4D48',
             clothingColor: '#5B4F96',
           },

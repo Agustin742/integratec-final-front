@@ -16,14 +16,35 @@ import {
 
 export const HAIR_TINT_MATERIAL = 'AvatarHairTint';
 export const TOP_TINT_MATERIAL = 'AvatarTopTint';
+export const ACCESSORY_TINT_MATERIAL = 'AvatarAccessoryTint';
+export const DETAIL_MATERIAL = 'AvatarDetail';
+/** Translucent lenses and visors; drawn after the opaque parts. */
+export const GLASS_MATERIAL = 'AvatarGlass';
 
-export type AvatarPartKind = 'hair' | 'top';
+const GLASS_RENDER_ORDER = 1;
+
+export type AvatarPartKind = 'hair' | 'top' | 'head' | 'face' | 'back';
+
+export interface AvatarPartInput {
+  readonly key: AvatarPartKind;
+  /** Loaded `gltf.scene` of the part; never mutated. */
+  readonly scene: Object3D;
+  /** `#RRGGBB` per material name; invalid values leave the material alone. */
+  readonly tints?: Readonly<Record<string, string>>;
+  /** Node names (meshes or groups) to hide on the composed clone. */
+  readonly hiddenMeshes?: readonly string[];
+  /** Morph target influences by name, for example `BackTuck`. */
+  readonly morphs?: Readonly<Record<string, number>>;
+}
 
 export interface ComposeAvatarInput {
   /** Loaded `gltf.scene` of the body; never mutated. */
   readonly body: Object3D;
-  /** Loaded `gltf.scene` of each optional part; never mutated. */
+  /** Any number of parts, attached in order. */
+  readonly parts?: readonly AvatarPartInput[];
+  /** Shorthand for a hair part tinted with `hairColor`. */
   readonly hair?: Object3D | null;
+  /** Shorthand for a top part tinted with `clothingColor`. */
   readonly top?: Object3D | null;
   readonly hairColor?: string;
   readonly clothingColor?: string;
@@ -81,28 +102,101 @@ function rebindSkeleton(
   return new Skeleton(bones, mesh.skeleton.boneInverses);
 }
 
+type ColoredMaterial = Material & { color: { set(value: string): void } };
+
 /**
- * `SkeletonUtils.clone` shares materials with the asset cache, so tint
- * targets are cloned per instance before their color is written.
+ * `SkeletonUtils.clone` shares materials with the asset cache, so any
+ * material that needs a change is cloned per instance first.
  */
-function tintMaterials(
+function prepareMaterials(
   mesh: Mesh,
-  targetName: string,
-  color: string,
+  tints: Readonly<Record<string, string>>,
   created: Material[],
 ): void {
-  const tint = (material: Material): Material => {
-    if (material.name !== targetName || !('color' in material)) return material;
-    const copy = material.clone() as Material & {
-      color: { set(value: string): void };
-    };
-    copy.color.set(color);
+  const prepare = (material: Material): Material => {
+    const tint = Object.hasOwn(tints, material.name)
+      ? tints[material.name]
+      : undefined;
+    const tinted =
+      tint !== undefined &&
+      'color' in material &&
+      safeHexColor(tint, '') !== '';
+    const glass = material.name === GLASS_MATERIAL;
+    if (!tinted && !glass) return material;
+    const copy = material.clone();
+    if (tinted) (copy as ColoredMaterial).color.set(tint);
+    if (glass) {
+      copy.transparent = true;
+      copy.depthWrite = false;
+    }
     created.push(copy);
     return copy;
   };
-  mesh.material = Array.isArray(mesh.material)
-    ? mesh.material.map(tint)
-    : tint(mesh.material);
+  const prepared = Array.isArray(mesh.material)
+    ? mesh.material.map(prepare)
+    : prepare(mesh.material);
+  mesh.material = prepared;
+  const list = Array.isArray(prepared) ? prepared : [prepared];
+  if (list.some((material) => material.name === GLASS_MATERIAL)) {
+    mesh.renderOrder = Math.max(mesh.renderOrder, GLASS_RENDER_ORDER);
+  }
+}
+
+function hideNodes(root: Object3D, names: readonly string[]): void {
+  root.traverse((node) => {
+    if (!names.includes(node.name)) return;
+    // The subtree is hidden node by node: parts are re-parented mesh by
+    // mesh, which would otherwise drop a hidden ancestor's visibility.
+    node.traverse((child) => {
+      child.visible = false;
+    });
+  });
+}
+
+function applyMorphs(
+  meshes: readonly Mesh[],
+  morphs: Readonly<Record<string, number>>,
+): void {
+  for (const mesh of meshes) {
+    const dictionary = mesh.morphTargetDictionary;
+    const influences = mesh.morphTargetInfluences;
+    if (!dictionary || !influences) continue;
+    for (const [name, value] of Object.entries(morphs)) {
+      const index = dictionary[name];
+      if (index !== undefined) influences[index] = value;
+    }
+  }
+}
+
+function legacyParts({
+  hair,
+  top,
+  hairColor,
+  clothingColor,
+}: ComposeAvatarInput): AvatarPartInput[] {
+  const parts: AvatarPartInput[] = [];
+  if (hair) {
+    parts.push({
+      key: 'hair',
+      scene: hair,
+      tints: {
+        [HAIR_TINT_MATERIAL]: safeHexColor(hairColor, DEFAULT_HAIR_COLOR),
+      },
+    });
+  }
+  if (top) {
+    parts.push({
+      key: 'top',
+      scene: top,
+      tints: {
+        [TOP_TINT_MATERIAL]: safeHexColor(
+          clothingColor,
+          DEFAULT_CLOTHING_COLOR,
+        ),
+      },
+    });
+  }
+  return parts;
 }
 
 /**
@@ -111,13 +205,8 @@ function tintMaterials(
  * placement; skinned meshes are re-bound to the body's bones by name so a
  * single mixer on the body animates the whole avatar.
  */
-export function composeAvatar({
-  body,
-  hair,
-  top,
-  hairColor,
-  clothingColor,
-}: ComposeAvatarInput): ComposedAvatar {
+export function composeAvatar(input: ComposeAvatarInput): ComposedAvatar {
+  const { body } = input;
   const root = cloneSkeleton(body);
   root.updateMatrixWorld(true);
   const bodyBones = bonesByName(root);
@@ -127,26 +216,10 @@ export function composeAvatar({
   );
   const skippedParts: AvatarPartKind[] = [];
 
-  const parts: ReadonlyArray<
-    readonly [AvatarPartKind, Object3D | null | undefined, string, string]
-  > = [
-    [
-      'hair',
-      hair,
-      HAIR_TINT_MATERIAL,
-      safeHexColor(hairColor, DEFAULT_HAIR_COLOR),
-    ],
-    [
-      'top',
-      top,
-      TOP_TINT_MATERIAL,
-      safeHexColor(clothingColor, DEFAULT_CLOTHING_COLOR),
-    ],
-  ];
+  const parts = [...legacyParts(input), ...(input.parts ?? [])];
 
-  for (const [kind, scene, materialName, color] of parts) {
-    if (!scene) continue;
-    const partClone = cloneSkeleton(scene);
+  for (const part of parts) {
+    const partClone = cloneSkeleton(part.scene);
     const skinned = skinnedMeshesOf(partClone);
     const statics = staticMeshesOf(partClone);
     const skeletons = skinned.map((mesh) => rebindSkeleton(mesh, bodyBones));
@@ -154,17 +227,19 @@ export function composeAvatar({
       skinned.length + statics.length === 0 ||
       skeletons.some((skeleton) => skeleton === null)
     ) {
-      skippedParts.push(kind);
+      skippedParts.push(part.key);
       skinned.forEach((mesh) => mesh.skeleton.dispose());
       continue;
     }
+    if (part.hiddenMeshes?.length) hideNodes(partClone, part.hiddenMeshes);
     // Bake each mesh's authored world placement before re-parenting: a mesh
     // nested under a transform group keeps its place instead of collapsing
     // onto the body root's frame.
     partClone.updateMatrixWorld(true);
     const intoRoot = new Matrix4().copy(root.matrixWorld).invert();
     const placement = new Matrix4();
-    for (const mesh of [...skinned, ...statics]) {
+    const meshes = [...skinned, ...statics];
+    for (const mesh of meshes) {
       placement.copy(intoRoot).multiply(mesh.matrixWorld);
       placement.decompose(mesh.position, mesh.quaternion, mesh.scale);
     }
@@ -172,13 +247,13 @@ export function composeAvatar({
       const skeleton = skeletons[index] as Skeleton;
       mesh.skeleton.dispose();
       mesh.bind(skeleton, mesh.bindMatrix);
-      tintMaterials(mesh, materialName, color, createdMaterials);
       createdSkeletons.push(skeleton);
     });
-    statics.forEach((mesh) => {
-      tintMaterials(mesh, materialName, color, createdMaterials);
-    });
-    root.add(...skinned, ...statics);
+    for (const mesh of meshes) {
+      prepareMaterials(mesh, part.tints ?? {}, createdMaterials);
+    }
+    if (part.morphs) applyMorphs(meshes, part.morphs);
+    root.add(...meshes);
   }
 
   return {

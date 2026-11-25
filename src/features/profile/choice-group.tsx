@@ -4,6 +4,8 @@ import { cn } from '@/lib/utils';
 export interface ChoiceOption<TValue extends string> {
   readonly value: TValue;
   readonly label: string;
+  /** Shown but not selectable; see `lockedLabel`. */
+  readonly locked?: boolean;
 }
 
 export interface ChoiceGroupProps<TValue extends string> {
@@ -17,6 +19,8 @@ export interface ChoiceGroupProps<TValue extends string> {
   readonly swatch?: boolean;
   readonly error?: string;
   readonly disabled?: boolean;
+  /** Accessible explanation read after the label of a locked option. */
+  readonly lockedLabel?: string;
 }
 
 /**
@@ -35,6 +39,7 @@ export function ChoiceGroup<TValue extends string>({
   swatch = false,
   error,
   disabled = false,
+  lockedLabel,
 }: ChoiceGroupProps<TValue>) {
   const errorId = useId();
   const hasError = error !== undefined && error !== '';
@@ -51,6 +56,7 @@ export function ChoiceGroup<TValue extends string>({
       <div className="flex flex-wrap gap-2">
         {options.map((option) => {
           const checked = option.value === value;
+          const locked = option.locked === true && !checked;
           return (
             <label
               key={option.value}
@@ -59,6 +65,8 @@ export function ChoiceGroup<TValue extends string>({
                 checked
                   ? 'border-primary bg-card font-semibold shadow-raised'
                   : 'border-edge bg-tray/60 hover:bg-tray-hover',
+                locked &&
+                  'cursor-not-allowed border-dashed bg-tray/30 text-muted-foreground hover:bg-tray/30',
                 disabled && 'cursor-not-allowed opacity-60',
               )}
             >
@@ -69,6 +77,7 @@ export function ChoiceGroup<TValue extends string>({
                 checked={checked}
                 onChange={() => onChange(option.value)}
                 onBlur={onBlur}
+                disabled={locked}
                 className="sr-only"
               />
               {swatch && (
@@ -80,6 +89,26 @@ export function ChoiceGroup<TValue extends string>({
                 />
               )}
               <span>{option.label}</span>
+              {locked && (
+                <>
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 16 16"
+                    className="size-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect x="3" y="7" width="10" height="7" rx="1.5" />
+                    <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
+                  </svg>
+                  {lockedLabel !== undefined && (
+                    <span className="sr-only">, {lockedLabel}</span>
+                  )}
+                </>
+              )}
               {checked && (
                 <svg
                   aria-hidden="true"

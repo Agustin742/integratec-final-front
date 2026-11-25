@@ -9,6 +9,7 @@ import {
 } from 'three';
 import type { Avatar } from '@/features/profile/avatar-options';
 import { AvatarModel } from '../avatar/avatar-model';
+import type { AvatarEquipped } from '../avatar/avatar-part-plan';
 import type { Pose } from '../movement';
 import { animationFor, placeAvatar } from './local-avatar-frame';
 import { advanceRemoteAvatar } from './remote-avatar-frame';
@@ -80,6 +81,8 @@ export interface RemoteClassroomParticipant {
   readonly z: number;
   readonly rotation: number;
   readonly avatar?: Avatar | undefined;
+  /** Accessory shop codes worn in this classroom. */
+  readonly equipped?: AvatarEquipped | undefined;
 }
 
 export interface RemoteAvatarProps {
@@ -87,6 +90,7 @@ export interface RemoteAvatarProps {
   readonly status?: string | undefined;
   readonly targetPose: Pose;
   readonly avatar?: Avatar | undefined;
+  readonly equipped?: AvatarEquipped | undefined;
   readonly scopeKey?: string | undefined;
 }
 
@@ -117,6 +121,7 @@ export function RemoteAvatar({
   status = 'online',
   targetPose,
   avatar,
+  equipped,
   scopeKey,
 }: RemoteAvatarProps) {
   const root = useMemo(() => {
@@ -210,6 +215,7 @@ export function RemoteAvatar({
       {avatar ? (
         <AvatarModel
           avatar={avatar}
+          equipped={equipped}
           scopeKey={scopeKey}
           animation={animationFor(moving)}
           fallback={<PlaceholderBody reconnecting={reconnecting} />}

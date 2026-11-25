@@ -20,12 +20,14 @@ import {
   hairOptionsFor,
   reconcileAvatarChoices,
   topOptionsFor,
+  withLockedStyles,
   type Avatar,
 } from './avatar-options';
 import { ChoiceGroup } from './choice-group';
 import { profileMessages } from './messages';
 import { avatarFormSchema } from './profile-schema';
 import { isAbortError, saveAvatar } from './profile-service';
+import { useAvatarStyles } from './use-avatar-styles';
 import { SaveStatusBadge, type SaveStatus } from './save-status';
 import type { ProfileSectionProps } from './section-props';
 import { useSessionService } from '@/session/provider';
@@ -43,6 +45,7 @@ export function AvatarForm({
   const [announcement, setAnnouncement] = useState('');
   const [adjusted, setAdjusted] = useState(false);
   const confirmed = profile.avatar;
+  const styles = useAvatarStyles();
 
   const form = useZodForm<Avatar, Avatar>({
     schema: avatarFormSchema,
@@ -105,6 +108,10 @@ export function AvatarForm({
           return;
         }
       }
+      // A rejected style means ownership changed under the draft: re-read it.
+      if (error instanceof ApiError && error.kind === 'forbidden') {
+        styles.refresh();
+      }
       throw error;
     }
   };
@@ -140,8 +147,21 @@ export function AvatarForm({
   else if (hasFailure) status = 'failed';
   else if (isDirty) status = 'unsaved';
 
-  const hairOptions = hairOptionsFor(bodyId);
-  const topOptions = topOptionsFor(bodyId);
+  const hairOptions = withLockedStyles(
+    'hair',
+    hairOptionsFor(bodyId),
+    styles.availability,
+    confirmed.hairId,
+  );
+  const topOptions = withLockedStyles(
+    'top',
+    topOptionsFor(bodyId),
+    styles.availability,
+    confirmed.topId,
+  );
+  const hasLockedStyles =
+    hairOptions.some((option) => option.locked) ||
+    topOptions.some((option) => option.locked);
 
   return (
     <section
@@ -183,6 +203,16 @@ export function AvatarForm({
 
         <div className="space-y-5">
           <FormRootError form={form} headingLevel="h4" title={copy.rootTitle} />
+          {styles.status === 'error' && (
+            <Alert variant="info" role="status">
+              <AlertDescription>{copy.stylesUnavailable}</AlertDescription>
+            </Alert>
+          )}
+          {hasLockedStyles && (
+            <p className="text-xs text-muted-foreground">
+              {copy.styleLockedHint}
+            </p>
+          )}
           {adjusted && (
             <Alert variant="info" role="status">
               <AlertDescription>{copy.adjusted}</AlertDescription>
@@ -213,6 +243,7 @@ export function AvatarForm({
                 legend={copy.groups.hairId}
                 name={field.name}
                 options={hairOptions}
+                lockedLabel={copy.styleLockedLabel}
                 value={field.value}
                 onChange={(value) => {
                   field.onChange(value);
@@ -249,6 +280,7 @@ export function AvatarForm({
                 legend={copy.groups.topId}
                 name={field.name}
                 options={topOptions}
+                lockedLabel={copy.styleLockedLabel}
                 value={field.value}
                 onChange={(value) => {
                   field.onChange(value);

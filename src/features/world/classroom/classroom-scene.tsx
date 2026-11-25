@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useThree } from '@react-three/fiber';
 import type { Avatar } from '@/features/profile/avatar-options';
 import { CLASSROOM_LAYOUT, type AvatarInput } from '@/realtime';
+import type { AvatarEquipped } from '../avatar/avatar-part-plan';
 import type { Pose } from '../movement';
 import { WarmLighting } from '../world-lighting';
 import { buildClassroomScene } from './build-classroom-scene';
@@ -11,21 +13,28 @@ import {
   type ClassroomInteractable,
   type InteractablePointerEvent,
 } from './classroom-interactables';
+import { deriveFurniturePlacements } from './classroom-furniture-placements';
+import { deriveShellPlacements } from './classroom-shell-placements';
 import type { FloorClickEvent } from './floor-click';
 import { FollowCamera } from './follow-camera';
 import { InteractableHighlight } from './interactable-highlight';
+import { ClassroomKit } from './kit/classroom-kit';
+import type { ClassroomKitModuleId } from './kit/classroom-kit-manifest';
 import { LocalAvatar } from './local-avatar';
 import { ProximityTracker, type ProximityAnchor } from './proximity-tracker';
 import { RemoteAvatar, type RemoteClassroomParticipant } from './remote-avatar';
 import { useClassroomNavigation } from './use-classroom-navigation';
 
 export interface ClassroomSceneProps {
+  onAssetError?: (() => void) | undefined;
   /** Confirmed profile avatar; the scene works without it. */
   avatar?: Avatar | undefined;
   /** Classroom id: scopes avatar assets and resets the local avatar. */
   scopeKey?: string | undefined;
   /** Authoritative pose from the room for the local participant (#37). */
   selfPose?: Pose | undefined;
+  /** Accessory shop codes the local member wears in this classroom. */
+  selfEquipped?: AvatarEquipped | undefined;
   /** Connection epoch key that changes on join/reconnect/drop (#37). */
   connectionKey?: string | undefined;
   /** True while the classroom freeze lock is active (#37). */
@@ -56,8 +65,8 @@ export interface ClassroomSceneProps {
 type ScenePointerEvent = FloorClickEvent & InteractablePointerEvent;
 
 /**
- * Classroom (floor, cutaway walls, desks from the layout and the
- * named prop placeholders) with the shared warm lighting and cream backdrop,
+ * Classroom (modular shell with cutaway near walls, modular furniture placed
+ * from the layout and the remaining named prop placeholders) with the shared warm lighting and cream backdrop,
  * plus the user's own avatar and live remote participants. Shadowless; the
  * object graph is built once per layout and disposed on unmount because
  * `<primitive>` objects are not owned by R3F. Only the scene root takes pointer
@@ -67,7 +76,9 @@ type ScenePointerEvent = FloorClickEvent & InteractablePointerEvent;
 export function ClassroomScene({
   avatar,
   scopeKey,
+  onAssetError,
   selfPose,
+  selfEquipped,
   connectionKey,
   frozen = false,
   remoteParticipants = [],
@@ -82,8 +93,35 @@ export function ClassroomScene({
   onProximityChange,
   onProximityAnchor,
 }: ClassroomSceneProps) {
-  const scene = useMemo(() => buildClassroomScene(CLASSROOM_LAYOUT), []);
+  const invalidate = useThree((state) => state.invalidate);
+  const { resource: scene } = useMemo(
+    () => ({ scopeKey, resource: buildClassroomScene(CLASSROOM_LAYOUT) }),
+    [scopeKey],
+  );
+  const failedModules = useRef({
+    scene,
+    ids: new Set<ClassroomKitModuleId>(),
+  });
+  const handleModuleError = useCallback(
+    (id: ClassroomKitModuleId) => {
+      if (failedModules.current.scene !== scene) {
+        failedModules.current = { scene, ids: new Set() };
+      }
+      failedModules.current.ids.add(id);
+      scene.setFailedModules(failedModules.current.ids);
+      invalidate();
+      onAssetError?.();
+    },
+    [scene, onAssetError, invalidate],
+  );
   useEffect(() => () => scene.dispose(), [scene]);
+  const kitPlacements = useMemo(
+    () => [
+      ...deriveShellPlacements(CLASSROOM_LAYOUT),
+      ...deriveFurniturePlacements(CLASSROOM_LAYOUT),
+    ],
+    [],
+  );
   const interactablesById = useMemo(
     () =>
       indexClassroomInteractables(
@@ -177,6 +215,12 @@ export function ClassroomScene({
         onPointerMove={handlePointerMove}
         onPointerOut={handlePointerOut}
       />
+      <ClassroomKit
+        key={scopeKey}
+        placements={kitPlacements}
+        scopeKey={scopeKey}
+        onModuleError={handleModuleError}
+      />
       <InteractableHighlight
         interactablesById={interactablesById}
         highlightedId={
@@ -190,6 +234,7 @@ export function ClassroomScene({
         controller={controller}
         marker={marker.object}
         avatar={avatar}
+        equipped={selfEquipped}
         scopeKey={scopeKey}
       />
       {/* After LocalAvatar so its frame callback sees the freshly stepped pose. */}
@@ -211,6 +256,7 @@ export function ClassroomScene({
             rotation: participant.rotation,
           }}
           avatar={participant.avatar}
+          equipped={participant.equipped}
           scopeKey={scopeKey}
         />
       ))}

@@ -61,13 +61,13 @@ vi.mock('./compose-avatar', async (original) => {
 const avatar: Avatar = {
   bodyId: 'female',
   hairId: 'afro',
-  topId: 'tshirt',
+  topId: 'basic-tshirt',
   hairColor: '#AF6D63',
   clothingColor: '#75B7DA',
 };
 const BODY = '/models/avatars/female/body.glb';
-const HAIR = '/models/avatars/female/hair-afro.glb';
-const TOP = '/models/avatars/female/top-tshirt.glb';
+const HAIR = '/models/avatars/shared/hair-afro.glb';
+const TOP = '/models/avatars/female/top-basic-tshirt.glb';
 
 function makeGltf(clips: readonly string[] = []): GLTF {
   const scene = new Group();
@@ -107,9 +107,20 @@ function useLoader(
   return loadAsync;
 }
 
+interface InputPart {
+  readonly key: string;
+  readonly scene: unknown;
+  readonly tints?: Record<string, string>;
+  readonly hiddenMeshes?: readonly string[];
+  readonly morphs?: Record<string, number>;
+}
+
+const partOf = (key: string) =>
+  lastComposed().input.parts.find((part) => part.key === key);
+
 const lastComposed = () =>
   composed[composed.length - 1] as ComposedAvatar & {
-    input: { hair?: unknown; top?: unknown; hairColor?: string };
+    input: { parts: readonly InputPart[] };
   };
 
 async function mount(ui: React.ReactElement) {
@@ -169,7 +180,8 @@ describe('AvatarModel', () => {
     expect(loadAsync.mock.calls.map(([url]) => url).sort()).toEqual(
       [BODY, HAIR, TOP].sort(),
     );
-    expect(lastComposed().input.hairColor).toBe('#AF6D63');
+    expect(partOf('hair')?.tints).toEqual({ AvatarHairTint: '#AF6D63' });
+    expect(partOf('top')?.tints).toEqual({ AvatarTopTint: '#75B7DA' });
   });
 
   it('renders the body without a part that fails to load', async () => {
@@ -178,8 +190,8 @@ describe('AvatarModel', () => {
     await mount(
       <AvatarModel avatar={avatar} onPartsSkipped={onPartsSkipped} />,
     );
-    expect(lastComposed().input.hair).toBeUndefined();
-    expect(lastComposed().input.top).toBeTruthy();
+    expect(partOf('hair')).toBeUndefined();
+    expect(partOf('top')).toBeTruthy();
     expect(onPartsSkipped).toHaveBeenCalledWith(['hair']);
   });
 
@@ -293,6 +305,131 @@ describe('AvatarModel', () => {
     expect(update).toHaveBeenCalledTimes(1);
     expect(frame.invalidate).not.toHaveBeenCalled();
   });
+  describe('equipped accessories', () => {
+    const SHARED = '/models/avatars/shared';
+
+    it('requests and tints each equipped head, face and back item', async () => {
+      const loadAsync = useLoader();
+      await mount(
+        <AvatarModel
+          avatar={avatar}
+          equipped={{
+            head: 'head_crown',
+            face: 'face_sunglasses',
+            back: 'back_backpack',
+          }}
+        />,
+      );
+      expect(loadAsync.mock.calls.map(([url]) => url).sort()).toEqual(
+        [
+          BODY,
+          HAIR,
+          TOP,
+          `${SHARED}/head-crown.glb`,
+          `${SHARED}/face-sunglasses.glb`,
+          '/models/avatars/female/back-backpack.glb',
+        ].sort(),
+      );
+      expect(partOf('head')?.tints).toEqual({ AvatarAccessoryTint: '#F7D86B' });
+      expect(partOf('face')?.tints).toEqual({ AvatarAccessoryTint: '#353849' });
+      expect(partOf('back')?.tints).toEqual({ AvatarAccessoryTint: '#62CFC7' });
+    });
+
+    it('ignores unknown codes and codes sitting in the wrong slot', async () => {
+      const loadAsync = useLoader();
+      await mount(
+        <AvatarModel
+          avatar={avatar}
+          equipped={{ head: 'nope', face: 'head_crown', back: null }}
+        />,
+      );
+      expect(loadAsync).toHaveBeenCalledTimes(3);
+      expect(partOf('head')).toBeUndefined();
+      expect(partOf('face')).toBeUndefined();
+    });
+
+    it('hides the hair parts a crown-covering hat would poke through', async () => {
+      useLoader();
+      await mount(
+        <AvatarModel avatar={avatar} equipped={{ head: 'head_beanie' }} />,
+      );
+      expect(partOf('hair')?.hiddenMeshes).toEqual(['HairAfro_Cloud']);
+    });
+
+    it('swaps the afro for the fitted one under a headband', async () => {
+      const loadAsync = useLoader();
+      await mount(
+        <AvatarModel avatar={avatar} equipped={{ head: 'head_headband' }} />,
+      );
+      const urls = loadAsync.mock.calls.map(([url]) => url);
+      expect(urls).toContain(`${SHARED}/hair-afro-with-headband.glb`);
+      expect(urls).not.toContain(HAIR);
+      expect(partOf('head')?.hiddenMeshes).toEqual([
+        'HeadHeadband_Band',
+        'HeadHeadband_Trim',
+      ]);
+    });
+
+    it('tucks long hair when a back item is worn', async () => {
+      useLoader();
+      const longHair: Avatar = {
+        ...avatar,
+        bodyId: 'male',
+        hairId: 'dreads',
+        topId: 'hoodie',
+      };
+      await mount(
+        <AvatarModel avatar={longHair} equipped={{ back: 'back_wings' }} />,
+      );
+      expect(partOf('hair')?.morphs).toEqual({ BackTuck: 1 });
+    });
+
+    it('renders without an accessory that fails to load', async () => {
+      useLoader([`${SHARED}/face-sunglasses.glb`]);
+      const onPartsSkipped = vi.fn();
+      await mount(
+        <AvatarModel
+          avatar={avatar}
+          equipped={{ head: 'head_crown', face: 'face_sunglasses' }}
+          onPartsSkipped={onPartsSkipped}
+        />,
+      );
+      expect(partOf('face')).toBeUndefined();
+      expect(partOf('head')).toBeTruthy();
+      expect(onPartsSkipped).toHaveBeenCalledWith(['face']);
+    });
+
+    it('re-composes and disposes the old composition when equipment changes', async () => {
+      useLoader();
+      const view = await mount(
+        <AvatarModel avatar={avatar} equipped={{ head: 'head_crown' }} />,
+      );
+      const first = lastComposed();
+      await act(async () => {
+        view.rerender(
+          <AvatarModel avatar={avatar} equipped={{ head: 'head_cap' }} />,
+        );
+      });
+      expect(first.dispose).toHaveBeenCalledTimes(1);
+      expect(partOf('head')?.tints).toEqual({ AvatarAccessoryTint: '#75B7DA' });
+    });
+
+    it('keeps the composition when an equal equipment object arrives', async () => {
+      useLoader();
+      const view = await mount(
+        <AvatarModel avatar={avatar} equipped={{ head: 'head_crown' }} />,
+      );
+      const first = lastComposed();
+      await act(async () => {
+        view.rerender(
+          <AvatarModel avatar={avatar} equipped={{ head: 'head_crown' }} />,
+        );
+      });
+      expect(first.dispose).not.toHaveBeenCalled();
+      expect(lastComposed()).toBe(first);
+    });
+  });
+
   describe('clip changes', () => {
     it('keeps one mixer and crossfades between Idle and Run', async () => {
       useLoader([], ['Idle', 'Walk', 'Run']);
