@@ -1,6 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
+import type { components } from '../src/api/schema.generated';
 import { messages } from '../src/app/messages';
 import { authMessages } from '../src/features/auth/messages';
+import {
+  FREE_HAIR_IDS,
+  FREE_TOP_IDS,
+  hairOptionsFor,
+  topOptionsFor,
+} from '../src/features/profile/avatar-options';
 import { profileMessages } from '../src/features/profile/messages';
 
 const TEST_ACCESS_TOKEN = 'e2e-profile-access-token';
@@ -71,6 +78,50 @@ test('edits display name and base avatar on /profile and persists across reload 
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(serverProfile),
+    });
+  });
+
+  // Published AvatarStylesDto: all hair, then all tops, alphabetical per type.
+  // This account bought Rastas and already owns its saved hoodie; other paid
+  // styles remain locked rather than bypassing the product ownership guard.
+  const avatarStyles: components['schemas']['AvatarStylesDto'] = {
+    items: [
+      ...hairOptionsFor('male')
+        .map(({ value }) => value)
+        .sort()
+        .map((styleId) => ({
+          styleType: 'hair' as const,
+          styleId,
+          free: FREE_HAIR_IDS.has(styleId),
+          owned: FREE_HAIR_IDS.has(styleId) || styleId === 'dreads',
+          shopItemCode: FREE_HAIR_IDS.has(styleId)
+            ? null
+            : `hair_${styleId.replaceAll('-', '_')}`,
+        })),
+      ...topOptionsFor('male')
+        .map(({ value }) => value)
+        .sort()
+        .map((styleId) => ({
+          styleType: 'top' as const,
+          styleId,
+          free: FREE_TOP_IDS.has(styleId),
+          owned: FREE_TOP_IDS.has(styleId) || styleId === 'hoodie',
+          shopItemCode: FREE_TOP_IDS.has(styleId)
+            ? null
+            : `top_${styleId.replaceAll('-', '_')}`,
+        })),
+    ],
+  };
+  await page.route('**/users/me/avatar/styles', async (route) => {
+    const authorization = await route.request().headerValue('authorization');
+    if (authorization !== `Bearer ${TEST_ACCESS_TOKEN}`) {
+      await route.fulfill({ status: 401, body: '' });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(avatarStyles),
     });
   });
 
@@ -167,6 +218,15 @@ test('edits display name and base avatar on /profile and persists across reload 
   const hairGroup = page.getByRole('group', {
     name: profileMessages.avatar.groups.hairId,
   });
+  await expect(
+    hairGroup.getByRole('radio', { name: 'Rastas', exact: true }),
+  ).toBeEnabled();
+  await expect(
+    hairGroup.getByRole('radio', {
+      name: `Mohicano suave , ${profileMessages.avatar.styleLockedLabel}`,
+      exact: true,
+    }),
+  ).toBeDisabled();
   await hairGroup.locator('label', { hasText: 'Rastas' }).click();
 
   const hairColorGroup = page.getByRole('group', {
@@ -202,12 +262,12 @@ test('edits display name and base avatar on /profile and persists across reload 
 
   if (testInfo.project.name === 'desktop') {
     await page.screenshot({
-      path: 'docs/assets/profile/streak-badges-1280.png',
+      path: 'odd/artifacts/pr136-profile/streak-badges-1280.png',
       fullPage: false,
     });
   } else if (testInfo.project.name === 'mobile') {
     await page.screenshot({
-      path: 'docs/assets/profile/streak-badges-360.png',
+      path: 'odd/artifacts/pr136-profile/streak-badges-360.png',
       fullPage: false,
     });
   }
