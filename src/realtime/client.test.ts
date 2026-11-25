@@ -2,6 +2,8 @@ import { MapSchema } from '@colyseus/schema';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Avatar } from './avatar.generated';
+import { AvatarAppearance } from './avatar-appearance.generated';
+import { EquippedItemView } from './equipped-item-view.generated';
 import { Npc } from './npc.generated';
 import {
   AVATAR_INPUT_MESSAGE,
@@ -620,6 +622,66 @@ describe('createClassroomRealtimeClient (#23)', () => {
     const { npcs } = client.getSnapshot();
     expect(npcs.get('pet')).toMatchObject({ id: 'pet', state: 'sleeping' });
     expect(npcs.get('tutorBot')?.x).toBe(-5.9);
+
+    client.dispose();
+  });
+
+  it('reads equipped accessories from the real synced appearance schema (#138)', async () => {
+    const { auth } = createFakeAuth('valid-token');
+    const sdk = createFakeSdk();
+    const room = new FakeRoom({ classroomId: CLASSROOM_A });
+    room.setAvatar('schema-user', { displayName: 'Ana' });
+    const avatar = room.state.avatars.get('schema-user')!;
+    const appearance = new AvatarAppearance();
+    appearance.bodyId = 'female';
+    appearance.hairId = 'afro';
+    appearance.topId = 'hoodie';
+    appearance.hairColor = '#AF6D63';
+    appearance.clothingColor = '#7EBA8B';
+    const item = (slot: string, shopItemCode: string) => {
+      const view = new EquippedItemView();
+      view.slot = slot;
+      view.shopItemId = `id-${slot}`;
+      view.shopItemCode = shopItemCode;
+      view.shopItemName = shopItemCode;
+      view.kind = 'AVATAR_ACCESSORY';
+      return view;
+    };
+    appearance.items.set('head', item('head', 'head_crown'));
+    appearance.items.set('back', item('back', 'back_wings'));
+    avatar.appearance = appearance;
+    sdk.setJoinHandler(async () => room);
+    const client = createClassroomRealtimeClient({
+      auth,
+      realtimeUrl: 'wss://realtime.example.invalid',
+      createSdkClient: sdk.createSdkClient,
+    });
+
+    await client.connect(CLASSROOM_A);
+    expect(
+      client.getSnapshot().participants.get('schema-user')?.avatar?.equipped,
+    ).toEqual({ head: 'head_crown', face: null, back: 'back_wings' });
+
+    client.dispose();
+  });
+
+  it('falls back to idle and no reaction for unknown NPC state values (#138)', async () => {
+    const { auth } = createFakeAuth('valid-token');
+    const sdk = createFakeSdk();
+    const room = new FakeRoom({ classroomId: CLASSROOM_A });
+    room.setNpc('pet', { state: 'dancing', reaction: 'explode' });
+    sdk.setJoinHandler(async () => room);
+    const client = createClassroomRealtimeClient({
+      auth,
+      realtimeUrl: 'wss://realtime.example.invalid',
+      createSdkClient: sdk.createSdkClient,
+    });
+
+    await client.connect(CLASSROOM_A);
+    expect(client.getSnapshot().npcs.get('pet')).toMatchObject({
+      state: 'idle',
+      reaction: '',
+    });
 
     client.dispose();
   });

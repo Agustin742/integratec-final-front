@@ -264,8 +264,16 @@ function readParticipantAppearance(
   return equipped ? Object.freeze({ ...base, equipped }) : base;
 }
 
+/** Reads one slot from a synced `MapSchema`/`Map` (`get`) or a plain record. */
+function readSlot(items: Record<string, unknown>, slot: string): unknown {
+  const getter = (items as { get?: unknown }).get;
+  return typeof getter === 'function'
+    ? (getter as (key: string) => unknown).call(items, slot)
+    : items[slot];
+}
+
 function readItemCode(items: Record<string, unknown>, slot: string) {
-  const item = items[slot];
+  const item = readSlot(items, slot);
   if (typeof item !== 'object' || item === null) {
     return null;
   }
