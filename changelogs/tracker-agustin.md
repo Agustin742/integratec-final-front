@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-24 — Interactive props, decorations, pet and tutor bot routines (#138)
+
+- **Status:** completed (pending visual review, CI and merge of the PR)
+- **Area / files:** `src/features/world/classroom/` (interactive and decoration placements, door with local occlusion fade, kit batching by material appearance), `src/features/world/npc/` (tutor bot, classroom pet, clip plans, live positions, skinned mesh merge, speech bubble), `src/features/classrooms/` (bot station, chat computer and report card stand interactables), `src/realtime/` (NPC snapshot, `npc:interact`, synced layout props, equipped items read from the synced map), `public/models/` (#137 interactive models, #139 cat clips and decorations)
+- **Change:** The classroom places only the props with a feature: door (exit), collaborative and bulletin boards, shop kiosk, chat computer, report card stand, bot station (bot panel) and pet bed (`6c67d04`, `2ff8866`, `cdf6a01`); the door stays at the entrance and fades locally when it hides your avatar. The tutor bot and Michi follow the room-synced routine with real clips (procedural fallback for the cat), and pressing E on them shows the shared reaction or academic phrase (`7d07105`, `c805688`, `0c8d6fe`, `2d01a56`). Flags at the teacher desk corners, christmas tree, plants, globe, rug and wall decor added; the kit batches by material appearance and the NPC meshes merge by material, so the scene costs 59 draw calls with both NPCs (`1401415`, `798f0d9`, `da165f9`). Fixed equipped accessories never rendering live (`3b47cf4`).
+- **Reason:** Use the #137 and #139 assets in the running classroom and bring the pet and tutor bot to life; back counterpart integratec-final-back#147.
+- **Verification:** Per-task strict TDD on touched tests, lint and typecheck, assets check; native review approved per task; once before the PR `--changed origin/develop`, build and `security:check`. Visual review pending.
+- **Next step:** Visual review with the team, then open the PR to `develop` (chained after #136).
+
 ## 2026-11-24 — Modular avatar and classroom assets (#135, covers #58)
 
 - **Status:** completed (pending CI and merge of the PR)
