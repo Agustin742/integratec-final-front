@@ -53,6 +53,7 @@ export {
   TUTOR_BOT_PHRASES,
   TUTOR_BOT_SLEEP_CLIP,
   buildClassroomLayout,
+  deriveNpcHomes,
   npcInteractSchema,
   type NpcId,
   type NpcInteract,

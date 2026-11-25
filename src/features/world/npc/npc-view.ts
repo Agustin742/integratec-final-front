@@ -1,8 +1,9 @@
-import type { ClassroomLayout } from '@/realtime';
+import { deriveNpcHomes, type ClassroomLayout } from '@/realtime';
 import { deriveClassroomPropSpecs } from '../classroom/classroom-interactables';
 
 /** Server NPC ids (`ClassroomState.npcs` keys). */
 export const TUTOR_BOT_NPC_ID = 'tutorBot';
+export const PET_NPC_ID = 'pet';
 
 export type NpcState = 'idle' | 'walking' | 'emote' | 'sleeping' | 'reacting';
 export type NpcReaction = '' | 'greet' | 'askForPets' | 'phrase';
@@ -66,6 +67,26 @@ export function deriveTutorBotHome(layout: ClassroomLayout): NpcView {
     z: spec.position[2],
     rotation: spec.rotationY ?? 0,
     state: 'idle',
+    emote: '',
+    reaction: '',
+    phraseId: -1,
+    reactionSeq: 0,
+    reactingSessionId: '',
+  };
+}
+
+/**
+ * Where Michi rests while no synced state is available: asleep on the cushion
+ * of its bed, the same spot the server picks as its home.
+ */
+export function derivePetHome(layout: ClassroomLayout): NpcView {
+  const home = deriveNpcHomes(layout).pet;
+  return {
+    id: PET_NPC_ID,
+    x: home.x,
+    z: home.z,
+    rotation: home.rotation,
+    state: 'sleeping',
     emote: '',
     reaction: '',
     phraseId: -1,

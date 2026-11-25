@@ -1,4 +1,4 @@
-import type { ClassroomLayout } from '@/realtime';
+import { deriveNpcHomes, type ClassroomLayout } from '@/realtime';
 import type { PlaceholderKind } from './build-classroom-scene';
 import {
   DESK_HEIGHT,
@@ -49,6 +49,8 @@ export function deriveClassroomPropSpecs(
   // Tutor Corner (`docs/art/tutor-bot.md`); the bot hovers just in front of it.
   const stationX = -6.95;
   const stationZ = 1.05;
+  // Michi sleeps on its bed cushion; its live position replaces this once it walks.
+  const petHome = deriveNpcHomes(layout).pet;
   const botHome: readonly [number, number, number] = [
     stationX + BOT_STATION_HALF_DEPTH + BOT_HOME_GAP,
     0,
@@ -83,9 +85,9 @@ export function deriveClassroomPropSpecs(
     },
     pet: {
       position: [7, 0, frontZ],
-      interactablePosition: [7, 0, frontZ + 0.14],
-      footprint: [1.0, 0.32],
-      beaconHeight: 0.85,
+      interactablePosition: [petHome.x, 0, petHome.z],
+      footprint: [0.5, 0.5],
+      beaconHeight: 0.7,
     },
     // Home of the roaming tutor bot: where it rests when not moving. Its live
     // position replaces `interactablePosition` once it walks (`npc-live-position`).
@@ -262,7 +264,8 @@ export function deriveClassroomInteractables(
     {
       id: 'pet',
       type: 'pet',
-      interactionClass: 'decorative',
+      interactionClass: 'npc',
+      npcId: 'pet',
       worldPosition: specs.pet.interactablePosition,
       footprint: specs.pet.footprint,
       beaconHeight: specs.pet.beaconHeight,

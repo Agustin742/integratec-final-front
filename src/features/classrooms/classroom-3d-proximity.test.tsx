@@ -134,11 +134,11 @@ describe('proximity prompt', () => {
     expect(screen.queryByRole('button', { name: /Abrir tienda/ })).toBeNull();
   });
 
-  test('the pet reads as a greeting with its name', async () => {
+  test('the pet reads as a caress with its name', async () => {
     renderStage();
     await nearTo('pet');
     expect(
-      screen.getByRole('button', { name: /Saludar a Michi/ }),
+      screen.getByRole('button', { name: /Acariciar a Michi/ }),
     ).toBeInTheDocument();
   });
 
@@ -297,7 +297,11 @@ describe('availability and highlight', () => {
       });
     expect(isTarget('shop')).toBe(true);
     expect(
-      isTarget('pet', { type: 'pet', interactionClass: 'decorative' }),
+      isTarget('pet', {
+        type: 'pet',
+        interactionClass: 'npc',
+        npcId: 'pet',
+      }),
     ).toBe(true);
     expect(
       isTarget('tutor-bot', {

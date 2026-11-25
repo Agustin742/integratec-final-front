@@ -202,7 +202,6 @@ describe('placeholders', () => {
     'classroom-shelf': 'shelf',
     'classroom-bulletin-board': 'bulletin-board',
     'classroom-shop': 'shop',
-    'classroom-pet': 'pet',
   } as const;
 
   test.each(Object.entries(expected))(
@@ -220,19 +219,9 @@ describe('placeholders', () => {
     expect(root.getObjectByName('classroom-tutor-bot')).toBeUndefined();
   });
 
-  test('the pet keeps its green placeholder colours', () => {
+  test('the pet is no longer a static placeholder: the moving cat owns its proxy', () => {
     const { root } = build();
-    const pet = named(root, 'classroom-pet');
-    const colours = (object: Object3D) =>
-      new Set(
-        meshes(object).map((mesh) =>
-          (
-            mesh.material as unknown as { color: { getHex(): number } }
-          ).color.getHex(),
-        ),
-      );
-    expect(colours(pet).has(0x65b96a)).toBe(true);
-    expect(colours(pet).has(0xb5a7d6)).toBe(false);
+    expect(root.getObjectByName('classroom-pet')).toBeUndefined();
   });
 
   /**

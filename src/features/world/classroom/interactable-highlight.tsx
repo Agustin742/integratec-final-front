@@ -11,9 +11,7 @@ import { npcFollowOffset, type NpcLivePositions } from './npc-live-position';
 import {
   applyPointerCursor,
   resetBeaconTransform,
-  resetPetPosition,
   stepBeaconTransform,
-  stepPetHop,
 } from './interactable-highlight-helpers';
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
@@ -192,8 +190,6 @@ export interface InteractableHighlightProps {
   readonly interactablesById: ReadonlyMap<string, ClassroomInteractable>;
   readonly highlightedId?: string | undefined;
   readonly ownDeskIndex?: number | null | undefined;
-  readonly sceneRoot: Group;
-  readonly petReactionNonce?: number | undefined;
   /** Live spots of roaming NPCs; their highlight follows them. */
   readonly npcPositions?: NpcLivePositions | undefined;
 }
@@ -207,8 +203,6 @@ export function InteractableHighlight({
   interactablesById,
   highlightedId,
   ownDeskIndex,
-  sceneRoot,
-  petReactionNonce = 0,
   npcPositions,
 }: InteractableHighlightProps) {
   const invalidate = useThree((state) => state.invalidate);
@@ -277,8 +271,6 @@ export function InteractableHighlight({
   }, []);
   const beaconElapsedRef = useRef(0);
   const beaconPulseActiveRef = useRef(false);
-  const lastPetNonceRef = useRef(petReactionNonce);
-  const petHopRef = useRef({ active: false, elapsed: 0 });
 
   useEffect(() => {
     const domElement = gl?.domElement;
@@ -303,27 +295,6 @@ export function InteractableHighlight({
     }
     invalidate();
   }, [beaconGroup, highlighted, ownDesk, reducedMotion, invalidate]);
-
-  useEffect(() => {
-    if (petReactionNonce === lastPetNonceRef.current) return;
-    lastPetNonceRef.current = petReactionNonce;
-    if (petReactionNonce <= 0) return;
-
-    const petGroup = sceneRoot.getObjectByName('classroom-pet');
-    if (reducedMotion || !petGroup) {
-      resetPetPosition(sceneRoot);
-      petHopRef.current.active = false;
-      return;
-    }
-    petHopRef.current = { active: true, elapsed: 0 };
-    invalidate();
-  }, [petReactionNonce, reducedMotion, sceneRoot, invalidate]);
-
-  useEffect(() => {
-    return () => {
-      resetPetPosition(sceneRoot);
-    };
-  }, [sceneRoot]);
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
@@ -354,20 +325,6 @@ export function InteractableHighlight({
         );
         beaconPulseActiveRef.current = stillPulsing;
         if (stillPulsing) {
-          needsMoreFrames = true;
-        }
-      }
-    }
-
-    if (petHopRef.current.active) {
-      if (reducedMotion) {
-        resetPetPosition(sceneRoot);
-        petHopRef.current.active = false;
-      } else {
-        petHopRef.current.elapsed += dt;
-        const stillHopping = stepPetHop(sceneRoot, petHopRef.current.elapsed);
-        petHopRef.current.active = stillHopping;
-        if (stillHopping) {
           needsMoreFrames = true;
         }
       }

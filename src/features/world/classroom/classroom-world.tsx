@@ -28,7 +28,6 @@ export interface ClassroomWorldProps extends Pick<
   onIntentChange?: (intent: AvatarInput) => void;
   highlightedInteractableId?: string | undefined;
   ownDeskIndex?: number | null | undefined;
-  petReactionNonce?: number | undefined;
   interactionLocked?: boolean | undefined;
   onHoverInteractable?: ((id: string | undefined) => void) | undefined;
   onSelectInteractable?:
@@ -67,7 +66,6 @@ export function ClassroomWorld({
   onIntentChange,
   highlightedInteractableId,
   ownDeskIndex,
-  petReactionNonce,
   interactionLocked,
   onHoverInteractable,
   onSelectInteractable,
@@ -113,7 +111,6 @@ export function ClassroomWorld({
         onIntentChange={onIntentChange}
         highlightedInteractableId={highlightedInteractableId}
         ownDeskIndex={ownDeskIndex}
-        petReactionNonce={petReactionNonce}
         interactionLocked={interactionLocked}
         onHoverInteractable={onHoverInteractable}
         onSelectInteractable={onSelectInteractable}

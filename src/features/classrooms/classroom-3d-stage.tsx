@@ -254,7 +254,6 @@ function Classroom3DStageContent({
   // Object the local avatar stands next to (set by the world, id changes only).
   const [proximityId, setProximityId] = useState<string | undefined>(undefined);
   const promptAnchorRef = useRef<HTMLDivElement | null>(null);
-  const [petReactionNonce, setPetReactionNonce] = useState(0);
   const [feedback, setFeedback] = useState<InteractableFeedback | null>(null);
   const [npcSpeech, setNpcSpeech] = useState<NpcSpeech | undefined>(undefined);
   const npcBubbleRef = useRef<HTMLDivElement | null>(null);
@@ -347,7 +346,6 @@ function Classroom3DStageContent({
       }
 
       if (interactable.interactionClass === 'decorative') {
-        setPetReactionNonce((nonce) => nonce + 1);
         setFeedback({
           kind: 'pet',
           text: copy.petGreeting(resolvedPetName),
@@ -492,7 +490,6 @@ function Classroom3DStageContent({
                 onIntentChange={onIntentChange}
                 highlightedInteractableId={effectiveHighlightedId}
                 ownDeskIndex={desks.myDeskIndex}
-                petReactionNonce={petReactionNonce}
                 interactionLocked={interactionLocked}
                 onHoverInteractable={handleHoverInteractable}
                 onSelectInteractable={(item) =>

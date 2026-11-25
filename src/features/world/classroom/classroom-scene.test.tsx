@@ -18,6 +18,7 @@ const nav = vi.hoisted(() => ({
   kitProps: null as unknown,
   doorProps: null as unknown,
   botProps: null as unknown as Record<string, unknown> | null,
+  petProps: null as unknown as Record<string, unknown> | null,
   trackerProps: null as unknown as {
     interactables: { id: string }[];
     onChange?: unknown;
@@ -79,6 +80,12 @@ vi.mock('../npc/tutor-bot', () => ({
     return <div data-testid="tutor-bot" />;
   },
 }));
+vi.mock('../npc/classroom-pet', () => ({
+  ClassroomPet: (props: Record<string, unknown>) => {
+    nav.petProps = props;
+    return <div data-testid="classroom-pet" />;
+  },
+}));
 vi.mock('./interactable-highlight', () => ({
   InteractableHighlight: (props: unknown) => {
     nav.highlightProps = props;
@@ -104,6 +111,7 @@ beforeEach(() => {
   nav.kitProps = null;
   nav.doorProps = null;
   nav.botProps = null;
+  nav.petProps = null;
   nav.trackerProps = null;
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -167,6 +175,37 @@ describe('ClassroomScene', () => {
     expect(npc.z).toBeCloseTo(1.05, 2);
   });
 
+  test('mounts the pet asleep on its bed when no NPC state arrives', () => {
+    render(<ClassroomScene scopeKey="room-1" />);
+    expect(screen.getByTestId('classroom-pet')).toBeInTheDocument();
+    const { npc, scopeKey } = nav.petProps as {
+      npc: { id: string; x: number; z: number; state: string };
+      scopeKey: string;
+    };
+    expect(scopeKey).toBe('room-1');
+    expect(npc).toMatchObject({ id: 'pet', state: 'sleeping' });
+    expect(npc.x).toBeCloseTo(6.73, 2);
+  });
+
+  test('feeds the pet its synced NPC state', () => {
+    const synced: NpcView = {
+      id: 'pet',
+      x: 2,
+      z: -3,
+      rotation: 1,
+      state: 'emote',
+      emote: 'Meow',
+      reaction: '',
+      phraseId: -1,
+      reactionSeq: 5,
+      reactingSessionId: '',
+    };
+    render(
+      <ClassroomScene scopeKey="room-1" npcs={new Map([['pet', synced]])} />,
+    );
+    expect(nav.petProps).toMatchObject({ npc: synced });
+  });
+
   test('feeds the bot the synced NPC state and its resolved phrase text', () => {
     const synced: NpcView = {
       id: 'tutorBot',
@@ -199,6 +238,7 @@ describe('ClassroomScene', () => {
     render(<ClassroomScene scopeKey="room-1" />);
     const live = (nav.botProps as { positions: unknown }).positions;
     expect(live).toBeInstanceOf(Map);
+    expect((nav.petProps as { positions: unknown }).positions).toBe(live);
     expect((nav.trackerProps as { npcPositions?: unknown }).npcPositions).toBe(
       live,
     );
@@ -223,7 +263,6 @@ describe('ClassroomScene', () => {
         onIntentChange={onIntentChange}
         highlightedInteractableId="board"
         ownDeskIndex={2}
-        petReactionNonce={3}
         interactionLocked={true}
       />,
     );
@@ -235,7 +274,6 @@ describe('ClassroomScene', () => {
     expect(nav.highlightProps).toMatchObject({
       highlightedId: undefined,
       ownDeskIndex: 2,
-      petReactionNonce: 3,
     });
   });
 
@@ -313,13 +351,11 @@ describe('ClassroomScene', () => {
         scopeKey="room-1"
         highlightedInteractableId="shop"
         ownDeskIndex={1}
-        petReactionNonce={4}
       />,
     );
     expect(nav.highlightProps).toMatchObject({
       highlightedId: 'shop',
       ownDeskIndex: 1,
-      petReactionNonce: 4,
     });
   });
 

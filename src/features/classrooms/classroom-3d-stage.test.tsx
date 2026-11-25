@@ -204,6 +204,28 @@ test('selecting the tutor bot calls onInteractNpc with its id and opens no panel
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
 
+test('selecting the pet calls onInteractNpc with its id and shows no local greeting', async () => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+  const onInteractNpc = vi.fn();
+  renderStage('aula-7', { onInteractNpc });
+  await screen.findByTestId('scene-host');
+  const pet = deriveClassroomInteractables(CLASSROOM_LAYOUT).find(
+    (item) => item.id === 'pet',
+  )!;
+  const select = world.props.onSelectInteractable as (item: unknown) => void;
+  act(() => select(pet));
+  expect(onInteractNpc).toHaveBeenCalledWith('pet');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(world.props.petReactionNonce).toBeUndefined();
+});
+
 test('selecting the tutor bot is a harmless no-op when nothing handles NPC interactions yet', async () => {
   vi.stubGlobal(
     'ResizeObserver',

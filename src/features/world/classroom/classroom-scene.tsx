@@ -4,7 +4,9 @@ import { CLASSROOM_LAYOUT, type AvatarInput } from '@/realtime';
 import type { AvatarEquipped } from '../avatar/avatar-part-plan';
 import type { Pose } from '../movement';
 import {
+  PET_NPC_ID,
   TUTOR_BOT_NPC_ID,
+  derivePetHome,
   deriveTutorBotHome,
   findNpcView,
   type NpcSpeech,
@@ -12,6 +14,7 @@ import {
   type NpcViews,
 } from '../npc/npc-view';
 import { TutorBot } from '../npc/tutor-bot';
+import { ClassroomPet } from '../npc/classroom-pet';
 import { WarmLighting } from '../world-lighting';
 import { buildClassroomScene } from './build-classroom-scene';
 import {
@@ -55,8 +58,6 @@ export interface ClassroomSceneProps {
   highlightedInteractableId?: string | undefined;
   /** Server-assigned 1-based student desk index, or null when unassigned. */
   ownDeskIndex?: number | null | undefined;
-  /** Monotonic nonce triggering a decorative bounce on the classroom pet. */
-  petReactionNonce?: number | undefined;
   /** True while a modal panel owns focus and blocks 3D interaction. */
   interactionLocked?: boolean | undefined;
   onHoverInteractable?: ((id: string | undefined) => void) | undefined;
@@ -104,7 +105,6 @@ export function ClassroomScene({
   onIntentChange,
   highlightedInteractableId,
   ownDeskIndex,
-  petReactionNonce,
   interactionLocked = false,
   onHoverInteractable,
   onSelectInteractable,
@@ -137,6 +137,9 @@ export function ClassroomScene({
   const npcPositions = useMemo(() => createNpcLivePositions(), []);
   const botHome = useMemo(() => deriveTutorBotHome(CLASSROOM_LAYOUT), []);
   const bot = findNpcView(npcs, TUTOR_BOT_NPC_ID) ?? botHome;
+  const petHome = useMemo(() => derivePetHome(CLASSROOM_LAYOUT), []);
+  // Without realtime Michi sleeps on its bed, so the scene never lacks it.
+  const pet = findNpcView(npcs, PET_NPC_ID) ?? petHome;
   const botPhrase =
     bot.reaction === 'phrase' ? resolveNpcPhrase?.(bot) : undefined;
 
@@ -225,7 +228,8 @@ export function ClassroomScene({
         onPointerMove={handlePointerMove}
         onPointerOut={handlePointerOut}
       >
-        {/* Under the scene root so clicks on the moving bot reach its handlers. */}
+        {/* Under the scene root so clicks on the moving NPCs reach its handlers. */}
+        <ClassroomPet npc={pet} scopeKey={scopeKey} positions={npcPositions} />
         <TutorBot
           npc={bot}
           phraseText={botPhrase}
@@ -243,8 +247,6 @@ export function ClassroomScene({
           interactionLocked ? undefined : highlightedInteractableId
         }
         ownDeskIndex={ownDeskIndex}
-        sceneRoot={scene.root}
-        petReactionNonce={petReactionNonce}
         npcPositions={npcPositions}
       />
       <LocalAvatar

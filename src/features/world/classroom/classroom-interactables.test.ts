@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { CLASSROOM_LAYOUT } from '@/realtime';
+import { CLASSROOM_LAYOUT, deriveNpcHomes } from '@/realtime';
 import { buildClassroomScene } from './build-classroom-scene';
 import {
   deriveClassroomInteractables,
@@ -13,6 +13,17 @@ const floor: InteractableObjectNode = {
   userData: { walkableFloor: true },
   parent: null,
 };
+
+describe('the pet interactable', () => {
+  test('starts at the pet home, the bed cushion where the server puts it', () => {
+    const pet = indexClassroomInteractables(
+      deriveClassroomInteractables(CLASSROOM_LAYOUT),
+    ).get('pet')!;
+    const home = deriveNpcHomes(CLASSROOM_LAYOUT).pet;
+    expect(pet.worldPosition[0]).toBeCloseTo(home.x, 5);
+    expect(pet.worldPosition[2]).toBeCloseTo(home.z, 5);
+  });
+});
 
 describe('deriveClassroomInteractables', () => {
   const interactables = deriveClassroomInteractables(CLASSROOM_LAYOUT);
@@ -69,7 +80,8 @@ describe('deriveClassroomInteractables', () => {
     });
     expect(byId.get('pet')).toMatchObject({
       type: 'pet',
-      interactionClass: 'decorative',
+      interactionClass: 'npc',
+      npcId: 'pet',
     });
     expect(byId.get('pet')?.panelKey).toBeUndefined();
     expect(byId.get('entrance')).toMatchObject({
@@ -92,8 +104,10 @@ describe('deriveClassroomInteractables', () => {
     const pet = byId.get('pet')!;
     const bot = byId.get('tutor-bot')!;
     expect(pet.id).not.toBe(bot.id);
-    expect(pet.interactionClass).toBe('decorative');
+    expect(pet.interactionClass).toBe('npc');
+    expect(pet.npcId).toBe('pet');
     expect(bot.interactionClass).toBe('npc');
+    expect(bot.npcId).toBe('tutorBot');
     expect(bot.panelKey).toBeUndefined();
     expect(pet.worldPosition).not.toEqual(bot.worldPosition);
   });
@@ -229,7 +243,6 @@ describe('resolveInteractableHit', () => {
         ['classroom-shelf', 'shelf'],
         ['classroom-bulletin-board', 'bulletin-board'],
         ['classroom-shop', 'shop'],
-        ['classroom-pet', 'pet'],
       ] as const;
 
       for (const [objectName, expectedId] of placeholderNames) {
