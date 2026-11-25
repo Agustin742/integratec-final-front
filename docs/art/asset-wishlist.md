@@ -242,10 +242,10 @@ Seasonal:
 
 ### Other spaces (if more than one room)
 
-- [ ] Hallway
-- [ ] Schoolyard
-- [ ] Library
-- [ ] Lab
+- [x] Hallway
+- [x] Schoolyard
+- [x] Library
+- [x] Lab
 
 ## 4. Interactive objects
 
