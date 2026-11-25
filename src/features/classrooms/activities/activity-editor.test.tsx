@@ -40,6 +40,7 @@ import {
 import { mswServer } from '@/test/msw/server';
 import { render } from '@/test/render';
 import { ActivitiesPanel } from './activities-panel';
+import { chooseRowAction } from './activities-test-utils';
 import { activityMessages } from './messages';
 
 // Multi-step dialog flows (several submits, MSW round trips, a11y scans)
@@ -51,12 +52,15 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-11-24T12:00:00.000Z'));
   vi.stubEnv('VITE_APP_ENV', 'test');
   vi.stubEnv('VITE_API_BASE_URL', TEST_API_BASE_URL);
   vi.stubEnv('VITE_REALTIME_URL', 'wss://realtime.example.invalid');
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   mswServer.resetHandlers();
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
@@ -253,10 +257,7 @@ async function openCreateDialog(): Promise<HTMLElement> {
 
 async function openEditDialog(title: string): Promise<HTMLElement> {
   renderActivitiesPanel();
-  const trigger = await screen.findByRole('button', {
-    name: actionsCopy.editAriaLabel(title),
-  });
-  fireEvent.click(trigger);
+  await chooseRowAction(title, 'edit');
   const dialog = await screen.findByRole('dialog', {
     name: editorCopy.editTitle,
   });
@@ -411,7 +412,7 @@ describe('ActivityEditorDialog and PublishActivityDialog (#39)', () => {
       ).not.toBeInTheDocument();
     });
 
-    const list = await screen.findByRole('list', {
+    const list = await screen.findByRole('group', {
       name: activityMessages.listRegionLabel,
     });
     expect(within(list).getByText('TP Nuevo Fracciones')).toBeVisible();
@@ -1070,11 +1071,7 @@ describe('ActivityEditorDialog and PublishActivityDialog (#39)', () => {
     });
 
     // 2. Question edit: questions must be included in the PATCH payload.
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: actionsCopy.editAriaLabel(draftExamSummary.title),
-      }),
-    );
+    await chooseRowAction(draftExamSummary.title, 'edit');
     const dialog2 = await screen.findByRole('dialog', {
       name: editorCopy.editTitle,
     });
@@ -1140,11 +1137,7 @@ describe('ActivityEditorDialog and PublishActivityDialog (#39)', () => {
     );
 
     renderActivitiesPanel();
-    fireEvent.click(
-      await screen.findByRole('button', {
-        name: actionsCopy.editAriaLabel(draftExamSummary.title),
-      }),
-    );
+    await chooseRowAction(draftExamSummary.title, 'edit');
 
     const dialog = await screen.findByRole('dialog', {
       name: editorCopy.editTitle,
@@ -1284,11 +1277,7 @@ describe('ActivityEditorDialog and PublishActivityDialog (#39)', () => {
     );
 
     renderActivitiesPanel();
-    fireEvent.click(
-      await screen.findByRole('button', {
-        name: actionsCopy.publishAriaLabel(draftFileTp.title),
-      }),
-    );
+    await chooseRowAction(draftFileTp.title, 'publish');
 
     const confirmDialog = await screen.findByRole('dialog', {
       name: editorCopy.publish.title(draftFileTp.title),
@@ -1318,7 +1307,7 @@ describe('ActivityEditorDialog and PublishActivityDialog (#39)', () => {
         screen.getByText(editorCopy.publishedDescription(draftFileTp.title)),
       ).toBeVisible();
     });
-    const list = screen.getByRole('list', {
+    const list = screen.getByRole('group', {
       name: activityMessages.listRegionLabel,
     });
     expect(
@@ -1363,11 +1352,7 @@ describe('ActivityEditorDialog and PublishActivityDialog (#39)', () => {
     );
 
     renderActivitiesPanel();
-    fireEvent.click(
-      await screen.findByRole('button', {
-        name: actionsCopy.publishAriaLabel(draftFileTp.title),
-      }),
-    );
+    await chooseRowAction(draftFileTp.title, 'publish');
     const confirmDialog = await screen.findByRole('dialog', {
       name: editorCopy.publish.title(draftFileTp.title),
     });
@@ -1444,11 +1429,7 @@ describe('ActivityEditorDialog and PublishActivityDialog (#39)', () => {
     );
 
     renderActivitiesPanel();
-    fireEvent.click(
-      await screen.findByRole('button', {
-        name: actionsCopy.publishAriaLabel(draftFileTp.title),
-      }),
-    );
+    await chooseRowAction(draftFileTp.title, 'publish');
     const confirmDialog = await screen.findByRole('dialog', {
       name: editorCopy.publish.title(draftFileTp.title),
     });

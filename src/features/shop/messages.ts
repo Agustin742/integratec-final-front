@@ -30,6 +30,11 @@ export const shopMessages = {
     sortNameAsc: 'Nombre (A–Z)',
     sortNameDesc: 'Nombre (Z–A)',
   },
+  preview: {
+    loading: 'Cargando vista previa',
+    alt: (name: string) => `Vista previa de ${name}`,
+    illustrationAlt: (name: string) => `Ilustración de ${name}`,
+  },
   kinds: {
     AVATAR_ACCESSORY: 'Accesorio de avatar',
     AVATAR_STYLE: 'Peinados y ropa',

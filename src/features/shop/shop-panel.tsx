@@ -45,6 +45,7 @@ import {
   type ShopReconcileSnapshot,
 } from './purchase-confirm-dialog';
 import { formatShopPoints, type ShopCatalogItemDto } from './shop-schema';
+import { ShopItemPreview } from './shop-item-preview';
 import { listShopItems, listShopPurchases } from './shop-service';
 
 const CATALOG_PAGE_SIZE = 12;
@@ -367,14 +368,14 @@ function ShopPanelScoped({ classroomId, userId }: ShopPanelScopedProps) {
     purchasesPage > 1 && purchaseItems.length === 0 && purchasesTotal > 0;
 
   return (
-    <section aria-label={panelMessages.heading} className="space-y-4">
+    <section aria-label={panelMessages.heading} className="min-w-0 space-y-4">
       <LiveRegion message={announcement} visuallyHidden />
 
       <div className="space-y-1">
         <h3
           ref={headingRef}
           tabIndex={-1}
-          className="text-base font-semibold text-foreground outline-none"
+          className="font-display text-lg font-semibold text-foreground outline-none"
         >
           {panelMessages.heading}
         </h3>
@@ -384,8 +385,8 @@ function ShopPanelScoped({ classroomId, userId }: ShopPanelScopedProps) {
       </div>
 
       {/* Server-authoritative individual student balance strip */}
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-surface-subtle/60 px-4 py-3">
-        <span className="text-xs font-medium text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-edge bg-tray/60 px-4 py-3 shadow-inset">
+        <span className="text-sm font-medium text-muted-foreground">
           {panelMessages.balanceLabel}
         </span>
         {wallet.status === 'ready' ? (
@@ -615,57 +616,64 @@ function ShopPanelScoped({ classroomId, userId }: ShopPanelScopedProps) {
                 )}
               </p>
 
-              <ul className="space-y-3">
+              <ul className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 lg:grid-cols-3">
                 {catalogItems.map((item) => {
                   const hasPendingKey = item.id in pendingKeysByItemId;
                   const seemsInsufficient =
                     walletBalance !== null &&
                     walletBalance < item.price &&
                     item.isPurchasable;
+                  const statusBadge = item.ownedByStudent ? (
+                    <Badge variant="success">
+                      {catalogMessages.statusOwnedStudent}
+                    </Badge>
+                  ) : item.kind === 'CLASSROOM_ITEM' &&
+                    item.ownedByClassroom ? (
+                    <Badge variant="success">
+                      {catalogMessages.statusOwnedClassroom}
+                    </Badge>
+                  ) : !item.isImplemented ? (
+                    <Badge variant="secondary">
+                      {catalogMessages.statusUpcoming}
+                    </Badge>
+                  ) : !item.isPurchasable ? (
+                    <Badge variant="secondary">
+                      {catalogMessages.statusUnavailable}
+                    </Badge>
+                  ) : null;
 
                   return (
                     <li
                       key={item.id}
-                      className="space-y-3 rounded-xl border border-border bg-surface p-4"
+                      className="flex min-w-0 flex-col gap-3 rounded-2xl border border-edge bg-card p-3 text-card-foreground shadow-panel"
                     >
-                      <div className="space-y-1.5">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <Badge variant="outline">
-                            {shopMessages.kinds[item.kind]}
-                          </Badge>
-                          {item.ownedByStudent ? (
-                            <Badge variant="success">
-                              {catalogMessages.statusOwnedStudent}
-                            </Badge>
-                          ) : item.kind === 'CLASSROOM_ITEM' &&
-                            item.ownedByClassroom ? (
-                            <Badge variant="success">
-                              {catalogMessages.statusOwnedClassroom}
-                            </Badge>
-                          ) : !item.isImplemented ? (
-                            <Badge variant="secondary">
-                              {catalogMessages.statusUpcoming}
-                            </Badge>
-                          ) : !item.isPurchasable ? (
-                            <Badge variant="secondary">
-                              {catalogMessages.statusUnavailable}
-                            </Badge>
-                          ) : null}
-                        </div>
+                      <div className="relative">
+                        <ShopItemPreview item={item} />
+                        <Badge
+                          variant="outline"
+                          className="absolute top-2 left-2 bg-card/90"
+                        >
+                          {shopMessages.kinds[item.kind]}
+                        </Badge>
+                      </div>
 
-                        <p className="break-words text-sm font-semibold text-foreground">
-                          {item.name}
-                        </p>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <p className="font-display text-base font-semibold break-words text-foreground">
+                            {item.name}
+                          </p>
+                          {statusBadge}
+                        </div>
                         {item.description ? (
-                          <p className="break-words text-xs text-muted-foreground">
+                          <p className="text-sm break-words text-muted-foreground">
                             {item.description}
                           </p>
                         ) : null}
                       </div>
 
-                      <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-end justify-between gap-2 border-t border-edge/60 pt-3">
                         <div className="space-y-0.5">
-                          <p className="text-sm font-semibold text-foreground">
+                          <p className="font-display text-lg font-semibold text-foreground">
                             {formatShopPoints(item.price)}
                           </p>
                           {item.kind === 'CLASSROOM_ITEM' &&

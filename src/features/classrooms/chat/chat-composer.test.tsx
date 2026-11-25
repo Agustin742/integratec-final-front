@@ -360,6 +360,64 @@ describe('ChatComposer (#51, send side: S2, S6, S11)', () => {
     expect(getDraftTextarea()).toHaveValue('');
   });
 
+  it('grows from one line up to four, scrolls past that and resets after a send', async () => {
+    const store = createClassroomChatStore({
+      classroomId: CLASSROOM_ID,
+      currentUserId: STUDENT_ID,
+      role: 'STUDENT',
+      members: makeMembers(),
+    });
+    mswServer.use(...store.handlers);
+    // jsdom has no layout: model 20px lines + 12px vertical padding.
+    const descriptor = Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      'scrollHeight',
+    );
+    Object.defineProperty(HTMLTextAreaElement.prototype, 'scrollHeight', {
+      configurable: true,
+      get(this: HTMLTextAreaElement) {
+        return this.value.split('\n').length * 20 + 12;
+      },
+    });
+    try {
+      renderComposerRoute({ role: 'STUDENT', userId: STUDENT_ID });
+      const textarea = await screen.findByRole('textbox', {
+        name: 'Mensaje del chat',
+      });
+      // No manual resize handle: the textarea sizes itself.
+      expect(textarea.className).toContain('resize-none');
+      textarea.style.lineHeight = '20px';
+      textarea.style.paddingTop = '6px';
+      textarea.style.paddingBottom = '6px';
+
+      typeDraft('una línea');
+      expect(textarea.style.height).toBe('32px');
+      typeDraft('uno\ndos\ntres');
+      expect(textarea.style.height).toBe('72px');
+      // Capped at 4 lines (4 * 20 + 12); the rest scrolls inside.
+      typeDraft('1\n2\n3\n4\n5\n6\n7');
+      expect(textarea.style.height).toBe('92px');
+      expect(textarea.style.overflowY).toBe('auto');
+
+      fireEvent.keyDown(textarea, { key: 'Enter' });
+      expect(await findHistoryRow('1 2 3 4 5 6 7')).toBeVisible();
+      await waitFor(() => {
+        expect(getDraftTextarea()).toHaveValue('');
+      });
+      expect(textarea.style.height).toBe('32px');
+    } finally {
+      if (descriptor === undefined) {
+        Reflect.deleteProperty(HTMLTextAreaElement.prototype, 'scrollHeight');
+      } else {
+        Object.defineProperty(
+          HTMLTextAreaElement.prototype,
+          'scrollHeight',
+          descriptor,
+        );
+      }
+    }
+  });
+
   it('keeps focus in the textarea after a confirmed send', async () => {
     const store = createClassroomChatStore({
       classroomId: CLASSROOM_ID,
@@ -1121,5 +1179,14 @@ describe('ChatComposer hardening (#113: mentions, cooldown)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('keeps at least 44px touch height on the single-line draft textarea', async () => {
+    setupStore();
+    renderComposerRoute();
+    const textarea = await screen.findByRole('textbox', {
+      name: 'Mensaje del chat',
+    });
+    expect(textarea.className).toContain('min-h-11');
   });
 });

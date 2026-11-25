@@ -37,8 +37,26 @@ export type QuestionInputDto = components['schemas']['QuestionInputDto'];
 export type PaginatedClassroomActivitiesDto =
   operations['ActivitiesController_list']['responses'][200]['content']['application/json'];
 
+export const ACTIVITY_WORK_STATUSES = [
+  'graded',
+  'submitted',
+  'overdue',
+  'pending',
+] as const;
+/** Student's own work status on a list item (`StudentActivitySummaryDto`). */
+export type ActivityWorkStatus = (typeof ACTIVITY_WORK_STATUSES)[number];
+
+/**
+ * List item: staff receive plain summaries, students additionally receive
+ * their own `status` and `canSubmit` (both absent for staff).
+ */
+export type ActivityListItemDto = ActivitySummaryDto & {
+  readonly status?: ActivityWorkStatus;
+  readonly canSubmit?: boolean;
+};
+
 export interface PaginatedActivityListDto {
-  readonly items: ActivitySummaryDto[];
+  readonly items: ActivityListItemDto[];
   readonly page: number;
   readonly pageSize: number;
   readonly total: number;
@@ -428,9 +446,15 @@ const baseActivityFields = {
 export const activitySummaryDtoSchema: z.ZodType<ActivitySummaryDto> =
   z.object(baseActivityFields);
 
+const activityListItemSchema: z.ZodType<ActivityListItemDto> = z.object({
+  ...baseActivityFields,
+  status: z.enum(ACTIVITY_WORK_STATUSES).optional(),
+  canSubmit: z.boolean().optional(),
+});
+
 export const paginatedActivityListSchema: z.ZodType<PaginatedActivityListDto> =
   z.object({
-    items: z.array(activitySummaryDtoSchema),
+    items: z.array(activityListItemSchema),
     page: z.number().int().min(1),
     pageSize: z.number().int().min(1).max(100),
     total: z.number().int().nonnegative(),

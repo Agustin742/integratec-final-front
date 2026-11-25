@@ -13,11 +13,14 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 
 export type PanelDescriptor = {
   key: string;
   title: string;
   component: ComponentType;
+  /** Opens the dialog wider than the default for dense, list-like panels. */
+  wide?: boolean;
 };
 export type PanelAvailability =
   { confirmed: false } | { confirmed: true; keys: readonly string[] };
@@ -154,7 +157,10 @@ function ScopedPanels(props: ClassroomPanelsProps) {
         >
           <DialogContent
             key={descriptor.key}
-            className="max-h-[calc(100%-2rem)] [overflow-wrap:anywhere]"
+            className={cn(
+              'max-h-[calc(100%-2rem)] [overflow-wrap:anywhere]',
+              descriptor.wide && 'max-w-3xl',
+            )}
             overlayClassName={
               props.immersive ? 'bg-foreground/15 backdrop-blur-xs' : undefined
             }

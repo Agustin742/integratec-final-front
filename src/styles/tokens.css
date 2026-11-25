@@ -159,6 +159,10 @@
   --animate-sheet-left-out: sheet-left-out var(--motion-duration-base)
     var(--motion-ease-in) forwards;
 
+  --animate-dock-in: dock-in var(--motion-duration-slow) var(--motion-ease-out);
+  --animate-dock-out: dock-out var(--motion-duration-base) var(--motion-ease-in)
+    forwards;
+
   @keyframes shimmer {
     from {
       background-position: 200% 0;
@@ -187,6 +191,20 @@
     to {
       opacity: 0;
       scale: 0.97;
+    }
+  }
+  @keyframes dock-in {
+    from {
+      opacity: 0;
+      translate: 0 0.5rem;
+      scale: 1 0.96;
+    }
+  }
+  @keyframes dock-out {
+    to {
+      opacity: 0;
+      translate: 0 0.5rem;
+      scale: 1 0.96;
     }
   }
   @keyframes sheet-right-in {

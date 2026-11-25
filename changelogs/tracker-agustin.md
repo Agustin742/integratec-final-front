@@ -9,6 +9,30 @@
 - **Verification:** Per-task strict TDD on touched tests, lint and typecheck; once before the PR `--changed origin/develop` (only load timeouts in 3 untouched files, passing alone), build and `security:check`; native review approved on each task; visual approval by Agustin. E2E specs not run locally (CI).
 - **Next step:** CI green and merge.
 
+## 2026-11-24 — UI polish pass for classroom panels (#131)
+
+- **Status:** completed (pending review and merge; stacked on PR #129)
+- **Area / files:** `src/features/classrooms/` (activities, materials, announcements, grades, roster/directory, bot, settings, chat), `src/features/shop/`, `src/features/chat-dock/`, `src/components/ui/{dropdown-menu,initials-avatar}.tsx`, `src/styles/tokens.css`, `src/test/msw/handlers.ts`, `src/api/schema.generated.ts`, `e2e/{study-materials,announcements}.spec.ts`
+- **Change:**
+  - Activities: roomy rows with a shared overflow menu, and grouping by state (`52148c5`).
+  - Material: ordered modules with lazy lists, "Sin módulo", create, rename, delete, reorder, upload into a module and move. Uses back #142 (`55f965d`, `8f0cd65`).
+  - Notices: a notice board of paper notes (`bbe9c8a`).
+  - Grades: a sticky gradebook for staff and a report card for students (`33d627f`).
+  - Members: a grouped directory (`f472d22`).
+  - Bot: chat bubbles and suggested prompts (`21d2513`).
+  - Shop: a storefront with real item previews (`47ee105`).
+  - Wide panels (`2505e62`).
+  - Settings: a working panel for name, subject, adult mode and chat mute, plus access (`b2757ed`). The panel stays open after saving (`789df7e`).
+  - Chat dock: open/close animation, a continuous surface and a chat-like empty state (`efc8d44`). The moderation action sits beside the bubble (`7e014bc`). The composer grows automatically up to four lines (`f512fc3`).
+- **Reason:** Every panel looked like the same thin card, wasted space and did not represent its content. Material could not be organized, and Settings was a placeholder.
+- **Verification:**
+  - Each task used strict TDD.
+  - Per task, the checks were lint, typecheck and prettier, plus the affected tests. The early tasks also ran `--changed`, build and `security:check`.
+  - Playwright passed for the touched specs.
+  - Before/after screenshots are in the local `odd/screens/ui-polish/`.
+  - Agustin approved the visuals.
+- **Next step:** Review, then retarget to `develop` once PR #129 merges.
+
 ## 2026-11-24 — Immersive 3D classroom (#128)
 
 - **Status:** completed (pending CI and merge of the PR)

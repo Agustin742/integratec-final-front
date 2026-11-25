@@ -21,6 +21,7 @@ import { DEFAULT_PAGE_SIZE } from '@/components/pagination/pagination';
 import { PaginationControls } from '@/components/pagination/pagination-controls';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { InitialsAvatar } from '@/components/ui/initials-avatar';
 import { formatDateOnly, formatInstant } from '@/lib/dates';
 import { WalletPanel } from '@/features/points/wallet-panel';
 import { useSessionService } from '@/session/provider';
@@ -153,52 +154,65 @@ function formatPoints(points: number): string {
 
 function ReportCardItem({ item }: { readonly item: ReportCardItemDto }) {
   const student = messages.student;
+  const ratio = item.maxScore > 0 ? (item.score / item.maxScore) * 100 : 0;
   return (
-    <li className="min-w-0 rounded-xl border border-edge bg-card p-4 shadow-xs">
-      <article className="min-w-0 space-y-2">
-        <div className="min-w-0 space-y-1">
-          <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-            {student.activityLabel}
-          </p>
-          <h4 className="break-words text-base font-semibold text-foreground">
-            {item.activityTitle}
-          </h4>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary">
-              {student.typeLabels[item.activityType]}
-            </Badge>
-            {item.isLate ? (
-              <Badge variant="outline">{student.lateBadge}</Badge>
-            ) : null}
-          </div>
-        </div>
-        <div className="min-w-0 space-y-1 border-t border-edge/60 pt-2.5">
+    <li className="min-w-0">
+      <article className="grid min-w-0 gap-4 rounded-2xl border border-edge bg-card p-4 text-card-foreground shadow-panel sm:grid-cols-[9rem_minmax(0,1fr)]">
+        <div className="flex min-w-0 flex-col justify-center gap-2 rounded-xl bg-tray px-3 py-3 text-center shadow-inset">
           <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
             {student.scoreLabel}
           </p>
-          <p className="font-display text-base font-semibold text-foreground">
+          <p className="font-display text-3xl leading-none font-semibold text-foreground">
             {item.score} / {item.maxScore}
           </p>
+          <div
+            role="meter"
+            aria-label={student.meterLabel(item.score, item.maxScore)}
+            aria-valuemin={0}
+            aria-valuemax={item.maxScore}
+            aria-valuenow={item.score}
+            className="h-2 overflow-hidden rounded-full bg-edge"
+          >
+            <div
+              className="h-full rounded-full bg-primary"
+              style={{ width: `${ratio}%` }}
+            />
+          </div>
         </div>
-        <div className="min-w-0 space-y-1 border-t border-edge/60 pt-2.5">
-          <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-            {student.feedbackLabel}
-          </p>
-          {/* The server-written feedback is rendered verbatim, never reinvented. */}
-          <p className="text-sm text-pretty text-foreground wrap-anywhere">
-            {item.feedback}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-edge/60 pt-2.5 text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">
-            {student.pointsLabel} {formatPoints(item.pointsAwarded)}
-          </span>
-          <span>
-            {student.gradedLabel}{' '}
-            <time dateTime={item.gradedAt}>
-              {formatGradedInstant(item.gradedAt)}
-            </time>
-          </span>
+        <div className="min-w-0 space-y-2.5">
+          <div className="min-w-0 space-y-1.5">
+            <h4 className="font-display text-base font-semibold break-words text-foreground">
+              {item.activityTitle}
+            </h4>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary">
+                {student.typeLabels[item.activityType]}
+              </Badge>
+              {item.isLate ? (
+                <Badge variant="outline">{student.lateBadge}</Badge>
+              ) : null}
+            </div>
+          </div>
+          <div className="min-w-0 space-y-1 border-t border-edge/60 pt-2.5">
+            <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              {student.feedbackLabel}
+            </p>
+            {/* The server-written feedback is rendered verbatim, never reinvented. */}
+            <p className="text-sm text-pretty text-foreground wrap-anywhere">
+              {item.feedback}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span className="font-semibold text-foreground">
+              {student.pointsLabel} {formatPoints(item.pointsAwarded)}
+            </span>
+            <span>
+              {student.gradedLabel}{' '}
+              <time dateTime={item.gradedAt}>
+                {formatGradedInstant(item.gradedAt)}
+              </time>
+            </span>
+          </div>
         </div>
       </article>
     </li>
@@ -211,37 +225,46 @@ function DailyMetricsTable({
   readonly items: readonly DailyMetricDto[];
 }) {
   const metrics = messages.student.metrics;
+  const cell = 'border-b border-edge/60 px-3 py-2';
   return (
-    <div className="min-w-0 overflow-x-auto">
-      <table className="w-full border-collapse text-sm">
+    <div
+      role="region"
+      aria-label={metrics.tableCaption}
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- The named overflow region must be focusable for keyboard scrolling.
+      tabIndex={0}
+      className="max-h-80 min-w-0 overflow-auto rounded-2xl border border-edge bg-card shadow-panel focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+    >
+      <table className="w-full min-w-[22rem] border-separate border-spacing-0 text-sm tabular-nums">
         <caption className="sr-only">{metrics.tableCaption}</caption>
         <thead>
-          <tr className="border-b-2 border-edge text-left">
-            <th scope="col" className="px-2 py-2 font-semibold">
-              {metrics.dayColumn}
-            </th>
-            <th scope="col" className="px-2 py-2 font-semibold">
-              {metrics.connectedColumn}
-            </th>
-            <th scope="col" className="px-2 py-2 font-semibold">
-              {metrics.submissionsColumn}
-            </th>
-            <th scope="col" className="px-2 py-2 font-semibold">
-              {metrics.messagesColumn}
-            </th>
+          <tr className="text-left">
+            {[
+              metrics.dayColumn,
+              metrics.connectedColumn,
+              metrics.submissionsColumn,
+              metrics.messagesColumn,
+            ].map((label) => (
+              <th
+                key={label}
+                scope="col"
+                className="sticky top-0 z-10 border-b-2 border-edge bg-tray px-3 py-2 font-semibold"
+              >
+                {label}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
           {items.map((row) => (
-            <tr key={row.day} className="border-b border-edge/60">
-              <th scope="row" className="px-2 py-2 text-left font-normal">
+            <tr key={row.day} className="hover:bg-row-hover">
+              <th scope="row" className={`${cell} text-left font-normal`}>
                 {formatMetricDay(row.day)}
               </th>
-              <td className="px-2 py-2">
+              <td className={cell}>
                 {formatConnectedSeconds(row.connectedSeconds)}
               </td>
-              <td className="px-2 py-2">{row.submissionCount}</td>
-              <td className="px-2 py-2">{row.messageCount}</td>
+              <td className={cell}>{row.submissionCount}</td>
+              <td className={cell}>{row.messageCount}</td>
             </tr>
           ))}
         </tbody>
@@ -426,7 +449,7 @@ function StudentGradesView({
   return (
     <div className="min-w-0 space-y-6">
       <div className="space-y-1">
-        <h3 className="text-lg font-semibold text-foreground">
+        <h3 className="font-display text-lg font-semibold text-foreground">
           {student.heading}
         </h3>
         <p className="text-sm text-muted-foreground">{student.subtitle}</p>
@@ -471,7 +494,10 @@ function StudentGradesView({
         />
       ) : data !== undefined ? (
         <div className="min-w-0 space-y-3">
-          <ul className="min-w-0 space-y-3">
+          <ul
+            aria-label={student.reportCardListLabel}
+            className="min-w-0 space-y-4"
+          >
             {data.items.map((item) => (
               <ReportCardItem key={item.activityId} item={item} />
             ))}
@@ -581,47 +607,73 @@ function ClassroomMetricsTable({
   readonly items: readonly StudentMetricSummaryDto[];
 }) {
   const columns = messages.teacher.columns;
+  const head =
+    'sticky top-0 z-10 min-w-[5.5rem] border-b-2 border-edge bg-tray px-3 py-2.5 text-right font-semibold';
+  const cell = 'border-b border-edge/60 px-3 py-2.5 text-right';
   return (
-    <div className="min-w-0 overflow-x-auto">
-      <table className="w-full border-collapse text-sm">
+    <div
+      role="region"
+      aria-label={messages.teacher.tableCaption}
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- The named overflow region must be focusable for keyboard scrolling.
+      tabIndex={0}
+      className="max-h-[60vh] min-w-0 overflow-auto rounded-2xl border border-edge bg-card shadow-panel focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+    >
+      <table className="w-full min-w-[38rem] border-separate border-spacing-0 text-sm tabular-nums">
         <caption className="sr-only">{messages.teacher.tableCaption}</caption>
         <thead>
-          <tr className="border-b-2 border-edge text-left">
-            <th scope="col" className="px-2 py-2 font-semibold">
+          <tr>
+            <th
+              scope="col"
+              className="sticky top-0 left-0 z-20 min-w-[9rem] max-w-[11rem] border-b-2 border-edge bg-tray px-3 py-2.5 text-left font-semibold sm:max-w-[16rem]"
+            >
               {columns.student}
             </th>
-            <th scope="col" className="px-2 py-2 font-semibold">
+            <th scope="col" className={head}>
               {columns.connected}
             </th>
-            <th scope="col" className="px-2 py-2 font-semibold">
+            <th scope="col" className={head}>
               {columns.submissions}
             </th>
-            <th scope="col" className="px-2 py-2 font-semibold">
+            <th scope="col" className={head}>
               {columns.messages}
             </th>
-            <th scope="col" className="px-2 py-2 font-semibold">
+            <th scope="col" className={head}>
               {columns.graded}
             </th>
-            <th scope="col" className="px-2 py-2 font-semibold">
+            <th scope="col" className={head}>
               {columns.ungraded}
             </th>
           </tr>
         </thead>
         <tbody>
           {items.map((row) => (
-            <tr key={row.studentId} className="border-b border-edge/60">
-              <th scope="row" className="px-2 py-2 text-left font-normal">
-                <span className="font-semibold text-foreground">
-                  {row.displayName}
+            <tr key={row.studentId} className="group">
+              <th
+                scope="row"
+                className="sticky left-0 z-10 max-w-[11rem] border-b border-edge/60 bg-card px-3 py-2.5 text-left font-normal group-hover:bg-row-hover sm:max-w-[16rem]"
+              >
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <InitialsAvatar name={row.displayName} size="sm" />
+                  <span className="min-w-0 truncate font-semibold text-foreground">
+                    {row.displayName}
+                  </span>
                 </span>
               </th>
-              <td className="px-2 py-2">
+              <td className={cell}>
                 {formatConnectedSeconds(row.connectedSeconds)}
               </td>
-              <td className="px-2 py-2">{row.submissionCount}</td>
-              <td className="px-2 py-2">{row.messageCount}</td>
-              <td className="px-2 py-2">{row.gradedCount}</td>
-              <td className="px-2 py-2">{row.ungradedCount}</td>
+              <td className={cell}>{row.submissionCount}</td>
+              <td className={cell}>{row.messageCount}</td>
+              <td className={cell}>{row.gradedCount}</td>
+              <td
+                className={
+                  row.ungradedCount > 0
+                    ? `${cell} bg-warning/60 font-semibold text-warning-foreground`
+                    : cell
+                }
+              >
+                {row.ungradedCount}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -761,9 +813,16 @@ function TeacherMetricsView({
   return (
     <div className="min-w-0 space-y-4">
       <div className="space-y-1">
-        <h3 className="text-lg font-semibold text-foreground">
-          {teacher.heading}
-        </h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="font-display text-lg font-semibold text-foreground">
+            {teacher.heading}
+          </h3>
+          {data !== undefined && data.total > 0 ? (
+            <Badge variant="secondary">
+              {teacher.studentCount(data.total)}
+            </Badge>
+          ) : null}
+        </div>
         <p className="text-sm text-muted-foreground">{teacher.subtitle}</p>
       </div>
 

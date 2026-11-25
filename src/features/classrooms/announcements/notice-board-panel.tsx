@@ -1,27 +1,27 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import { ApiError } from '@/api/errors';
 import {
   classroomAnnouncementsQueryKey,
+  classroomDirectoryMembersQueryKey,
   createClassroomAnnouncementsPredicate,
 } from '@/api/query-keys';
-import {
-  EmptyState,
-  ErrorState,
-  LoadingState,
-  StaleDataNotice,
-} from '@/components/feedback/states';
+import { ErrorState, StaleDataNotice } from '@/components/feedback/states';
 import { PaginationControls } from '@/components/pagination/pagination-controls';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useSessionService } from '@/session/provider';
+import { classroomDetailQueryKey } from '@/api/query-keys';
+import type { ClassroomDirectoryMemberDto } from '../activities/forum/forum-schema';
+import { listClassroomDirectoryMembers } from '../activities/forum/forum-service';
 import {
   useClassroomCapabilities,
   useClassroomContext,
 } from '../use-classroom-capabilities';
 import { AnnouncementForm } from './announcement-form';
 import { AnnouncementList } from './announcement-list';
+import type { NoticeAuthor } from './announcement-note';
 import type { AnnouncementDto } from './announcement-schema';
 import {
   isAbortError,
@@ -30,6 +30,11 @@ import {
   removeClassroomAnnouncement,
 } from './announcement-service';
 import { announcementMessages } from './messages';
+import {
+  NoticeBoardEmpty,
+  NoticeBoardLoading,
+  NoticeBoardSurface,
+} from './notice-board-surface';
 
 const PAGE_SIZE = 10;
 
@@ -56,6 +61,9 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
   const capabilities = useClassroomCapabilities(classroomId);
 
   const [page, setPage] = useState(1);
+  const [composerOpen, setComposerOpen] = useState(false);
+  // Relative ages tick once a minute; the client clock only phrases them.
+  const [now, setNow] = useState(() => Date.now());
   const [editingAnnouncement, setEditingAnnouncement] =
     useState<AnnouncementDto | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
@@ -81,6 +89,11 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
     };
   }, []);
 
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
   const userId = context.status === 'ready' ? context.userId : null;
   const canPublish =
     capabilities.status === 'ready' && capabilities.can('publish_content');
@@ -91,6 +104,27 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
     if (userId === null) return false;
     return (canPublish && item.authorId === userId) || canManageSchool;
   };
+
+  const accessKey = `${userId ?? 'anon'}:${canPublish}:${canManageSchool}`;
+  const [prevAccessKey, setPrevAccessKey] = useState(accessKey);
+  if (prevAccessKey !== accessKey) {
+    setPrevAccessKey(accessKey);
+    if (!canPublish) {
+      setComposerOpen(false);
+    }
+    if (!canPublish && !canManageSchool) {
+      setEditingAnnouncement(null);
+      setPendingConfirmId(null);
+    } else if (
+      editingAnnouncement &&
+      !(
+        (canPublish && editingAnnouncement.authorId === userId) ||
+        canManageSchool
+      )
+    ) {
+      setEditingAnnouncement(null);
+    }
+  }
 
   const query = useQuery({
     queryKey: classroomAnnouncementsQueryKey(
@@ -111,35 +145,89 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
     enabled: userId !== null,
   });
 
+  // Optional, non-blocking lookup so notices can name their author and role.
+  const canListDirectory =
+    capabilities.status === 'ready' && capabilities.can('list_directory');
+  const directoryQuery = useQuery({
+    queryKey: classroomDirectoryMembersQueryKey(
+      userId ?? 'anonymous',
+      classroomId,
+      { page: 1, pageSize: 100 },
+    ),
+    queryFn: ({ signal }) =>
+      listClassroomDirectoryMembers(
+        client,
+        classroomId,
+        { page: 1, pageSize: 100 },
+        { signal },
+      ),
+    enabled: userId !== null && canListDirectory,
+    staleTime: 60_000,
+    retry: false,
+  });
+  const membersByUserId = useMemo(() => {
+    const map = new Map<string, ClassroomDirectoryMemberDto>();
+    for (const member of directoryQuery.data?.items ?? []) {
+      map.set(member.userId, member);
+    }
+    return map;
+  }, [directoryQuery.data?.items]);
+
+  function resolveAuthor(item: AnnouncementDto): NoticeAuthor {
+    const member = membersByUserId.get(item.authorId);
+    if (item.authorId === userId) {
+      return {
+        name: member?.displayName ?? announcementMessages.list.authorSelf,
+        role: member?.role ?? null,
+      };
+    }
+    return {
+      name: member?.displayName ?? announcementMessages.list.authorFallback,
+      role: member?.role ?? null,
+    };
+  }
+
   async function reconcileAnnouncements(resetPage = false) {
     if (resetPage) {
       setPage(1);
     }
     if (userId === null) return;
-    await queryClient.invalidateQueries({
-      predicate: createClassroomAnnouncementsPredicate(userId, classroomId),
-    });
-    if (
-      editingAnnouncement === null ||
-      resetPage ||
-      editPageRef.current !== page
-    ) {
-      return;
-    }
-    const refreshed = queryClient.getQueryData<{
-      readonly items: readonly AnnouncementDto[];
-    }>(
-      classroomAnnouncementsQueryKey(userId, classroomId, {
-        page,
-        pageSize: PAGE_SIZE,
-      }),
-    );
-    if (
-      refreshed &&
-      !refreshed.items.some((item) => item.id === editingAnnouncement.id)
-    ) {
-      setEditingAnnouncement(null);
-      headingRef.current?.focus();
+    const targetPage = resetPage ? 1 : page;
+    try {
+      await queryClient.invalidateQueries({
+        predicate: createClassroomAnnouncementsPredicate(userId, classroomId),
+      });
+      if (
+        unmountAbortRef.current?.signal.aborted ||
+        editingAnnouncement === null ||
+        resetPage ||
+        editPageRef.current !== page
+      ) {
+        return;
+      }
+      const refreshed = await queryClient.fetchQuery({
+        queryKey: classroomAnnouncementsQueryKey(userId, classroomId, {
+          page: targetPage,
+          pageSize: PAGE_SIZE,
+        }),
+        queryFn: ({ signal }) =>
+          listClassroomAnnouncements(
+            client,
+            classroomId,
+            { page: targetPage, pageSize: PAGE_SIZE },
+            { signal },
+          ),
+        staleTime: 0,
+      });
+      if (
+        !unmountAbortRef.current?.signal.aborted &&
+        !refreshed.items.some((item) => item.id === editingAnnouncement.id)
+      ) {
+        setEditingAnnouncement(null);
+        headingRef.current?.focus();
+      }
+    } catch {
+      // Query invalidation leaves stale state visible with retry notice.
     }
   }
 
@@ -147,7 +235,6 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
     readonly title: string;
     readonly content: string;
   }): Promise<boolean> {
-    setPage(1);
     if (userId === null) return false;
     const params = { page: 1, pageSize: PAGE_SIZE };
     let first: { readonly items: readonly AnnouncementDto[] };
@@ -161,6 +248,10 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
     } catch {
       return false;
     }
+    if (unmountAbortRef.current?.signal.aborted) {
+      return false;
+    }
+    setPage(1);
     void queryClient.invalidateQueries({
       predicate: createClassroomAnnouncementsPredicate(userId, classroomId),
     });
@@ -171,6 +262,8 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
         item.content === values.content,
     );
     if (!match) return false;
+    setComposerOpen(false);
+    headingRef.current?.focus();
     setActionNotice({
       kind: 'success',
       title: announcementMessages.form.publishedNoticeTitle,
@@ -197,6 +290,10 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
     mode: 'create' | 'edit',
   ) {
     setEditingAnnouncement(null);
+    if (mode === 'create') {
+      setComposerOpen(false);
+      headingRef.current?.focus();
+    }
     setActionNotice({
       kind: 'success',
       title:
@@ -209,22 +306,25 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
           : announcementMessages.form.updatedNoticeDescription(saved.title),
     });
     await reconcileAnnouncements(mode === 'create');
-    if (mode === 'edit') {
+    if (!unmountAbortRef.current?.signal.aborted && mode === 'edit') {
       headingRef.current?.focus();
     }
   }
 
   async function handleConfirmRemove(item: AnnouncementDto) {
-    if (removingRef.current) {
+    if (userId === null || !canModifyItem(item) || removingRef.current) {
       return;
     }
+    const signal = unmountAbortRef.current?.signal;
+    if (signal?.aborted) return;
     removingRef.current = true;
     setRemovingId(item.id);
     setActionNotice(null);
     try {
       await removeClassroomAnnouncement(client, classroomId, item.id, {
-        signal: unmountAbortRef.current?.signal,
+        signal,
       });
+      if (signal?.aborted) return;
       setPendingConfirmId(null);
       if (editingAnnouncement?.id === item.id) {
         setEditingAnnouncement(null);
@@ -239,10 +339,15 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
       await reconcileAnnouncements(false);
       headingRef.current?.focus();
     } catch (error) {
-      if (isAbortError(error)) {
+      if (isAbortError(error) || signal?.aborted) {
         return;
       }
       setPendingConfirmId(null);
+      if (error instanceof ApiError && error.status === 403) {
+        await queryClient.invalidateQueries({
+          queryKey: classroomDetailQueryKey(userId, classroomId),
+        });
+      }
       if (error instanceof ApiError && error.status === 404) {
         if (editingAnnouncement?.id === item.id) {
           setEditingAnnouncement(null);
@@ -270,12 +375,14 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
       });
     } finally {
       removingRef.current = false;
-      setRemovingId(null);
+      if (!signal?.aborted) {
+        setRemovingId(null);
+      }
     }
   }
 
   if (context.status === 'pending') {
-    return <LoadingState label={announcementMessages.loadingTitle} />;
+    return <NoticeBoardLoading />;
   }
 
   if (context.status === 'error') {
@@ -342,12 +449,34 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
     );
   }
 
-  const showForm =
-    canPublish ||
-    (editingAnnouncement !== null && canModifyItem(editingAnnouncement));
   const totalPages = query.data
     ? Math.max(1, Math.ceil(query.data.total / query.data.pageSize))
     : 1;
+
+  const editForm = (item: AnnouncementDto) => (
+    <AnnouncementForm
+      key={`edit-${item.id}`}
+      classroomId={classroomId}
+      mode={{ kind: 'edit', announcement: item }}
+      onSubmitStart={() => {
+        setIsFormSubmitting(true);
+        setActionNotice(null);
+      }}
+      onSubmitSettled={() => setIsFormSubmitting(false)}
+      onEditTargetMissing={handleEditTargetMissing}
+      onSuccess={(saved, mode) => {
+        void handleFormSuccess(saved, mode);
+      }}
+      onReconcileRequired={(resetPage) => {
+        void reconcileAnnouncements(resetPage);
+      }}
+      onUncertainCreate={handleUncertainCreate}
+      onCancelEdit={() => {
+        setEditingAnnouncement(null);
+        headingRef.current?.focus();
+      }}
+    />
+  );
 
   return (
     <div className="min-w-0 space-y-5">
@@ -355,7 +484,7 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
         <h3
           ref={headingRef}
           tabIndex={-1}
-          className="text-lg font-semibold text-foreground focus:outline-none"
+          className="font-display text-2xl font-semibold text-foreground focus:outline-none"
         >
           {announcementMessages.heading}
         </h3>
@@ -373,39 +502,60 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
         </Alert>
       ) : null}
 
-      {showForm ? (
-        <AnnouncementForm
-          key={
-            editingAnnouncement ? `edit-${editingAnnouncement.id}` : 'create'
-          }
-          classroomId={classroomId}
-          mode={
-            editingAnnouncement
-              ? { kind: 'edit', announcement: editingAnnouncement }
-              : { kind: 'create' }
-          }
-          onSubmitStart={() => {
-            setIsFormSubmitting(true);
-            setActionNotice(null);
-          }}
-          onSubmitSettled={() => setIsFormSubmitting(false)}
-          onEditTargetMissing={handleEditTargetMissing}
-          onSuccess={(saved, mode) => {
-            void handleFormSuccess(saved, mode);
-          }}
-          onReconcileRequired={(resetPage) => {
-            void reconcileAnnouncements(resetPage);
-          }}
-          onUncertainCreate={handleUncertainCreate}
-          onCancelEdit={() => {
-            setEditingAnnouncement(null);
-            headingRef.current?.focus();
-          }}
-        />
+      {canPublish ? (
+        composerOpen ? (
+          <AnnouncementForm
+            key="create"
+            classroomId={classroomId}
+            mode={{ kind: 'create' }}
+            onSubmitStart={() => {
+              setIsFormSubmitting(true);
+              setActionNotice(null);
+            }}
+            onSubmitSettled={() => setIsFormSubmitting(false)}
+            onSuccess={(saved, mode) => {
+              void handleFormSuccess(saved, mode);
+            }}
+            onReconcileRequired={(resetPage) =>
+              reconcileAnnouncements(resetPage)
+            }
+            onUncertainCreate={handleUncertainCreate}
+            onCancelCreate={() => {
+              setComposerOpen(false);
+              headingRef.current?.focus();
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setComposerOpen(true)}
+            className="group flex min-h-16 w-full min-w-0 items-center gap-3 rounded-2xl border border-edge bg-card px-4 py-3 text-left shadow-ambient transition-colors hover:bg-row-hover focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring sm:px-5"
+          >
+            <span
+              aria-hidden="true"
+              className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="size-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2.2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </span>
+            <span className="min-w-0 font-display text-base font-semibold text-foreground">
+              {announcementMessages.composer.open}
+            </span>
+          </button>
+        )
       ) : null}
 
       {query.isPending ? (
-        <LoadingState label={announcementMessages.loadingTitle} />
+        <NoticeBoardLoading />
       ) : query.data ? (
         <div className="min-w-0 space-y-4">
           {query.isError ? (
@@ -420,8 +570,7 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
           ) : null}
 
           {query.data.items.length === 0 ? (
-            <EmptyState
-              headingLevel="h4"
+            <NoticeBoardEmpty
               title={
                 page > 1
                   ? announcementMessages.emptyPageTitle
@@ -430,7 +579,9 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
               description={
                 page > 1
                   ? announcementMessages.emptyPageDescription
-                  : announcementMessages.emptyDescription
+                  : canPublish
+                    ? announcementMessages.emptyTeacherDescription
+                    : announcementMessages.emptyDescription
               }
               action={
                 page > 1 ? (
@@ -446,28 +597,33 @@ function NoticeBoardPanelContent({ classroomId }: { classroomId: string }) {
             />
           ) : (
             <>
-              <AnnouncementList
-                items={query.data.items}
-                canModifyItem={canModifyItem}
-                editingId={editingAnnouncement?.id ?? null}
-                removingId={removingId}
-                actionsLocked={isFormSubmitting}
-                pendingConfirmId={pendingConfirmId}
-                onStartEdit={(item) => {
-                  setActionNotice(null);
-                  setPendingConfirmId(null);
-                  editPageRef.current = page;
-                  setEditingAnnouncement(item);
-                }}
-                onRequestRemove={(id) => {
-                  setActionNotice(null);
-                  setPendingConfirmId(id);
-                }}
-                onConfirmRemove={(item) => {
-                  void handleConfirmRemove(item);
-                }}
-                onCancelRemove={() => setPendingConfirmId(null)}
-              />
+              <NoticeBoardSurface>
+                <AnnouncementList
+                  items={query.data.items}
+                  resolveAuthor={resolveAuthor}
+                  now={now}
+                  canModifyItem={canModifyItem}
+                  editingId={editingAnnouncement?.id ?? null}
+                  removingId={removingId}
+                  actionsLocked={isFormSubmitting}
+                  pendingConfirmId={pendingConfirmId}
+                  renderEditor={editForm}
+                  onStartEdit={(item) => {
+                    setActionNotice(null);
+                    setPendingConfirmId(null);
+                    editPageRef.current = page;
+                    setEditingAnnouncement(item);
+                  }}
+                  onRequestRemove={(id) => {
+                    setActionNotice(null);
+                    setPendingConfirmId(id);
+                  }}
+                  onConfirmRemove={(item) => {
+                    void handleConfirmRemove(item);
+                  }}
+                  onCancelRemove={() => setPendingConfirmId(null)}
+                />
+              </NoticeBoardSurface>
 
               {totalPages > 1 ? (
                 <PaginationControls
