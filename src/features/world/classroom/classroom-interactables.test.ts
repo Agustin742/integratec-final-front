@@ -19,7 +19,7 @@ describe('deriveClassroomInteractables', () => {
   const byId = indexClassroomInteractables(interactables);
 
   test('covers all 3 interaction classes and maps each object to its intended target', () => {
-    expect(interactables).toHaveLength(20);
+    expect(interactables).toHaveLength(21);
     expect(byId.get('board')).toMatchObject({
       type: 'board',
       interactionClass: 'opens_panel',
@@ -42,6 +42,11 @@ describe('deriveClassroomInteractables', () => {
     });
     expect(byId.get('tutor-bot')).toMatchObject({
       type: 'tutor-bot',
+      interactionClass: 'opens_panel',
+      panelKey: 'bot',
+    });
+    expect(byId.get('bot-station')).toMatchObject({
+      type: 'bot-station',
       interactionClass: 'opens_panel',
       panelKey: 'bot',
     });
@@ -79,6 +84,34 @@ describe('deriveClassroomInteractables', () => {
     expect(bot.interactionClass).toBe('opens_panel');
     expect(bot.panelKey).toBe('bot');
     expect(pet.worldPosition).not.toEqual(bot.worldPosition);
+  });
+});
+
+describe('bot station', () => {
+  test('is separate from the tutor bot and sits at its own prop spec', () => {
+    const byId = indexClassroomInteractables(
+      deriveClassroomInteractables(CLASSROOM_LAYOUT),
+    );
+    const station = byId.get('bot-station')!;
+    const bot = byId.get('tutor-bot')!;
+    expect(station.id).not.toBe(bot.id);
+    expect(station.worldPosition).not.toEqual(bot.worldPosition);
+    expect(station.panelKey).toBe(bot.panelKey);
+  });
+
+  test('resolves a hit on its proxy to the bot-station interactable', () => {
+    const byId = indexClassroomInteractables(
+      deriveClassroomInteractables(CLASSROOM_LAYOUT),
+    );
+    const built = buildClassroomScene(CLASSROOM_LAYOUT);
+    const station = built.root.getObjectByName('classroom-bot-station')!;
+    expect(
+      resolveInteractableHit(
+        [{ object: station.children[0] as unknown as InteractableObjectNode }],
+        byId,
+      )?.id,
+    ).toBe('bot-station');
+    built.dispose();
   });
 });
 
@@ -165,6 +198,7 @@ describe('resolveInteractableHit', () => {
         ['classroom-shop', 'shop'],
         ['classroom-pet', 'pet'],
         ['classroom-tutor-bot', 'tutor-bot'],
+        ['classroom-bot-station', 'bot-station'],
       ] as const;
 
       for (const [objectName, expectedId] of placeholderNames) {
@@ -181,6 +215,15 @@ describe('resolveInteractableHit', () => {
           Math.abs(group.position.z - interactable.worldPosition[2]),
         ).toBeLessThanOrEqual(0.2);
       }
+
+      // The door is drawn on the wall; the exit target is the floor 0.6 m in front.
+      const door = built.root.getObjectByName('classroom-door')!;
+      expect(
+        resolveInteractableHit([{ object: door.children[0]! }], byId)?.id,
+      ).toBe('entrance');
+      expect(door.position.x).toBeCloseTo(
+        byId.get('entrance')!.worldPosition[0],
+      );
 
       const entrance = built.root.getObjectByName('entrance')!;
       expect(resolveInteractableHit([{ object: entrance }], byId)?.id).toBe(

@@ -101,6 +101,7 @@ export const classroomMessages = {
       'bulletin-board': 'Abrir avisos',
       shop: 'Abrir tienda',
       'tutor-bot': 'Abrir asistente de estudio',
+      'bot-station': 'Abrir asistente de estudio',
       'teacher-desk': 'Ver integrantes',
       'student-desk': 'Abrir calificaciones',
       entrance: 'Salir del aula',

@@ -6,7 +6,12 @@ import {
   deriveDesks,
 } from './classroom-desks';
 
+/** Width of the back-wall cutaway gap (shell) that frames the spawn area. */
 export const ENTRANCE_WIDTH = 2;
+/** `door.glb` is 1.44 m wide; the exit hit area matches it. */
+export const DOOR_WIDTH = 1.44;
+/** Door x on the front wall: the solid bay between the bookshelf and the board. */
+const DOOR_X = -4.65;
 
 export interface ClassroomPropSpec {
   readonly position: readonly [number, number, number];
@@ -23,6 +28,7 @@ export interface ClassroomPropSpecs {
   readonly shop: ClassroomPropSpec;
   readonly pet: ClassroomPropSpec;
   readonly tutorBot: ClassroomPropSpec;
+  readonly botStation: ClassroomPropSpec;
   readonly entrance: ClassroomPropSpec;
 }
 
@@ -82,11 +88,21 @@ export function deriveClassroomPropSpecs(
       footprint: [0.45, 0.45],
       beaconHeight: DESK_HEIGHT + 0.95,
     },
+    // Tutor Corner under the left window bay, facing +x (`docs/art/tutor-bot.md`).
+    botStation: {
+      position: [-6.95, 0, 1.05],
+      rotationY: Math.PI / 2,
+      interactablePosition: [-6.95, 0, 1.05],
+      footprint: [1.28, 1.53],
+      beaconHeight: 1.6,
+    },
+    // The exit is the door on the far wall: a 2.3 m door on the near (back)
+    // wall would hide avatars from the +x,+z camera.
     entrance: {
-      position: [0, 0.012, bounds.maxZ + 0.05],
-      interactablePosition: [0, 0, bounds.maxZ + 0.05],
-      footprint: [ENTRANCE_WIDTH, 0.6],
-      beaconHeight: 0.55,
+      position: [DOOR_X, 0.012, frontZ + 0.6],
+      interactablePosition: [DOOR_X, 0, frontZ + 0.6],
+      footprint: [DOOR_WIDTH, 0.6],
+      beaconHeight: 2.5,
     },
   };
 }
@@ -101,6 +117,7 @@ export type ClassroomInteractableType =
   | 'shop'
   | 'pet'
   | 'tutor-bot'
+  | 'bot-station'
   | 'student-desk'
   | 'teacher-desk'
   | 'entrance';
@@ -147,6 +164,7 @@ const PLACEHOLDER_INTERACTABLE_IDS: ReadonlySet<PlaceholderKind> = new Set([
   'shop',
   'pet',
   'tutor-bot',
+  'bot-station',
   'entrance',
 ]);
 
@@ -216,6 +234,15 @@ export function deriveClassroomInteractables(
       worldPosition: specs.tutorBot.interactablePosition,
       footprint: specs.tutorBot.footprint,
       beaconHeight: specs.tutorBot.beaconHeight,
+    },
+    {
+      id: 'bot-station',
+      type: 'bot-station',
+      interactionClass: 'opens_panel',
+      panelKey: 'bot',
+      worldPosition: specs.botStation.interactablePosition,
+      footprint: specs.botStation.footprint,
+      beaconHeight: specs.botStation.beaconHeight,
     },
   ];
 

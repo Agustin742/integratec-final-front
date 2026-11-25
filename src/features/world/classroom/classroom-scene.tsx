@@ -13,6 +13,7 @@ import {
   type InteractablePointerEvent,
 } from './classroom-interactables';
 import { deriveFurniturePlacements } from './classroom-furniture-placements';
+import { deriveInteractivePlacements } from './classroom-interactive-placements';
 import { deriveShellPlacements } from './classroom-shell-placements';
 import type { FloorClickEvent } from './floor-click';
 import { FollowCamera } from './follow-camera';
@@ -95,6 +96,7 @@ export function ClassroomScene({
     () => [
       ...deriveShellPlacements(CLASSROOM_LAYOUT),
       ...deriveFurniturePlacements(CLASSROOM_LAYOUT),
+      ...deriveInteractivePlacements(CLASSROOM_LAYOUT),
     ],
     [],
   );

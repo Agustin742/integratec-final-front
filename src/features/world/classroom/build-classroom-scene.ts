@@ -41,6 +41,7 @@ export type PlaceholderKind =
   | 'shop'
   | 'pet'
   | 'tutor-bot'
+  | 'bot-station'
   | 'entrance';
 
 export interface ClassroomScene {
@@ -62,8 +63,9 @@ type Vec3 = readonly [number, number, number];
  * room = negative z (board, shelf, shop, pet); the entrance is at the back.
  * The shell and the furniture (desks, board, shelf) are the modular kit
  * rendered by `<ClassroomKit>`; this scene keeps the invisible walkable-floor
- * and entrance raycast planes, invisible picking proxies for desks, board and
- * shelf, the teaching zone and the remaining prop placeholders.
+ * and entrance raycast planes, invisible picking proxies for desks, board,
+ * shelf, shop, bulletin board, door and bot station, the teaching zone and the
+ * remaining prop placeholders (pet, tutor bot).
  */
 export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   const { bounds } = layout;
@@ -260,14 +262,35 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   const shelf = prop('classroom-shelf', 'shelf', propSpecs.shelf.position);
   proxy(shelf, [1.8, 1.54, 0.3], [0, 0.77, 0.15]);
 
-  // Shop corner, front wall, right of the board.
+  // Shop kiosk (1.96 x 2.15 m), front wall right of the board: drawn by the kit.
   const shop = prop('classroom-shop', 'shop', propSpecs.shop.position);
-  block(shop, CLASSROOM_COLORS.peach, [2, 0.9, 0.28], [0, 0.45, 0.14]);
-  block(shop, CLASSROOM_COLORS.wood, [2, 0.05, 0.28], [0, 0.925, 0.14]);
-  block(shop, CLASSROOM_COLORS.peach, [1.4, 0.4, 0.05], [0, 1.7, 0.025]);
-  block(shop, CLASSROOM_COLORS.butter, [0.2, 0.2, 0.2], [-0.6, 1.05, 0.14]);
-  block(shop, CLASSROOM_COLORS.turquoise, [0.25, 0.15, 0.2], [0, 1.0, 0.14]);
-  block(shop, CLASSROOM_COLORS.coral, [0.18, 0.25, 0.18], [0.6, 1.075, 0.14]);
+  proxy(shop, [1.96, 2.15, 0.28], [0, 1.075, 0.14]);
+
+  // Exit door (1.44 x 2.3 m) on the front wall: drawn by the kit; the
+  // `entrance` floor quad stays as the walk-up target in front of it.
+  const door = prop('classroom-door', 'entrance', [
+    propSpecs.entrance.position[0],
+    0,
+    bounds.minZ,
+  ]);
+  proxy(door, [1.44, 2.3, 0.28], [0, 1.15, 0.14]);
+
+  // Tutor Corner station: a free-standing kit prop (1.28 x 1.35 x 1.53 m once
+  // rotated); the proxy keeps its world-aligned hit box.
+  const station = prop(
+    'classroom-bot-station',
+    'bot-station',
+    propSpecs.botStation.position,
+  );
+  proxy(
+    station,
+    [
+      propSpecs.botStation.footprint[0],
+      1.35,
+      propSpecs.botStation.footprint[1],
+    ],
+    [0, 0.675, 0],
+  );
 
   // Pet corner (basket + green pet), front-right corner of the front wall.
   const pet = prop('classroom-pet', 'pet', propSpecs.pet.position);
@@ -294,17 +317,7 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
     propSpecs.bulletinBoard.position,
     propSpecs.bulletinBoard.rotationY ?? 0,
   );
-  block(bulletin, CLASSROOM_COLORS.wood, [2, 1, 0.06], [0, 1.5, 0.03]);
-  block(bulletin, CLASSROOM_COLORS.coral, [1.8, 0.8, 0.03], [0, 1.5, 0.075]);
-  (
-    [
-      [-0.55, CLASSROOM_COLORS.butter],
-      [0, CLASSROOM_COLORS.turquoise],
-      [0.55, CLASSROOM_COLORS.peach],
-    ] as const
-  ).forEach(([x, color]) =>
-    block(bulletin, color, [0.3, 0.4, 0.01], [x, 1.5, 0.095]),
-  );
+  proxy(bulletin, [2.01, 1.34, 0.23], [0, 1.66, 0.115]);
 
   // Tutor bot stands on the teacher desk, so its footprint is inside the obstacle.
   const bot = prop(

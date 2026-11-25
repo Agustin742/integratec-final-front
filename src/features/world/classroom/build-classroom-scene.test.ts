@@ -14,6 +14,7 @@ import {
 import { CLASSROOM_LAYOUT } from '@/realtime';
 import { isWalkable } from '../movement';
 import { DESK_HEIGHT, deriveDesks } from './classroom-desks';
+import { deriveClassroomPropSpecs } from './classroom-interactables';
 import {
   buildClassroomScene,
   type ClassroomScene,
@@ -93,8 +94,10 @@ describe('shell ownership', () => {
   test('keeps the entrance raycastable while decorative floor zones let floor rays pass', () => {
     const { root } = build();
     root.updateMatrixWorld(true);
+    const [entranceX, , entranceZ] =
+      deriveClassroomPropSpecs(layout).entrance.interactablePosition;
     const raycaster = new Raycaster(
-      new Vector3(0, 5, layout.bounds.maxZ + 0.05),
+      new Vector3(entranceX, 5, entranceZ),
       new Vector3(0, -1, 0),
     );
     const entranceHits = raycaster.intersectObject(root, true);
@@ -200,6 +203,7 @@ describe('placeholders', () => {
     'classroom-shop': 'shop',
     'classroom-pet': 'pet',
     'classroom-tutor-bot': 'tutor-bot',
+    'classroom-door': 'entrance',
   } as const;
 
   test.each(Object.entries(expected))(
@@ -252,6 +256,44 @@ describe('placeholders', () => {
       expect(box.max.z).toBeLessThanOrEqual(layout.bounds.maxZ + 1e-6);
     },
   );
+
+  test('shop, bulletin board and door keep only invisible pick proxies; the kit draws them', () => {
+    const { root } = build();
+    for (const name of [
+      'classroom-shop',
+      'classroom-bulletin-board',
+      'classroom-door',
+      'classroom-bot-station',
+    ]) {
+      const proxies = meshes(named(root, name));
+      expect(proxies.length, name).toBeGreaterThan(0);
+      for (const mesh of proxies) {
+        expect((mesh.material as Material).visible, name).toBe(false);
+      }
+    }
+  });
+
+  test('the bot station is a free-standing prop that opens the bot panel and clears every desk', () => {
+    const { root } = build();
+    const station = named(root, 'classroom-bot-station');
+    expect(station.userData.placeholder).toBe('bot-station');
+    const box = worldBox(station);
+    expect(box.min.x).toBeGreaterThanOrEqual(layout.bounds.minX + 0.28 - 1e-6);
+    for (const o of layout.obstacles) {
+      const overlaps =
+        box.min.x < o.maxX &&
+        box.max.x > o.minX &&
+        box.min.z < o.maxZ &&
+        box.max.z > o.minZ;
+      expect(overlaps).toBe(false);
+    }
+    const [x, , z] = deriveClassroomPropSpecs(layout).botStation.position;
+    root.updateMatrixWorld(true);
+    const hit = new Raycaster(new Vector3(x, 5, z), new Vector3(0, -1, 0))
+      .intersectObject(root, true)
+      .find((h) => h.object.name !== 'walkable-floor');
+    expect(hit?.object.parent?.name).toBe('classroom-bot-station');
+  });
 
   test('the tutor bot stands on the teacher desk top', () => {
     const { root } = build();

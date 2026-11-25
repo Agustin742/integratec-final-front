@@ -1,10 +1,12 @@
 /**
  * Modular classroom kit manifest: module id -> public GLB URL
- * (`docs/art/classroom-shell.md`, `docs/art/classroom-furniture.md`).
+ * (`docs/art/classroom-shell.md`, `docs/art/classroom-furniture.md`,
+ * `docs/art/classroom-interactive.md`).
  * Assets are Draco-compressed, +Y up, face +Z, 1 unit = 1 m, transforms applied.
  */
 const SHELL_BASE = '/models/scenes/classroom/shell';
 const FURNITURE_BASE = '/models/scenes/classroom/furniture';
+const INTERACTIVE_BASE = '/models/scenes/classroom/interactive';
 
 export const CLASSROOM_SHELL_MODULES = {
   'baseboard-cutaway': `${SHELL_BASE}/baseboard-cutaway.glb`,
@@ -31,9 +33,24 @@ export const CLASSROOM_FURNITURE_MODULES = {
   'trash-bin': `${FURNITURE_BASE}/trash-bin.glb`,
 } as const;
 
+/**
+ * Interactive props (`docs/art/classroom-interactive.md`) and the tutor corner
+ * station (`docs/art/tutor-bot.md`). Only props backed by an existing feature
+ * are listed; the rest of the interactive GLBs stay unplaced.
+ */
+export const CLASSROOM_INTERACTIVE_MODULES = {
+  'board-collaborative': `${INTERACTIVE_BASE}/board-collaborative.glb`,
+  'bot-station': '/models/bot/bot-station.glb',
+  'bulletin-board': `${INTERACTIVE_BASE}/bulletin-board.glb`,
+  door: `${INTERACTIVE_BASE}/door.glb`,
+  'pet-bed': `${INTERACTIVE_BASE}/pet-bed.glb`,
+  'shop-kiosk': `${INTERACTIVE_BASE}/shop-kiosk.glb`,
+} as const;
+
 export const CLASSROOM_KIT_MANIFEST = {
   ...CLASSROOM_SHELL_MODULES,
   ...CLASSROOM_FURNITURE_MODULES,
+  ...CLASSROOM_INTERACTIVE_MODULES,
 } as const;
 
 export type ClassroomKitModuleId = keyof typeof CLASSROOM_KIT_MANIFEST;
