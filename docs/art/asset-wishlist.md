@@ -216,11 +216,11 @@ Seasonal:
 
 ### Desk clutter
 
-- [ ] Notebooks
-- [ ] Pencil case
-- [ ] Pencils
-- [ ] Stacked books
-- [ ] Backpack on the floor
+- [x] Notebooks
+- [x] Pencil case
+- [x] Pencils
+- [x] Stacked books
+- [x] Backpack on the floor
 
 ### Desk decor (shop)
 

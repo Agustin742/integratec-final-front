@@ -1,5 +1,14 @@
 # Tracker — Alejo
 
+## 2026-11-24 — Section 3 Classroom Desk Clutter (5 modular 3D assets)
+
+- **Status:** completed (committed locally on `feat/desk-clutter-assets` in `odd/worktrees/desk-clutter-assets`, branched from `origin/develop` `93fcf193`; not pushed)
+- **Area / files:** `public/models/scenes/classroom/desk-clutter/` (`5` GLBs: `notebooks`, `pencil-case`, `pencils`, `stacked-books`, `backpack-floor`), `assets/blender/environment/classroom-desk-clutter/` (`5` `.blend` masters), `scripts/assets/test-classroom-desk-clutter.mjs`, `docs/art/classroom-desk-clutter.md`, `docs/art/asset-wishlist.md`, `docs/assets/classroom-desk-clutter/` (`7` PNGs), `docs/ai-usage.md`, `changelogs/tracker-alejo.md`
+- **Change:** Delivered all 5 Section 3 **Desk clutter** wishlist items (`Notebooks`, `Pencil case`, `Pencils`, `Stacked books`, `Backpack on the floor`; `85,396` B / `83.4` KB total, `37` meshes, `14,920` unique triangles) as origin-centered, `Y = 0` grounded modular assets in Blender 5.2.2 LTS, leaving `src/`, `e2e/`, and the main working tree untouched. Assembled `ClassroomDeskClutter_ModularKit` (5 isolated Outliner collections) and `ClassroomDeskClutter_Assembly` (`16 × 12 m` classroom with shell, furniture, interactive, decoration, desk clutter, and reference avatars) in `odd/previews/classroom-desk-clutter-review.blend`, ticked all `5/5` Desk clutter items in `docs/art/asset-wishlist.md`, added `docs/art/classroom-desk-clutter.md`, and created `scripts/assets/test-classroom-desk-clutter.mjs`.
+- **Reason:** Complete Section 3 `Desk clutter` from `docs/art/asset-wishlist.md` on a dedicated branch (`feat/desk-clutter-assets`) and worktree off latest `origin/develop` (`93fcf193`).
+- **Verification:** `node scripts/assets/test-classroom-desk-clutter.mjs` (`5/5` PASS, `85,396` B), `node scripts/assets/check-asset-budget.mjs` (`147` models within FD8 limits, `839.9 KB / 8.00 MB` scene total, `3` pre-existing `#91` avatar exceptions), `test-classroom-{shell,furniture,interactive,decoration}.mjs` (all PASS), Prettier & ESLint (`0` errors on touched `.mjs`/`.md` files), `scripts/ci/check_docs.py`, `git diff --check`, and visual inspection of all `7` Cycles preview renders. Disclosures: `src/` and `e2e/` are untouched, full `tsc`/`vitest`/`e2e`/CI shell tests run in Ubuntu CI, and human visual review in Blender is pending before commit/push.
+- **Next step:** Push `feat/desk-clutter-assets` and open PR into `develop` (or continue with Section 3 `Desk decor (shop)`).
+
 ## 2026-11-24 — Recover and export 4 animation clips for Classroom Pet (Michi)
 
 - **Status:** completed (committed locally on `feat/environment-decor-assets` in `odd/worktrees/environment-decor-assets`; not pushed)
