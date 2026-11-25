@@ -14,6 +14,8 @@ import {
   CLOSE_REASON_ACCESS_REVOKED,
   CLOSE_REASON_TOO_MANY_CONNECTIONS,
   ClassroomRealtimeProvider,
+  NPC_INTERACT_MESSAGE,
+  TUTOR_BOT_PHRASES,
   realtimeMessages,
   type AvatarInput,
 } from '@/realtime';
@@ -22,6 +24,7 @@ import { profile } from '@/session/test-fixtures';
 import { expectAccessible } from '@/test/accessibility';
 import { createFakeRealtimeSdk } from '@/test/realtime/fake-realtime-sdk';
 import { render } from '@/test/render';
+import { findNpcView } from '@/features/world/npc/npc-view';
 import type { Classroom3DStageProps } from './classroom-3d-stage';
 import { ClassroomWorkspace } from './classroom-workspace';
 import { classroomMessages } from './messages';
@@ -340,6 +343,40 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
     expect(room.send).toHaveBeenCalledWith(AVATAR_INPUT_MESSAGE, intent);
 
     await expectAccessible(container);
+  });
+
+  test('forwards synced NPCs, their phrase text and npc:interact to the stage (#138)', async () => {
+    const { sdk } = setupPresenceWorkspace();
+    await waitFor(() => {
+      expect(sdk.roomFor(CLASSROOM_A)).toBeDefined();
+    });
+    const room = sdk.roomFor(CLASSROOM_A)!;
+
+    act(() => {
+      room.setNpc('tutorBot', {
+        x: -5.9,
+        z: 1.05,
+        state: 'reacting',
+        reaction: 'phrase',
+        phraseId: 1,
+        reactionSeq: 1,
+      });
+    });
+
+    await waitFor(() => {
+      const bot = stage.props?.npcs
+        ? findNpcView(stage.props.npcs, 'tutorBot')
+        : undefined;
+      expect(bot).toMatchObject({ x: -5.9, z: 1.05, phraseId: 1 });
+      expect(stage.props?.resolveNpcPhrase?.(bot!)).toBe(TUTOR_BOT_PHRASES[1]);
+    });
+
+    act(() => {
+      stage.props?.onInteractNpc?.('tutorBot');
+    });
+    expect(room.send).toHaveBeenCalledWith(NPC_INTERACT_MESSAGE, {
+      npcId: 'tutorBot',
+    });
   });
 
   test('forwards equipped accessory codes of the local and remote members to the stage', async () => {

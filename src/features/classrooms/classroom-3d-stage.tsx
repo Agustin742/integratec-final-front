@@ -184,7 +184,7 @@ export function Classroom3DStage({
 const ALL_INTERACTABLES = deriveClassroomInteractables(CLASSROOM_LAYOUT);
 const INTERACTABLES_BY_ID = indexClassroomInteractables(ALL_INTERACTABLES);
 
-/** Until the realtime layer wires `npc:interact`, interacting with an NPC does nothing. */
+/** Without a realtime connection (previews, tests) interacting with an NPC does nothing. */
 const NOOP_INTERACT_NPC = (): void => undefined;
 
 /** Pet greetings fade on their own; errors with a retry never do. */

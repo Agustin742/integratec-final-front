@@ -2448,7 +2448,7 @@ export interface components {
         ShopCatalogItemDto: {
             /** Format: uuid */
             id: string;
-            /** @example cap_blue */
+            /** @example head_cap */
             code: string;
             /** @example Blue Classroom Cap */
             name: string;
@@ -2488,7 +2488,7 @@ export interface components {
             studentId: string;
             /** Format: uuid */
             shopItemId: string;
-            /** @example cap_blue */
+            /** @example head_cap */
             shopItemCode: string;
             /** @example Blue Classroom Cap */
             shopItemName: string;
@@ -2708,7 +2708,7 @@ export interface components {
             slot: components["schemas"]["EquippedSlotName"];
             /** Format: uuid */
             shopItemId: string;
-            /** @example cap_blue */
+            /** @example head_cap */
             shopItemCode: string;
             /** @example Blue Classroom Cap */
             shopItemName: string;

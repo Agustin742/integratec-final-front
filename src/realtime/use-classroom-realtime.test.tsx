@@ -7,6 +7,8 @@ import { fakeSession } from '@/app/router/fake-session';
 import { SessionProvider } from '@/session/provider';
 import { profile } from '@/session/test-fixtures';
 import { Avatar } from './avatar.generated';
+import { NPC_INTERACT_MESSAGE } from './contracts.generated';
+import { Npc } from './npc.generated';
 import { ClassroomRealtimeProvider } from './classroom-realtime-provider';
 import type { RealtimeRoomLike, RealtimeSdkClientLike } from './client';
 import { ClassroomState } from './room-state.generated';
@@ -134,6 +136,50 @@ describe('useClassroomRealtime (#23)', () => {
     secondMount.unmount();
     expect(secondRoom?.leave).toHaveBeenCalledTimes(1);
     expect(secondRoom?.removeAllListeners).toHaveBeenCalledTimes(1);
+  });
+
+  it('exposes synced NPCs and forwards npc:interact (#138)', async () => {
+    const created = createHookTestRoom(CLASSROOM_A);
+    const bot = new Npc();
+    bot.id = 'tutorBot';
+    bot.x = 2;
+    bot.z = 3;
+    bot.state = 'idle';
+    created.room.state.npcs.set('tutorBot', bot);
+    const createSdkClient = (): RealtimeSdkClientLike => ({
+      auth: { token: undefined },
+      joinOrCreate: async () => created.room,
+      reconnect: async () => created.room,
+    });
+    const session = fakeSession({ status: 'authenticated', user: profile });
+    session.service.controller.getAccessToken = () => 'hook-token';
+    session.service.controller.refreshAccessToken = async () => 'hook-token';
+    session.service.controller.registerCleanup = () => () => {};
+    const queryClient = createAppQueryClient();
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <ApiQueryProvider client={queryClient}>
+        <SessionProvider service={session.service}>{children}</SessionProvider>
+      </ApiQueryProvider>
+    );
+
+    const { result } = renderHook(
+      () =>
+        useClassroomRealtime({
+          classroomId: CLASSROOM_A,
+          realtimeUrl: 'wss://realtime.example.invalid',
+          createSdkClient,
+        }),
+      { wrapper },
+    );
+    expect(result.current.interactNpc('tutorBot')).toBe(false);
+    await vi.waitFor(() => {
+      expect(result.current.status).toBe('connected');
+    });
+    expect(result.current.npcs.get('tutorBot')).toMatchObject({ x: 2, z: 3 });
+    expect(result.current.interactNpc('tutorBot')).toBe(true);
+    expect(created.send).toHaveBeenCalledWith(NPC_INTERACT_MESSAGE, {
+      npcId: 'tutorBot',
+    });
   });
 
   it('S3 & S5: disconnects previous classroom on switch and clears room when disabled or logged out', async () => {

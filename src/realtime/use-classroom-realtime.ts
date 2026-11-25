@@ -11,9 +11,11 @@ import {
   type RealtimeSdkClientLike,
   type RealtimeSnapshot,
 } from './client';
+import type { NpcView } from '@/features/world/npc/npc-view';
 import type { AvatarInput } from './contracts.generated';
 
 const EMPTY_PARTICIPANTS: ReadonlyMap<string, RealtimeParticipant> = new Map();
+const EMPTY_NPCS: ReadonlyMap<string, NpcView> = new Map();
 const DEFAULT_CONTROLS: RealtimeClassroomControls = Object.freeze({
   frozen: false,
 });
@@ -27,6 +29,7 @@ const DISCONNECTED_SNAPSHOT: RealtimeSnapshot = Object.freeze({
   reason: null,
   message: null,
   participants: EMPTY_PARTICIPANTS,
+  npcs: EMPTY_NPCS,
   controls: DEFAULT_CONTROLS,
 });
 
@@ -40,6 +43,7 @@ export interface UseClassroomRealtimeOptions {
 export interface UseClassroomRealtimeResult extends RealtimeSnapshot {
   readonly reconnect: () => Promise<boolean>;
   readonly sendAvatarInput: (input: AvatarInput) => boolean;
+  readonly interactNpc: (npcId: string) => boolean;
 }
 
 /**
@@ -139,6 +143,7 @@ export function useClassroomRealtime({
             reason: 'too-many-connections',
             message: realtimeMessages.tooManyConnections,
             participants: EMPTY_PARTICIPANTS,
+            npcs: EMPTY_NPCS,
             controls: DEFAULT_CONTROLS,
           }),
         });
@@ -225,6 +230,16 @@ export function useClassroomRealtime({
     [activeClassroomId],
   );
 
+  const interactNpc = useCallback(
+    (npcId: string) => {
+      if (activeClassroomId === null || !clientRef.current) {
+        return false;
+      }
+      return clientRef.current.interactNpc(npcId);
+    },
+    [activeClassroomId],
+  );
+
   const visibleSnapshot =
     activeClassroomId === null ||
     sessionUserId === null ||
@@ -238,5 +253,6 @@ export function useClassroomRealtime({
     ...visibleSnapshot,
     reconnect,
     sendAvatarInput,
+    interactNpc,
   };
 }
