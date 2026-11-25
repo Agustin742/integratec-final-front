@@ -289,4 +289,4 @@ Seasonal:
 - [x] Face / screen: surprised
 - [x] Face / screen: sleeping
 - [x] 2D bot icon for the study panel and the daily review
-- [ ] Color or accessory variants (future shop items)
+- [x] Color or accessory variants (future shop items)
