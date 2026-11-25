@@ -56,10 +56,16 @@ export function RegisterForm({ title }: RegisterFormProps) {
     }
   }, [confirmed]);
 
+  const safeReturnTarget = readReturnTarget(searchParams);
+  const defaultRegistrationPath: RegistrationChoice =
+    safeReturnTarget.startsWith('/invitations/accept')
+      ? 'INVITEE'
+      : 'INDEPENDENT_TEACHER';
+
   const form = useZodForm<RegisterFormInput, RegisterFormOutput>({
     schema: registerFormSchema,
     defaultValues: {
-      path: 'INDEPENDENT_TEACHER',
+      path: defaultRegistrationPath,
       displayName: '',
       email: '',
       password: '',

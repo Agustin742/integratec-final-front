@@ -212,8 +212,18 @@ function InvitationTokenSection({
   const acceptingRef = useRef(false);
   const [isAccepting, setIsAccepting] = useState(false);
   const [acceptError, setAcceptError] = useState<string | null>(null);
+  const [parentConfirmation, setParentConfirmation] =
+    useState<JoinClassroomResponse | null>(null);
   const invalidAlertId = useId();
   const readyCardId = useId();
+  const parentConfirmedHeadingId = useId();
+  const parentConfirmedHeadingRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    if (parentConfirmation !== null) {
+      parentConfirmedHeadingRef.current?.focus();
+    }
+  }, [parentConfirmation]);
 
   const handleAccept = async () => {
     if (tokenState.status !== 'valid' || acceptingRef.current) {
@@ -230,6 +240,18 @@ function InvitationTokenSection({
         { signal },
       );
       signal.throwIfAborted();
+      if (result.role === 'PARENT') {
+        const matchesUser = createUserScopePredicate(userId);
+        await queryClient.invalidateQueries({
+          predicate: (query) => {
+            if (!matchesUser(query)) return false;
+            const first = query.queryKey[0] as { domain?: unknown } | undefined;
+            return first?.domain === 'classrooms';
+          },
+        });
+        setParentConfirmation(result);
+        return;
+      }
       await completeJoinNavigation(queryClient, navigate, userId, result);
     } catch (error) {
       if (isJoinCancellation(error)) {
@@ -241,6 +263,58 @@ function InvitationTokenSection({
       setIsAccepting(false);
     }
   };
+
+  if (parentConfirmation !== null) {
+    return (
+      <section className="space-y-6">
+        <PageHeader subtitle={joinMessages.invitation.subtitle} />
+
+        <div
+          role="status"
+          aria-live="polite"
+          data-testid="parent-invitation-outcome"
+          className="space-y-5"
+        >
+          <Alert
+            variant={parentConfirmation.alreadyMember ? 'info' : 'success'}
+            role="group"
+            aria-labelledby={parentConfirmedHeadingId}
+          >
+            <AlertTitle
+              as="h3"
+              id={parentConfirmedHeadingId}
+              ref={parentConfirmedHeadingRef}
+              tabIndex={-1}
+              className="outline-none"
+            >
+              {parentConfirmation.alreadyMember
+                ? joinMessages.outcome.parentAlreadyMemberTitle
+                : joinMessages.outcome.parentJoinedTitle}
+            </AlertTitle>
+            <AlertDescription>
+              {parentConfirmation.alreadyMember
+                ? joinMessages.outcome.parentAlreadyMemberBody
+                : joinMessages.outcome.parentJoinedBody}
+            </AlertDescription>
+          </Alert>
+
+          <div className="space-y-3 rounded-2xl border border-edge bg-tray/60 p-4">
+            <Badge variant="success">{joinMessages.outcome.parentBadge}</Badge>
+            <p className="text-sm text-foreground">
+              <span className="font-medium">
+                {joinMessages.invitation.signedInAccountPrefix}
+              </span>{' '}
+              <span className="font-semibold wrap-anywhere">{userEmail}</span>
+            </p>
+          </div>
+
+          <Link to="/" className={primaryCtaLinkClass}>
+            {joinMessages.outcome.parentContinueCta}
+          </Link>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="space-y-6">

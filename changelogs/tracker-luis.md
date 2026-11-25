@@ -1,5 +1,20 @@
 # Tracker — Luis
 
+## 2026-11-25 — Parent invitations and guardian links UI (Corte 1)
+
+- **Status:** completed (branch `feat/parent-invitations`; verified lint, typecheck, targeted Vitest, production build, security check, Prettier, and docs checks; full Ubuntu CI regression runs on push).
+- **Area / files:** `src/api/schema.generated.ts`, `src/api/query-keys.ts`, `src/features/classrooms/invitation-schema.ts`, `src/features/classrooms/invitation-service.ts`, `src/features/classrooms/join-schema.ts`, `src/features/classrooms/join-messages.ts`, `src/features/classrooms/invitation-accept-view.tsx`, `src/features/classrooms/classroom-workspace.tsx`, `src/features/classrooms/classroom-invitations-panel.tsx`, `src/features/classrooms/messages.ts`, `src/features/auth/register-form.tsx`, `src/test/msw/handlers.ts`, `src/features/classrooms/classroom-invitations-panel.test.tsx`, `src/features/classrooms/invitation-accept-page.test.tsx`, `src/features/classrooms/invitation-service.test.ts`, `src/features/auth/register-page.test.tsx`, and this tracker.
+- **Change:**
+  1. Synchronized OpenAPI REST contracts (`src/api/schema.generated.ts`) for `PARENT` classroom invitations (`role: 'STUDENT' | 'PARENT'`, optional `childId`, `childDisplayName`), `POST /invitations/accept` nullable membership/desk fields (`childId`, `parentLinkId`), and `GET`/`DELETE /classrooms/:id/parent-links` (reverting unrelated `src/realtime/` diffs).
+  2. Added user+classroom-scoped `classroomParentLinksQueryKey` and `createClassroomParentLinksPredicate` (`src/api/query-keys.ts`), updated jitless Zod schemas (`invitation-schema.ts`, `join-schema.ts`) and REST services (`invitation-service.ts`) with `409` conflict mapping, `listClassroomParentLinks`, and `removeClassroomParentLink`.
+  3. Updated `InvitationAcceptView` and `ClassroomWorkspace` to handle `PARENT` invitation acceptance (`membershipId: null`, `desk: null`, `deskIndex: null`) with an accessible Spanish confirmation state (`Vínculo familiar confirmado`) and idempotent re-acceptance copy.
+  4. Updated `ClassroomInvitationsPanel` with `adultMode`-aware role selector (`Estudiante` / `Padre o tutor`), active student `<select>` showing guardian counts (`0/2`, `1/2`, disabling `2/2`), role and student badges in the invitations list, and a **Tutores vinculados** section with inline unlink confirmation, focus restoration, `AbortSignal`, and cache invalidation.
+  5. Updated `RegisterForm` (`/register`) to default the registration path to `'INVITEE'` when `?next=` targets `/invitations/accept` while preserving manual path switching.
+  6. Updated MSW handlers (`src/test/msw/handlers.ts`) and added unit/RTL/axe test coverage across `classroom-invitations-panel.test.tsx`, `invitation-accept-page.test.tsx`, `invitation-service.test.ts`, and `register-page.test.tsx`.
+- **Reason:** Deliver Corte 1 (Parent Invitations & Guardian Links UI) on `feat/parent-invitations`.
+- **Verification:** Local Windows checks: `pnpm.cmd lint` (`0` errors), `pnpm.cmd typecheck` passed, targeted Vitest across 5 suites (**59/59 passed, `0` skipped**: `classroom-invitations-panel.test.tsx` `9/9`, `invitation-accept-page.test.tsx` `17/17`, `register-page.test.tsx` `15/15`, `invitation-service.test.ts` `8/8`, `join-service.test.ts` `10/10`), production `pnpm.cmd build` (`739` modules transformed), `pnpm.cmd security:check` passed, `prettier --end-of-line auto --check` on all touched files passed, and `python scripts/ci/check_docs.py` (`123` files passed). Disclosure: full 60+ file Vitest regression (`pnpm test`), `actionlint`, and bash-dependent Python CI scripts remain delegated to Ubuntu GitHub Actions CI on push; all unit/RTL/MSW checks use synthetic responses.
+- **Next step:** Review working tree, commit with conventional commit, and push `feat/parent-invitations`.
+
 ## 2026-11-25 — Student registration invitation loop fix and /reset-password route alias (#120)
 
 - **Status:** completed (branch `fix/120-student-registration-loop` off `origin/develop`; verified lint, typecheck, targeted Vitest, production build, security check, Prettier, and docs checks; ready for PR).

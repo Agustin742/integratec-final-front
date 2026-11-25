@@ -920,4 +920,31 @@ describe('RegisterPage (/register)', () => {
       password: 'ClaveSegura123',
     });
   });
+
+  test('preselects INVITEE when arriving from /invitations/accept while still allowing path switching', async () => {
+    renderRegisterRoute(
+      '/register?next=%2Finvitations%2Faccept%3Ftoken%3Dinv-valid-token',
+    );
+    const main = await findMainRegion();
+
+    const inviteeRadio = within(main).getByRole('radio', {
+      name: new RegExp(authMessages.paths.options.INVITEE.title, 'i'),
+    }) as HTMLInputElement;
+    const independentRadio = within(main).getByRole('radio', {
+      name: new RegExp(
+        authMessages.paths.options.INDEPENDENT_TEACHER.title,
+        'i',
+      ),
+    }) as HTMLInputElement;
+
+    expect(inviteeRadio.checked).toBe(true);
+    expect(independentRadio.checked).toBe(false);
+    expect(
+      within(main).getByText(authMessages.invitationNotice.heading),
+    ).toBeVisible();
+
+    fireEvent.click(independentRadio);
+    expect(independentRadio.checked).toBe(true);
+    expect(inviteeRadio.checked).toBe(false);
+  });
 });

@@ -305,21 +305,37 @@ function WorkspaceContext({
       data-testid="classroom-join-outcome"
     >
       <AlertTitle as="h3">
-        {joinOutcome.alreadyMember
-          ? joinMessages.outcome.alreadyMemberTitle
-          : joinMessages.outcome.joinedTitle}
+        {joinOutcome.role === 'PARENT'
+          ? joinOutcome.alreadyMember
+            ? joinMessages.outcome.parentAlreadyMemberTitle
+            : joinMessages.outcome.parentJoinedTitle
+          : joinOutcome.alreadyMember
+            ? joinMessages.outcome.alreadyMemberTitle
+            : joinMessages.outcome.joinedTitle}
       </AlertTitle>
       <AlertDescription>
-        {joinOutcome.role === 'TEACHER'
-          ? joinOutcome.alreadyMember
-            ? joinMessages.outcome.teacherAlreadyMemberBody
-            : joinMessages.outcome.teacherJoinedBody
-          : joinOutcome.alreadyMember
-            ? joinMessages.outcome.alreadyMemberBody
-            : joinMessages.outcome.joinedBody}{' '}
-        {joinOutcome.desk
-          ? joinMessages.outcome.formatAssignedDesk(joinOutcome.desk.deskIndex)
-          : joinMessages.outcome.noDeskAssigned}
+        {joinOutcome.role === 'PARENT' ? (
+          joinOutcome.alreadyMember ? (
+            joinMessages.outcome.parentAlreadyMemberBody
+          ) : (
+            joinMessages.outcome.parentJoinedBody
+          )
+        ) : (
+          <>
+            {joinOutcome.role === 'TEACHER'
+              ? joinOutcome.alreadyMember
+                ? joinMessages.outcome.teacherAlreadyMemberBody
+                : joinMessages.outcome.teacherJoinedBody
+              : joinOutcome.alreadyMember
+                ? joinMessages.outcome.alreadyMemberBody
+                : joinMessages.outcome.joinedBody}{' '}
+            {joinOutcome.desk
+              ? joinMessages.outcome.formatAssignedDesk(
+                  joinOutcome.desk.deskIndex,
+                )
+              : joinMessages.outcome.noDeskAssigned}
+          </>
+        )}
       </AlertDescription>
     </Alert>
   );

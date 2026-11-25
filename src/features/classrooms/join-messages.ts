@@ -81,6 +81,14 @@ export const joinMessages = {
     teacherJoinedBody: 'Tu acceso docente al aula quedó confirmado.',
     teacherAlreadyMemberBody:
       'Ya formabas parte de esta aula. Conservamos tu inscripción existente sin duplicarla.',
+    parentBadge: 'Vínculo familiar',
+    parentJoinedTitle: 'Vínculo familiar confirmado',
+    parentJoinedBody:
+      'Tu cuenta quedó vinculada como padre o tutor en esta aula. Ya podés hacer el seguimiento del estudiante desde tu espacio.',
+    parentAlreadyMemberTitle: 'El vínculo familiar ya estaba activo',
+    parentAlreadyMemberBody:
+      'Tu cuenta ya estaba vinculada como padre o tutor para este estudiante. Conservamos tu vínculo existente sin duplicarlo.',
+    parentContinueCta: 'Ir al inicio',
     formatAssignedDesk: (deskIndex: number) =>
       `Pupitre asignado: #${deskIndex}.`,
     noDeskAssigned: 'Tu inscripción quedó activa en el aula.',
