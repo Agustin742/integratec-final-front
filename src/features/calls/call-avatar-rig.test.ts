@@ -1,4 +1,11 @@
-import { BufferGeometry, Group, Bone, Mesh, MeshBasicMaterial } from 'three';
+import {
+  BufferGeometry,
+  Group,
+  Bone,
+  Mesh,
+  MeshBasicMaterial,
+  Vector3,
+} from 'three';
 import { describe, expect, it } from 'vitest';
 import { createAvatarRig } from './call-avatar-rig';
 
@@ -36,6 +43,34 @@ describe('createAvatarRig', () => {
     expect(head.quaternion.angleTo(new Group().quaternion)).toBe(0);
     rig.update({ dt: 0.1, level: 1, animated: true, blink: 0 });
     expect(head.quaternion.angleTo(new Group().quaternion)).toBeGreaterThan(0);
+  });
+
+  it('keeps the nod bounded when the mixer never writes the head', () => {
+    const { root, head } = build();
+    const rig = createAvatarRig(root);
+    for (let i = 0; i < 300; i += 1) {
+      rig.update({ dt: 0.016, level: 1, animated: true, blink: 0 });
+      expect(head.quaternion.angleTo(new Group().quaternion)).toBeLessThan(
+        0.2,
+      );
+    }
+  });
+
+  it('restores the base pose when the nod stops', () => {
+    const { root, head } = build();
+    const rig = createAvatarRig(root);
+    rig.update({ dt: 0.1, level: 1, animated: true, blink: 0 });
+    rig.update({ dt: 0.1, level: 0, animated: true, blink: 0 });
+    expect(head.quaternion.angleTo(new Group().quaternion)).toBeCloseTo(0, 6);
+  });
+
+  it('builds on the pose the mixer wrote this frame', () => {
+    const { root, head } = build();
+    const rig = createAvatarRig(root);
+    rig.update({ dt: 0.1, level: 1, animated: true, blink: 0 });
+    head.quaternion.setFromAxisAngle(new Vector3(0, 1, 0), 1);
+    rig.update({ dt: 0.1, level: 0, animated: true, blink: 0 });
+    expect(head.quaternion.angleTo(new Group().quaternion)).toBeCloseTo(1, 5);
   });
 
   it('does not nod when not animated', () => {

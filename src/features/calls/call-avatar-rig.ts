@@ -54,6 +54,9 @@ export function createAvatarRig(root: Object3D): AvatarRig {
   let target: FaceMorph | null = null;
   let seconds = 0;
   const nod = new Quaternion();
+  const base = new Quaternion();
+  const written = new Quaternion();
+  let hasBase = false;
   const euler = new Euler();
 
   const write = (name: string, value: number) => {
@@ -78,12 +81,20 @@ export function createAvatarRig(root: Object3D): AvatarRig {
               Math.sin((seconds / BREATH_PERIOD_SECONDS) * Math.PI * 2)
           : 1;
       }
-      if (head && animated) {
-        const { pitch, yaw } = nodAngles(level, seconds, false);
+      if (head) {
+        // The mixer may or may not write the head each frame. If the bone is
+        // not what we left last frame, the mixer wrote it: that is the new base.
+        if (!hasBase || !head.quaternion.equals(written)) {
+          base.copy(head.quaternion);
+          hasBase = true;
+        }
+        const { pitch, yaw } = nodAngles(level, seconds, !animated);
+        head.quaternion.copy(base);
         if (pitch !== 0 || yaw !== 0) {
           euler.set(pitch, yaw, 0);
           head.quaternion.multiply(nod.setFromEuler(euler));
         }
+        written.copy(head.quaternion);
       }
       const step = Math.min(1, dt * EXPRESSION_RATE);
       for (const name of MORPHS) {

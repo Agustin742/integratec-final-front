@@ -37,7 +37,10 @@ export function useEmotePlayback({
     seen.current = emoteSeq;
     const current = latest.current;
     const plan = planEmote(current.emote, current.clipNames, current.reduced);
-    if (!plan) return;
+    if (!plan) {
+      setPlayback(IDLE);
+      return;
+    }
     setPlayback({ animation: plan.clip ?? 'Idle', morph: plan.morph });
     const timer = setTimeout(() => setPlayback(IDLE), plan.seconds * 1000);
     return () => clearTimeout(timer);

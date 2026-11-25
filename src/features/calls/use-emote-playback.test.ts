@@ -52,6 +52,14 @@ describe('useEmotePlayback', () => {
     expect(result.current).toEqual({ animation: 'Idle', morph: 'Happy' });
   });
 
+  it('returns to idle when an unknown emote follows a running one', () => {
+    const { result, rerender } = setup({ emote: '', seq: 0 });
+    rerender({ emote: 'wave', seq: 1 });
+    expect(result.current.animation).toBe('Wave');
+    rerender({ emote: 'dance', seq: 2 });
+    expect(result.current).toEqual({ animation: 'Idle', morph: null });
+  });
+
   it('ignores unknown emotes', () => {
     const { result, rerender } = setup({ emote: '', seq: 0 });
     rerender({ emote: 'dance', seq: 1 });
