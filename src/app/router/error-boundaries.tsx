@@ -86,6 +86,7 @@ const rootActionClass =
  */
 export function RootErrorBoundary() {
   useDocumentTitle(messages.errors.root.title);
+  console.error("[ci-debug root error]", useRouteError());
 
   return (
     <main className="grid min-h-dvh place-items-center bg-background px-4 py-8 text-foreground">
