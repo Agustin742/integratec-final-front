@@ -335,6 +335,33 @@ describe('AvatarModel', () => {
       expect(partOf('back')?.tints).toEqual({ AvatarAccessoryTint: '#62CFC7' });
     });
 
+    it('requests and tints each equipped hand, neck and ear item', async () => {
+      const loadAsync = useLoader();
+      await mount(
+        <AvatarModel
+          avatar={avatar}
+          equipped={{
+            hand: 'hand_mate',
+            neck: 'neck_scarf',
+            ears: 'ears_earrings',
+          }}
+        />,
+      );
+      expect(loadAsync.mock.calls.map(([url]) => url).sort()).toEqual(
+        [
+          BODY,
+          HAIR,
+          TOP,
+          `${SHARED}/hand-mate.glb`,
+          '/models/avatars/female/neck-scarf.glb',
+          `${SHARED}/neck-earrings.glb`,
+        ].sort(),
+      );
+      expect(partOf('hand')?.tints).toEqual({ AvatarAccessoryTint: '#AF7B52' });
+      expect(partOf('neck')?.tints).toEqual({ AvatarAccessoryTint: '#E66861' });
+      expect(partOf('ears')?.tints).toEqual({ AvatarAccessoryTint: '#F5B5AB' });
+    });
+
     it('ignores unknown codes and codes sitting in the wrong slot', async () => {
       const loadAsync = useLoader();
       await mount(

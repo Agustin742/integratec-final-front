@@ -9,7 +9,7 @@ vi.mock('./item-preview-renderer', () => ({ renderGlbThumbnail }));
 function makeItem(overrides: Partial<ShopCatalogItemDto> = {}) {
   return {
     id: 'item-1',
-    code: 'cap_blue',
+    code: 'head_cap',
     name: 'Gorra azul',
     description: '',
     kind: 'AVATAR_ACCESSORY',
@@ -46,8 +46,8 @@ describe('ShopItemPreview', () => {
     );
     await waitFor(() =>
       expect(renderGlbThumbnail).toHaveBeenCalledWith(
-        '/models/avatars/male/accessory-cap.glb',
-        undefined,
+        '/models/avatars/shared/head-cap.glb',
+        '#75B7DA',
       ),
     );
 
@@ -59,7 +59,7 @@ describe('ShopItemPreview', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('tints the model with the item color metadata', async () => {
+  it('tints the model with the color the avatar wears', async () => {
     renderGlbThumbnail.mockResolvedValue('data:image/png;base64,CCCC');
     render(
       <ShopItemPreview
@@ -70,8 +70,8 @@ describe('ShopItemPreview', () => {
     );
     await screen.findByRole('img', { name: 'Vista previa de Gorra azul' });
     expect(renderGlbThumbnail).toHaveBeenCalledWith(
-      '/models/avatars/male/accessory-cap.glb',
-      '#1E3A8A',
+      '/models/avatars/shared/head-cap.glb',
+      '#75B7DA',
     );
   });
 
@@ -145,7 +145,7 @@ describe('ShopItemPreview', () => {
         item={makeItem({
           id: 'item-2',
           name: 'Gorra roja',
-          metadata: { slot: 'head', assetId: 'cap', color: '#DC2626' },
+          code: 'head_beanie',
         })}
       />,
     );

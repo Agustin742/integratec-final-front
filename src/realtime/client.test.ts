@@ -649,6 +649,9 @@ describe('createClassroomRealtimeClient (#23)', () => {
     };
     appearance.items.set('head', item('head', 'head_crown'));
     appearance.items.set('back', item('back', 'back_wings'));
+    appearance.items.set('hand', item('hand', 'hand_mate'));
+    appearance.items.set('neck', item('neck', 'neck_scarf'));
+    appearance.items.set('ears', item('ears', 'ears_earrings'));
     avatar.appearance = appearance;
     sdk.setJoinHandler(async () => room);
     const client = createClassroomRealtimeClient({
@@ -660,7 +663,14 @@ describe('createClassroomRealtimeClient (#23)', () => {
     await client.connect(CLASSROOM_A);
     expect(
       client.getSnapshot().participants.get('schema-user')?.avatar?.equipped,
-    ).toEqual({ head: 'head_crown', face: null, back: 'back_wings' });
+    ).toEqual({
+      head: 'head_crown',
+      face: null,
+      back: 'back_wings',
+      hand: 'hand_mate',
+      neck: 'neck_scarf',
+      ears: 'ears_earrings',
+    });
 
     client.dispose();
   });
@@ -1073,7 +1083,7 @@ describe('createClassroomRealtimeClient (#23)', () => {
     client.dispose();
   });
 
-  it('exposes the equipped head, face and back item codes of a participant', async () => {
+  it('exposes the equipped accessory item codes of a participant', async () => {
     const { auth } = createFakeAuth('valid-token');
     const sdk = createFakeSdk();
     const room = new FakeRoom({ classroomId: CLASSROOM_A });
@@ -1106,6 +1116,7 @@ describe('createClassroomRealtimeClient (#23)', () => {
         head: item('head', 'head_crown'),
         face: null,
         back: item('back', 'back_wings'),
+        neck: item('neck', 'neck_bandana'),
         desk_decor: item('desk_decor', 'desk_plant'),
       },
     });
@@ -1119,7 +1130,14 @@ describe('createClassroomRealtimeClient (#23)', () => {
     await client.connect(CLASSROOM_A);
     expect(
       client.getSnapshot().participants.get('equipped-user')?.avatar?.equipped,
-    ).toEqual({ head: 'head_crown', face: null, back: 'back_wings' });
+    ).toEqual({
+      head: 'head_crown',
+      face: null,
+      back: 'back_wings',
+      hand: null,
+      neck: 'neck_bandana',
+      ears: null,
+    });
 
     client.dispose();
   });

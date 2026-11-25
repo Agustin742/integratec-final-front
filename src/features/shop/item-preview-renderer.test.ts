@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => {
   const clearAssetCache = vi.fn();
   const configureKtx2RendererSupport = vi.fn();
   const loadGlbAsset = vi.fn();
+  const cloneSkeleton = vi.fn((scene: unknown) => scene);
+  const updateMatrixWorld = vi.fn();
   let lost = false;
   const listeners = new Map<
     string,
@@ -35,6 +37,8 @@ const mocks = vi.hoisted(() => {
     clearAssetCache,
     configureKtx2RendererSupport,
     loadGlbAsset,
+    cloneSkeleton,
+    updateMatrixWorld,
     domElement,
     setLost: (value: boolean) => {
       lost = value;
@@ -52,8 +56,11 @@ const mocks = vi.hoisted(() => {
 vi.mock('three', () => {
   class MockMaterial {
     color: unknown = null;
+    name = '';
     clone() {
-      return new MockMaterial();
+      const copy = new MockMaterial();
+      copy.name = this.name;
+      return copy;
     }
     dispose() {
       mocks.disposeMaterial();
@@ -63,10 +70,12 @@ vi.mock('three', () => {
     material = new MockMaterial();
   }
   class MockGroup {
-    private meshes = [new MockMesh()];
-    clone() {
-      return this;
-    }
+    private meshes = ['AvatarAccessoryTint', 'AvatarDetail'].map((name) => {
+      const mesh = new MockMesh();
+      mesh.material.name = name;
+      return mesh;
+    });
+    updateMatrixWorld = mocks.updateMatrixWorld;
     traverse(fn: (node: unknown) => void) {
       for (const m of this.meshes) fn(m);
     }
@@ -135,6 +144,14 @@ vi.mock('three', () => {
   };
 });
 
+vi.mock('three/examples/jsm/utils/SkeletonUtils.js', () => ({
+  clone: mocks.cloneSkeleton,
+}));
+
+vi.mock('@/features/world/avatar/compose-avatar', () => ({
+  ACCESSORY_TINT_MATERIAL: 'AvatarAccessoryTint',
+}));
+
 vi.mock('@/features/world/asset-cache', () => ({
   clearAssetCache: mocks.clearAssetCache,
   configureKtx2RendererSupport: mocks.configureKtx2RendererSupport,
@@ -159,6 +176,8 @@ describe('item-preview-renderer', () => {
     mocks.clearAssetCache.mockClear();
     mocks.configureKtx2RendererSupport.mockClear();
     mocks.loadGlbAsset.mockReset();
+    mocks.cloneSkeleton.mockClear();
+    mocks.updateMatrixWorld.mockClear();
     mocks.loadGlbAsset.mockResolvedValue({
       scene: new Group(),
     });
@@ -176,6 +195,12 @@ describe('item-preview-renderer', () => {
     expect(mocks.clearAssetCache).toHaveBeenCalledWith({
       scopeKey: 'shop-preview',
     });
+  });
+
+  it('clones with its skeleton and poses the bones before framing', async () => {
+    await renderGlbThumbnail('/models/avatars/shared/hand-mate.glb');
+    expect(mocks.cloneSkeleton).toHaveBeenCalledTimes(1);
+    expect(mocks.updateMatrixWorld).toHaveBeenCalledWith(true);
   });
 
   it('still cleans render lists and cache when render throws', async () => {

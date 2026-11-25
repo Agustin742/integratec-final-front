@@ -60,6 +60,9 @@ export interface RealtimeEquippedCodes {
   readonly head: string | null;
   readonly face: string | null;
   readonly back: string | null;
+  readonly hand: string | null;
+  readonly neck: string | null;
+  readonly ears: string | null;
 }
 
 export interface RealtimeAvatarAppearance {
@@ -290,8 +293,11 @@ function parseEquippedCodes(items: unknown): RealtimeEquippedCodes | undefined {
     head: readItemCode(record, 'head'),
     face: readItemCode(record, 'face'),
     back: readItemCode(record, 'back'),
+    hand: readItemCode(record, 'hand'),
+    neck: readItemCode(record, 'neck'),
+    ears: readItemCode(record, 'ears'),
   });
-  return equipped.head || equipped.face || equipped.back ? equipped : undefined;
+  return Object.values(equipped).some(Boolean) ? equipped : undefined;
 }
 
 function toFiniteCoordinate(value: unknown, fallback = 0): number {

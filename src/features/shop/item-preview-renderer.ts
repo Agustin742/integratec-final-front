@@ -11,11 +11,13 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three';
+import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import {
   clearAssetCache,
   configureKtx2RendererSupport,
   loadGlbAsset,
 } from '@/features/world/asset-cache';
+import { ACCESSORY_TINT_MATERIAL } from '@/features/world/avatar/compose-avatar';
 
 const PREVIEW_SIZE = 256;
 const SCOPE_KEY = 'shop-preview';
@@ -105,12 +107,16 @@ async function renderOnce(url: string, tint?: string): Promise<string> {
     key.position.set(2, 3, 4);
     scene.add(key);
 
-    model = gltf.scene.clone(true);
+    // Accessories are skinned: a plain clone would keep the source bones, and
+    // unposed bones would misplace both the meshes and the framing box.
+    model = cloneSkeleton(gltf.scene) as typeof gltf.scene;
+    model.updateMatrixWorld(true);
     if (tint !== undefined) {
       model.traverse((node) => {
         if (
           node instanceof Mesh &&
-          node.material instanceof MeshStandardMaterial
+          node.material instanceof MeshStandardMaterial &&
+          node.material.name === ACCESSORY_TINT_MATERIAL
         ) {
           const cloned = node.material.clone();
           cloned.color = new Color(tint);
@@ -158,8 +164,8 @@ async function renderOnce(url: string, tint?: string): Promise<string> {
 /**
  * Renders one GLB to a PNG data URL on a single shared offscreen renderer.
  * Renders are serialized and cached per URL, so a grid of cards never owns a
- * live WebGL canvas: each preview is a static `<img>`. `tint` is the item's
- * `metadata.color`, applied to the model's base color.
+ * live WebGL canvas: each preview is a static `<img>`. `tint` colors only the
+ * `AvatarAccessoryTint` material, as on the avatar.
  */
 export function renderGlbThumbnail(
   url: string,

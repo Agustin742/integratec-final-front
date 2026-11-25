@@ -23,7 +23,8 @@ export const GLASS_MATERIAL = 'AvatarGlass';
 
 const GLASS_RENDER_ORDER = 1;
 
-export type AvatarPartKind = 'hair' | 'top' | 'head' | 'face' | 'back';
+export type AvatarPartKind =
+  'hair' | 'top' | 'head' | 'face' | 'back' | 'hand' | 'neck' | 'ears';
 
 export interface AvatarPartInput {
   readonly key: AvatarPartKind;

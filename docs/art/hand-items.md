@@ -54,4 +54,6 @@ Both `male/body.glb` and `female/body.glb` share identical `DEF-hand.R` bone tra
 | Decoded GLB roundtrips (Blender 5.2.2 LTS) | All `10/10` `shared/hand-*.glb` imports pass exact 34-bone canonical rest matrices (`< 1e-4`), `1` bone influence (`DEF-hand.R`, weight `1.0`, sum error `0.0`), and `0` head/body hits across all `5` tested frames on both genders (`odd/artifacts/hand-items-export.json`) |
 | Structural & budget (`test-hand-items.mjs`, `check-asset-budget.mjs`) | Valid Draco-compressed GLBs (`14.8 KB–21.6 KB`, all `<= 1 MB`), zero animations/cameras/lights, neutral `#FFFFFF` `AvatarAccessoryTint` + `AvatarDetail` (+ `AvatarGlass` `BLEND` on `magnifying-glass`) |
 
+**Runtime status (#149):** integrated into the avatar catalog (`src/features/world/avatar/accessory-catalog.ts`) under the `hand` slot, rendered from synced equipped items and previewed in the shop. Fixed colors mirror the backend shop seed; equip and inventory UI is pending.
+
 Rules: [modular avatar assets](../../rules/modular-avatar-assets.md), [art direction](../../rules/art-direction.md).

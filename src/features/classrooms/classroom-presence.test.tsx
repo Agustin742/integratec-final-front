@@ -421,6 +421,7 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
             ...emptyItems,
             head: item('head', 'head_crown'),
             back: item('back', 'back_wings'),
+            hand: item('hand', 'hand_mate'),
           },
         },
       });
@@ -431,12 +432,22 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
         head: null,
         face: 'face_sunglasses',
         back: null,
+        hand: null,
+        neck: null,
+        ears: null,
       });
       expect(
         stage.props?.remoteParticipants?.find(
           (p) => p.userId === REMOTE_STUDENT_ID,
         )?.equipped,
-      ).toEqual({ head: 'head_crown', face: null, back: 'back_wings' });
+      ).toEqual({
+        head: 'head_crown',
+        face: null,
+        back: 'back_wings',
+        hand: 'hand_mate',
+        neck: null,
+        ears: null,
+      });
     });
   });
 

@@ -426,13 +426,20 @@ export function useClassroomPresence({
   const selfHead = selfParticipant?.avatar?.equipped?.head ?? null;
   const selfFace = selfParticipant?.avatar?.equipped?.face ?? null;
   const selfBack = selfParticipant?.avatar?.equipped?.back ?? null;
-  const selfEquipped = useMemo<RealtimeEquippedCodes | undefined>(
-    () =>
-      selfHead || selfFace || selfBack
-        ? { head: selfHead, face: selfFace, back: selfBack }
-        : undefined,
-    [selfHead, selfFace, selfBack],
-  );
+  const selfHand = selfParticipant?.avatar?.equipped?.hand ?? null;
+  const selfNeck = selfParticipant?.avatar?.equipped?.neck ?? null;
+  const selfEars = selfParticipant?.avatar?.equipped?.ears ?? null;
+  const selfEquipped = useMemo<RealtimeEquippedCodes | undefined>(() => {
+    const codes = {
+      head: selfHead,
+      face: selfFace,
+      back: selfBack,
+      hand: selfHand,
+      neck: selfNeck,
+      ears: selfEars,
+    };
+    return Object.values(codes).some(Boolean) ? codes : undefined;
+  }, [selfHead, selfFace, selfBack, selfHand, selfNeck, selfEars]);
 
   const remoteParticipants = useMemo(() => {
     if (!hasPresenceParticipants) {

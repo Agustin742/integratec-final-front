@@ -1,5 +1,13 @@
 # Tracker — Agustin
 
+## 2026-11-25 — Hand, neck and ear accessories and shop 3D preview (#149)
+
+- **Status:** completed (equip and inventory UI pending)
+- **Area / files:** `src/features/world/avatar/`, `src/features/shop/`, `src/realtime/client.ts`, `src/features/classrooms/use-classroom-presence.ts`, `docs/art/{hand-items,neck-ears}.md`
+- **Change:** Added the `hand`, `neck` and `ears` slots to the avatar catalog (19 items, colors mirroring the shop seed), the part plan and the synced equipped codes; the shop preview now resolves every accessory from that catalog by shop code, tints only `AvatarAccessoryTint` and poses skinned meshes.
+- **Reason:** The merged assets are unused and shop accessory previews fail; back counterpart integratec-final-back#154.
+- **Next step:** Equip and inventory UI once the backend types are regenerated.
+
 ## 2026-11-24 — Interactive props, decorations, pet and tutor bot routines (#138)
 
 - **Status:** completed (pending visual review, CI and merge of the PR)

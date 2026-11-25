@@ -14,7 +14,6 @@ type PreviewState =
   | { readonly status: 'ready'; readonly src: string }
   | { readonly status: 'failed' };
 
-const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const STROKE = 'var(--palette-ink)';
 
 /** Flat category illustrations on palette colors: the last-resort preview. */
@@ -148,9 +147,7 @@ export interface ShopItemPreviewProps {
 export function ShopItemPreview({ item, className }: ShopItemPreviewProps) {
   const source = resolveItemPreview(item);
   const glbUrl = source.type === 'glb' ? source.url : null;
-  const color = item.metadata.color;
-  const tint =
-    typeof color === 'string' && HEX_COLOR.test(color) ? color : undefined;
+  const tint = source.type === 'glb' ? source.tint : undefined;
   const hostRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(
     () => typeof IntersectionObserver === 'undefined',
