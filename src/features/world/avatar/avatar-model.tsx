@@ -7,7 +7,12 @@ import {
   useRef,
   type ReactNode,
 } from 'react';
-import { AnimationClip, AnimationMixer, type AnimationAction } from 'three';
+import {
+  AnimationClip,
+  AnimationMixer,
+  type AnimationAction,
+  type Object3D,
+} from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Avatar } from '@/features/profile/avatar-options';
 import { evictRejectedGlbAsset, readCachedGlbAsset } from '../asset-cache';
@@ -18,6 +23,13 @@ import { composeAvatar, type AvatarPartKind } from './compose-avatar';
 
 /** Blend time between two body clips; short so starting to move feels instant. */
 export const AVATAR_CROSSFADE_SECONDS = 0.2;
+
+/** Handed to `onReady` once the avatar is composed. */
+export interface AvatarReadyInfo {
+  readonly root: Object3D;
+  /** Every clip the avatar can play, including `fallbackClipsUrl` ones. */
+  readonly clipNames: readonly string[];
+}
 
 export interface AvatarModelProps {
   readonly avatar: Avatar;
@@ -35,6 +47,13 @@ export interface AvatarModelProps {
   readonly onBodyError?: (error: unknown) => void;
   /** Parts left out because they failed to load or do not fit the body. */
   readonly onPartsSkipped?: (parts: readonly AvatarPartKind[]) => void;
+  /**
+   * Another body GLB whose clips fill the names the avatar's own body lacks
+   * (bodies share the canonical skeleton). Ignored if it fails to load.
+   */
+  readonly fallbackClipsUrl?: string;
+  /** Lets a host drive the composed avatar procedurally (bones, morph targets). */
+  readonly onReady?: (info: AvatarReadyInfo) => void;
 }
 
 class BodyErrorBoundary extends Component<
@@ -93,11 +112,17 @@ function LoadedAvatar({
   scale,
   animation,
   onPartsSkipped,
+  fallbackClipsUrl,
+  onReady,
 }: Omit<AvatarModelProps, 'fallback' | 'errorFallback' | 'onBodyError'>) {
   const parts = resolveAvatarParts(avatar);
   const body = read(parts.bodyUrl, scopeKey);
   const hair = parts.hairUrl ? read(parts.hairUrl, scopeKey) : null;
   const top = parts.topUrl ? read(parts.topUrl, scopeKey) : null;
+  const extraClips =
+    fallbackClipsUrl && fallbackClipsUrl !== parts.bodyUrl
+      ? read(fallbackClipsUrl, scopeKey)
+      : null;
 
   // A part that failed stays out of the avatar; evict it on unmount so a
   // later mount retries the download.
@@ -116,7 +141,7 @@ function LoadedAvatar({
   }, [failedKey, scopeKey]);
 
   if (body.status === 'failed') throw body.error;
-  const pending = [body, hair, top].flatMap((item) =>
+  const pending = [body, hair, top, extraClips].flatMap((item) =>
     item?.status === 'pending' ? [item.promise] : [],
   );
   if (pending.length > 0) {
@@ -126,6 +151,7 @@ function LoadedAvatar({
   const bodyGltf = (body as Extract<Read, { status: 'ready' }>).gltf;
   const hairGltf = hair?.status === 'ready' ? hair.gltf : null;
   const topGltf = top?.status === 'ready' ? top.gltf : null;
+  const extraGltf = extraClips?.status === 'ready' ? extraClips.gltf : null;
   const { hairColor, clothingColor } = parts;
 
   const composed = useMemo(
@@ -178,17 +204,25 @@ function LoadedAvatar({
       advancingRef.current = false;
     };
   }, [composed]);
-  const clipNames = useMemo(
-    () => bodyGltf.animations.map((clip) => clip.name),
-    [bodyGltf],
-  );
+  const clips = useMemo(() => {
+    const own = bodyGltf.animations;
+    if (!extraGltf) return own;
+    const names = new Set(own.map((clip) => clip.name));
+    return [...own, ...extraGltf.animations.filter((c) => !names.has(c.name))];
+  }, [bodyGltf, extraGltf]);
+  const clipNames = useMemo(() => clips.map((clip) => clip.name), [clips]);
+  const onReadyRef = useRef(onReady);
+  useEffect(() => {
+    onReadyRef.current = onReady;
+  }, [onReady]);
+  useEffect(() => {
+    onReadyRef.current?.({ root: composed.root, clipNames });
+  }, [composed, clipNames]);
   useEffect(() => {
     const mixer = mixerRef.current;
     if (!mixer) return;
     const name = resolveClip(animation, clipNames);
-    const clip = name
-      ? AnimationClip.findByName(bodyGltf.animations, name)
-      : null;
+    const clip = name ? AnimationClip.findByName(clips, name) : null;
     const previous = actionRef.current;
     if (!clip) {
       mixer.stopAllAction();
@@ -228,7 +262,7 @@ function LoadedAvatar({
     mixer.update(0);
     advancingRef.current = !reducedMotion;
     invalidate();
-  }, [animation, reducedMotion, bodyGltf, clipNames, composed, invalidate]);
+  }, [animation, reducedMotion, clips, clipNames, composed, invalidate]);
   // A `demand` loop stops once nothing invalidates it (hidden tab, offscreen
   // host), so an active clip asks for its next frame and for the first frame
   // after the loop resumes.

@@ -1,0 +1,65 @@
+export type EmoteName =
+  'wave' | 'happy' | 'sad' | 'angry' | 'think' | 'celebrate';
+export type FaceMorph = 'Happy' | 'Sad' | 'Angry';
+
+export interface EmotePlan {
+  /** Body clip to play, or `null` for a face-only emote. */
+  readonly clip: string | null;
+  readonly morph: FaceMorph | null;
+  /** How long the emote stays before the avatar returns to idle. */
+  readonly seconds: number;
+}
+
+const CLIPS: Readonly<Record<EmoteName, readonly string[]>> = {
+  wave: ['Wave'],
+  happy: ['Happy'],
+  sad: ['Sad'],
+  angry: ['Angry'],
+  think: ['Think', 'ThinkStart'],
+  celebrate: ['Celebrate'],
+};
+
+const MORPHS: Readonly<Record<EmoteName, FaceMorph | null>> = {
+  wave: null,
+  happy: 'Happy',
+  sad: 'Sad',
+  angry: 'Angry',
+  think: null,
+  celebrate: 'Happy',
+};
+
+/** Clip lengths are not exposed by the avatar, so each emote holds a fixed time. */
+export const EMOTE_DURATION_SECONDS: Readonly<Record<EmoteName, number>> = {
+  wave: 2.4,
+  happy: 2.6,
+  sad: 2.8,
+  angry: 2.6,
+  think: 3,
+  celebrate: 2.8,
+};
+
+function isEmote(value: string): value is EmoteName {
+  return Object.hasOwn(CLIPS, value);
+}
+
+export function emoteMorph(emote: string): FaceMorph | null {
+  return isEmote(emote) ? MORPHS[emote] : null;
+}
+
+/**
+ * Chooses how to show an emote. `available` is every clip the avatar can play
+ * (its own plus the shared male clips), so a female body still gets Happy, Sad
+ * and Angry; with no clip at all, or under reduced motion, only the face
+ * morph runs.
+ */
+export function planEmote(
+  emote: string,
+  available: readonly string[],
+  reducedMotion: boolean,
+): EmotePlan | null {
+  if (!isEmote(emote)) return null;
+  const clip = reducedMotion
+    ? null
+    : (CLIPS[emote].find((name) => available.includes(name)) ?? null);
+  return { clip, morph: MORPHS[emote], seconds: EMOTE_DURATION_SECONDS[emote] };
+}

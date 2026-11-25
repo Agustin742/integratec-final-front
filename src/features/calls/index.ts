@@ -22,3 +22,5 @@ export {
   type ClassroomCallSignals,
   type IncomingCall,
 } from './use-classroom-call-signals';
+export { CallStage, type CallStageProps } from './call-stage';
+export { computeStageLayout, MAX_STAGE_TILES } from './call-stage-layout';

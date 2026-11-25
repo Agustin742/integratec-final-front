@@ -50,7 +50,11 @@ export {
   type ComposeAvatarInput,
   type ComposedAvatar,
 } from './avatar/compose-avatar';
-export { AvatarModel, type AvatarModelProps } from './avatar/avatar-model';
+export {
+  AvatarModel,
+  type AvatarModelProps,
+  type AvatarReadyInfo,
+} from './avatar/avatar-model';
 export {
   DEFAULT_CELL_SIZE,
   INPUT_DEADZONE,
