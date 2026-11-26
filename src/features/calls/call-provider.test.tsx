@@ -28,6 +28,9 @@ vi.mock('./call-stage', () => ({
 }));
 
 import { CallProvider, useCalls } from './call-provider';
+// Load the lazy CallView module during test-file import (after hoisted vi.mock
+// calls) so cold Vite transforms do not consume the first test's 5 s budget.
+import './call-view';
 
 const CLASSROOM = '11111111-1111-4111-8111-111111111111';
 
