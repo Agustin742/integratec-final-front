@@ -1,7 +1,9 @@
+import { useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import type {
   BotAllowedMaterialDto,
-  BotIndexingStatus,
+  BotIndexState,
 } from './material-bot-schema';
 import type { MaterialDto } from './material-schema';
 import { materialMessages } from './messages';
@@ -14,6 +16,14 @@ export interface MaterialBotToggleSlotProps {
   readonly isToggling: boolean;
   readonly onToggle: (material: MaterialDto, nextEnabled: boolean) => void;
 }
+
+type BotIndexingStatus = 'disabled' | 'pending' | 'ready' | 'failed';
+
+const STATUS_BY_INDEX_STATE: Record<BotIndexState, BotIndexingStatus> = {
+  PENDING: 'pending',
+  INDEXED: 'ready',
+  FAILED: 'failed',
+};
 
 function getIndexingBadgeVariant(
   status: BotIndexingStatus,
@@ -69,9 +79,12 @@ export function MaterialBotToggleSlot({
   onToggle,
 }: MaterialBotToggleSlotProps) {
   const isUnavailable = isConfigPending || isConfigError;
-  const botEnabled = isUnavailable ? false : (botState?.botEnabled ?? false);
-  const indexingStatus: BotIndexingStatus =
-    botState?.indexingStatus ?? 'disabled';
+  // Only allowed materials have an entry; no entry means disabled.
+  const botEnabled = !isUnavailable && botState !== undefined;
+  const indexingStatus: BotIndexingStatus = botState
+    ? STATUS_BY_INDEX_STATE[botState.indexState]
+    : 'disabled';
+  const switchRef = useRef<HTMLButtonElement>(null);
   const isDisabled = isToggling || isUnavailable;
   const hintId = `bot-material-hint-${material.id}`;
 
@@ -101,15 +114,36 @@ export function MaterialBotToggleSlot({
         </p>
         {!isUnavailable &&
           indexingStatus === 'failed' &&
-          typeof botState?.indexingError === 'string' &&
-          botState.indexingError.length > 0 && (
+          typeof botState?.failureReason === 'string' &&
+          botState.failureReason.length > 0 && (
             <p className="text-xs text-destructive wrap-anywhere">
-              {botState.indexingError}
+              {botState.failureReason}
             </p>
           )}
+        {!isUnavailable && indexingStatus === 'failed' && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="min-h-11"
+            aria-label={materialMessages.list.bot.retryIndexLabel(
+              material.filename,
+            )}
+            aria-disabled={isDisabled}
+            onClick={() => {
+              if (isDisabled) return;
+              // This button unmounts once indexing succeeds.
+              switchRef.current?.focus();
+              onToggle(material, true);
+            }}
+          >
+            {materialMessages.list.bot.retryIndexAction}
+          </Button>
+        )}
       </div>
 
       <button
+        ref={switchRef}
         type="button"
         role="switch"
         aria-checked={botEnabled}

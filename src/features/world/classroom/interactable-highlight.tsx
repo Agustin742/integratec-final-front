@@ -7,12 +7,11 @@ import {
   OctahedronGeometry,
 } from 'three';
 import type { ClassroomInteractable } from './classroom-interactables';
+import { npcFollowOffset, type NpcLivePositions } from './npc-live-position';
 import {
   applyPointerCursor,
   resetBeaconTransform,
-  resetPetPosition,
   stepBeaconTransform,
-  stepPetHop,
 } from './interactable-highlight-helpers';
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
@@ -191,8 +190,8 @@ export interface InteractableHighlightProps {
   readonly interactablesById: ReadonlyMap<string, ClassroomInteractable>;
   readonly highlightedId?: string | undefined;
   readonly ownDeskIndex?: number | null | undefined;
-  readonly sceneRoot: Group;
-  readonly petReactionNonce?: number | undefined;
+  /** Live spots of roaming NPCs; their highlight follows them. */
+  readonly npcPositions?: NpcLivePositions | undefined;
 }
 
 /**
@@ -204,8 +203,7 @@ export function InteractableHighlight({
   interactablesById,
   highlightedId,
   ownDeskIndex,
-  sceneRoot,
-  petReactionNonce = 0,
+  npcPositions,
 }: InteractableHighlightProps) {
   const invalidate = useThree((state) => state.invalidate);
   const gl = useThree(
@@ -264,10 +262,15 @@ export function InteractableHighlight({
     group.name = 'interactable-beacon';
     return group;
   }, []);
+  // Frame, outline and beacon of a roaming NPC ride in this group, shifted each
+  // frame by how far the NPC walked from its catalog spot.
+  const followGroup = useMemo(() => {
+    const group = new Group();
+    group.name = 'interactable-follow';
+    return group;
+  }, []);
   const beaconElapsedRef = useRef(0);
   const beaconPulseActiveRef = useRef(false);
-  const lastPetNonceRef = useRef(petReactionNonce);
-  const petHopRef = useRef({ active: false, elapsed: 0 });
 
   useEffect(() => {
     const domElement = gl?.domElement;
@@ -293,30 +296,16 @@ export function InteractableHighlight({
     invalidate();
   }, [beaconGroup, highlighted, ownDesk, reducedMotion, invalidate]);
 
-  useEffect(() => {
-    if (petReactionNonce === lastPetNonceRef.current) return;
-    lastPetNonceRef.current = petReactionNonce;
-    if (petReactionNonce <= 0) return;
-
-    const petGroup = sceneRoot.getObjectByName('classroom-pet');
-    if (reducedMotion || !petGroup) {
-      resetPetPosition(sceneRoot);
-      petHopRef.current.active = false;
-      return;
-    }
-    petHopRef.current = { active: true, elapsed: 0 };
-    invalidate();
-  }, [petReactionNonce, reducedMotion, sceneRoot, invalidate]);
-
-  useEffect(() => {
-    return () => {
-      resetPetPosition(sceneRoot);
-    };
-  }, [sceneRoot]);
-
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.05);
     let needsMoreFrames = false;
+
+    if (highlighted?.npcId) {
+      const [dx, dz] = npcFollowOffset(highlighted, npcPositions);
+      followGroup.position.set(dx, 0, dz);
+    } else if (followGroup.position.x !== 0 || followGroup.position.z !== 0) {
+      followGroup.position.set(0, 0, 0);
+    }
 
     if (highlighted && beaconPulseActiveRef.current) {
       if (reducedMotion) {
@@ -336,20 +325,6 @@ export function InteractableHighlight({
         );
         beaconPulseActiveRef.current = stillPulsing;
         if (stillPulsing) {
-          needsMoreFrames = true;
-        }
-      }
-    }
-
-    if (petHopRef.current.active) {
-      if (reducedMotion) {
-        resetPetPosition(sceneRoot);
-        petHopRef.current.active = false;
-      } else {
-        petHopRef.current.elapsed += dt;
-        const stillHopping = stepPetHop(sceneRoot, petHopRef.current.elapsed);
-        petHopRef.current.active = stillHopping;
-        if (stillHopping) {
           needsMoreFrames = true;
         }
       }
@@ -376,7 +351,7 @@ export function InteractableHighlight({
       )}
 
       {highlighted && (
-        <>
+        <primitive object={followGroup}>
           <FrameOutline
             centerX={highlighted.worldPosition[0]}
             baseY={highlighted.worldPosition[1] + 0.018}
@@ -412,7 +387,7 @@ export function InteractableHighlight({
               rotation={[0, Math.PI / 4, 0]}
             />
           </primitive>
-        </>
+        </primitive>
       )}
     </>
   );

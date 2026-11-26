@@ -2,6 +2,9 @@ import { MapSchema } from '@colyseus/schema';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Avatar } from './avatar.generated';
+import { AvatarAppearance } from './avatar-appearance.generated';
+import { EquippedItemView } from './equipped-item-view.generated';
+import { Npc } from './npc.generated';
 import {
   AVATAR_INPUT_MESSAGE,
   CLASSROOM_ROOM_NAME,
@@ -11,6 +14,7 @@ import {
   CLOSE_REASON_ACCESS_REVOKED,
   CLOSE_REASON_TOO_MANY_CONNECTIONS,
   CLOSE_REASON_VERIFICATION_UNAVAILABLE,
+  NPC_INTERACT_MESSAGE,
 } from './contracts.generated';
 import { ClassroomState } from './room-state.generated';
 import {
@@ -23,6 +27,19 @@ import {
 
 const CLASSROOM_A = '7b1f3c52-8d1e-4f0a-9a57-2c6f5e8d9a10';
 const CLASSROOM_B = '11111111-1111-4111-8111-111111111111';
+
+/**
+ * Tests feed legacy and nested appearance shapes the server schema would reject:
+ * shadow the schema accessor on this instance with a plain value.
+ */
+function setLooseAppearance(avatar: object, value: unknown): void {
+  Object.defineProperty(avatar, 'appearance', {
+    value,
+    writable: true,
+    configurable: true,
+    enumerable: true,
+  });
+}
 
 class FakeRoom implements RealtimeRoomLike<ClassroomState> {
   readonly roomId: string;
@@ -123,6 +140,21 @@ class FakeRoom implements RealtimeRoomLike<ClassroomState> {
     avatar.rotation = data.rotation ?? 0;
     avatar.status = data.status ?? 'online';
     this.state.avatars.set(userId, avatar);
+  }
+
+  setNpc(id: string, data: Partial<Omit<Npc, 'id'>> = {}): void {
+    const npc = new Npc();
+    npc.id = id;
+    npc.x = data.x ?? 1;
+    npc.z = data.z ?? 2;
+    npc.rotation = data.rotation ?? 0;
+    npc.state = data.state ?? 'idle';
+    npc.emote = data.emote ?? '';
+    npc.reaction = data.reaction ?? '';
+    npc.phraseId = data.phraseId ?? -1;
+    npc.reactionSeq = data.reactionSeq ?? 0;
+    npc.reactingSessionId = data.reactingSessionId ?? '';
+    this.state.npcs.set(id, npc);
   }
 
   emitStateChange(): void {
@@ -547,6 +579,136 @@ describe('createClassroomRealtimeClient (#23)', () => {
     client.dispose();
   });
 
+  it('maps synced NPCs into the snapshot and follows state changes (#138)', async () => {
+    const { auth } = createFakeAuth('valid-token');
+    const sdk = createFakeSdk();
+    const room = new FakeRoom({ classroomId: CLASSROOM_A });
+    room.setNpc('tutorBot', {
+      x: -5.9,
+      z: 1.05,
+      rotation: 1.5,
+      state: 'reacting',
+      emote: 'Talk',
+      reaction: 'phrase',
+      phraseId: 3,
+      reactionSeq: 2,
+      reactingSessionId: 'conn-session-1',
+    });
+    sdk.setJoinHandler(async () => room);
+    const client = createClassroomRealtimeClient({
+      auth,
+      realtimeUrl: 'wss://realtime.example.invalid',
+      createSdkClient: sdk.createSdkClient,
+    });
+    expect(client.getSnapshot().npcs.size).toBe(0);
+
+    await client.connect(CLASSROOM_A);
+    expect(client.getSnapshot().npcs.get('tutorBot')).toEqual({
+      id: 'tutorBot',
+      x: -5.9,
+      z: 1.05,
+      rotation: 1.5,
+      state: 'reacting',
+      emote: 'Talk',
+      reaction: 'phrase',
+      phraseId: 3,
+      reactionSeq: 2,
+      reactingSessionId: 'conn-session-1',
+    });
+
+    room.setNpc('pet', { state: 'sleeping', emote: 'Sleep' });
+    room.state.npcs.get('tutorBot')!.x = Number.NaN;
+    room.emitStateChange();
+    const { npcs } = client.getSnapshot();
+    expect(npcs.get('pet')).toMatchObject({ id: 'pet', state: 'sleeping' });
+    expect(npcs.get('tutorBot')?.x).toBe(-5.9);
+
+    client.dispose();
+  });
+
+  it('reads equipped accessories from the real synced appearance schema (#138)', async () => {
+    const { auth } = createFakeAuth('valid-token');
+    const sdk = createFakeSdk();
+    const room = new FakeRoom({ classroomId: CLASSROOM_A });
+    room.setAvatar('schema-user', { displayName: 'Ana' });
+    const avatar = room.state.avatars.get('schema-user')!;
+    const appearance = new AvatarAppearance();
+    appearance.bodyId = 'female';
+    appearance.hairId = 'afro';
+    appearance.topId = 'hoodie';
+    appearance.hairColor = '#AF6D63';
+    appearance.clothingColor = '#7EBA8B';
+    const item = (slot: string, shopItemCode: string) => {
+      const view = new EquippedItemView();
+      view.slot = slot;
+      view.shopItemId = `id-${slot}`;
+      view.shopItemCode = shopItemCode;
+      view.shopItemName = shopItemCode;
+      view.kind = 'AVATAR_ACCESSORY';
+      return view;
+    };
+    appearance.items.set('head', item('head', 'head_crown'));
+    appearance.items.set('back', item('back', 'back_wings'));
+    avatar.appearance = appearance;
+    sdk.setJoinHandler(async () => room);
+    const client = createClassroomRealtimeClient({
+      auth,
+      realtimeUrl: 'wss://realtime.example.invalid',
+      createSdkClient: sdk.createSdkClient,
+    });
+
+    await client.connect(CLASSROOM_A);
+    expect(
+      client.getSnapshot().participants.get('schema-user')?.avatar?.equipped,
+    ).toEqual({ head: 'head_crown', face: null, back: 'back_wings' });
+
+    client.dispose();
+  });
+
+  it('falls back to idle and no reaction for unknown NPC state values (#138)', async () => {
+    const { auth } = createFakeAuth('valid-token');
+    const sdk = createFakeSdk();
+    const room = new FakeRoom({ classroomId: CLASSROOM_A });
+    room.setNpc('pet', { state: 'dancing', reaction: 'explode' });
+    sdk.setJoinHandler(async () => room);
+    const client = createClassroomRealtimeClient({
+      auth,
+      realtimeUrl: 'wss://realtime.example.invalid',
+      createSdkClient: sdk.createSdkClient,
+    });
+
+    await client.connect(CLASSROOM_A);
+    expect(client.getSnapshot().npcs.get('pet')).toMatchObject({
+      state: 'idle',
+      reaction: '',
+    });
+
+    client.dispose();
+  });
+
+  it('sends a validated npc:interact only while connected (#138)', async () => {
+    const { auth } = createFakeAuth('valid-token');
+    const sdk = createFakeSdk();
+    const room = new FakeRoom({ classroomId: CLASSROOM_A });
+    sdk.setJoinHandler(async () => room);
+    const client = createClassroomRealtimeClient({
+      auth,
+      realtimeUrl: 'wss://realtime.example.invalid',
+      createSdkClient: sdk.createSdkClient,
+    });
+
+    expect(client.interactNpc('tutorBot')).toBe(false);
+    await client.connect(CLASSROOM_A);
+    expect(client.interactNpc('tutorBot')).toBe(true);
+    expect(room.sentMessages).toEqual([
+      { type: NPC_INTERACT_MESSAGE, payload: { npcId: 'tutorBot' } },
+    ]);
+    expect(client.interactNpc('dragon')).toBe(false);
+    expect(room.sentMessages).toHaveLength(1);
+
+    client.dispose();
+  });
+
   it('S4: validates outgoing avatarInputSchema, ignores unknown/malformed messages safely, and blocks duplicate/stale sequences', async () => {
     const { auth } = createFakeAuth('valid-token');
     const sdk = createFakeSdk();
@@ -723,16 +885,16 @@ describe('createClassroomRealtimeClient (#23)', () => {
     });
     const avatarWithLook = room.state.avatars.get(
       'user-with-look',
-    ) as Avatar & {
+    ) as unknown as Omit<Avatar, 'appearance'> & {
       appearance?: unknown;
     };
-    avatarWithLook.appearance = {
+    setLooseAppearance(avatarWithLook, {
       bodyId: 'female',
       hairId: 'classic-short',
       topId: 'basic-tshirt',
       hairColor: '#6C4D48',
       clothingColor: '#75B7DA',
-    };
+    });
     Object.assign(room.state, {
       chatMuted: true,
       collaborationLocked: true,
@@ -920,7 +1082,9 @@ describe('createClassroomRealtimeClient (#23)', () => {
       role: 'STUDENT',
       status: 'online',
     });
-    const equippedAvatar = room.state.avatars.get('equipped-user') as Avatar & {
+    const equippedAvatar = room.state.avatars.get(
+      'equipped-user',
+    ) as unknown as Omit<Avatar, 'appearance'> & {
       appearance?: unknown;
     };
     const item = (slot: string, shopItemCode: string) => ({
@@ -930,7 +1094,7 @@ describe('createClassroomRealtimeClient (#23)', () => {
       shopItemName: shopItemCode,
       kind: 'AVATAR_ACCESSORY',
     });
-    equippedAvatar.appearance = {
+    setLooseAppearance(equippedAvatar, {
       baseAvatar: {
         bodyId: 'female',
         hairId: 'afro',
@@ -944,7 +1108,7 @@ describe('createClassroomRealtimeClient (#23)', () => {
         back: item('back', 'back_wings'),
         desk_decor: item('desk_decor', 'desk_plant'),
       },
-    };
+    });
     sdk.setJoinHandler(async () => room);
     const client = createClassroomRealtimeClient({
       auth,
@@ -972,10 +1136,12 @@ describe('createClassroomRealtimeClient (#23)', () => {
       rotation: Number.NEGATIVE_INFINITY,
       status: 'online',
     });
-    const nestedAvatar = room.state.avatars.get('nested-user') as Avatar & {
+    const nestedAvatar = room.state.avatars.get(
+      'nested-user',
+    ) as unknown as Omit<Avatar, 'appearance'> & {
       appearance?: unknown;
     };
-    nestedAvatar.appearance = {
+    setLooseAppearance(nestedAvatar, {
       baseAvatar: {
         bodyId: 'female',
         hairId: 'afro',
@@ -989,7 +1155,7 @@ describe('createClassroomRealtimeClient (#23)', () => {
         back: null,
         desk_decor: null,
       },
-    };
+    });
     sdk.setJoinHandler(async () => room);
 
     const client = createClassroomRealtimeClient({

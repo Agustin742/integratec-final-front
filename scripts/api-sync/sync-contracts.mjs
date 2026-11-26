@@ -10,6 +10,11 @@ export const BACKEND_ARTIFACT_PATHS = Object.freeze({
   contracts: 'packages/contracts/src/index.ts',
   realtimeState: 'packages/contracts/src/realtime/generated/ClassroomState.ts',
   realtimeAvatar: 'packages/contracts/src/realtime/generated/Avatar.ts',
+  realtimeNpc: 'packages/contracts/src/realtime/generated/Npc.ts',
+  realtimeAppearance:
+    'packages/contracts/src/realtime/generated/AvatarAppearance.ts',
+  realtimeEquippedItem:
+    'packages/contracts/src/realtime/generated/EquippedItemView.ts',
 });
 
 export const FRONTEND_OUTPUT_PATHS = Object.freeze({
@@ -17,6 +22,9 @@ export const FRONTEND_OUTPUT_PATHS = Object.freeze({
   contracts: 'src/realtime/contracts.generated.ts',
   realtimeState: 'src/realtime/room-state.generated.ts',
   realtimeAvatar: 'src/realtime/avatar.generated.ts',
+  realtimeNpc: 'src/realtime/npc.generated.ts',
+  realtimeAppearance: 'src/realtime/avatar-appearance.generated.ts',
+  realtimeEquippedItem: 'src/realtime/equipped-item-view.generated.ts',
 });
 
 export const GENERATED_HEADER = [
@@ -354,7 +362,11 @@ export function formatPulledTypeArtifact(rawSource, artifactPath) {
       /(?<!type\s)\bDataChange\b(?=\s*\}\s*from\s*['"]@colyseus\/schema['"])/g,
       'type DataChange',
     )
-    .replace(/from (['"])\.\/Avatar\1/g, 'from $1./avatar.generated$1');
+    .replace(
+      /from (['"])\.\/(Avatar|Npc|AvatarAppearance|EquippedItemView)\1/g,
+      (_match, quote, name) =>
+        `from ${quote}./${name.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase()}.generated${quote}`,
+    );
   return normalizeLineEndings(
     `${buildGeneratedFileBanner(artifactPath)}${stripped}`,
   );
@@ -454,6 +466,24 @@ export async function syncContracts(options = {}) {
       label: 'Realtime Colyseus avatar schema types',
       artifactPath: artifactPaths.realtimeAvatar,
       relativeOutputPath: outputPaths.realtimeAvatar,
+    },
+    {
+      kind: 'realtimeNpc',
+      label: 'Realtime Colyseus NPC schema types',
+      artifactPath: artifactPaths.realtimeNpc,
+      relativeOutputPath: outputPaths.realtimeNpc,
+    },
+    {
+      kind: 'realtimeAppearance',
+      label: 'Realtime Colyseus avatar appearance schema types',
+      artifactPath: artifactPaths.realtimeAppearance,
+      relativeOutputPath: outputPaths.realtimeAppearance,
+    },
+    {
+      kind: 'realtimeEquippedItem',
+      label: 'Realtime Colyseus equipped item schema types',
+      artifactPath: artifactPaths.realtimeEquippedItem,
+      relativeOutputPath: outputPaths.realtimeEquippedItem,
     },
   ];
 

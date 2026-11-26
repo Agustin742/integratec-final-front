@@ -1,10 +1,5 @@
 import { act, render } from '@testing-library/react';
-import {
-  BoxGeometry,
-  Group,
-  MeshBasicMaterial,
-  OctahedronGeometry,
-} from 'three';
+import { BoxGeometry, MeshBasicMaterial, OctahedronGeometry } from 'three';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { CLASSROOM_LAYOUT } from '@/realtime';
 import {
@@ -36,14 +31,6 @@ const byId = indexClassroomInteractables(
   deriveClassroomInteractables(CLASSROOM_LAYOUT),
 );
 
-function makeSceneRoot() {
-  const root = new Group();
-  const pet = new Group();
-  pet.name = 'classroom-pet';
-  root.add(pet);
-  return { root, pet };
-}
-
 function stubReducedMotion(matches: boolean) {
   vi.stubGlobal(
     'matchMedia',
@@ -70,13 +57,8 @@ afterEach(() => {
 
 describe('InteractableHighlight', () => {
   test('sets pointer cursor while an interactable is highlighted and resets on clear and unmount', () => {
-    const { root } = makeSceneRoot();
     const view = render(
-      <InteractableHighlight
-        interactablesById={byId}
-        highlightedId="board"
-        sceneRoot={root}
-      />,
+      <InteractableHighlight interactablesById={byId} highlightedId="board" />,
     );
     expect(r3f.domElement?.style.cursor).toBe('pointer');
 
@@ -84,17 +66,12 @@ describe('InteractableHighlight', () => {
       <InteractableHighlight
         interactablesById={byId}
         highlightedId={undefined}
-        sceneRoot={root}
       />,
     );
     expect(r3f.domElement?.style.cursor).toBe('');
 
     view.rerender(
-      <InteractableHighlight
-        interactablesById={byId}
-        highlightedId="shop"
-        sceneRoot={root}
-      />,
+      <InteractableHighlight interactablesById={byId} highlightedId="shop" />,
     );
     expect(r3f.domElement?.style.cursor).toBe('pointer');
     view.unmount();
@@ -102,7 +79,6 @@ describe('InteractableHighlight', () => {
   });
 
   test('renders non-raycasting highlight meshes and disposes geometries and materials on unmount', () => {
-    const { root } = makeSceneRoot();
     const boxDispose = vi.spyOn(BoxGeometry.prototype, 'dispose');
     const octDispose = vi.spyOn(OctahedronGeometry.prototype, 'dispose');
     const matDispose = vi.spyOn(MeshBasicMaterial.prototype, 'dispose');
@@ -112,7 +88,6 @@ describe('InteractableHighlight', () => {
         interactablesById={byId}
         highlightedId="board"
         ownDeskIndex={1}
-        sceneRoot={root}
       />,
     );
 
@@ -125,51 +100,10 @@ describe('InteractableHighlight', () => {
     expect(matDispose).toHaveBeenCalledTimes(3);
   });
 
-  test('animates the pet hop over ~450ms and restores exact baseline y = 0', () => {
-    const { root, pet } = makeSceneRoot();
-    const view = render(
-      <InteractableHighlight
-        interactablesById={byId}
-        sceneRoot={root}
-        petReactionNonce={0}
-      />,
-    );
-    expect(pet.position.y).toBe(0);
-
-    view.rerender(
-      <InteractableHighlight
-        interactablesById={byId}
-        sceneRoot={root}
-        petReactionNonce={1}
-      />,
-    );
-    r3f.invalidate.mockClear();
-
-    act(() => r3f.callback?.({}, 0.05));
-    expect(pet.position.y).toBeGreaterThan(0);
-    expect(r3f.invalidate).toHaveBeenCalledTimes(1);
-
-    for (let step = 0; step < 12; step += 1) {
-      act(() => r3f.callback?.({}, 0.05));
-    }
-    expect(pet.position.y).toBe(0);
-
-    r3f.invalidate.mockClear();
-    act(() => r3f.callback?.({}, 0.05));
-    expect(r3f.invalidate).not.toHaveBeenCalled();
-  });
-
   test('runs a bounded beacon entrance pulse and returns demand rendering to idle while highlighted', () => {
-    const { root } = makeSceneRoot();
     render(
-      <InteractableHighlight
-        interactablesById={byId}
-        highlightedId="board"
-        sceneRoot={root}
-      />,
+      <InteractableHighlight interactablesById={byId} highlightedId="board" />,
     );
-    const beacon = root.parent ?? undefined;
-    expect(beacon).toBeUndefined();
 
     r3f.invalidate.mockClear();
     act(() => r3f.callback?.({}, 0.05));
@@ -184,29 +118,13 @@ describe('InteractableHighlight', () => {
     expect(r3f.invalidate).not.toHaveBeenCalled();
   });
 
-  test('skips pet hop and beacon motion under prefers-reduced-motion', () => {
+  test('skips the beacon pulse under prefers-reduced-motion', () => {
     stubReducedMotion(true);
-    const { root, pet } = makeSceneRoot();
-    const view = render(
-      <InteractableHighlight
-        interactablesById={byId}
-        highlightedId="board"
-        sceneRoot={root}
-        petReactionNonce={0}
-      />,
-    );
-
-    view.rerender(
-      <InteractableHighlight
-        interactablesById={byId}
-        highlightedId="board"
-        sceneRoot={root}
-        petReactionNonce={1}
-      />,
+    render(
+      <InteractableHighlight interactablesById={byId} highlightedId="board" />,
     );
     r3f.invalidate.mockClear();
     act(() => r3f.callback?.({}, 0.05));
-    expect(pet.position.y).toBe(0);
     expect(r3f.invalidate).not.toHaveBeenCalled();
   });
 });

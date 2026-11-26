@@ -373,7 +373,7 @@ test('opens panels from the floating HUD buttons, triggers proximity prompt with
   expect(pageErrors).toEqual([]);
 });
 
-test('greets the decorative pet Michi via proximity KeyE without opening a dialog and auto-dismisses the greeting', async ({
+test('interacts with the classroom pet Michi via proximity KeyE without opening a dialog or showing a local greeting', async ({
   page,
 }, testInfo) => {
   test.setTimeout(60_000);
@@ -395,7 +395,7 @@ test('greets the decorative pet Michi via proximity KeyE without opening a dialo
   await dismissLowFpsOfferIfPresent(page);
   await canvas.scrollIntoViewIfNeeded();
 
-  // Walk along the clear back aisle (+x) to the right wall, then straight up (-z) to Michi at (7, -5.86).
+  // Walk along the clear back aisle (+x) to the right wall, then straight up (-z) to Michi on its pet bed at (6.73, -5.40).
   await page.keyboard.down('KeyD');
   await page.keyboard.down('KeyS');
   try {
@@ -405,7 +405,7 @@ test('greets the decorative pet Michi via proximity KeyE without opening a dialo
     await page.keyboard.up('KeyS');
   }
 
-  const petPrompt = page.getByRole('button', { name: /Saludar a Michi/ });
+  const petPrompt = page.getByRole('button', { name: /Acariciar a Michi/ });
   await page.keyboard.down('KeyW');
   await page.keyboard.down('KeyD');
   try {
@@ -417,13 +417,12 @@ test('greets the decorative pet Michi via proximity KeyE without opening a dialo
 
   await expect(petPrompt).toBeVisible();
   await expect(page.getByTestId('classroom-proximity-status')).toHaveText(
-    classroomMessages.proximity.announce('Saludar a Michi'),
+    classroomMessages.proximity.announce('Acariciar a Michi'),
   );
   await page.keyboard.press('KeyE');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   const status = page.getByTestId('classroom-interactable-status');
-  await expect(status).toHaveText('Michi te saluda desde su rincón.');
-  await expect(status).toBeEmpty({ timeout: 6_000 });
+  await expect(status).toBeEmpty();
 
   expect(cspViolations).toEqual([]);
   expect(pageErrors).toEqual([]);

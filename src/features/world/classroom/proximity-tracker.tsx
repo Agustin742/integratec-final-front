@@ -3,6 +3,10 @@ import { useEffect, useMemo, useRef } from 'react';
 import { Vector3 } from 'three';
 import type { Pose } from '../movement';
 import type { ClassroomInteractable } from './classroom-interactables';
+import {
+  resolveLiveInteractable,
+  type NpcLivePositions,
+} from './npc-live-position';
 import { selectProximityTarget } from './proximity';
 
 export interface ProximityAnchor {
@@ -21,6 +25,8 @@ export interface ProximityTrackerProps {
   onChange: ((id: string | undefined) => void) | undefined;
   /** Fires while a target exists, with its projected screen point (no React state). */
   onAnchor: ((anchor: ProximityAnchor) => void) | undefined;
+  /** Live spots of roaming NPCs; their interactables follow them each frame. */
+  npcPositions?: NpcLivePositions | undefined;
 }
 
 const SCRATCH = new Vector3();
@@ -36,6 +42,7 @@ export function ProximityTracker({
   interactables,
   onChange,
   onAnchor,
+  npcPositions,
 }: ProximityTrackerProps) {
   const invalidate = useThree((state) => state.invalidate);
   const currentRef = useRef<string | undefined>(undefined);
@@ -68,7 +75,11 @@ export function ProximityTracker({
   useFrame(({ camera }) => {
     const next = selectProximityTarget({
       position: poseRef?.current,
-      candidates: interactables,
+      candidates: npcPositions
+        ? interactables.map((item) =>
+            resolveLiveInteractable(item, npcPositions),
+          )
+        : interactables,
       currentId: currentRef.current,
     });
     if (next !== currentRef.current) {
@@ -76,8 +87,9 @@ export function ProximityTracker({
       lastAnchorRef.current = null;
       callbacks.current.onChange?.(next);
     }
-    const target = next === undefined ? undefined : byId.get(next);
-    if (!target) return;
+    const staticTarget = next === undefined ? undefined : byId.get(next);
+    if (!staticTarget) return;
+    const target = resolveLiveInteractable(staticTarget, npcPositions);
     const [worldX, , worldZ] = target.worldPosition;
     camera.updateMatrixWorld();
     SCRATCH.set(worldX, target.beaconHeight, worldZ).project(camera);

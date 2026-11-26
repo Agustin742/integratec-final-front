@@ -19,9 +19,11 @@ import { fakeSession } from '@/app/router/fake-session';
 import { SessionProvider } from '@/session/provider';
 import { profile } from '@/session/test-fixtures';
 import {
+  BOT_INDEX_FAILURE_REASON,
   TEST_API_BASE_URL,
   createClassroomDetailHandler,
   createClassroomMaterialsStore,
+  type BotMaterialStateEntry,
   type ClassroomMaterialItem,
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
@@ -45,6 +47,23 @@ const BASE_ITEM: ClassroomMaterialItem = {
   sizeBytes: 4096,
   createdAt: '2026-11-18T10:00:00.000Z',
 };
+
+function botEntry(
+  overrides: Partial<BotMaterialStateEntry> = {},
+): BotMaterialStateEntry {
+  return {
+    id: '00000000-0000-4000-8000-000000009001',
+    classroomId: CLASSROOM_ID,
+    materialId: MATERIAL_ID,
+    filename: BASE_ITEM.filename,
+    contentType: 'application/pdf',
+    sizeBytes: BASE_ITEM.sizeBytes,
+    indexState: 'INDEXED',
+    failureReason: null,
+    createdAt: '2026-11-19T01:00:00.000Z',
+    ...overrides,
+  };
+}
 
 function renderPanel(options: {
   readonly role?: 'TEACHER' | 'STUDENT' | 'PARENT';
@@ -105,16 +124,7 @@ describe('MaterialPanel HU-BOT-001', () => {
     const store = createClassroomMaterialsStore({
       classroomId: CLASSROOM_ID,
       initialItems: [BASE_ITEM],
-      initialBotStates: [
-        {
-          materialId: MATERIAL_ID,
-          classroomId: CLASSROOM_ID,
-          botEnabled: true,
-          indexingStatus: 'ready',
-          indexingError: null,
-          updatedAt: '2026-11-19T01:00:00.000Z',
-        },
-      ],
+      initialBotStates: [botEntry()],
     });
     mswServer.use(...store.handlers);
 
@@ -158,14 +168,12 @@ describe('MaterialPanel HU-BOT-001', () => {
       await screen.findByText('Material habilitado para el asistente'),
     ).toBeInTheDocument();
     expect(toggle).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByText('Indexando…')).toBeInTheDocument();
+    expect(screen.getByText('Listo para el bot')).toBeInTheDocument();
 
-    store.setBotState(MATERIAL_ID, {
-      botEnabled: true,
-      indexingStatus: 'ready',
-    });
+    // A row left PENDING by the server is shown as such.
+    store.setBotState(MATERIAL_ID, { indexState: 'PENDING' });
     await queryClient.invalidateQueries();
-    expect(await screen.findByText('Listo para el bot')).toBeInTheDocument();
+    expect(await screen.findByText('Indexando…')).toBeInTheDocument();
 
     fireEvent.click(toggle);
     expect(
@@ -183,14 +191,10 @@ describe('MaterialPanel HU-BOT-001', () => {
       classroomId: CLASSROOM_ID,
       initialItems: [BASE_ITEM],
       initialBotStates: [
-        {
-          materialId: MATERIAL_ID,
-          classroomId: CLASSROOM_ID,
-          botEnabled: true,
-          indexingStatus: 'failed',
-          indexingError: '<img src=x onerror=alert(1)> PDF sin texto extraíble',
-          updatedAt: '2026-11-19T01:00:00.000Z',
-        },
+        botEntry({
+          indexState: 'FAILED',
+          failureReason: '<img src=x onerror=alert(1)> PDF sin texto extraíble',
+        }),
       ],
     });
     mswServer.use(...store.handlers);
@@ -201,6 +205,71 @@ describe('MaterialPanel HU-BOT-001', () => {
       screen.getByText('<img src=x onerror=alert(1)> PDF sin texto extraíble'),
     ).toBeInTheDocument();
     expect(document.querySelector('img')).toBeNull();
+  });
+
+  it('reports a failed indexing and retries it without disabling the material', async () => {
+    const store = createClassroomMaterialsStore({
+      classroomId: CLASSROOM_ID,
+      initialItems: [BASE_ITEM],
+    });
+    store.setBotIndexOutcome('FAILED');
+    mswServer.use(...store.handlers);
+
+    renderPanel({ role: 'TEACHER' });
+    const toggle = await screen.findByRole('switch');
+    await waitFor(() => {
+      expect(toggle).toHaveAttribute('aria-disabled', 'false');
+    });
+    fireEvent.click(toggle);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'No pudimos indexar el material',
+    );
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText(BOT_INDEX_FAILURE_REASON)).toBeInTheDocument();
+
+    store.setBotIndexOutcome('INDEXED');
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Reintentar indexación de «guia-bot-unidad-1.pdf»',
+      }),
+    );
+
+    expect(await screen.findByText('Listo para el bot')).toBeInTheDocument();
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(toggle).toHaveFocus();
+    expect(
+      screen.queryByRole('button', { name: /Reintentar indexación/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the material as excluded when the index cleanup is pending', async () => {
+    const store = createClassroomMaterialsStore({
+      classroomId: CLASSROOM_ID,
+      initialItems: [BASE_ITEM],
+      initialBotStates: [botEntry()],
+    });
+    mswServer.use(...store.handlers);
+
+    renderPanel({ role: 'TEACHER' });
+    expect(await screen.findByText('Listo para el bot')).toBeInTheDocument();
+    store.failNext('botDisable', {
+      status: 503,
+      body: {
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Cleanup pending',
+        correlationId: 'req-bot-503',
+      },
+    });
+    const toggle = screen.getByRole('switch');
+    fireEvent.click(toggle);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'El material ya quedó excluido del asistente',
+    );
+    await waitFor(() => {
+      expect(toggle).toHaveAttribute('aria-checked', 'false');
+    });
   });
 
   it('keeps confirmed switch state unchanged and alerts on 403 and 503 toggle failures', async () => {
@@ -216,7 +285,7 @@ describe('MaterialPanel HU-BOT-001', () => {
     });
     expect(toggle).toHaveAttribute('aria-checked', 'false');
 
-    store.failNext('botToggle', {
+    store.failNext('botEnable', {
       status: 403,
       body: {
         code: 'FORBIDDEN',
@@ -233,7 +302,7 @@ describe('MaterialPanel HU-BOT-001', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'false');
     expect(store.readBotStates()).toEqual([]);
 
-    store.failNext('botToggle', {
+    store.failNext('botEnable', {
       status: 503,
       body: {
         code: 'SERVICE_UNAVAILABLE',
@@ -269,9 +338,19 @@ describe('MaterialPanel HU-BOT-001', () => {
             await new Promise<void>((resolve) => {
               releaseDelayedGet = resolve;
             });
-            return HttpResponse.json({ items: [] });
+            return HttpResponse.json({
+              items: [],
+              page: 1,
+              pageSize: 100,
+              total: 0,
+            });
           }
-          return HttpResponse.json({ items: store.readBotStates() });
+          return HttpResponse.json({
+            items: store.readBotStates(),
+            page: 1,
+            pageSize: 100,
+            total: store.readBotStates().length,
+          });
         },
       ),
     );
@@ -303,7 +382,7 @@ describe('MaterialPanel HU-BOT-001', () => {
 
     // Delayed pre-toggle GET must not overwrite confirmed state.
     expect(toggle).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByText('Indexando…')).toBeInTheDocument();
+    expect(screen.getByText('Listo para el bot')).toBeInTheDocument();
 
     // Terminal 403 on bot-config load disables switch without showing disabledHint (F-02, F-03).
     mswServer.use(

@@ -9,7 +9,6 @@ import {
   Object3D,
   PlaneGeometry,
   Quaternion,
-  SphereGeometry,
   Vector3,
   type BufferGeometry,
 } from 'three';
@@ -28,7 +27,6 @@ export const CLASSROOM_COLORS = {
   boardGreen: '#3E8654',
   coral: '#E66861',
   peach: '#F5B5AB',
-  petGreen: '#65B96A',
   lavender: '#B5A7D6',
   bookSage: '#9DB4A0',
   bookClay: '#C7A98B',
@@ -42,6 +40,9 @@ export type PlaceholderKind =
   | 'shop'
   | 'pet'
   | 'tutor-bot'
+  | 'bot-station'
+  | 'chat-computer'
+  | 'report-card-stand'
   | 'entrance';
 
 export interface ClassroomScene {
@@ -64,14 +65,15 @@ type Vec3 = readonly [number, number, number];
  * room = negative z (board, shelf, shop, pet); the entrance is at the back.
  * The shell and the furniture (desks, board, shelf) are the modular kit
  * rendered by `<ClassroomKit>`; this scene keeps the invisible walkable-floor
- * and entrance raycast planes, invisible picking proxies for desks, board and
- * shelf, the teaching zone and the remaining prop placeholders.
+ * and entrance raycast planes, invisible picking proxies for desks, board,
+ * shelf, shop, bulletin board, door and bot station, and the teaching zone. The
+ * roaming tutor bot and pet are drawn and picked by `<TutorBot>` and
+ * `<ClassroomPet>`, which mount their own proxy under this root.
  */
 export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   const { bounds } = layout;
   const propSpecs = deriveClassroomPropSpecs(layout);
   const box = new BoxGeometry(1, 1, 1);
-  const sphere = new SphereGeometry(0.5, 16, 12);
   const plane = new PlaneGeometry(1, 1);
   const materials = new Map<string, MeshStandardMaterial>();
   const material = (color: string) => {
@@ -105,21 +107,6 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
     return mesh;
   };
 
-  const part = (
-    parent: Object3D,
-    geometry: BufferGeometry,
-    color: string,
-    size: Vec3,
-    position: Vec3,
-  ) => {
-    const mesh = new Mesh(geometry, material(color));
-    mesh.scale.set(...size);
-    mesh.position.set(...position);
-    parent.add(mesh);
-    return mesh;
-  };
-  const block = (parent: Object3D, color: string, size: Vec3, position: Vec3) =>
-    part(parent, box, color, size, position);
   const flat = (
     color: string,
     width: number,
@@ -269,32 +256,41 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
   const shelf = prop('classroom-shelf', 'shelf', propSpecs.shelf.position);
   proxy(shelf, [1.8, 1.54, 0.3], [0, 0.77, 0.15]);
 
-  // Shop corner, front wall, right of the board.
+  // Shop kiosk (1.96 x 2.15 m), front wall right of the board: drawn by the kit.
   const shop = prop('classroom-shop', 'shop', propSpecs.shop.position);
-  block(shop, CLASSROOM_COLORS.peach, [2, 0.9, 0.28], [0, 0.45, 0.14]);
-  block(shop, CLASSROOM_COLORS.wood, [2, 0.05, 0.28], [0, 0.925, 0.14]);
-  block(shop, CLASSROOM_COLORS.peach, [1.4, 0.4, 0.05], [0, 1.7, 0.025]);
-  block(shop, CLASSROOM_COLORS.butter, [0.2, 0.2, 0.2], [-0.6, 1.05, 0.14]);
-  block(shop, CLASSROOM_COLORS.turquoise, [0.25, 0.15, 0.2], [0, 1.0, 0.14]);
-  block(shop, CLASSROOM_COLORS.coral, [0.18, 0.25, 0.18], [0.6, 1.075, 0.14]);
+  proxy(shop, [1.96, 2.15, 0.28], [0, 1.075, 0.14]);
 
-  // Pet corner (basket + green pet), front-right corner of the front wall.
-  const pet = prop('classroom-pet', 'pet', propSpecs.pet.position);
-  block(pet, CLASSROOM_COLORS.wood, [1, 0.14, 0.28], [0, 0.07, 0.14]);
-  part(
-    pet,
-    sphere,
-    CLASSROOM_COLORS.petGreen,
-    [0.5, 0.26, 0.22],
-    [-0.05, 0.27, 0.14],
+  // Exit door (1.44 x 2.3 m) in the back-wall gap, drawn outside the batched
+  // kit (it fades over the local avatar); this proxy owns its hit box and stays
+  // pickable while it is faded. Local z points out of the room here.
+  const door = prop('classroom-door', 'entrance', [0, 0, bounds.maxZ]);
+  proxy(door, [1.44, 2.3, 0.24], [0, 1.15, 0.12]);
+
+  // Tutor Corner station: a free-standing kit prop (1.28 x 1.35 x 1.53 m once
+  // rotated); the proxy keeps its world-aligned hit box.
+  const station = prop(
+    'classroom-bot-station',
+    'bot-station',
+    propSpecs.botStation.position,
   );
-  part(
-    pet,
-    sphere,
-    CLASSROOM_COLORS.petGreen,
-    [0.2, 0.2, 0.2],
-    [0.28, 0.32, 0.14],
+  proxy(station, [1.28, 1.35, 1.53], [0, 0.675, 0]);
+
+  // Report card stand (0.78 x 1.36 x 0.48 m) on the front wall: drawn by the kit.
+  const reportCards = prop(
+    'classroom-report-card-stand',
+    'report-card-stand',
+    propSpecs.reportCardStand.position,
   );
+  proxy(reportCards, [0.78, 1.36, 0.48], [0, 0.68, 0.02]);
+
+  // Chat computer (0.88 x 1.24 x 0.55 m) on the left wall, facing +x.
+  const chatComputer = prop(
+    'classroom-chat-computer',
+    'chat-computer',
+    propSpecs.chatComputer.position,
+    propSpecs.chatComputer.rotationY ?? 0,
+  );
+  proxy(chatComputer, [0.88, 1.24, 0.55], [0, 0.62, 0]);
 
   // Bulletin board on the left wall near the entrance (local z points into the room).
   const bulletin = prop(
@@ -303,33 +299,7 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
     propSpecs.bulletinBoard.position,
     propSpecs.bulletinBoard.rotationY ?? 0,
   );
-  block(bulletin, CLASSROOM_COLORS.wood, [2, 1, 0.06], [0, 1.5, 0.03]);
-  block(bulletin, CLASSROOM_COLORS.coral, [1.8, 0.8, 0.03], [0, 1.5, 0.075]);
-  (
-    [
-      [-0.55, CLASSROOM_COLORS.butter],
-      [0, CLASSROOM_COLORS.turquoise],
-      [0.55, CLASSROOM_COLORS.peach],
-    ] as const
-  ).forEach(([x, color]) =>
-    block(bulletin, color, [0.3, 0.4, 0.01], [x, 1.5, 0.095]),
-  );
-
-  // Tutor bot stands on the teacher desk, so its footprint is inside the obstacle.
-  const bot = prop(
-    'classroom-tutor-bot',
-    'tutor-bot',
-    propSpecs.tutorBot.position,
-  );
-  block(bot, CLASSROOM_COLORS.lavender, [0.28, 0.3, 0.2], [0, 0.15, 0]);
-  part(
-    bot,
-    sphere,
-    CLASSROOM_COLORS.lavender,
-    [0.24, 0.24, 0.24],
-    [0, 0.42, 0],
-  );
-  block(bot, CLASSROOM_COLORS.lavender, [0.02, 0.1, 0.02], [0, 0.59, 0]);
+  proxy(bulletin, [2.01, 1.34, 0.23], [0, 1.66, 0.115]);
 
   const dispose = () => {
     const geometries = new Set<BufferGeometry>();
@@ -356,6 +326,7 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
     ['teacher-desk', root.getObjectByName('teacher-desk')],
     ['board', board.children[0]],
     ['bookshelf', shelf.children[0]],
+    ['door', door.children[0]],
   ] as const;
   const setFailedModules = (ids: ReadonlySet<ClassroomKitModuleId>) => {
     for (const [id, target] of recoveryTargets) {

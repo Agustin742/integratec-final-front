@@ -32,6 +32,18 @@ describe('isWalkable', () => {
   });
 });
 
+describe('isWalkable props (#138)', () => {
+  test('treats every shared floor prop like a desk', () => {
+    expect(layout.props.length).toBeGreaterThan(0);
+    for (const prop of layout.props) {
+      const cx = (prop.minX + prop.maxX) / 2;
+      const cz = (prop.minZ + prop.maxZ) / 2;
+      expect(isWalkable(layout, cx, cz)).toBe(false);
+      expect(isWalkable(layout, cx, prop.maxZ + r - 0.01)).toBe(false);
+    }
+  });
+});
+
 describe('stepAvatar', () => {
   test('moves at the fixed speed regardless of the input length', () => {
     const short = stepAvatar(layout, start(0, 0), { x: 0.1, z: 0 }, 0.1);
@@ -135,6 +147,7 @@ describe('stepAvatar', () => {
       bounds: { minX: 0, maxX: 2, minZ: 0, maxZ: 2 },
       avatarRadius: 0.5,
       obstacles: [],
+      props: [],
       spawnPoints: [{ x: 1, z: 1 }],
     };
     expect(stepAvatar(small, start(1, 1), { x: 1, z: 0 }, 10).x).toBeCloseTo(

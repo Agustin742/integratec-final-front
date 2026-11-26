@@ -6,7 +6,7 @@ import { deriveClassroomPropSpecs } from './classroom-interactables';
 import { deriveShellPlacements } from './classroom-shell-placements';
 import { getKitModuleUrl } from './kit/classroom-kit-manifest';
 import { estimateKitDrawCalls } from './kit/kit-draw-calls';
-import { glbMaterialNames } from './kit/glb-materials.test-utils';
+import { glbMaterialKeys } from './kit/glb-materials.test-utils';
 import { groupPlacementsByModule } from './kit/kit-placement';
 
 const layout = CLASSROOM_LAYOUT;
@@ -148,7 +148,7 @@ describe('deriveShellPlacements', () => {
     const meshCounts = Object.fromEntries(
       [...byModule.keys()].map((id) => [
         id,
-        glbMaterialNames(getKitModuleUrl(id)),
+        glbMaterialKeys(getKitModuleUrl(id)),
       ]),
     );
     const shell = estimateKitDrawCalls(placements, meshCounts);

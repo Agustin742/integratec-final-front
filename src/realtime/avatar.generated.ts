@@ -10,11 +10,13 @@
 //
 
 import { Schema, type, ArraySchema, MapSchema, SetSchema, type DataChange } from '@colyseus/schema';
+import { AvatarAppearance } from './avatar-appearance.generated';
 
 export class Avatar extends Schema {
   @type('string') public userId!: string;
   @type('string') public displayName!: string;
   @type('string') public role!: string;
+  @type(AvatarAppearance) public appearance: AvatarAppearance = new AvatarAppearance();
   @type('float32') public x!: number;
   @type('float32') public z!: number;
   @type('float32') public rotation!: number;

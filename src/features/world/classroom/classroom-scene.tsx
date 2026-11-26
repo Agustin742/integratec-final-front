@@ -4,6 +4,18 @@ import type { Avatar } from '@/features/profile/avatar-options';
 import { CLASSROOM_LAYOUT, type AvatarInput } from '@/realtime';
 import type { AvatarEquipped } from '../avatar/avatar-part-plan';
 import type { Pose } from '../movement';
+import {
+  PET_NPC_ID,
+  TUTOR_BOT_NPC_ID,
+  derivePetHome,
+  deriveTutorBotHome,
+  findNpcView,
+  type NpcSpeech,
+  type NpcView,
+  type NpcViews,
+} from '../npc/npc-view';
+import { TutorBot } from '../npc/tutor-bot';
+import { ClassroomPet } from '../npc/classroom-pet';
 import { WarmLighting } from '../world-lighting';
 import { buildClassroomScene } from './build-classroom-scene';
 import {
@@ -13,14 +25,18 @@ import {
   type ClassroomInteractable,
   type InteractablePointerEvent,
 } from './classroom-interactables';
+import { deriveDecorationPlacements } from './classroom-decoration-placements';
 import { deriveFurniturePlacements } from './classroom-furniture-placements';
+import { deriveInteractivePlacements } from './classroom-interactive-placements';
 import { deriveShellPlacements } from './classroom-shell-placements';
+import { ClassroomDoor } from './classroom-door';
 import type { FloorClickEvent } from './floor-click';
 import { FollowCamera } from './follow-camera';
 import { InteractableHighlight } from './interactable-highlight';
 import { ClassroomKit } from './kit/classroom-kit';
 import type { ClassroomKitModuleId } from './kit/classroom-kit-manifest';
 import { LocalAvatar } from './local-avatar';
+import { createNpcLivePositions } from './npc-live-position';
 import { ProximityTracker, type ProximityAnchor } from './proximity-tracker';
 import { RemoteAvatar, type RemoteClassroomParticipant } from './remote-avatar';
 import { useClassroomNavigation } from './use-classroom-navigation';
@@ -46,8 +62,6 @@ export interface ClassroomSceneProps {
   highlightedInteractableId?: string | undefined;
   /** Server-assigned 1-based student desk index, or null when unassigned. */
   ownDeskIndex?: number | null | undefined;
-  /** Monotonic nonce triggering a decorative bounce on the classroom pet. */
-  petReactionNonce?: number | undefined;
   /** True while a modal panel owns focus and blocks 3D interaction. */
   interactionLocked?: boolean | undefined;
   onHoverInteractable?: ((id: string | undefined) => void) | undefined;
@@ -60,6 +74,17 @@ export interface ClassroomSceneProps {
   onProximityChange?: ((id: string | undefined) => void) | undefined;
   /** Screen point of the nearby target, every frame it is shown. */
   onProximityAnchor?: ((anchor: ProximityAnchor) => void) | undefined;
+  /**
+   * Synced NPC state by id. Without it the tutor bot rests idle at its home
+   * in front of the bot station, so the scene never lacks one.
+   */
+  npcs?: NpcViews | undefined;
+  /** Text for an NPC phrase reaction (resolved from its synced phrase id). */
+  resolveNpcPhrase?: ((npc: NpcView) => string | undefined) | undefined;
+  /** Phrase an NPC is saying now, or undefined once it fades. */
+  onNpcSpeech?: ((speech: NpcSpeech | undefined) => void) | undefined;
+  /** Screen point (0..1, y down) above the speaking NPC, every frame it moves. */
+  onNpcSpeechAnchor?: ((anchor: ProximityAnchor) => void) | undefined;
 }
 
 type ScenePointerEvent = FloorClickEvent & InteractablePointerEvent;
@@ -85,13 +110,16 @@ export function ClassroomScene({
   onIntentChange,
   highlightedInteractableId,
   ownDeskIndex,
-  petReactionNonce,
   interactionLocked = false,
   onHoverInteractable,
   onSelectInteractable,
   isProximityTarget,
   onProximityChange,
   onProximityAnchor,
+  npcs,
+  resolveNpcPhrase,
+  onNpcSpeech,
+  onNpcSpeechAnchor,
 }: ClassroomSceneProps) {
   const invalidate = useThree((state) => state.invalidate);
   const { resource: scene } = useMemo(
@@ -119,6 +147,8 @@ export function ClassroomScene({
     () => [
       ...deriveShellPlacements(CLASSROOM_LAYOUT),
       ...deriveFurniturePlacements(CLASSROOM_LAYOUT),
+      ...deriveInteractivePlacements(CLASSROOM_LAYOUT),
+      ...deriveDecorationPlacements(CLASSROOM_LAYOUT),
     ],
     [],
   );
@@ -129,6 +159,15 @@ export function ClassroomScene({
       ),
     [],
   );
+
+  const npcPositions = useMemo(() => createNpcLivePositions(), []);
+  const botHome = useMemo(() => deriveTutorBotHome(CLASSROOM_LAYOUT), []);
+  const bot = findNpcView(npcs, TUTOR_BOT_NPC_ID) ?? botHome;
+  const petHome = useMemo(() => derivePetHome(CLASSROOM_LAYOUT), []);
+  // Without realtime Michi sleeps on its bed, so the scene never lacks it.
+  const pet = findNpcView(npcs, PET_NPC_ID) ?? petHome;
+  const botPhrase =
+    bot.reaction === 'phrase' ? resolveNpcPhrase?.(bot) : undefined;
 
   const proximityCandidates = useMemo(
     () =>
@@ -214,12 +253,34 @@ export function ClassroomScene({
         onClick={handleClick}
         onPointerMove={handlePointerMove}
         onPointerOut={handlePointerOut}
-      />
+      >
+        {/* Under the scene root so clicks on the moving NPCs reach its handlers. */}
+        <ClassroomPet
+          npc={pet}
+          scopeKey={scopeKey}
+          positions={npcPositions}
+          onError={onAssetError}
+        />
+        <TutorBot
+          npc={bot}
+          phraseText={botPhrase}
+          scopeKey={scopeKey}
+          positions={npcPositions}
+          onSpeech={onNpcSpeech}
+          onSpeechAnchor={onNpcSpeechAnchor}
+          onError={onAssetError}
+        />
+      </primitive>
       <ClassroomKit
         key={scopeKey}
         placements={kitPlacements}
         scopeKey={scopeKey}
         onModuleError={handleModuleError}
+      />
+      <ClassroomDoor
+        poseRef={controller.poseRef}
+        scopeKey={scopeKey}
+        onError={() => handleModuleError('door')}
       />
       <InteractableHighlight
         interactablesById={interactablesById}
@@ -227,8 +288,7 @@ export function ClassroomScene({
           interactionLocked ? undefined : highlightedInteractableId
         }
         ownDeskIndex={ownDeskIndex}
-        sceneRoot={scene.root}
-        petReactionNonce={petReactionNonce}
+        npcPositions={npcPositions}
       />
       <LocalAvatar
         controller={controller}
@@ -244,6 +304,7 @@ export function ClassroomScene({
         interactables={proximityCandidates}
         onChange={onProximityChange}
         onAnchor={onProximityAnchor}
+        npcPositions={npcPositions}
       />
       {remoteParticipants.map((participant) => (
         <RemoteAvatar

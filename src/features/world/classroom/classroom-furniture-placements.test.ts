@@ -7,7 +7,7 @@ import { deriveFurniturePlacements } from './classroom-furniture-placements';
 import { deriveShellPlacements } from './classroom-shell-placements';
 import { getKitModuleUrl } from './kit/classroom-kit-manifest';
 import { estimateKitDrawCalls } from './kit/kit-draw-calls';
-import { glbMaterialNames } from './kit/glb-materials.test-utils';
+import { glbMaterialKeys } from './kit/glb-materials.test-utils';
 import { groupPlacementsByModule } from './kit/kit-placement';
 
 const layout = CLASSROOM_LAYOUT;
@@ -97,7 +97,7 @@ describe('deriveFurniturePlacements', () => {
     const meshCounts = Object.fromEntries(
       [...groupPlacementsByModule(all).keys()].map((id) => [
         id,
-        glbMaterialNames(getKitModuleUrl(id)),
+        glbMaterialKeys(getKitModuleUrl(id)),
       ]),
     );
     const kit = estimateKitDrawCalls(all, meshCounts);
@@ -109,10 +109,10 @@ describe('deriveFurniturePlacements', () => {
       primitive += 1;
     });
     scene.dispose();
-    // Batched by material: one draw call per distinct material name across
-    // every placed module (11 shell + 10 furniture, read from the GLB JSON).
-    // Avatars come on top of this.
-    expect(kit).toBe(21);
+    // Batched by material appearance: one draw call per distinct colour and
+    // finish across every placed module (shell + furniture, read from the GLB
+    // JSON), however each GLB family names it. Avatars come on top of this.
+    expect(kit).toBe(16);
     expect(kit + primitive).toBeLessThanOrEqual(60);
   });
 });

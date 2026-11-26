@@ -4,18 +4,47 @@ import { setupServer } from 'msw/node';
 import { createApiClient } from '@/api/client';
 import { ApiError } from '@/api/errors';
 import {
+  BOT_INDEX_FAILURE_REASON,
   createClassroomMaterialsStore,
   TEST_API_BASE_URL,
+  type BotMaterialStateEntry,
+  type ClassroomMaterialItem,
 } from '@/test/msw/handlers';
-import { botAllowedMaterialDtoSchema } from './material-bot-schema';
 import {
+  disableClassroomBotMaterial,
+  enableClassroomBotMaterial,
   isUncertainBotMaterialError,
   listClassroomBotMaterials,
-  setClassroomBotMaterialEnabled,
 } from './material-bot-service';
+import { materialMessages } from './messages';
 
 const CLASSROOM_ID = '00000000-0000-4000-8000-000000000010';
 const MATERIAL_ID = '00000000-0000-4000-8000-000000000101';
+
+const ITEM: ClassroomMaterialItem = {
+  id: MATERIAL_ID,
+  classroomId: CLASSROOM_ID,
+  authorId: '00000000-0000-4000-8000-000000000001',
+  filename: 'guia-unidad-1.pdf',
+  contentType: 'application/pdf',
+  sizeBytes: 2048,
+  createdAt: '2026-11-18T10:00:00.000Z',
+};
+
+function allowedEntry(index: number): BotMaterialStateEntry {
+  const suffix = String(index).padStart(12, '0');
+  return {
+    id: `00000000-0000-4000-9000-${suffix}`,
+    classroomId: CLASSROOM_ID,
+    materialId: `00000000-0000-4000-8000-${suffix}`,
+    filename: `guia-${index}.pdf`,
+    contentType: 'application/pdf',
+    sizeBytes: 1024,
+    indexState: 'INDEXED',
+    failureReason: null,
+    createdAt: '2026-11-19T01:00:00.000Z',
+  };
+}
 
 const server = setupServer();
 
@@ -23,135 +52,105 @@ beforeAll(() => server.listen());
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
+function setup(initialBotStates: readonly BotMaterialStateEntry[] = []) {
+  const store = createClassroomMaterialsStore({
+    classroomId: CLASSROOM_ID,
+    initialItems: [ITEM],
+    initialBotStates,
+  });
+  server.use(...store.handlers);
+  return { store, client: createApiClient({ baseUrl: TEST_API_BASE_URL }) };
+}
+
+const enable = (client: ReturnType<typeof createApiClient>) =>
+  enableClassroomBotMaterial(client, CLASSROOM_ID, MATERIAL_ID);
+const disable = (client: ReturnType<typeof createApiClient>) =>
+  disableClassroomBotMaterial(client, CLASSROOM_ID, MATERIAL_ID);
+
 describe('material-bot-service', () => {
-  it('lists and toggles bot-enabled state with server-confirmed indexingStatus', async () => {
-    const store = createClassroomMaterialsStore({
-      classroomId: CLASSROOM_ID,
-      initialItems: [
-        {
-          id: MATERIAL_ID,
-          classroomId: CLASSROOM_ID,
-          authorId: '00000000-0000-4000-8000-000000000001',
-          filename: 'guia-unidad-1.pdf',
-          contentType: 'application/pdf',
-          sizeBytes: 2048,
-          createdAt: '2026-11-18T10:00:00.000Z',
-        },
-      ],
+  it('enables with POST, lists the allowed material and disables with DELETE', async () => {
+    const { client } = setup();
+
+    expect(await listClassroomBotMaterials(client, CLASSROOM_ID)).toEqual({
+      items: [],
     });
-    server.use(...store.handlers);
-    const client = createApiClient({ baseUrl: TEST_API_BASE_URL });
 
-    const initial = await listClassroomBotMaterials(client, CLASSROOM_ID);
-    expect(initial.items).toEqual([]);
-
-    const enabled = await setClassroomBotMaterialEnabled(
-      client,
-      CLASSROOM_ID,
-      MATERIAL_ID,
-      { enabled: true },
-    );
-    expect(enabled.botEnabled).toBe(true);
-    expect(enabled.indexingStatus).toBe('pending');
-
-    store.setBotState(MATERIAL_ID, {
-      botEnabled: true,
-      indexingStatus: 'ready',
+    const enabled = await enable(client);
+    expect(enabled).toMatchObject({
+      materialId: MATERIAL_ID,
+      indexState: 'INDEXED',
+      failureReason: null,
     });
-    const afterReady = await listClassroomBotMaterials(client, CLASSROOM_ID);
-    expect(afterReady.items).toHaveLength(1);
-    expect(afterReady.items[0]?.indexingStatus).toBe('ready');
+    const listed = await listClassroomBotMaterials(client, CLASSROOM_ID);
+    expect(listed.items).toEqual([enabled]);
 
-    const disabled = await setClassroomBotMaterialEnabled(
-      client,
-      CLASSROOM_ID,
-      MATERIAL_ID,
-      { enabled: false },
-    );
-    expect(disabled.botEnabled).toBe(false);
-    expect(disabled.indexingStatus).toBe('disabled');
+    await expect(disable(client)).resolves.toBeUndefined();
+    expect(await listClassroomBotMaterials(client, CLASSROOM_ID)).toEqual({
+      items: [],
+    });
   });
 
-  it('rejects malformed payloads and marks 5xx/network toggle errors as uncertain', async () => {
-    const store = createClassroomMaterialsStore({
-      classroomId: CLASSROOM_ID,
-      initialItems: [
-        {
-          id: MATERIAL_ID,
-          classroomId: CLASSROOM_ID,
-          authorId: '00000000-0000-4000-8000-000000000001',
-          filename: 'guia.pdf',
-          contentType: 'application/pdf',
-          sizeBytes: 1024,
-          createdAt: '2026-11-18T10:00:00.000Z',
-        },
-      ],
-    });
-    server.use(...store.handlers);
-    const client = createApiClient({ baseUrl: TEST_API_BASE_URL });
+  it('reads every page when the classroom has more allowed materials than one page', async () => {
+    const { client, store } = setup(
+      Array.from({ length: 205 }, (_, index) => allowedEntry(index + 1)),
+    );
 
-    store.failNext('botToggle', {
-      status: 403,
-      body: {
-        code: 'FORBIDDEN',
-        message: 'Forbidden',
-        correlationId: 'req-bot-403',
-      },
-    });
-    await expect(
-      setClassroomBotMaterialEnabled(client, CLASSROOM_ID, MATERIAL_ID, {
-        enabled: true,
-      }),
-    ).rejects.toMatchObject({
-      kind: 'forbidden',
-      status: 403,
+    const listed = await listClassroomBotMaterials(client, CLASSROOM_ID);
+
+    expect(listed.items).toHaveLength(205);
+    expect(new Set(listed.items.map((entry) => entry.materialId)).size).toBe(
+      205,
+    );
+    expect(store.botListCalls).toEqual([1, 2, 3]);
+  });
+
+  it('returns a failed indexing as a confirmed result that can be retried', async () => {
+    const { client, store } = setup();
+    store.setBotIndexOutcome('FAILED');
+
+    expect(await enable(client)).toMatchObject({
+      indexState: 'FAILED',
+      failureReason: BOT_INDEX_FAILURE_REASON,
     });
 
-    store.failNext('botToggle', {
+    store.setBotIndexOutcome('INDEXED');
+    expect(await enable(client)).toMatchObject({ indexState: 'INDEXED' });
+  });
+
+  it('translates 404, pending cleanup and uncertain failures', async () => {
+    const { client, store } = setup();
+
+    await expect(disable(client)).rejects.toMatchObject({
+      kind: 'not-found',
+      status: 404,
+    });
+
+    await enable(client);
+    store.failNext('botDisable', {
       status: 503,
       body: {
         code: 'SERVICE_UNAVAILABLE',
-        message: 'Try again later',
+        message: 'Cleanup pending',
         correlationId: 'req-bot-503',
       },
     });
-    let caught: unknown;
-    try {
-      await setClassroomBotMaterialEnabled(client, CLASSROOM_ID, MATERIAL_ID, {
-        enabled: true,
-      });
-    } catch (error) {
-      caught = error;
-    }
-    expect(caught).toBeInstanceOf(ApiError);
-    expect(isUncertainBotMaterialError(caught)).toBe(true);
+    const cleanup = await disable(client).catch((error: unknown) => error);
+    expect(cleanup).toBeInstanceOf(ApiError);
+    expect((cleanup as ApiError).userMessage).toBe(
+      materialMessages.list.bot.toggleErrors.cleanupPending,
+    );
+    expect(isUncertainBotMaterialError(cleanup)).toBe(true);
+
+    store.failNext('botEnable', 'network');
+    const offline = await enable(client).catch((error: unknown) => error);
+    expect(isUncertainBotMaterialError(offline)).toBe(true);
 
     server.use(
-      http.put(
-        `${TEST_API_BASE_URL}/classrooms/:id/bot/materials/:materialId`,
-        () => HttpResponse.json({ invalid: true }),
+      http.post(`${TEST_API_BASE_URL}/classrooms/:id/bot/materials`, () =>
+        HttpResponse.json({ invalid: true }, { status: 201 }),
       ),
     );
-    let malformedError: unknown;
-    try {
-      await setClassroomBotMaterialEnabled(client, CLASSROOM_ID, MATERIAL_ID, {
-        enabled: true,
-      });
-    } catch (error) {
-      malformedError = error;
-    }
-    expect(isUncertainBotMaterialError(malformedError)).toBe(true);
-  });
-
-  it('validates failed indexing status with error message in schema', () => {
-    const parsed = botAllowedMaterialDtoSchema.safeParse({
-      materialId: MATERIAL_ID,
-      classroomId: CLASSROOM_ID,
-      botEnabled: true,
-      indexingStatus: 'failed',
-      indexingError: 'El PDF no contiene texto extraíble.',
-      updatedAt: '2026-11-19T01:30:00.000Z',
-    });
-    expect(parsed.success).toBe(true);
+    const malformed = await enable(client).catch((error: unknown) => error);
+    expect(isUncertainBotMaterialError(malformed)).toBe(true);
   });
 });

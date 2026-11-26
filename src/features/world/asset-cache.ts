@@ -2,6 +2,7 @@ import {
   Material,
   SkinnedMesh,
   Texture,
+  TextureLoader,
   WebGLRenderTarget,
   type Object3D,
   type WebGLRenderer,
@@ -133,6 +134,17 @@ export function createConfiguredGltfLoader(
   loader.setDRACOLoader(draco);
   loader.setKTX2Loader(ktx2);
   loader.setMeshoptDecoder(MeshoptDecoder);
+  // Embedded GLB images (bufferView) are turned into temporary `blob:` URLs.
+  // Three's default ImageBitmapLoader fetches `blob:` via `fetch()`, which
+  // violates strict `connect-src`; TextureLoader loads via `<img>`, allowed
+  // by `img-src 'self' data: blob:`.
+  loader.register((parser) => {
+    const textureLoader = new TextureLoader(parser.options.manager);
+    textureLoader.setCrossOrigin(parser.options.crossOrigin);
+    textureLoader.setRequestHeader(parser.options.requestHeader);
+    parser.textureLoader = textureLoader;
+    return { name: 'CSP_SAFE_TEXTURE_LOADER' };
+  });
   return loader;
 }
 
