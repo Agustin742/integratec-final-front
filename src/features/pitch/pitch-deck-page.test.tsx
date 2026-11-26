@@ -236,7 +236,7 @@ test('renders opaque Meet screen with minimal scroll-only chrome and advances ac
   expect(
     screen.getByRole('heading', {
       level: 2,
-      name: 'Les presentamos el Aula Virtual',
+      name: 'Les presentamos Bankito',
     }),
   ).toBeVisible();
   expect(screen.getByText('¡Volvimos al aula!')).toBeVisible();

@@ -366,22 +366,28 @@
 
 /* Speech bubbles show once in conversational turn order above their speaker, then fade out cleanly. */
 @keyframes pitchSpeechOnce {
-  0%,
-  100% {
+  0% {
     opacity: 0;
+    scale: 0.92;
   }
   14%,
   84% {
     opacity: 1;
+    scale: 1;
+  }
+  100% {
+    opacity: 0;
+    scale: 0.97;
   }
 }
 
 .pitch-speech-bubble {
-  --pitch-dur: 2.6s;
+  --pitch-dur: 2.8s;
   --pitch-iter: 1;
+  transform-origin: bottom center;
   animation-name: pitchSpeechOnce !important;
   animation-duration: var(--pitch-dur) !important;
-  animation-timing-function: ease-in-out !important;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1) !important;
   animation-delay: var(--pitch-delay, 520ms) !important;
   animation-fill-mode: both !important;
 }

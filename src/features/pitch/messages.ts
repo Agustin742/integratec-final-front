@@ -1,7 +1,7 @@
 export const pitchMessages = {
-  pageTitle: 'Presentación',
-  deckHeading: 'Aula Virtual 3D',
-  canvasLabel: 'Escenario 3D interactivo de la presentación del Aula Virtual',
+  pageTitle: 'Presentación · Bankito',
+  deckHeading: 'Bankito · Aula Virtual 3D',
+  canvasLabel: 'Escenario 3D interactivo de la presentación de Bankito',
   controls: {
     advanceStage: 'Avanzar al siguiente paso de la presentación',
     liveDemoCta: 'Y ahora se lo mostramos en vivo',
@@ -14,9 +14,10 @@ export const pitchMessages = {
   },
   intro: {
     eyebrow: 'Proyecto Integrador · Presentación Interactiva',
-    title: 'Aula Virtual 3D',
+    title: 'Bankito',
+    logoAlt: 'Logo de Bankito, Aula Virtual',
     tagline:
-      'Un entorno educativo compartido donde volver a clase es algo que da ganas de hacer.',
+      'Un aula virtual 3D compartida donde volver a clase es algo que da ganas de hacer.',
     highlights: [
       'Presencia en vivo',
       'Espacios con función real',
@@ -26,7 +27,7 @@ export const pitchMessages = {
   },
   launch: {
     eyebrow: 'Pasando a la demostración real',
-    title: 'Cargando Aula Virtual en vivo…',
+    title: 'Cargando Bankito en vivo…',
     subtitle:
       'Preparando escenario 3D, avatares personalizados y sesión interactiva.',
     steps: [
@@ -59,6 +60,13 @@ export const pitchMessages = {
     { id: 't8', name: 'Valentina R.', role: 'bored' as const },
     { id: 't9', name: 'Nicolás D.', role: 'off' as const },
   ],
+  meetChrome: {
+    meetingTitle: 'Clase de Matemática · 2° B',
+    meetingTime: '08:42',
+    participantsCount: '9 participantes',
+    silenceNotice: 'Sin interacción en el chat',
+    disconnectedNotice: '8 de 9 cámaras apagadas',
+  },
   meetStatuses: {
     handRaised: 'Mano levantada',
     watchingPhone: 'Mirando el celular',
@@ -209,7 +217,7 @@ export const pitchMessages = {
     ],
   },
   closing: {
-    manifesto: 'Aula Virtual 3D · Enseñar, aprender y convivir en vivo',
+    manifesto: 'Bankito · Enseñar, aprender y convivir en vivo',
     handoffNote:
       'Al avanzar o tocar el botón se inicia la carga rápida del aula hacia el deploy en vivo',
   },

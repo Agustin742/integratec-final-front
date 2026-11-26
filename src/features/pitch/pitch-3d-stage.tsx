@@ -213,6 +213,7 @@ function LoadedPitchAvatar({
     () =>
       composeAvatar({
         body: bodyGltf.scene,
+        face: 'happy',
         parts: loaded.map(({ part, gltf }) => ({
           key: part.key,
           scene: gltf.scene,
@@ -585,7 +586,7 @@ function MovingPitchActor({
     if (bubbleEl) {
       const settled = dist <= 0.16;
       bubbleEl.dataset.settled = settled ? 'true' : 'false';
-      const headHeight = state.animation === 'SitWrite' ? 1.48 : 1.92;
+      const headHeight = state.animation === 'SitWrite' ? 1.24 : 1.54;
       headVecRef.current.set(
         group.position.x,
         group.position.y + headHeight,
@@ -594,13 +595,13 @@ function MovingPitchActor({
       headVecRef.current.project(frameState.camera);
       const xPct = MathUtils.clamp(
         (headVecRef.current.x * 0.5 + 0.5) * 100,
-        16,
-        84,
+        14,
+        86,
       );
       const yPct = MathUtils.clamp(
         (-headVecRef.current.y * 0.5 + 0.5) * 100,
-        16,
-        72,
+        18,
+        76,
       );
       bubbleEl.style.left = `${xPct.toFixed(2)}%`;
       bubbleEl.style.top = `${yPct.toFixed(2)}%`;

@@ -54,8 +54,10 @@ function collectEmbeddedAssets() {
   );
 
   const avatarsDir = path.join(ROOT, 'public/models/avatars');
-  const allAvatarFiles = walkFiles(avatarsDir).map((full) =>
-    '/' + path.relative(path.join(ROOT, 'public'), full).replaceAll('\\', '/'),
+  const allAvatarFiles = walkFiles(avatarsDir).map(
+    (full) =>
+      '/' +
+      path.relative(path.join(ROOT, 'public'), full).replaceAll('\\', '/'),
   );
 
   const usedAvatarGlbs = allAvatarFiles.filter((relUrl) => {
@@ -70,7 +72,9 @@ function collectEmbeddedAssets() {
     );
   });
 
-  const urls = [...new Set([...decoderFiles, ...classroomGlbs, ...usedAvatarGlbs])];
+  const urls = [
+    ...new Set([...decoderFiles, ...classroomGlbs, ...usedAvatarGlbs]),
+  ];
   const assetMap = {};
   let totalBytes = 0;
 
@@ -105,8 +109,12 @@ async function main() {
     },
     define: {
       'import.meta.env.VITE_APP_ENV': JSON.stringify('development'),
-      'import.meta.env.VITE_API_BASE_URL': JSON.stringify('http://localhost:3000'),
-      'import.meta.env.VITE_REALTIME_URL': JSON.stringify('ws://localhost:2567'),
+      'import.meta.env.VITE_API_BASE_URL': JSON.stringify(
+        'http://localhost:3000',
+      ),
+      'import.meta.env.VITE_REALTIME_URL': JSON.stringify(
+        'ws://localhost:2567',
+      ),
     },
     build: {
       write: false,
@@ -116,7 +124,7 @@ async function main() {
         input: path.join(ROOT, 'src/features/pitch/pitch-standalone.tsx'),
         output: {
           format: 'iife',
-          name: 'IntegrarTecPitch',
+          name: 'BankitoPitch',
           inlineDynamicImports: true,
         },
       },
@@ -131,7 +139,10 @@ async function main() {
     if (chunk.type === 'chunk' && chunk.isEntry) {
       jsCode = chunk.code;
     } else if (chunk.type === 'asset' && chunk.fileName.endsWith('.css')) {
-      cssCode += typeof chunk.source === 'string' ? chunk.source : Buffer.from(chunk.source).toString('utf8');
+      cssCode +=
+        typeof chunk.source === 'string'
+          ? chunk.source
+          : Buffer.from(chunk.source).toString('utf8');
     }
   }
 
@@ -144,7 +155,7 @@ async function main() {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Presentación · Aula Virtual 3D</title>
+    <title>Presentación · Bankito · Aula Virtual 3D</title>
     <style>${cssCode}</style>
   </head>
   <body>

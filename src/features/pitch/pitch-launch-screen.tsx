@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { buttonStyles } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import bankitoLogoUrl from './assets/bankito-logo.jpg';
 import { pitchMessages as copy } from './messages';
 import { PITCH_LAUNCH_LOADING_MS } from './pitch-config';
 
@@ -41,11 +42,15 @@ export function PitchLaunchScreen({ onComplete }: PitchLaunchScreenProps) {
           className="pitch-warm-grid-bg pointer-events-none absolute inset-0 opacity-75"
         />
 
-        <span className="pitch-anim-pop relative z-10 rounded-full border-2 border-[#D5B54B] bg-[#F7D86B] px-4 py-1 font-display text-xs font-bold text-foreground shadow-panel sm:text-sm">
-          {copy.launch.eyebrow}
-        </span>
+        <div className="pitch-anim-pop relative z-10 size-20 overflow-hidden rounded-2xl border-2 border-border bg-[#F5EDE1] shadow-panel sm:size-24">
+          <img
+            src={bankitoLogoUrl}
+            alt=""
+            className="h-full w-full scale-[1.18] object-cover"
+          />
+        </div>
 
-        <h1 className="pitch-anim-up relative z-10 font-display text-3xl font-bold sm:text-5xl">
+        <h1 className="pitch-anim-up relative z-10 font-display text-3xl font-bold tracking-tight sm:text-5xl">
           {copy.launch.title}
         </h1>
 

@@ -1,9 +1,12 @@
 import {
+  AnimationClip,
+  AnimationMixer,
   Bone,
   BufferGeometry,
   Group,
   Mesh,
   MeshStandardMaterial,
+  NumberKeyframeTrack,
   Skeleton,
   SkinnedMesh,
   type Object3D,
@@ -62,6 +65,58 @@ function skinnedMeshes(root: Object3D): SkinnedMesh[] {
   });
   return found;
 }
+
+/** A face mesh shipped, like the body GLBs, with the Sad morph switched on. */
+function makeSadBody() {
+  const body = makeRig(BONES, 'skin', 'eyes');
+  body.mesh.morphTargetDictionary = { Blink: 0, Happy: 1, Sad: 2, Angry: 3 };
+  body.mesh.morphTargetInfluences = [0, 0, 0.72, 0];
+  return body;
+}
+
+describe('resting face', () => {
+  it('is neutral by default, leaving the cached body untouched', () => {
+    const body = makeSadBody();
+
+    const avatar = composeAvatar({ body: body.scene });
+    const [face] = skinnedMeshes(avatar.root);
+
+    expect(face!.morphTargetInfluences).toEqual([0, 0, 0, 0]);
+    expect(body.mesh.morphTargetInfluences).toEqual([0, 0, 0.72, 0]);
+  });
+
+  it('can be slightly happy', () => {
+    const avatar = composeAvatar({ body: makeSadBody().scene, face: 'happy' });
+    const [blink, happy, sad, angry] = skinnedMeshes(avatar.root)[0]!
+      .morphTargetInfluences!;
+
+    expect([blink, sad, angry]).toEqual([0, 0, 0]);
+    expect(happy).toBeGreaterThan(0);
+    expect(happy).toBeLessThan(0.7);
+  });
+
+  it('still plays a facial clip and returns to rest when it stops', () => {
+    const avatar = composeAvatar({ body: makeSadBody().scene });
+    const [face] = skinnedMeshes(avatar.root);
+    const mixer = new AnimationMixer(avatar.root);
+    const action = mixer.clipAction(
+      new AnimationClip('Sad', 1, [
+        new NumberKeyframeTrack(
+          'eyes.morphTargetInfluences',
+          [0, 1],
+          [0, 0, 0.9, 0, 0, 0, 0.9, 0],
+        ),
+      ]),
+    );
+
+    action.play();
+    mixer.update(0.5);
+    expect(face!.morphTargetInfluences![2]).toBeCloseTo(0.9);
+
+    mixer.stopAllAction();
+    expect(face!.morphTargetInfluences).toEqual([0, 0, 0, 0]);
+  });
+});
 
 describe('composeAvatar', () => {
   it('re-binds a part to the body clone bones by name', () => {

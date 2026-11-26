@@ -51,6 +51,9 @@ const ACTOR_SPEECH_META: Readonly<
     {
       readonly name: string;
       readonly badgeClass: string;
+      readonly dotClass: string;
+      readonly borderClass: string;
+      readonly tailStroke: string;
       readonly defaultLeft: string;
       readonly defaultTop: string;
     }
@@ -59,26 +62,38 @@ const ACTOR_SPEECH_META: Readonly<
   sofia: {
     name: 'Sofía',
     badgeClass: 'bg-[#5B4F96] text-[#FFF9EB]',
+    dotClass: 'bg-[#F7D86B]',
+    borderClass: 'border-[#5B4F96]',
+    tailStroke: '#5B4F96',
     defaultLeft: '50%',
-    defaultTop: '24%',
+    defaultTop: '30%',
   },
   lucas: {
     name: 'Lucas',
     badgeClass: 'bg-[#28603B] text-[#FFF9EB]',
+    dotClass: 'bg-[#62CFC7]',
+    borderClass: 'border-[#28603B]',
+    tailStroke: '#28603B',
     defaultLeft: '24%',
-    defaultTop: '30%',
+    defaultTop: '35%',
   },
   mateo: {
     name: 'Mateo',
     badgeClass: 'bg-[#AF7B52] text-[#FFF9EB]',
+    dotClass: 'bg-[#FFF0D8]',
+    borderClass: 'border-[#AF7B52]',
+    tailStroke: '#AF7B52',
     defaultLeft: '76%',
-    defaultTop: '30%',
+    defaultTop: '35%',
   },
   docente: {
     name: 'Docente',
     badgeClass: 'bg-[#382F3F] text-[#FFF9EB]',
+    dotClass: 'bg-[#F5B5AB]',
+    borderClass: 'border-[#382F3F]',
+    tailStroke: '#382F3F',
     defaultLeft: '38%',
-    defaultTop: '24%',
+    defaultTop: '30%',
   },
 };
 
@@ -200,20 +215,66 @@ function MeetPersonSvg({
     return (
       <svg
         aria-hidden="true"
-        viewBox="0 0 120 96"
-        className="h-20 w-24 shrink-0"
+        viewBox="0 0 160 112"
+        className="h-24 w-32 shrink-0 sm:h-28 sm:w-36"
       >
-        <rect x="12" y="64" width="96" height="32" rx="16" fill="#5B4F96" />
-        <circle cx="56" cy="40" r="20" fill="#F8C6AF" />
+        {/* Subtle room wall & shelf silhouette behind webcam */}
+        <rect
+          x="10"
+          y="10"
+          width="42"
+          height="28"
+          rx="4"
+          fill="#221F30"
+          opacity="0.7"
+        />
+        <rect
+          x="112"
+          y="22"
+          width="36"
+          height="4"
+          rx="2"
+          fill="#3E3954"
+          opacity="0.75"
+        />
+        {/* Shoulders & sweater */}
+        <path d="M28 112c2-22 18-34 44-34s42 12 44 34Z" fill="#5B4F96" />
+        <path d="M62 78h20l-4 10h-12Z" fill="#463C78" />
+        <rect x="65" y="64" width="14" height="16" rx="7" fill="#F8C6AF" />
+        {/* Hair back */}
         <path
-          d="M34 38c0-14 10-22 22-22s22 8 22 22c-6-6-14-8-22-8s-16 2-22 8Z"
+          d="M44 46c0-18 12-30 28-30s28 12 28 30v26c0 6-6 10-12 10H56c-6 0-12-4-12-10Z"
           fill="#6C4D48"
         />
-        <circle cx="49" cy="40" r="2.2" fill="#382F3F" />
-        <circle cx="63" cy="40" r="2.2" fill="#382F3F" />
+        {/* Face */}
+        <ellipse cx="72" cy="46" rx="20" ry="21" fill="#F8C6AF" />
+        {/* Hair front sweep */}
+        <path
+          d="M50 42c2-15 13-22 24-22 10 0 18 5 20 15-8-5-16-6-26-4-7 2-13 6-18 11Z"
+          fill="#573C38"
+        />
+        {/* Blush & features */}
+        <ellipse
+          cx="59"
+          cy="51"
+          rx="3.8"
+          ry="2"
+          fill="#EFA5AE"
+          opacity="0.55"
+        />
+        <ellipse
+          cx="85"
+          cy="51"
+          rx="3.8"
+          ry="2"
+          fill="#EFA5AE"
+          opacity="0.55"
+        />
+        <circle cx="64" cy="46" r="2.3" fill="#382F3F" />
+        <circle cx="80" cy="46" r="2.3" fill="#382F3F" />
         {handUp ? (
           <path
-            d="M49 49q7 4 14 0"
+            d="M67 55q5 3.5 10 0"
             fill="none"
             stroke="#382F3F"
             strokeWidth="2.2"
@@ -221,7 +282,7 @@ function MeetPersonSvg({
           />
         ) : (
           <path
-            d="M50 51q6-3 12 0"
+            d="M67 57q5-2.5 10 0"
             fill="none"
             stroke="#382F3F"
             strokeWidth="2.2"
@@ -230,8 +291,22 @@ function MeetPersonSvg({
         )}
         {handUp && (
           <g className="pitch-hand-wave">
-            <rect x="84" y="22" width="12" height="38" rx="6" fill="#F8C6AF" />
-            <circle cx="90" cy="20" r="7" fill="#F8C6AF" />
+            <path
+              d="M114 96c2-16 4-28 4-38"
+              fill="none"
+              stroke="#5B4F96"
+              strokeWidth="14"
+              strokeLinecap="round"
+            />
+            <rect
+              x="111"
+              y="34"
+              width="13"
+              height="20"
+              rx="6.5"
+              fill="#F8C6AF"
+            />
+            <circle cx="117.5" cy="31" r="7" fill="#F8C6AF" />
           </g>
         )}
       </svg>
@@ -242,33 +317,65 @@ function MeetPersonSvg({
     return (
       <svg
         aria-hidden="true"
-        viewBox="0 0 120 96"
-        className="h-20 w-24 shrink-0"
+        viewBox="0 0 160 112"
+        className="h-24 w-32 shrink-0 sm:h-28 sm:w-36"
       >
-        <rect x="16" y="66" width="88" height="30" rx="14" fill="#75B7DA" />
-        <circle cx="56" cy="44" r="19" fill="#ECA786" />
+        {/* Dark bedroom backdrop */}
+        <rect
+          x="14"
+          y="16"
+          width="36"
+          height="50"
+          rx="4"
+          fill="#1E1B2B"
+          opacity="0.8"
+        />
+        {/* Shoulders & hoodie */}
+        <path d="M34 112c3-22 19-34 46-34s43 12 46 34Z" fill="#3E6E8E" />
+        <rect x="73" y="65" width="14" height="15" rx="7" fill="#ECA786" />
+        {/* Head tilted slightly down */}
+        <ellipse cx="80" cy="48" rx="20" ry="20" fill="#ECA786" />
         <path
-          d="M37 40c0-13 9-20 19-20s19 7 19 20c-6-5-13-7-19-7s-13 2-19 7Z"
+          d="M58 45c1-15 11-23 22-23s21 8 22 23c-7-5-14-7-22-7s-15 2-22 7Z"
           fill="#353849"
         />
-        <circle cx="50" cy="47" r="2" fill="#382F3F" />
-        <circle cx="62" cy="47" r="2" fill="#382F3F" />
+        {/* Eyes looking down at phone */}
+        <circle cx="72" cy="51" r="2.2" fill="#382F3F" />
+        <circle cx="88" cy="51" r="2.2" fill="#382F3F" />
+        <path
+          d="M75 59h10"
+          fill="none"
+          stroke="#382F3F"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+        {/* Cool screen glow on face */}
+        <ellipse
+          cx="80"
+          cy="56"
+          rx="14"
+          ry="9"
+          fill="#A9E7F4"
+          opacity="0.16"
+          className="pitch-phone-glow"
+        />
+        {/* Smartphone held up */}
         <rect
-          x="44"
-          y="60"
+          x="68"
+          y="72"
           width="24"
-          height="32"
-          rx="4"
-          fill="#231E29"
+          height="34"
+          rx="5"
+          fill="#1A1724"
           stroke="#75B7DA"
           strokeWidth="2"
         />
         <rect
-          x="48"
-          y="64"
+          x="72"
+          y="76"
           width="16"
-          height="22"
-          rx="2"
+          height="24"
+          rx="2.5"
           fill="#A9E7F4"
           className="pitch-phone-glow"
         />
@@ -280,67 +387,184 @@ function MeetPersonSvg({
     return (
       <svg
         aria-hidden="true"
-        viewBox="0 0 120 96"
-        className="h-20 w-24 shrink-0"
+        viewBox="0 0 160 112"
+        className="h-24 w-32 shrink-0 sm:h-28 sm:w-36"
       >
-        <rect x="14" y="64" width="92" height="32" rx="14" fill="#F4E6D2" />
-        <path d="M55 64h10l-3 18h-4Z" fill="#E66861" />
-        <circle cx="60" cy="40" r="20" fill="#CB8966" />
+        {/* Subtle classroom board behind teacher */}
+        <rect
+          x="16"
+          y="10"
+          width="128"
+          height="54"
+          rx="6"
+          fill="#1F3B36"
+          stroke="#4E4863"
+          strokeWidth="2"
+          opacity="0.85"
+        />
         <path
-          d="M40 36c0-13 9-20 20-20s20 7 20 20c-7-5-13-7-20-7s-13 2-20 7Z"
+          d="M28 24h34M28 34h22M106 24h26"
+          stroke="#A9E7F4"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          opacity="0.45"
+        />
+        {/* Shirt, collar & tie */}
+        <path d="M34 112c3-22 19-34 46-34s43 12 46 34Z" fill="#F4E6D2" />
+        <path d="M75 78h10l-2.5 22h-5Z" fill="#E66861" />
+        <path
+          d="M68 78l12 9 12-9"
+          fill="none"
+          stroke="#D7C3A5"
+          strokeWidth="2.5"
+        />
+        <rect x="73" y="64" width="14" height="16" rx="7" fill="#CB8966" />
+        {/* Head */}
+        <ellipse cx="80" cy="44" rx="20" ry="21" fill="#CB8966" />
+        <path
+          d="M59 40c1-14 10-22 21-22s20 8 21 22c-7-5-14-7-21-7s-14 2-21 7Z"
           fill="#6C4D48"
         />
+        {/* Glasses */}
         <circle
-          cx="52"
-          cy="41"
-          r="5"
+          cx="71"
+          cy="45"
+          r="6"
           fill="none"
           stroke="#382F3F"
-          strokeWidth="2"
+          strokeWidth="2.2"
         />
         <circle
-          cx="68"
-          cy="41"
-          r="5"
+          cx="89"
+          cy="45"
+          r="6"
           fill="none"
           stroke="#382F3F"
-          strokeWidth="2"
+          strokeWidth="2.2"
         />
         <line
-          x1="57"
-          y1="41"
-          x2="63"
-          y2="41"
+          x1="77"
+          y1="45"
+          x2="83"
+          y2="45"
           stroke="#382F3F"
-          strokeWidth="2"
+          strokeWidth="2.2"
         />
-        <circle cx="52" cy="41" r="1.8" fill="#382F3F" />
-        <circle cx="68" cy="41" r="1.8" fill="#382F3F" />
-        <ellipse cx="60" cy="51" rx="4.5" ry="2.8" fill="#382F3F" />
+        <circle cx="71" cy="45" r="1.9" fill="#382F3F" />
+        <circle cx="89" cy="45" r="1.9" fill="#382F3F" />
+        <ellipse cx="80" cy="56" rx="4.5" ry="2.8" fill="#382F3F" />
       </svg>
     );
   }
 
   return (
-    <svg aria-hidden="true" viewBox="0 0 120 96" className="h-20 w-24 shrink-0">
-      <rect x="18" y="66" width="84" height="30" rx="14" fill="#7EBA8B" />
-      <circle cx="60" cy="42" r="19" fill="#ECA786" />
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 160 112"
+      className="h-24 w-32 shrink-0 sm:h-28 sm:w-36"
+    >
+      {/* Muted wall frame behind */}
+      <rect
+        x="110"
+        y="14"
+        width="34"
+        height="26"
+        rx="4"
+        fill="#211E2F"
+        opacity="0.75"
+      />
+      {/* Slouched hoodie */}
+      <path d="M36 112c3-21 19-32 44-32s41 11 44 32Z" fill="#5D8A6B" />
+      <rect x="73" y="66" width="14" height="16" rx="7" fill="#ECA786" />
+      {/* Head */}
+      <ellipse cx="80" cy="47" rx="20" ry="20" fill="#ECA786" />
       <path
-        d="M41 37c0-12 9-19 19-19s19 7 19 19c-6-4-13-6-19-6s-13 2-19 6Z"
+        d="M59 42c1-14 10-21 21-21s20 7 21 21c-7-4-14-6-21-6s-14 2-21 6Z"
         fill="#AF6D63"
       />
-      <circle cx="53" cy="42" r="2" fill="#382F3F" />
-      <circle cx="67" cy="42" r="2" fill="#382F3F" />
-      <line
-        x1="54"
-        y1="50"
-        x2="66"
-        y2="50"
+      {/* Heavy-lidded weary eyes */}
+      <path
+        d="M68 47h7M85 47h7"
         stroke="#382F3F"
-        strokeWidth="2.2"
+        strokeWidth="2.4"
         strokeLinecap="round"
       />
+      <circle cx="71.5" cy="48.5" r="1.6" fill="#382F3F" />
+      <circle cx="88.5" cy="48.5" r="1.6" fill="#382F3F" />
+      <path
+        d="M74 57q6-2 12 0"
+        fill="none"
+        stroke="#382F3F"
+        strokeWidth="2.1"
+        strokeLinecap="round"
+      />
+      {/* Hand supporting chin */}
+      <ellipse cx="62" cy="70" rx="8" ry="6" fill="#ECA786" />
     </svg>
+  );
+}
+
+function MeetCallDock({ className }: { readonly className?: string }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={cn(
+        'pointer-events-none flex items-center gap-2 rounded-full border border-[#343046] bg-[#181623]/95 px-3 py-1.5 shadow-float',
+        className,
+      )}
+    >
+      {/* Mic muted */}
+      <span className="flex size-8 items-center justify-center rounded-full bg-[#3D242B] text-[#F5B5AB]">
+        <MicOffIcon />
+      </span>
+      {/* Camera off */}
+      <span className="flex size-8 items-center justify-center rounded-full bg-[#3D242B] text-[#F5B5AB]">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="size-3.5"
+        >
+          <path d="M16 16v1a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2" />
+          <path d="m16 10 5-3v10l-5-3" />
+          <path d="m2 2 20 20" />
+        </svg>
+      </span>
+      {/* Raise hand */}
+      <span className="flex size-8 items-center justify-center rounded-full bg-[#2A2639] text-[#D5CEE0]">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="size-3.5"
+        >
+          <path d="M18 11V6a2 2 0 0 0-4 0v5" />
+          <path d="M14 10V4a2 2 0 0 0-4 0v6" />
+          <path d="M10 10.5V6a2 2 0 0 0-4 0v8" />
+          <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-5.7-2.4L3.4 16a2 2 0 0 1 2.9-2.8L8 15" />
+        </svg>
+      </span>
+      {/* Hang up */}
+      <span className="flex h-8 w-11 items-center justify-center rounded-full bg-[#A33630] text-[#FFF9EB]">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="size-3.5"
+        >
+          <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45c.92.35 1.88.58 2.86.69A2 2 0 0 1 22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 3.09 5.18 2 2 0 0 1 5.08 3h3a2 2 0 0 1 2 1.72c.11.98.34 1.94.69 2.86a2 2 0 0 1-.45 2.11L9.06 10.95" />
+        </svg>
+      </span>
+    </div>
   );
 }
 
@@ -392,109 +616,161 @@ function MeetGridOverlay({ beat }: { readonly beat: PitchBeat }) {
     <div
       aria-hidden={isBroken}
       className={cn(
-        'pointer-events-none absolute inset-0 z-10 grid grid-cols-3 grid-rows-3 gap-2.5 bg-[#15131E] p-4 pb-20',
+        'pointer-events-none absolute inset-0 z-10 flex flex-col bg-[#14121D]',
         isBroken && 'pitch-grid-shatter',
       )}
     >
-      {copy.meetTiles.map((tile, index) => {
-        const isTeacher = tile.role === 'teacher';
-        const cameraOn =
-          isTeacher ||
-          (phase === '1.0' && tile.role !== 'off') ||
-          (phase === '1.1' && (tile.role === 'hand' || tile.role === 'phone'));
+      {/* Sleek top meeting status bar */}
+      <div className="flex items-center justify-between gap-3 border-b border-[#2B273B] bg-[#191624]/95 px-4 py-2 text-xs">
+        <div className="flex items-center gap-2.5 text-[#FFF9EB]">
+          <span
+            aria-hidden="true"
+            className="size-2 rounded-full bg-[#E66861]/85"
+          />
+          <span className="font-display font-bold tracking-tight">
+            {copy.meetChrome.meetingTitle}
+          </span>
+          <span className="text-[#9E97B0]">·</span>
+          <span className="font-medium tabular-nums text-[#D5CEE0]">
+            {copy.meetChrome.meetingTime}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {phase !== '1.0' && (
+            <span className="hidden rounded-full border border-[#4B3A4B] bg-[#281F29] px-2.5 py-0.5 font-medium text-[#F5B5AB] sm:inline-flex">
+              {phase === '1.2'
+                ? copy.meetChrome.disconnectedNotice
+                : copy.meetChrome.silenceNotice}
+            </span>
+          )}
+          <span className="rounded-full border border-[#322E44] bg-[#221E30] px-2.5 py-0.5 font-medium text-[#D5CEE0]">
+            {copy.meetChrome.participantsCount}
+          </span>
+        </div>
+      </div>
 
-        let statusText: string = copy.meetStatuses.cameraOff;
-        if (isTeacher) {
-          statusText =
-            phase === '1.0'
-              ? copy.meetStatuses.cameraOn
-              : copy.meetStatuses.teacherSpeaking;
-        } else if (cameraOn) {
-          if (tile.role === 'hand') {
+      {/* 3x3 webcam tile matrix */}
+      <div className="grid flex-1 grid-cols-3 grid-rows-3 gap-2.5 p-3 pb-24">
+        {copy.meetTiles.map((tile, index) => {
+          const isTeacher = tile.role === 'teacher';
+          const cameraOn =
+            isTeacher ||
+            (phase === '1.0' && tile.role !== 'off') ||
+            (phase === '1.1' &&
+              (tile.role === 'hand' || tile.role === 'phone'));
+
+          let statusText: string = copy.meetStatuses.cameraOff;
+          if (isTeacher) {
             statusText =
               phase === '1.0'
-                ? copy.meetStatuses.handRaised
-                : copy.meetStatuses.cameraOn;
-          } else if (tile.role === 'phone') {
-            statusText = copy.meetStatuses.watchingPhone;
-          } else {
-            statusText = copy.meetStatuses.cameraOn;
+                ? copy.meetStatuses.cameraOn
+                : copy.meetStatuses.teacherSpeaking;
+          } else if (cameraOn) {
+            if (tile.role === 'hand') {
+              statusText =
+                phase === '1.0'
+                  ? copy.meetStatuses.handRaised
+                  : copy.meetStatuses.cameraOn;
+            } else if (tile.role === 'phone') {
+              statusText = copy.meetStatuses.watchingPhone;
+            } else {
+              statusText = copy.meetStatuses.cameraOn;
+            }
+          } else if (phase === '1.2') {
+            statusText =
+              tile.role === 'phone'
+                ? copy.meetStatuses.missingWork
+                : index % 2 === 0
+                  ? copy.meetStatuses.absent
+                  : copy.meetStatuses.cameraOff;
           }
-        } else if (phase === '1.2') {
-          statusText =
-            tile.role === 'phone'
-              ? copy.meetStatuses.missingWork
-              : index % 2 === 0
-                ? copy.meetStatuses.absent
-                : copy.meetStatuses.cameraOff;
-        }
 
-        return (
-          <div
-            key={tile.id}
-            style={staggerStyle(index * 40)}
-            className={cn(
-              'pitch-anim-up flex flex-col justify-between rounded-2xl border p-3 transition-colors duration-300',
-              isTeacher
-                ? 'border-[#75B7DA] bg-[#262336]'
-                : cameraOn
-                  ? 'border-[#524B63] bg-[#2D2940]'
-                  : 'border-[#2E2A3B] bg-[#1D1A27]',
-            )}
-          >
-            <div className="flex items-center justify-between gap-2 text-xs font-semibold text-[#FFF9EB]">
-              <span className="truncate">{tile.name}</span>
-              {isTeacher ? (
-                <span
-                  className="flex h-3.5 items-end gap-0.5"
-                  aria-hidden="true"
-                >
-                  <span className="pitch-voice-bar h-3 w-1 rounded-full bg-[#62CFC7]" />
-                  <span
-                    style={staggerStyle(150)}
-                    className="pitch-voice-bar h-3.5 w-1 rounded-full bg-[#62CFC7]"
-                  />
-                  <span
-                    style={staggerStyle(300)}
-                    className="pitch-voice-bar h-2.5 w-1 rounded-full bg-[#62CFC7]"
-                  />
-                </span>
-              ) : (
-                <span className="text-[#D5CEE0]">
-                  <MicOffIcon />
-                </span>
+          const showHandBadge =
+            tile.role === 'hand' && phase === '1.0' && cameraOn;
+
+          return (
+            <div
+              key={tile.id}
+              style={staggerStyle(index * 35)}
+              className={cn(
+                'pitch-anim-up relative flex flex-col justify-between overflow-hidden rounded-2xl border p-2.5 transition-colors duration-300',
+                isTeacher
+                  ? 'border-[#62CFC7]/80 bg-gradient-to-b from-[#25283C] to-[#1C1A2A] ring-1 ring-[#62CFC7]/30'
+                  : cameraOn
+                    ? 'border-[#48435C] bg-gradient-to-b from-[#2A263C] to-[#1F1C2D]'
+                    : 'border-[#2A2638] bg-[#181522]',
               )}
-            </div>
-
-            <div className="flex items-center justify-center">
-              {cameraOn ? (
-                <MeetPersonSvg role={tile.role} phase={phase} />
-              ) : (
-                <div className="flex size-11 items-center justify-center rounded-full border border-[#3E394E] bg-[#272334] font-display text-sm font-bold text-[#D5CEE0]">
-                  {tile.name.slice(0, 2).toUpperCase()}
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between gap-2">
-              <span
-                className={cn(
-                  'rounded-md px-2 py-0.5 text-xs font-medium',
-                  tile.role === 'hand' && phase === '1.0'
-                    ? 'bg-[#F7D86B] font-bold text-foreground'
-                    : tile.role === 'phone' && cameraOn
-                      ? 'bg-[#353849] text-[#A9E7F4]'
-                      : isTeacher
-                        ? 'bg-[#353849] text-[#FFF9EB]'
-                        : 'text-[#D5CEE0]',
+            >
+              {/* Top row: hand-raised badge or spacer + mic/voice indicator */}
+              <div className="relative z-10 flex items-center justify-between gap-2">
+                {showHandBadge ? (
+                  <span className="rounded-full bg-[#F7D86B] px-2.5 py-0.5 font-display text-[11px] font-bold text-[#382F3F] shadow-sm">
+                    {statusText}
+                  </span>
+                ) : (
+                  <span />
                 )}
-              >
-                {statusText}
-              </span>
+
+                {isTeacher ? (
+                  <span
+                    className="flex h-5 items-end gap-0.5 rounded-full bg-[#15131E]/75 px-2 py-1"
+                    aria-hidden="true"
+                  >
+                    <span className="pitch-voice-bar h-2.5 w-1 rounded-full bg-[#62CFC7]" />
+                    <span
+                      style={staggerStyle(150)}
+                      className="pitch-voice-bar h-3 w-1 rounded-full bg-[#62CFC7]"
+                    />
+                    <span
+                      style={staggerStyle(300)}
+                      className="pitch-voice-bar h-2 w-1 rounded-full bg-[#62CFC7]"
+                    />
+                  </span>
+                ) : (
+                  <span className="flex size-6 items-center justify-center rounded-full bg-[#15131E]/75 text-[#D5CEE0]">
+                    <MicOffIcon />
+                  </span>
+                )}
+              </div>
+
+              {/* Center webcam portrait or camera-off initials */}
+              <div className="flex flex-1 items-center justify-center">
+                {cameraOn ? (
+                  <MeetPersonSvg role={tile.role} phase={phase} />
+                ) : (
+                  <div className="flex size-14 items-center justify-center rounded-full border border-[#3B364D] bg-[#242033] font-display text-sm font-bold text-[#D5CEE0] ring-4 ring-[#1D1A29]">
+                    {tile.name.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom row: clean translucent nameplate + muted status */}
+              <div className="relative z-10 flex items-center justify-between gap-2">
+                <span className="truncate rounded-lg bg-[#15131E]/80 px-2 py-0.5 text-xs font-semibold text-[#FFF9EB]">
+                  {tile.name}
+                </span>
+                {!showHandBadge && (
+                  <span
+                    className={cn(
+                      'truncate rounded-lg px-2 py-0.5 text-[11px] font-medium',
+                      tile.role === 'phone' && cameraOn
+                        ? 'bg-[#253244] text-[#A9E7F4]'
+                        : isTeacher
+                          ? 'bg-[#22323A] text-[#A9E7F4]'
+                          : 'bg-[#15131E]/70 text-[#D5CEE0]',
+                    )}
+                  >
+                    {statusText}
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+
+      {/* Decorative call controls kept clear of the bottom-left headline and bottom-right slide counter */}
+      <MeetCallDock className="absolute right-32 bottom-4 hidden md:flex" />
     </div>
   );
 }
@@ -509,8 +785,8 @@ function estimateInitialBubblePlacement(
   fallback: { readonly defaultLeft: string; readonly defaultTop: string },
 ): { readonly left: string; readonly top: string } {
   const [x, , z] = position;
-  const leftPct = Math.min(84, Math.max(16, 50 + x * 14));
-  const topPct = Math.min(68, Math.max(18, 28 + z * 7));
+  const leftPct = Math.min(86, Math.max(14, 50 + x * 14));
+  const topPct = Math.min(76, Math.max(18, 34 + z * 7));
   return {
     left: Number.isFinite(leftPct)
       ? `${leftPct.toFixed(1)}%`
@@ -555,25 +831,48 @@ function OverheadSpeechBubbles({
               top: initial.top,
               ...staggerStyle(550 + turnIdx * 2500),
             }}
-            className="pitch-speech-bubble pointer-events-none absolute z-20 max-w-52 -translate-x-1/2 -translate-y-full"
+            className="pitch-speech-bubble pointer-events-none absolute z-20 min-w-44 max-w-68 -translate-x-1/2 -translate-y-full sm:max-w-72"
           >
-            <div className="rounded-2xl border-2 border-border bg-card/95 px-3 py-2 text-foreground shadow-float">
-              <span
+            <div className="flex flex-col items-center">
+              <div
                 className={cn(
-                  'inline-block rounded-md px-1.5 py-0.5 font-display text-[11px] font-bold',
-                  meta.badgeClass,
+                  'w-full rounded-[1.25rem] border-2 bg-[#FFF9EB]/98 px-4 py-2.5 text-foreground shadow-[0_14px_30px_-10px_rgba(56,47,63,0.36)] sm:px-4.5 sm:py-3',
+                  meta.borderClass,
                 )}
               >
-                {meta.name}
-              </span>
-              <p className="mt-1 text-xs font-semibold leading-snug text-foreground">
-                {actor.speech}
-              </p>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 font-display text-xs font-bold tracking-tight',
+                      meta.badgeClass,
+                    )}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn('size-1.5 rounded-full', meta.dotClass)}
+                    />
+                    {meta.name}
+                  </span>
+                </div>
+                <p className="mt-1.5 text-sm font-semibold leading-snug text-foreground sm:text-[15px]">
+                  {actor.speech}
+                </p>
+              </div>
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 12"
+                className="-mt-[2px] h-3 w-6 shrink-0"
+              >
+                <path d="M2 0 L12 10 L22 0 Z" fill="#FFF9EB" />
+                <path
+                  d="M2 0 L12 10 L22 0"
+                  fill="none"
+                  stroke={meta.tailStroke}
+                  strokeWidth="2.2"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </div>
-            <div
-              aria-hidden="true"
-              className="mx-auto size-2.5 -translate-y-1.5 rotate-45 border-r-2 border-b-2 border-border bg-card"
-            />
           </div>
         );
       })}
