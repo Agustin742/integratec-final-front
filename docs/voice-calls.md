@@ -53,7 +53,7 @@ pnpm exec playwright test e2e/voice-calls.spec.ts
 
 The existing `desktop` and `mobile` projects capture 1280×800 and 360×800 respectively. The test observes successful body/hair/top GLB responses and actual WebGL indexed geometry submissions matching those assets, rather than sleeping or treating canvas creation as avatar readiness. It checks viewport overflow, participant labels, keyboard microphone and teacher controls, and request-only moderation state. It requires working WebGL2; a 2D fallback is not accepted as visual evidence.
 
-**Capture status: desktop and mobile checks passed (2/2); generated PNGs inspected by the coding agent.** Avatars, readable controls, and panel placement are visible; team visual approval and independent fixture review are still pending. The test writes only these new paths:
+**Capture status: desktop and mobile checks passed (2/2); generated PNGs inspected by the coding agent.** Avatars, readable controls, and panel placement are visible; team visual approval remains pending; independent fixture review subsequently approved the scoped evidence. The test writes only these new paths:
 
 - [1280×800 stage, teacher panel, and controls](./assets/voice-calls/fixture-panel-1280.png).
 - [360×800 unobscured avatar stage and controls](./assets/voice-calls/fixture-stage-360.png).
@@ -63,20 +63,26 @@ These are visual-fixture checks, not full call-flow end-to-end coverage. Inspect
 
 ## Correction verification checkpoint
 
-The classroom retry correction and request-only moderation feedback have independent scoped reviews. The visual fixture has browser evidence but its independent review was unavailable due to quota; this checkpoint is **not merge approval**.
+The classroom retry correction and request-only moderation feedback have independent scoped reviews. The visual fixture has browser evidence and a subsequently recovered independent review approved its scoped evidence and production gate; this checkpoint is **not merge approval**.
 
 | Check | Observed result |
 | --- | --- |
 | Lint, typecheck, production build, security build check, assets | Passed |
 | Production fixture exclusion | Passed: no fixture module or unique fixture data in built JavaScript |
-| Unit suite | 2257 passed; one security-lint test exceeded its 15-second timeout |
-| Full browser suite | 167 passed, 8 failed, 1 skipped; retry and both visual fixture cases passed |
+| Unit suite | Final `pnpm test`: 215 files and 2258 cases passed after isolating tooling first and bounding the application worker pool |
+| Full browser suite | Final hardware ANGLE D3D11 matrix: 175 passed, 1 existing skip, 0 failed; all original assertions and timeouts retained |
 | Python CI tests, documentation links, whitespace | Passed: 10 Python tests and 124 Markdown files |
-| Formatting | Three new files corrected after failed check; subsequent global check exceeded 30 seconds, so no final pass claimed |
+| Formatting | Passed in the subsequently authorized bounded check (job 21), after correcting three new files |
 
-Browser failures affect Michi interaction, classroom invitations, inventory equip/rejection, and teacher regrading, on both viewports. Michi/invitation failures were also observed on the earlier develop baseline; the inventory/regrading failures remain unattributed. Their snapshots show the slow-3D offer, but that does not establish causation. No timeout was increased and no failing expectation was weakened. The earlier context-stream abort assertion passed in this full run, without proving why it failed in the earlier focused batch.
+A subsequently authorized isolated security-lint check passed 2/2 within the existing timeout (job 21); this does not retroactively make the earlier full unit run green or establish that timeout's cause. The earlier isolated inventory/regrading diagnostic failed all four cases (job 20), so those failures were not limited to the full-suite run. The subsequent hardware differential and full matrix passed. Earlier failed runs remain evidence, not retroactively successful runs.
 
-The develop merge and seven conflicts remain explicitly deferred. Screenshots and fixes are local; live audio/signaling verification, team visual approval, and the unavailable independent fixture review must not be inferred from these checks.
+Earlier SwiftShader browser failures affected Michi interaction, classroom invitations, inventory equip/rejection, and teacher regrading, on both viewports. Michi/invitation failures were also observed on the earlier develop baseline; the original inventory/regrading failures were investigated with renderer telemetry. Chromium was using ANGLE SwiftShader. With hardware ANGLE D3D11 on a verified RTX 4070 SUPER, the same four inventory/regrading cases passed (1.7–3.0 seconds each) under unchanged 15-second test limits and assertions. This differential provides strong environment evidence; it does not retroactively make the earlier full run green. Their snapshots show the slow-3D offer, but that offer alone does not establish causation. No timeout was increased and no failing expectation was weakened. The earlier context-stream abort assertion passed in this full run, without proving why it failed in the earlier focused batch.
+
+The final hardware matrix used an ignored local wrapper with unchanged original test-source hashes, explicit `--use-angle=d3d11 --enable-gpu --disable-software-rasterizer`, and a runtime physical-GPU identity check. Screenshots were redirected to ignored artifacts; no failing test was excluded. The existing skipped case is the mobile-only unthrottled reference-scene overlay reading (`performance-offer.spec.ts:403`). The default headless renderer is environment-dependent; a passing D3D11 run is not a claim that the earlier SwiftShader run passed.
+
+Vitest's declaration inventory was identical before and after grouping (1930 declarations across 215 files, expanding to 2258 executed cases); positional and name filters were also checked. Independent review covered the runner contract and the fixture's build-time exclusion.
+
+The develop merge and seven conflicts remain explicitly deferred. Screenshots and fixes are local; live audio/signaling verification, and team visual approval must not be inferred from these checks. Independent review is scoped to the fixture and does not establish global readiness.
 
 ## Limits
 
