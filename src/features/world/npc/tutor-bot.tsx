@@ -12,15 +12,17 @@ import {
   type AnimationAction,
   type AnimationClip,
   type Object3D,
+  type Skeleton,
   type SkinnedMesh,
 } from 'three';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { loadGlbAsset } from '../asset-cache';
+import { evictRejectedGlbAsset, loadGlbAsset } from '../asset-cache';
 import { dampYaw } from '../classroom/avatar-yaw';
 import { placeAvatar } from '../classroom/local-avatar-frame';
 import type { NpcLivePositions } from '../classroom/npc-live-position';
 import type { Pose } from '../movement';
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion';
+import { createIdleInvalidator } from './idle-invalidator';
 import { mergeSkinnedByMaterial } from './merge-skinned-by-material';
 import { advanceNpc, BOT_LEAN_RADIANS } from './npc-frame';
 import {
@@ -67,6 +69,8 @@ export interface TutorBotProps {
     ((anchor: { x: number; y: number }) => void) | undefined;
   /** Fired once the model is loaded (tests, debugging). */
   readonly onReady?: ((handle: TutorBotHandle) => void) | undefined;
+  /** Fired when loading the tutor bot GLB fails so the scene can surface recovery. */
+  readonly onError?: ((error: unknown) => void) | undefined;
 }
 
 interface BotVisual {
@@ -133,9 +137,11 @@ export function TutorBot({
   onSpeech,
   onSpeechAnchor,
   onReady,
+  onError,
 }: TutorBotProps) {
   const reducedMotion = usePrefersReducedMotion();
   const invalidate = useThree((state) => state.invalidate);
+  const frameloop = useThree((state) => state.frameloop);
   // The mixer's `finished` listener outlives renders; it reads the live value.
   const reducedMotionRef = useRef(reducedMotion);
   useEffect(() => {
@@ -185,9 +191,9 @@ export function TutorBot({
     rotation: npc.rotation,
   });
 
-  const callbacks = useRef({ onSpeech, onSpeechAnchor, onReady });
+  const callbacks = useRef({ onSpeech, onSpeechAnchor, onReady, onError });
   useEffect(() => {
-    callbacks.current = { onSpeech, onSpeechAnchor, onReady };
+    callbacks.current = { onSpeech, onSpeechAnchor, onReady, onError };
   });
   const visualRef = useRef<BotVisual | null>(null);
   const speakingRef = useRef(false);
@@ -196,7 +202,18 @@ export function TutorBot({
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    if (ready && !reducedMotion && frameloop === 'demand') invalidate();
+  }, [ready, reducedMotion, frameloop, invalidate]);
+
+  const idleInvalidator = useMemo(
+    () => createIdleInvalidator(invalidate),
+    [invalidate],
+  );
+  useEffect(() => () => idleInvalidator.dispose(), [idleInvalidator]);
+
+  useEffect(() => {
     let cancelled = false;
+    const skeletons = new Set<Skeleton>();
     let mergedMeshes: readonly SkinnedMesh[] = [];
     let built: BotVisual | null = null;
     loadGlbAsset(
@@ -206,6 +223,11 @@ export function TutorBot({
       (gltf) => {
         if (cancelled) return;
         const model = cloneSkeleton(gltf.scene);
+        // Retain private skeletons even when merging detaches their meshes.
+        model.traverse((node) => {
+          const mesh = node as SkinnedMesh;
+          if (mesh.isSkinnedMesh) skeletons.add(mesh.skeleton);
+        });
         // Fewer draw calls: same-material skinned parts become one mesh.
         mergedMeshes = mergeSkinnedByMaterial(model);
         model.traverse((node) => {
@@ -239,7 +261,11 @@ export function TutorBot({
         setReady(true);
         callbacks.current.onReady?.({ group: root });
       },
-      () => undefined,
+      (error: unknown) => {
+        if (cancelled) return;
+        evictRejectedGlbAsset(TUTOR_BOT_URL, scopeKey);
+        callbacks.current.onError?.(error);
+      },
     );
     return () => {
       cancelled = true;
@@ -248,6 +274,7 @@ export function TutorBot({
         built.mixer.uncacheRoot(built.model);
         holder.remove(built.model);
         for (const merged of mergedMeshes) merged.geometry.dispose();
+        for (const skeleton of skeletons) skeleton.dispose();
       }
       visualRef.current = null;
       setReady(false);
@@ -357,7 +384,13 @@ export function TutorBot({
     const frozenIdle = reducedMotion && visual?.activeClip === BOT_IDLE_CLIP;
     if (visual && !frozenIdle) {
       visual.mixer.update(dt);
-      invalidate();
+      // The hover loop is cosmetic: cap its cadence so the demand canvas does
+      // not render at the display rate. Speech and one-shots stay full rate.
+      if (visual.activeClip === BOT_IDLE_CLIP && !speakingRef.current) {
+        idleInvalidator.request();
+      } else {
+        invalidate();
+      }
     }
 
     const anchor = callbacks.current.onSpeechAnchor;

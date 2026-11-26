@@ -8,12 +8,18 @@ import {
   MeshStandardMaterial,
   OrthographicCamera,
   Raycaster,
+  Skeleton,
+  SkinnedMesh,
   Vector3,
 } from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from '@/test/render';
-import { clearAssetCache, setGlbLoaderForTests } from '../asset-cache';
+import {
+  clearAssetCache,
+  getAssetCacheSize,
+  setGlbLoaderForTests,
+} from '../asset-cache';
 import { createNpcLivePositions } from '../classroom/npc-live-position';
 import type { NpcView } from './npc-view';
 import { skinnedGltf, skinnedMeshes } from './skinned-fixture.test-utils';
@@ -111,6 +117,65 @@ afterEach(() => {
 });
 
 describe('TutorBot model', () => {
+  it('disposes every private skeleton once on scope change and unmount, never cached skeletons', async () => {
+    const source = skinnedGltf(3, CLIPS);
+    const sourceDisposals = skinnedMeshes(source.scene).map((mesh) =>
+      vi.spyOn(mesh.skeleton, 'dispose'),
+    );
+    setGlbLoaderForTests({ loadAsync: () => Promise.resolve(source) });
+    const clone = vi.spyOn(Skeleton.prototype, 'clone');
+    const instances: Skeleton[][] = [];
+    const onReady = ({ group }: TutorBotHandle) => {
+      const skeletons = clone.mock.results.map(
+        (result) => result.value as Skeleton,
+      );
+      clone.mockClear();
+      for (const skeleton of skeletons) {
+        skeleton.computeBoneTexture();
+        vi.spyOn(skeleton, 'dispose');
+      }
+      instances.push(skeletons);
+      // Multiple live meshes can reference the same private skeleton.
+      const mesh = skinnedMeshes(group)[0]!;
+      const alias = new SkinnedMesh(mesh.geometry, mesh.material);
+      alias.skeleton = mesh.skeleton;
+      mesh.parent!.add(alias);
+    };
+    const ui = render(
+      <TutorBot npc={home} scopeKey="first" onReady={onReady} />,
+    );
+    await waitFor(() => expect(instances).toHaveLength(1));
+    expect(instances[0]).toHaveLength(4);
+    ui.rerender(<TutorBot npc={home} scopeKey="second" onReady={onReady} />);
+    await waitFor(() => expect(instances).toHaveLength(2));
+    for (const skeleton of instances[0]!) {
+      expect(skeleton.dispose).toHaveBeenCalledTimes(1);
+      expect(skeleton.boneTexture).toBeNull();
+    }
+    for (const skeleton of instances[1]!) {
+      expect(skeleton.dispose).not.toHaveBeenCalled();
+    }
+    ui.unmount();
+    for (const instance of instances) {
+      for (const skeleton of instance) {
+        expect(skeleton.dispose).toHaveBeenCalledTimes(1);
+        expect(skeleton.boneTexture).toBeNull();
+      }
+    }
+    for (const dispose of sourceDisposals)
+      expect(dispose).not.toHaveBeenCalled();
+    clone.mockRestore();
+  });
+
+  it('evicts the rejected bot asset and notifies onError when loading fails', async () => {
+    const failure = new Error('bot unavailable');
+    setGlbLoaderForTests({ loadAsync: () => Promise.reject(failure) });
+    const onError = vi.fn();
+    render(<TutorBot npc={home} scopeKey="bot-err" onError={onError} />);
+    await waitFor(() => expect(onError).toHaveBeenCalledWith(failure));
+    expect(getAssetCacheSize('bot-err')).toBe(0);
+  });
+
   it('merges the skinned parts of one material but keeps the morph face apart', async () => {
     setGlbLoaderForTests({
       loadAsync: () => Promise.resolve(skinnedGltf(3, CLIPS)),
@@ -304,5 +369,17 @@ describe('TutorBot phrase bubble', () => {
     expect(onSpeech).not.toHaveBeenCalledWith(
       expect.objectContaining({ seq: 2 }),
     );
+  });
+});
+
+describe('TutorBot idle cadence', () => {
+  it('caps idle hover invalidations instead of rendering every frame', async () => {
+    const { handle } = await setup(home);
+    expect(handle.group.userData.activeClip).toBe('IdleHover');
+    frame.invalidate.mockClear();
+    for (let i = 0; i < 30; i += 1) tick(1 / 60);
+    expect(frame.invalidate).not.toHaveBeenCalled();
+    await waitFor(() => expect(frame.invalidate).toHaveBeenCalled());
+    expect(frame.invalidate.mock.calls.length).toBeLessThan(5);
   });
 });
