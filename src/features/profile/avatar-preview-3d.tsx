@@ -14,8 +14,8 @@ const BACKGROUND = '#FFF9EB';
 const SHOW = ['Wave', 'Idle', 'Idle'] as const;
 
 /**
- * Keeps the previous avatar on screen while the files of a new hair or top
- * load, instead of flashing an empty stage for every option change.
+ * Keeps the previous avatar on screen while the files of a new hair, top or
+ * accessory load, instead of flashing the placeholder for every change.
  */
 function DeferredAvatar({
   avatar,
@@ -26,10 +26,11 @@ function DeferredAvatar({
   readonly animation: string;
 }) {
   const shown = useDeferredValue(avatar);
+  const worn = useDeferredValue(equipped);
   return (
     <AvatarModel
       avatar={shown}
-      equipped={equipped}
+      equipped={worn}
       scopeKey={PREVIEW_SCOPE}
       animation={animation}
       face="happy"

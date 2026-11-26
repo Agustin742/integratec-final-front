@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-26 — Keep the preview avatar while an accessory loads (#149)
+
+- **Status:** completed
+- **Area / files:** `src/features/profile/`
+- **Change:** The 3D preview defers the equipped accessories together with the avatar.
+- **Reason:** Equipping an uncached accessory replaced the whole avatar with the placeholder capsule.
+- **Verification:** Strict TDD; preview 3D test, lint, typecheck, prettier.
+- **Next step:** None.
+
 ## 2026-11-26 — Locked styles without a classroom shop (#149)
 
 - **Status:** completed
