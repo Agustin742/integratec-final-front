@@ -10,7 +10,11 @@ import {
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from '@/test/render';
-import { clearAssetCache, setGlbLoaderForTests } from '../asset-cache';
+import {
+  clearAssetCache,
+  getAssetCacheSize,
+  setGlbLoaderForTests,
+} from '../asset-cache';
 import { ClassroomDoor } from './classroom-door';
 import { DOOR_FADE_OPACITY } from './classroom-door-fade';
 
@@ -116,5 +120,20 @@ describe('ClassroomDoor', () => {
       new Vector3(0, 0, -1),
     ).intersectObject(mesh, false);
     expect(hits).toHaveLength(0);
+  });
+
+  it('evicts the failed door asset and notifies onError when loading rejects', async () => {
+    const failure = new Error('door unavailable');
+    setGlbLoaderForTests({ loadAsync: () => Promise.reject(failure) });
+    const onError = vi.fn();
+    render(
+      <ClassroomDoor
+        poseRef={{ current: { x: 0, z: 0, rotation: 0 } }}
+        scopeKey="door-err"
+        onError={onError}
+      />,
+    );
+    await waitFor(() => expect(onError).toHaveBeenCalledWith(failure));
+    expect(getAssetCacheSize('door-err')).toBe(0);
   });
 });

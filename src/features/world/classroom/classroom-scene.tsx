@@ -255,7 +255,12 @@ export function ClassroomScene({
         onPointerOut={handlePointerOut}
       >
         {/* Under the scene root so clicks on the moving NPCs reach its handlers. */}
-        <ClassroomPet npc={pet} scopeKey={scopeKey} positions={npcPositions} />
+        <ClassroomPet
+          npc={pet}
+          scopeKey={scopeKey}
+          positions={npcPositions}
+          onError={onAssetError}
+        />
         <TutorBot
           npc={bot}
           phraseText={botPhrase}
@@ -263,6 +268,7 @@ export function ClassroomScene({
           positions={npcPositions}
           onSpeech={onNpcSpeech}
           onSpeechAnchor={onNpcSpeechAnchor}
+          onError={onAssetError}
         />
       </primitive>
       <ClassroomKit
@@ -271,7 +277,11 @@ export function ClassroomScene({
         scopeKey={scopeKey}
         onModuleError={handleModuleError}
       />
-      <ClassroomDoor poseRef={controller.poseRef} scopeKey={scopeKey} />
+      <ClassroomDoor
+        poseRef={controller.poseRef}
+        scopeKey={scopeKey}
+        onError={() => handleModuleError('door')}
+      />
       <InteractableHighlight
         interactablesById={interactablesById}
         highlightedId={

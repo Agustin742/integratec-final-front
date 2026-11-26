@@ -326,6 +326,7 @@ export function buildClassroomScene(layout: ClassroomLayout): ClassroomScene {
     ['teacher-desk', root.getObjectByName('teacher-desk')],
     ['board', board.children[0]],
     ['bookshelf', shelf.children[0]],
+    ['door', door.children[0]],
   ] as const;
   const setFailedModules = (ids: ReadonlySet<ClassroomKitModuleId>) => {
     for (const [id, target] of recoveryTargets) {

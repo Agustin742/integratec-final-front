@@ -5,8 +5,11 @@ import {
   Box3,
   Group,
   Mesh,
+  MeshBasicMaterial,
   MeshStandardMaterial,
+  Texture,
   Vector3,
+  type Material,
   type Object3D,
 } from 'three';
 import { describe, expect, it, vi } from 'vitest';
@@ -27,9 +30,7 @@ function material(name: string, color?: string, transparent = false) {
   return m;
 }
 
-function moduleScene(
-  parts: readonly { name: string; material: MeshStandardMaterial }[],
-) {
+function moduleScene(parts: readonly { name: string; material: Material }[]) {
   const scene = new Group();
   const geometries: BoxGeometry[] = [];
   parts.forEach((part, index) => {
@@ -136,6 +137,59 @@ describe('buildBatchedKit', () => {
     expect(wood?.geometry.getAttribute('position').count).toBe(48);
     expect(wood?.userData).toEqual({ kitModuleIds: ['board', 'cabinet'] });
   });
+
+  it.each([
+    ['unsupported', () => new MeshBasicMaterial({ color: 'red' })],
+    ['textured', () => new MeshStandardMaterial({ map: new Texture() })],
+  ] as const)(
+    'preserves distinct same-named %s materials and their geometry while batching supported appearances',
+    (_kind, createMaterial) => {
+      const first = createMaterial();
+      const second = createMaterial();
+      first.name = second.name = 'Shared';
+      const supported = material('SupportedA', 'brown');
+      const a = moduleScene([
+        { name: 'a', material: first },
+        { name: 'plain-a', material: supported },
+      ]);
+      const b = moduleScene([
+        { name: 'b', material: second },
+        { name: 'plain-b', material: material('SupportedB', 'brown') },
+      ]);
+      const built = buildBatchedKit(
+        modules([
+          ['board', a.scene],
+          ['cabinet', b.scene],
+        ]),
+        [
+          place('board', [0, 0, 0]),
+          place('board', [4, 0, 0]),
+          place('cabinet', [8, 0, 0]),
+        ],
+      );
+
+      expect(built.meshes).toHaveLength(3);
+      expect(countBatchedDrawCalls(built.group)).toBe(3);
+      for (const [source, vertices, minX, maxX, moduleIds] of [
+        [first, 48, -0.5, 4.5, ['board']],
+        [second, 24, 7.5, 8.5, ['cabinet']],
+        [supported, 72, -0.5, 8.5, ['board', 'cabinet']],
+      ] as const) {
+        const mesh = built.meshes.find((entry) => entry.material === source);
+        expect(mesh).toBeDefined();
+        const positions = mesh!.geometry.getAttribute('position');
+        expect(positions.count).toBe(vertices);
+        const bounds = new Box3().setFromBufferAttribute(
+          positions as BufferAttribute,
+        );
+        expect(bounds.min.x).toBeCloseTo(minX);
+        expect(bounds.max.x).toBeCloseTo(maxX);
+        expect(mesh!.userData).toEqual({ kitModuleIds: moduleIds });
+      }
+      expect(new Set(built.meshes.map((mesh) => mesh.name)).size).toBe(3);
+      built.dispose();
+    },
+  );
 
   it('keeps same-coloured materials apart when vertex colours or alpha test differ', () => {
     const plain = material('Plain', 'brown');
