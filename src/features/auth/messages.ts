@@ -1,10 +1,10 @@
 export const authMessages = {
   page: {
     subtitle:
-      'Creá tu cuenta y elegí el recorrido con el que vas a empezar en IntegrarTec.',
+      'Creá tu cuenta y elegí el recorrido con el que vas a empezar en Bankito.',
   },
   paths: {
-    legend: '¿Cómo vas a usar IntegrarTec?',
+    legend: '¿Cómo vas a usar Bankito?',
     description: 'Elegí el punto de partida que mejor describe tu ingreso.',
     options: {
       INDEPENDENT_TEACHER: {
@@ -58,7 +58,7 @@ export const authMessages = {
     },
   },
   validation: {
-    pathRequired: 'Elegí cómo vas a usar IntegrarTec.',
+    pathRequired: 'Elegí cómo vas a usar Bankito.',
     displayNameRequired: 'Ingresá tu nombre y apellido.',
     displayNameTooLong: 'El nombre no puede superar los 100 caracteres.',
     emailRequired: 'Ingresá tu correo electrónico.',

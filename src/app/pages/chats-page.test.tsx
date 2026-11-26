@@ -185,7 +185,7 @@ describe('ChatsPage', () => {
     expect(links[0]).not.toHaveAttribute('aria-current');
     expect(screen.getByText('Elegí un chat')).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/chats');
-    expect(document.title).toBe('Mensajes · IntegrarTec');
+    expect(document.title).toBe('Mensajes · Bankito');
   });
 
   it('opens a conversation from the list, marks it as current and clears its unread', async () => {
@@ -204,7 +204,7 @@ describe('ChatsPage', () => {
     expect(
       within(list).getByRole('link', { name: /Matemática/ }),
     ).toHaveAttribute('aria-current', 'page');
-    expect(document.title).toBe('Chat de Matemática · IntegrarTec');
+    expect(document.title).toBe('Chat de Matemática · Bankito');
 
     await waitFor(
       () => {
