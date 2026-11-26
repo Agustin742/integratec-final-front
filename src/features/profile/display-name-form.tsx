@@ -109,25 +109,20 @@ export function DisplayNameForm({
   return (
     <section
       aria-labelledby={headingId}
-      className="space-y-4 rounded-2xl border border-edge bg-card p-5 shadow-panel"
+      className="rounded-3xl border border-edge bg-card p-3 shadow-panel sm:p-5"
     >
-      <div className="space-y-1">
-        <h3
-          id={headingId}
-          className="font-display text-lg font-bold text-foreground"
-        >
-          {copy.heading}
-        </h3>
-        <p className="text-sm text-muted-foreground">{copy.description}</p>
-      </div>
+      {/* The field label already names this section on screen. */}
+      <h3 id={headingId} className="sr-only">
+        {copy.heading}
+      </h3>
 
-      <form noValidate onSubmit={handleSubmit} className="space-y-4">
+      <form noValidate onSubmit={handleSubmit} className="space-y-3">
         <FormRootError form={form} headingLevel="h4" title={copy.rootTitle} />
         <FormField
           control={form.control}
           name="displayName"
           label={copy.label}
-          description={copy.hint}
+          description={`${copy.description} ${copy.hint}`}
         >
           {(fieldProps) => (
             <Input

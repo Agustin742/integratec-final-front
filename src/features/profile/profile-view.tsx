@@ -6,7 +6,7 @@ import {
   StaleDataNotice,
 } from '@/components/feedback/states';
 import { useSessionSnapshot } from '@/session/provider';
-import { StreakAndBadgesSection } from '@/features/points/streak-and-badges-section';
+import { AccountFooter } from './account-footer';
 import { AvatarForm } from './avatar-form';
 import { DisplayNameForm } from './display-name-form';
 import { profileMessages } from './messages';
@@ -93,32 +93,24 @@ export function ProfileView({ title }: ProfileViewProps) {
             />
           )}
 
-          <dl className="rounded-2xl border border-edge bg-tray/60 p-4 text-sm">
-            <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {profileMessages.page.emailLabel}
-            </dt>
-            <dd className="font-semibold text-foreground">{profile.email}</dd>
-            <dd className="text-muted-foreground">
-              {profileMessages.page.emailNote}
-            </dd>
-          </dl>
-
           {/* Keyed by account: a draft never survives an account switch. */}
-          <DisplayNameForm
-            key={`name-${profile.id}`}
-            profile={profile}
-            commit={commit}
-            reconcile={reconcile}
-            onDirtyChange={onDisplayNameDirty}
-          />
           <AvatarForm
             key={`avatar-${profile.id}`}
             profile={profile}
             commit={commit}
             reconcile={reconcile}
             onDirtyChange={onAvatarDirty}
+            intro={
+              <DisplayNameForm
+                key={`name-${profile.id}`}
+                profile={profile}
+                commit={commit}
+                reconcile={reconcile}
+                onDirtyChange={onDisplayNameDirty}
+              />
+            }
           />
-          <StreakAndBadgesSection key={`gamification-${profile.id}`} />
+          <AccountFooter key={`account-${profile.id}`} email={profile.email} />
         </>
       )}
     </section>

@@ -1,5 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import { createMemoryRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import {
@@ -40,6 +41,13 @@ const preview3d = vi.hoisted(() => ({
   keep: false,
   equipped: undefined as unknown,
 }));
+// Card pictures are rendered offscreen with Three.js: only what is asked for
+// matters here.
+const thumbnails = vi.hoisted(() => ({ worn: vi.fn(), glb: vi.fn() }));
+vi.mock('@/features/shop/item-preview-renderer', () => ({
+  renderWornThumbnail: thumbnails.worn,
+  renderGlbThumbnail: thumbnails.glb,
+}));
 vi.mock('./avatar-preview-3d', async () => {
   const { useEffect } = await import('react');
   return {
@@ -66,6 +74,8 @@ beforeAll(() => {
 beforeEach(() => {
   window.sessionStorage.clear();
   vi.stubEnv('VITE_APP_ENV', 'test');
+  thumbnails.worn.mockReset().mockResolvedValue('data:image/png;base64,worn');
+  thumbnails.glb.mockReset().mockResolvedValue('data:image/png;base64,glb');
   vi.stubEnv('VITE_API_BASE_URL', TEST_API_BASE_URL);
   vi.stubEnv('VITE_REALTIME_URL', 'wss://realtime.example.invalid');
 });
@@ -122,7 +132,24 @@ const nameSection = () =>
   screen.getByRole('region', { name: copy.displayName.heading });
 const avatarSection = () =>
   screen.getByRole('region', { name: copy.avatar.heading });
-const group = (name: string) => screen.getByRole('group', { name });
+const tab = (name: string) => screen.getByRole('tab', { name });
+/** Radix activates a tab on mouse down. */
+function openTab(name: string) {
+  fireEvent.mouseDown(tab(name), { button: 0, ctrlKey: false });
+}
+
+/** The tab each choice group lives in. */
+const TAB_OF_GROUP: Readonly<Record<string, string>> = {
+  Cuerpo: 'Cuerpo',
+  Peinado: 'Pelo',
+  'Color de pelo': 'Pelo',
+  'Prenda superior': 'Ropa',
+  'Color de la prenda': 'Ropa',
+};
+const group = (name: string) => {
+  openTab(TAB_OF_GROUP[name]!);
+  return screen.getByRole('group', { name });
+};
 const radio = (groupName: string, label: string) =>
   within(group(groupName)).getByRole('radio', { name: label });
 const nameInput = () =>
@@ -771,27 +798,121 @@ describe('Profile page (/profile)', () => {
 describe('Profile customization', () => {
   const CLASSROOM_ID = '00000000-0000-4000-8000-000000000057';
 
-  test('offers every category and moves focus to the chosen one', async () => {
+  test('shows one category panel at a time, moved with the arrow keys', async () => {
     await renderProfile(createOwnProfileStore());
     await waitForProfile();
-    const nav = within(avatarSection()).getByRole('navigation', {
+
+    const list = within(avatarSection()).getByRole('tablist', {
       name: copy.avatar.categoriesLabel,
     });
+    expect(
+      within(list)
+        .getAllByRole('tab')
+        .map((item) => item.textContent),
+    ).toEqual(['Cuerpo', 'Pelo', 'Ropa', 'Accesorios']);
+    expect(tab('Cuerpo')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getAllByRole('tabpanel')).toHaveLength(1);
+    expect(screen.queryByRole('group', { name: 'Peinado' })).toBeNull();
 
-    for (const label of Object.values(copy.avatar.categories)) {
-      expect(
-        within(nav).getByRole('button', { name: label }),
-      ).toBeInTheDocument();
-    }
-    fireEvent.click(
-      within(nav).getByRole('button', { name: copy.avatar.categories.hair }),
+    tab('Cuerpo').focus();
+    fireEvent.keyDown(tab('Cuerpo'), { key: 'ArrowRight' });
+    await waitFor(() =>
+      expect(tab('Pelo')).toHaveAttribute('aria-selected', 'true'),
     );
+    expect(screen.getByRole('group', { name: 'Peinado' })).toBeVisible();
+    expect(screen.queryByRole('group', { name: 'Cuerpo' })).toBeNull();
+  });
+
+  test('keeps the unsaved draft, and its save action, across every tab', async () => {
+    const store = createOwnProfileStore();
+    await renderProfile(store);
+    await waitForProfile();
+
+    selectChoice('Color de pelo', 'Rubio');
+    openTab('Accesorios');
+    expect(saveStatus(avatarSection())).toBe('unsaved');
+    expect(
+      screen.getByRole('button', { name: copy.avatar.submit }),
+    ).toBeVisible();
+    expect(radio('Color de pelo', 'Rubio')).toBeChecked();
+
+    openTab('Accesorios');
+    fireEvent.click(screen.getByRole('button', { name: copy.avatar.submit }));
+    await waitFor(() => expect(store.read().avatar.hairColor).toBe('#E5AD58'));
+  });
+
+  test('opens the tab of the field the server rejected', async () => {
+    const store = createOwnProfileStore();
+    await renderProfile(store);
+    await waitForProfile();
+    store.failNext('avatar', { status: 400, body: validationDetail('topId') });
+
+    selectChoice('Color de pelo', 'Rubio');
+    openTab('Cuerpo');
+    fireEvent.click(screen.getByRole('button', { name: copy.avatar.submit }));
+
+    await waitFor(() =>
+      expect(tab('Ropa')).toHaveAttribute('aria-selected', 'true'),
+    );
+    expect(screen.getByText('topId was rejected by the server')).toBeVisible();
+  });
+
+  test('pictures every style on the chosen body, only for the open tab', async () => {
+    await renderProfile(createOwnProfileStore());
+    await waitForProfile();
+    const sources = () =>
+      thumbnails.worn.mock.calls.map(
+        ([source]) => source as { part: string; bodyUrl: string },
+      );
+
+    // The body tab pictures each body wearing the current top.
+    await waitFor(() =>
+      expect(new Set(sources().map((source) => source.bodyUrl)).size).toBe(2),
+    );
+    expect(sources().every((source) => source.part === 'top')).toBe(true);
+
+    selectChoice('Cuerpo', 'Femenino');
+    thumbnails.worn.mockClear();
+    openTab('Pelo');
+    await waitFor(() => expect(sources().length).toBeGreaterThan(2));
+    expect(sources().every((source) => source.part === 'hair')).toBe(true);
+    expect(sources().every((source) => source.bodyUrl.includes('female'))).toBe(
+      true,
+    );
+  });
+
+  test('a locked style leads to the shop', async () => {
+    await renderProfile(
+      createOwnProfileStore({
+        ownedPaidStyles: [{ styleType: 'hair', styleId: 'dreads' }],
+      }),
+    );
+    await waitForProfile();
+    openTab('Pelo');
 
     expect(
-      within(avatarSection()).getByRole('heading', {
-        name: copy.avatar.categories.hair,
+      await screen.findByRole('link', {
+        name: copy.avatar.shopLinkLabel('Mohicano suave'),
       }),
-    ).toHaveFocus();
+    ).toHaveAttribute('href', '/');
+  });
+
+  test('ends with the streak and the account email, without medals', async () => {
+    await renderProfile(createOwnProfileStore());
+    await waitForProfile();
+    const footer = screen.getByRole('region', { name: copy.page.footerLabel });
+
+    await within(footer).findByText(/Racha actual/);
+    expect(within(footer).getByText('ana@example.com')).toBeInTheDocument();
+    expect(footer).toHaveTextContent(copy.page.emailNote);
+    expect(screen.queryByText(/medalla/i)).toBeNull();
+    // Name first, account details last.
+    for (const earlier of [nameInput(), avatarSection()]) {
+      expect(
+        earlier.compareDocumentPosition(footer) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).not.toBe(0);
+    }
   });
 
   test('keeps the classroom accessories in the same area and shows them on the preview', async () => {
@@ -835,13 +956,121 @@ describe('Profile customization', () => {
     );
     await waitForProfile();
 
+    // The preview wears them before the tab is even opened.
+    await waitFor(() => {
+      expect(preview3d.equipped).toMatchObject({ hand: 'hand_mate' });
+    });
+    openTab('Accesorios');
     expect(
       within(avatarSection()).getByRole('heading', {
         name: 'Inventario por aula',
       }),
     ).toBeInTheDocument();
-    await waitFor(() => {
-      expect(preview3d.equipped).toMatchObject({ hand: 'hand_mate' });
+    expect(avatarSection()).toHaveTextContent(copy.avatar.accessoriesNote);
+    expect(
+      await screen.findByText(/cada aula tiene sus propios accesorios/i),
+    ).toHaveTextContent('Aula de prueba');
+  });
+
+  test('pictures owned and locked accessories one part at a time and equips at once', async () => {
+    const MATE = '00000000-0000-4000-8000-000000001001';
+    const CAP = '00000000-0000-4000-8000-000000001002';
+    const equipment = createClassroomEquipmentStore({
+      classroomId: CLASSROOM_ID,
+      includeCatalogHandler: false,
+      itemMetadata: { [MATE]: { slot: 'hand' } },
+      initialPurchases: [
+        {
+          id: '00000000-0000-4000-8000-000000002001',
+          classroomId: CLASSROOM_ID,
+          studentId: '00000000-0000-4000-8000-000000007001',
+          shopItemId: MATE,
+          shopItemCode: 'hand_mate',
+          shopItemName: 'Mate',
+          shopItemKind: 'AVATAR_ACCESSORY',
+          pointTransactionId: '00000000-0000-4000-8000-000000003001',
+          pricePaid: 100,
+          createdAt: '2026-11-20T10:00:00.000Z',
+        },
+      ],
     });
+    const catalogItem = (
+      id: string,
+      code: string,
+      name: string,
+      slot: string,
+      owned: boolean,
+    ) => ({
+      id,
+      code,
+      name,
+      description: '',
+      kind: 'AVATAR_ACCESSORY',
+      price: 100,
+      isImplemented: true,
+      isPurchasable: true,
+      ownedByStudent: owned,
+      ownedByClassroom: false,
+      metadata: { slot },
+      createdAt: '2026-11-01T10:00:00.000Z',
+    });
+    await renderProfile(createOwnProfileStore());
+    mswServer.use(
+      createClassroomListHandler({
+        items: [
+          {
+            id: CLASSROOM_ID,
+            name: 'Aula de prueba',
+            subject: null,
+            schoolId: null,
+            independentTeacherId: '00000000-0000-4000-8000-000000000001',
+            adultMode: false,
+            chatMuted: false,
+            collaborationLocked: false,
+            gamesDisabled: false,
+            tutorBotSkin: 'none',
+            myRole: 'STUDENT',
+            capabilities: [],
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      }),
+      createClassroomDetailHandler(CLASSROOM_ID, { myRole: 'STUDENT' }),
+      http.get(`${TEST_API_BASE_URL}/classrooms/:id/shop/items`, () =>
+        HttpResponse.json({
+          items: [
+            catalogItem(MATE, 'hand_mate', 'Mate', 'hand', true),
+            catalogItem(CAP, 'head_cap', 'Gorra', 'head', false),
+          ],
+          page: 1,
+          pageSize: 100,
+          total: 2,
+        }),
+      ),
+      ...equipment.handlers,
+    );
+    await waitForProfile();
+    openTab('Accesorios');
+
+    // Head is the first part: only a locked item, which leads to the shop.
+    expect(
+      await screen.findByRole('link', {
+        name: copy.avatar.shopLinkLabel('Gorra'),
+      }),
+    ).toHaveAttribute('href', `/classrooms/${CLASSROOM_ID}/panels/shop`);
+    expect(screen.queryByRole('radio', { name: /Mate/ })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Mano/ }));
+    expect(
+      screen.queryByRole('link', {
+        name: copy.avatar.shopLinkLabel('Gorra'),
+      }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole('radio', { name: /Mate/ }));
+    await waitFor(() =>
+      expect(equipment.getSlots().hand?.shopItemId).toBe(MATE),
+    );
+    await waitFor(() => expect(thumbnails.glb).toHaveBeenCalled());
   });
 });

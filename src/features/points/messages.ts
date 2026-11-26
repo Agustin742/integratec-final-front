@@ -51,6 +51,9 @@ export const pointsMessages = {
     errorTitle: 'No pudimos cargar tu racha ni tus medallas',
     errorDescription: 'Revisá tu conexión e intentá de nuevo.',
     retryAction: 'Reintentar',
+    streakLoading: 'Cargando tu racha…',
+    streakErrorTitle: 'No pudimos cargar tu racha',
+    streakStaleTitle: 'Racha pendiente de sincronización',
     staleTitle: 'Racha y medallas pendientes de sincronización',
     staleDescription:
       'Mostrando los últimos datos confirmados. Falló la actualización en segundo plano.',

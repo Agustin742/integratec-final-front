@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-26 — Profile page redesign (#149)
+
+- **Status:** completed (not visually checked)
+- **Area / files:** `src/features/{profile,inventory,points}/`, `e2e/profile.spec.ts`, `docs/{routing,ui-inventory,streak-and-badges}.md`
+- **Change:** Sticky avatar preview beside a name field and Cuerpo/Pelo/Ropa/Accesorios tabs; picture cards with clear chosen and locked states; locked items link to the shop; accessories one part at a time with a clear classroom and instant save; streak and email moved to a small footer; medals hidden (code kept).
+- **Reason:** The owner rejected the previous page: weak hierarchy, no item previews and a poor selector.
+- **Verification:** Strict TDD on the profile page tests; inventory panel tests, lint and typecheck. No full suite, build, e2e (spec updated, not run) or visual review.
+- **Next step:** Visual check at desktop and 360px.
+
 ## 2026-11-26 — Shop previews for hair styles and tops (#149)
 
 - **Status:** completed (not visually checked)

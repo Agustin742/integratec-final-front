@@ -1,6 +1,8 @@
 # Daily Study Streak and Badge Showcase
 
-Implements [issue #47](https://github.com/Agustin742/integratec-final-front/issues/47) (`HU-GAM-002`): reusable `StreakIndicator` and `BadgeShowcase` components integrated into `ProfileView` (`/profile`).
+Implements [issue #47](https://github.com/Agustin742/integratec-final-front/issues/47) (`HU-GAM-002`): reusable `StreakIndicator` and `BadgeShowcase` components for the profile.
+
+`/profile` currently shows only the streak, as a small footer line (`StreakSummary`, `src/features/points/streak-summary.tsx`). Medals are hidden in the interface: `StreakAndBadgesSection` and `BadgeShowcase` remain in the code, tested, but no screen renders them. The data and contract below are unchanged.
 
 ## Architecture and Contract
 

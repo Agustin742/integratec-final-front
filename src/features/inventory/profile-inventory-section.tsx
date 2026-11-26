@@ -1,23 +1,22 @@
-import { useEffect, useId, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { classroomListQueryKey } from '@/api/query-keys';
+import { useId } from 'react';
 import {
   EmptyState,
   ErrorState,
   LoadingState,
 } from '@/components/feedback/states';
-import { useSessionService, useSessionSnapshot } from '@/session/provider';
-import { listAccessibleClassrooms } from '../classrooms/classroom-service';
+import type { AvatarBodyId } from '@/features/world/avatar/accessory-catalog';
 import { inventoryMessages } from './inventory-messages';
 import { InventoryPanel } from './inventory-panel';
+import type { StudentClassrooms } from './use-student-classrooms';
 
 const msgs = inventoryMessages.profile;
 
 export interface ProfileInventorySectionProps {
-  /** Id of the heading, so the customization categories can focus it. */
-  readonly headingId?: string;
-  /** Reports the classroom on screen, empty when there is none. */
-  readonly onClassroomChange?: (classroomId: string) => void;
+  readonly classrooms: StudentClassrooms;
+  /** Body the item pictures are drawn on. */
+  readonly bodyId: AvatarBodyId;
+  /** Whether the section is on screen; pictures are only drawn then. */
+  readonly active: boolean;
 }
 
 /**
@@ -26,72 +25,35 @@ export interface ProfileInventorySectionProps {
  * `/profile`.
  */
 export function ProfileInventorySection({
-  headingId = 'profile-inventory-heading',
-  onClassroomChange,
-}: ProfileInventorySectionProps = {}) {
-  const { client } = useSessionService();
-  const snapshot = useSessionSnapshot();
-  const userId = snapshot.status === 'authenticated' ? snapshot.user.id : null;
+  classrooms,
+  bodyId,
+  active,
+}: ProfileInventorySectionProps) {
+  const headingId = useId();
   const selectId = useId();
-  const [selectedClassroomId, setSelectedClassroomId] = useState<string>('');
-
-  const classroomsQuery = useQuery({
-    queryKey: classroomListQueryKey(userId ?? 'anonymous', {
-      page: 1,
-      pageSize: 50,
-      sort: '-createdAt',
-    }),
-    queryFn: ({ signal }) =>
-      listAccessibleClassrooms(
-        client,
-        { page: 1, pageSize: 50, sort: '-createdAt' },
-        { signal },
-      ),
-    enabled: Boolean(userId),
-    retry: false,
-  });
-
-  const studentClassrooms = (classroomsQuery.data?.items ?? []).filter(
-    (classroom) => classroom.myRole === 'STUDENT',
-  );
-
-  const activeClassroomId = studentClassrooms.some(
-    (c) => c.id === selectedClassroomId,
-  )
-    ? selectedClassroomId
-    : (studentClassrooms[0]?.id ?? '');
-
-  useEffect(() => {
-    onClassroomChange?.(activeClassroomId);
-  }, [activeClassroomId, onClassroomChange]);
+  const { query, items, activeId, select } = classrooms;
+  const activeName = items.find(({ id }) => id === activeId)?.name;
 
   return (
-    <section
-      aria-labelledby={headingId}
-      className="space-y-4 border-t border-edge pt-4"
-    >
-      <div className="space-y-1">
-        <h4
-          id={headingId}
-          tabIndex={-1}
-          className="font-display text-base font-semibold text-foreground"
-        >
-          {msgs.heading}
-        </h4>
-        <p className="text-sm text-muted-foreground">{msgs.description}</p>
-      </div>
+    <section aria-labelledby={headingId} className="space-y-4">
+      <h4
+        id={headingId}
+        className="font-display text-base font-semibold text-foreground"
+      >
+        {msgs.heading}
+      </h4>
 
-      {classroomsQuery.isPending && classroomsQuery.data === undefined ? (
+      {query.isPending && query.data === undefined ? (
         <LoadingState label={msgs.loading} skeletonLines={2} />
-      ) : classroomsQuery.isError && classroomsQuery.data === undefined ? (
+      ) : query.isError && query.data === undefined ? (
         <ErrorState
           headingLevel="h4"
           title={msgs.errorTitle}
           description={msgs.errorDescription}
-          onRetry={() => void classroomsQuery.refetch()}
-          isRetrying={classroomsQuery.isFetching}
+          onRetry={() => void query.refetch()}
+          isRetrying={query.isFetching}
         />
-      ) : studentClassrooms.length === 0 ? (
+      ) : items.length === 0 ? (
         <EmptyState
           headingLevel="h4"
           title={msgs.emptyTitle}
@@ -99,31 +61,45 @@ export function ProfileInventorySection({
         />
       ) : (
         <div className="space-y-4">
-          {studentClassrooms.length > 1 ? (
-            <div className="flex flex-col gap-1 sm:max-w-xs">
-              <label
-                htmlFor={selectId}
-                className="text-xs font-medium text-muted-foreground"
-              >
-                {msgs.classroomLabel}
-              </label>
-              <select
-                id={selectId}
-                value={activeClassroomId}
-                onChange={(event) => setSelectedClassroomId(event.target.value)}
-                className="min-h-11 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                {studentClassrooms.map((classroom) => (
-                  <option key={classroom.id} value={classroom.id}>
-                    {classroom.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
+          <div className="space-y-2 rounded-2xl bg-tray/60 p-3">
+            {items.length > 1 && (
+              <div className="flex flex-col gap-1 sm:max-w-xs">
+                <label
+                  htmlFor={selectId}
+                  className="text-sm font-semibold text-foreground"
+                >
+                  {msgs.classroomLabel}
+                </label>
+                <select
+                  id={selectId}
+                  value={activeId}
+                  onChange={(event) => select(event.target.value)}
+                  className="min-h-11 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:ring-2 focus:ring-ring focus:outline-none"
+                >
+                  {items.map((classroom) => (
+                    <option key={classroom.id} value={classroom.id}>
+                      {classroom.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {activeName !== undefined && (
+              <p className="text-sm text-foreground">
+                {msgs.classroomNote(activeName)}
+              </p>
+            )}
+          </div>
 
-          {activeClassroomId ? (
-            <InventoryPanel classroomId={activeClassroomId} />
+          {activeId ? (
+            <InventoryPanel
+              classroomId={activeId}
+              pictures={{
+                bodyId,
+                active,
+                shopHref: `/classrooms/${activeId}/panels/shop`,
+              }}
+            />
           ) : null}
         </div>
       )}

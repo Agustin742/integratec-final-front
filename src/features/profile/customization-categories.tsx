@@ -1,5 +1,4 @@
-import type { ReactNode } from 'react';
-import { Button } from '@/components/ui/button';
+import { TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { profileMessages } from './messages';
 
 const copy = profileMessages.avatar;
@@ -34,67 +33,22 @@ export function CategoryIcon({ category }: { readonly category: CategoryId }) {
   );
 }
 
-/**
- * Jumps to a category and moves focus to its heading. Buttons, not hash links:
- * a location change would trip the unsaved-draft blocker.
- */
-export function CategoryNav({
-  headingIds,
-}: {
-  readonly headingIds: Readonly<Record<CategoryId, string>>;
-}) {
-  const goTo = (category: CategoryId) => {
-    const heading = document.getElementById(headingIds[category]);
-    heading?.scrollIntoView?.({ block: 'start' });
-    heading?.focus({ preventScroll: true });
-  };
-
+/** The category tabs: arrow keys move between them (Radix). */
+export function CategoryTabs() {
   return (
-    <nav aria-label={copy.categoriesLabel}>
-      <ul className="flex flex-wrap gap-2">
-        {(Object.keys(copy.categories) as CategoryId[]).map((category) => (
-          <li key={category}>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="min-h-11 gap-2"
-              onClick={() => goTo(category)}
-            >
-              <CategoryIcon category={category} />
-              {copy.categories[category]}
-            </Button>
-          </li>
-        ))}
-      </ul>
-    </nav>
-  );
-}
-
-/** One group of related choices under a focusable heading. */
-export function CategorySection({
-  category,
-  headingId,
-  children,
-}: {
-  readonly category: CategoryId;
-  readonly headingId: string;
-  readonly children: ReactNode;
-}) {
-  return (
-    <section
-      aria-labelledby={headingId}
-      className="space-y-3 border-t border-edge pt-4"
-    >
-      <h4
-        id={headingId}
-        tabIndex={-1}
-        className="flex items-center gap-2 font-display text-base font-semibold text-foreground"
-      >
-        <CategoryIcon category={category} />
-        {copy.categories[category]}
-      </h4>
-      {children}
-    </section>
+    <TabsList aria-label={copy.categoriesLabel} className="flex w-full">
+      {(Object.keys(copy.categories) as CategoryId[]).map((category) => (
+        <TabsTrigger
+          key={category}
+          value={category}
+          className="min-h-11 flex-auto gap-2 px-2 text-sm sm:text-base"
+        >
+          <span className="hidden sm:block">
+            <CategoryIcon category={category} />
+          </span>
+          {copy.categories[category]}
+        </TabsTrigger>
+      ))}
+    </TabsList>
   );
 }
