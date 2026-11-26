@@ -17,6 +17,7 @@ export const gradesMessages = {
     title: 'Vista para madres, padres y tutores',
     description:
       'La vista de calificaciones para responsables se ofrece en el área familiar; este panel del aula está disponible para alumnos y docentes.',
+    ctaLabel: 'Ir al área familiar',
   },
   student: {
     heading: 'Boletín de calificaciones',

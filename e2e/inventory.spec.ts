@@ -210,7 +210,11 @@ async function mockAuthAndClassroom(
       return;
     }
 
-    if (pathname === '/notifications' || pathname === '/chats') {
+    if (
+      pathname === '/notifications' ||
+      pathname === '/chats' ||
+      pathname === '/me/family-threads'
+    ) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -365,7 +369,7 @@ async function mockAuthAndClassroom(
 async function loginAsStudent(page: Page) {
   await page.goto('/login');
   await page.getByLabel(/correo|email/i).fill('estudiante@example.test');
-  await page.getByLabel(/contraseña/i).fill('Password123!');
+  await page.getByLabel(/^contraseña$/i).fill('Password123!');
   await page.getByRole('button', { name: /ingresar|iniciar sesión/i }).click();
   await page.waitForURL((url) => !url.pathname.endsWith('/login'));
 }

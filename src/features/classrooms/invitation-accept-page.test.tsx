@@ -628,4 +628,57 @@ describe('InvitationAcceptPage (/invitations/accept)', () => {
     );
     expect(codeInput.value).toBe('K7P9X2M');
   });
+
+  test('accepts a PARENT invitation with null deskIndex/membershipId and renders Spanish guardian confirmation', async () => {
+    mswServer.use(createAcceptInvitationHandler());
+
+    const { container, router } = renderInvitationRoute(
+      '/invitations/accept?token=inv-valid-parent-token',
+      { signedIn: true, email: 'tutor@ejemplo.com' },
+    );
+
+    const acceptButton = await screen.findByRole('button', {
+      name: joinMessages.invitation.acceptAction,
+    });
+    await waitFor(() => {
+      expect(router.state.location.search).toBe('');
+    });
+
+    fireEvent.click(acceptButton);
+
+    const outcome = await screen.findByTestId('parent-invitation-outcome');
+    expect(outcome).toHaveTextContent(joinMessages.outcome.parentJoinedTitle);
+    expect(outcome).toHaveTextContent(joinMessages.outcome.parentJoinedBody);
+    expect(outcome).toHaveTextContent('tutor@ejemplo.com');
+    expect(
+      within(outcome).getByRole('link', {
+        name: joinMessages.outcome.parentContinueCta,
+      }),
+    ).toHaveAttribute('href', '/family/6e5f6a7b-0000-4000-8000-000000000001');
+
+    await expectAccessible(container);
+  });
+
+  test('renders idempotent confirmation when a PARENT re-accepts an already linked invitation', async () => {
+    mswServer.use(createAcceptInvitationHandler());
+
+    renderInvitationRoute(
+      '/invitations/accept?token=inv-already-parent-token',
+      { signedIn: true, email: 'tutor@ejemplo.com' },
+    );
+
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: joinMessages.invitation.acceptAction,
+      }),
+    );
+
+    const outcome = await screen.findByTestId('parent-invitation-outcome');
+    expect(outcome).toHaveTextContent(
+      joinMessages.outcome.parentAlreadyMemberTitle,
+    );
+    expect(outcome).toHaveTextContent(
+      joinMessages.outcome.parentAlreadyMemberBody,
+    );
+  });
 });

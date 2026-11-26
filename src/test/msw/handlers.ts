@@ -22,6 +22,15 @@ export type JoinClassroomWithCodePayload =
   components['schemas']['JoinClassroomWithCodeDto'];
 export type JoinClassroomResponsePayload =
   components['schemas']['JoinClassroomResponseDto'];
+export type AcceptInvitationResponsePayload = Omit<
+  components['schemas']['AcceptInvitationResponseDto'],
+  'membershipId' | 'deskIndex' | 'childId' | 'parentLinkId'
+> & {
+  readonly membershipId: string | null;
+  readonly deskIndex?: number | null;
+  readonly childId?: string | null;
+  readonly parentLinkId?: string | null;
+};
 export type ClassroomListItemPayload =
   components['schemas']['ClassroomListItemDto'];
 export type RosterGuardianPayload = components['schemas']['RosterGuardianDto'];
@@ -63,19 +72,28 @@ export type InvitationStateFilterPayload = InvitationStatePayload | 'ALL';
 
 export type ClassroomInvitationPayload = Omit<
   components['schemas']['ClassroomInvitationResponseDto'],
-  'targetEmail' | 'maxUses'
+  'targetEmail' | 'maxUses' | 'childId' | 'childDisplayName'
 > & {
   readonly targetEmail: string | null;
   readonly maxUses: number | null;
+  readonly childId?: string | null;
+  readonly childDisplayName?: string | null;
 };
 
 export type CreatedClassroomInvitationPayload = Omit<
   components['schemas']['CreatedClassroomInvitationResponseDto'],
-  'targetEmail' | 'maxUses'
+  'targetEmail' | 'maxUses' | 'childId' | 'childDisplayName'
 > & {
   readonly targetEmail: string | null;
   readonly maxUses: number | null;
+  readonly childId?: string | null;
+  readonly childDisplayName?: string | null;
 };
+
+export type ClassroomParentLinkPayload =
+  components['schemas']['ClassroomParentLinkDto'];
+export type ClassroomParentLinksResponsePayload =
+  components['schemas']['ClassroomParentLinksResponseDto'];
 
 export interface PaginatedClassroomInvitationsPayload {
   readonly items: ClassroomInvitationPayload[];
@@ -2431,10 +2449,135 @@ export function createRevokeJoinCodeHandler(
   );
 }
 
+export interface CreateClassroomParentLinksHandlerOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly items?: readonly ClassroomParentLinkPayload[];
+  readonly error?: MswErrorResponseSpec | 'network';
+  readonly resolveResponse?: (context: {
+    readonly classroomId: string;
+    readonly request: Request;
+  }) =>
+    | ClassroomParentLinksResponsePayload
+    | Response
+    | Promise<ClassroomParentLinksResponsePayload | Response>;
+  readonly onRequest?: (request: Request) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `GET /classrooms/{id}/parent-links`
+ * (`ClassroomsController_listParentLinks`).
+ */
+export function createClassroomParentLinksHandler(
+  options: CreateClassroomParentLinksHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomSegment = options.classroomId ?? ':id';
+  return http.get(
+    `${baseUrl}/classrooms/${classroomSegment}/parent-links`,
+    async ({ params, request }) => {
+      await options.onRequest?.(request);
+
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+
+      const resolvedClassroomId =
+        options.classroomId ?? String(params.id ?? '');
+
+      if (options.resolveResponse) {
+        const resolved = await options.resolveResponse({
+          classroomId: resolvedClassroomId,
+          request,
+        });
+        if (resolved instanceof Response) {
+          return resolved;
+        }
+        return HttpResponse.json(resolved, { status: 200 });
+      }
+
+      const payload: ClassroomParentLinksResponsePayload = {
+        items: (options.items ?? []).map((item) => ({ ...item })),
+      };
+      return HttpResponse.json(payload, { status: 200 });
+    },
+  );
+}
+
+export interface CreateUnlinkParentLinkHandlerOptions {
+  readonly baseUrl?: string;
+  readonly classroomId?: string;
+  readonly linkId?: string;
+  readonly error?: MswErrorResponseSpec | 'network';
+  readonly resolveResponse?: (context: {
+    readonly classroomId: string;
+    readonly linkId: string;
+    readonly request: Request;
+  }) => Response | null | Promise<Response | null>;
+  readonly onRequest?: (
+    request: Request,
+    linkId: string,
+  ) => void | Promise<void>;
+}
+
+/**
+ * Contract-faithful MSW handler for `DELETE /classrooms/{id}/parent-links/{linkId}`
+ * (`ClassroomsController_unlinkParentLink`).
+ */
+export function createUnlinkParentLinkHandler(
+  options: CreateUnlinkParentLinkHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
+  const classroomSegment = options.classroomId ?? ':id';
+  const linkSegment = options.linkId ?? ':linkId';
+  return http.delete(
+    `${baseUrl}/classrooms/${classroomSegment}/parent-links/${linkSegment}`,
+    async ({ params, request }) => {
+      const resolvedLinkId = options.linkId ?? String(params.linkId ?? '');
+      await options.onRequest?.(request, resolvedLinkId);
+
+      if (options.error === 'network') {
+        return HttpResponse.error();
+      }
+      if (options.error) {
+        return createErrorEnvelopeResponse(
+          options.error.status,
+          options.error.body,
+        );
+      }
+
+      const resolvedClassroomId =
+        options.classroomId ?? String(params.id ?? '');
+
+      if (options.resolveResponse) {
+        const resolved = await options.resolveResponse({
+          classroomId: resolvedClassroomId,
+          linkId: resolvedLinkId,
+          request,
+        });
+        if (resolved instanceof Response) {
+          return resolved;
+        }
+      }
+
+      return new HttpResponse(null, { status: 204 });
+    },
+  );
+}
+
 export interface ClassroomInvitationsStoreOptions {
   readonly baseUrl?: string;
   readonly classroomId: string;
+  readonly adultMode?: boolean;
   readonly initialInvitations?: readonly ClassroomInvitationPayload[];
+  readonly initialParentLinks?: readonly ClassroomParentLinkPayload[];
+  readonly studentNamesById?: Readonly<Record<string, string>>;
   readonly onListRequest?: (request: Request) => void | Promise<void>;
   readonly onCreateInvitationRequest?: (
     request: Request,
@@ -2449,24 +2592,38 @@ export interface ClassroomInvitationsStoreOptions {
     body: unknown,
   ) => void | Promise<void>;
   readonly onRevokeJoinCodeRequest?: (request: Request) => void | Promise<void>;
+  readonly onListParentLinksRequest?: (
+    request: Request,
+  ) => void | Promise<void>;
+  readonly onUnlinkParentLinkRequest?: (
+    request: Request,
+    linkId: string,
+  ) => void | Promise<void>;
 }
 
 export interface ClassroomInvitationsStore {
   readonly read: () => readonly ClassroomInvitationPayload[];
+  readonly readParentLinks: () => readonly ClassroomParentLinkPayload[];
   readonly failNextList: (failure: MswErrorResponseSpec | 'network') => void;
   readonly failNextCreateInvitation: (failure: InvitationFailureSpec) => void;
   readonly failNextRevokeInvitation: (failure: InvitationFailureSpec) => void;
   readonly failNextGenerateJoinCode: (failure: InvitationFailureSpec) => void;
   readonly failNextRevokeJoinCode: (failure: InvitationFailureSpec) => void;
+  readonly failNextParentLinksList: (
+    failure: MswErrorResponseSpec | 'network',
+  ) => void;
+  readonly failNextUnlinkParentLink: (failure: InvitationFailureSpec) => void;
   readonly handlers: readonly HttpHandler[];
 }
 
 /**
- * Stateful MSW store for `/classrooms/{id}/invitations` and `/classrooms/{id}/join-code`.
- * Enforces one-time token/code exposure, atomic join-code regeneration
- * (marking any prior `PENDING` `JOIN_CODE` as `REVOKED`), `404` when no active
- * join code exists, `400` when revoking a non-`PENDING` invitation, and
- * `failNext*` fault injection including `'drop-response'` after server commit.
+ * Stateful MSW store for `/classrooms/{id}/invitations`, `/classrooms/{id}/join-code`,
+ * and `/classrooms/{id}/parent-links`.
+ * Enforces one-time token/code exposure, `STUDENT` and `PARENT` invitations
+ * (including `adultMode` and 2-guardian cap `409` checks), atomic join-code
+ * regeneration, `404` when no active join code exists, `400` when revoking a
+ * non-`PENDING` invitation, logical guardian unlinking, and `failNext*` fault
+ * injection including `'drop-response'` after server commit.
  */
 export function createClassroomInvitationsStore(
   options: ClassroomInvitationsStoreOptions,
@@ -2474,12 +2631,17 @@ export function createClassroomInvitationsStore(
   let items: ClassroomInvitationPayload[] = (
     options.initialInvitations ?? []
   ).map((item) => ({ ...item }));
+  let parentLinks: ClassroomParentLinkPayload[] = (
+    options.initialParentLinks ?? []
+  ).map((link) => ({ ...link }));
   let seq = 1;
   let nextListFailure: MswErrorResponseSpec | 'network' | undefined;
   let nextCreateFailure: InvitationFailureSpec | undefined;
   let nextRevokeFailure: InvitationFailureSpec | undefined;
   let nextGenerateCodeFailure: InvitationFailureSpec | undefined;
   let nextRevokeCodeFailure: InvitationFailureSpec | undefined;
+  let nextParentLinksListFailure: MswErrorResponseSpec | 'network' | undefined;
+  let nextUnlinkParentFailure: InvitationFailureSpec | undefined;
 
   const toFailureResponse = (
     failure: MswErrorResponseSpec | 'network',
@@ -2490,6 +2652,7 @@ export function createClassroomInvitationsStore(
 
   return {
     read: () => items.map((item) => ({ ...item })),
+    readParentLinks: () => parentLinks.map((link) => ({ ...link })),
     failNextList(failure) {
       nextListFailure = failure;
     },
@@ -2504,6 +2667,12 @@ export function createClassroomInvitationsStore(
     },
     failNextRevokeJoinCode(failure) {
       nextRevokeCodeFailure = failure;
+    },
+    failNextParentLinksList(failure) {
+      nextParentLinksListFailure = failure;
+    },
+    failNextUnlinkParentLink(failure) {
+      nextUnlinkParentFailure = failure;
     },
     handlers: [
       createClassroomInvitationsHandler({
@@ -2544,10 +2713,13 @@ export function createClassroomInvitationsStore(
           const rawEmail =
             typeof record.email === 'string' ? record.email.trim() : '';
           const role = record.role;
+          const rawChildId =
+            typeof record.childId === 'string' ? record.childId.trim() : '';
+
           if (
             rawEmail === '' ||
             !rawEmail.includes('@') ||
-            role !== 'STUDENT'
+            (role !== 'STUDENT' && role !== 'PARENT')
           ) {
             return createErrorEnvelopeResponse(400, {
               code: 'VALIDATION_FAILED',
@@ -2565,6 +2737,39 @@ export function createClassroomInvitationsStore(
             });
           }
 
+          if (role === 'PARENT') {
+            if (options.adultMode) {
+              return createErrorEnvelopeResponse(409, {
+                code: 'CONFLICT',
+                message: 'Parent invitations are disabled in adult mode.',
+                correlationId: 'corr-inv-create-409-adult',
+              });
+            }
+            if (rawChildId === '') {
+              return createErrorEnvelopeResponse(400, {
+                code: 'VALIDATION_FAILED',
+                message: 'childId is required for PARENT invitations.',
+                correlationId: 'corr-inv-create-400-child',
+                details: [
+                  {
+                    field: 'childId',
+                    messages: ['Seleccioná un estudiante.'],
+                  },
+                ],
+              });
+            }
+            const activeGuardiansForChild = parentLinks.filter(
+              (link) => link.state === 'ACTIVE' && link.childId === rawChildId,
+            ).length;
+            if (activeGuardiansForChild >= 2) {
+              return createErrorEnvelopeResponse(409, {
+                code: 'CONFLICT',
+                message: 'Student already has 2 active guardians.',
+                correlationId: 'corr-inv-create-409-cap',
+              });
+            }
+          }
+
           const currentSeq = seq;
           seq += 1;
           const createdAt = new Date(
@@ -2574,11 +2779,18 @@ export function createClassroomInvitationsStore(
             Date.UTC(2026, 10, 25, 16, currentSeq, 0),
           ).toISOString();
           const id = `71000000-0000-4000-8000-${String(currentSeq).padStart(12, '0')}`;
+          const childId = role === 'PARENT' ? rawChildId : null;
+          const childDisplayName =
+            role === 'PARENT'
+              ? (options.studentNamesById?.[rawChildId] ?? 'Estudiante')
+              : null;
           const listItem: ClassroomInvitationPayload = {
             id,
             kind: 'EMAIL',
             targetEmail: rawEmail,
-            role: 'STUDENT',
+            role,
+            childId,
+            childDisplayName,
             maxUses: 1,
             useCount: 0,
             state: 'PENDING',
@@ -2595,6 +2807,54 @@ export function createClassroomInvitationsStore(
             ...listItem,
             token: `inv-token-${String(currentSeq).padStart(4, '0')}`,
           };
+        },
+      }),
+      createClassroomParentLinksHandler({
+        baseUrl: options.baseUrl,
+        classroomId: options.classroomId,
+        onRequest: options.onListParentLinksRequest,
+        resolveResponse: () => {
+          if (nextParentLinksListFailure !== undefined) {
+            const failure = nextParentLinksListFailure;
+            nextParentLinksListFailure = undefined;
+            return toFailureResponse(failure);
+          }
+          return {
+            items: parentLinks
+              .filter((link) => link.state === 'ACTIVE')
+              .map((link) => ({ ...link })),
+          };
+        },
+      }),
+      createUnlinkParentLinkHandler({
+        baseUrl: options.baseUrl,
+        classroomId: options.classroomId,
+        onRequest: options.onUnlinkParentLinkRequest,
+        resolveResponse: ({ linkId }) => {
+          const failure = nextUnlinkParentFailure;
+          nextUnlinkParentFailure = undefined;
+          if (failure !== undefined && failure !== 'drop-response') {
+            return toFailureResponse(failure);
+          }
+
+          const target = parentLinks.find((link) => link.id === linkId);
+          if (!target) {
+            return createErrorEnvelopeResponse(404, {
+              code: 'NOT_FOUND',
+              message: 'Parent link not found.',
+              correlationId: 'corr-parent-unlink-404',
+            });
+          }
+
+          parentLinks = parentLinks.map((link) =>
+            link.id === linkId ? { ...link, state: 'INACTIVE' } : link,
+          );
+
+          if (failure === 'drop-response') {
+            return HttpResponse.error();
+          }
+
+          return null;
         },
       }),
       createRevokeClassroomInvitationHandler({
@@ -3316,7 +3576,7 @@ function readBearerAuthorization(request: Request): string | null {
 export interface CreateAcceptInvitationHandlerOptions {
   readonly baseUrl?: string;
   readonly status?: number;
-  readonly response?: Partial<JoinClassroomResponsePayload>;
+  readonly response?: Partial<AcceptInvitationResponsePayload>;
   readonly error?: MswErrorResponseSpec;
   readonly onRequest?: (
     request: Request,
@@ -3404,12 +3664,41 @@ export function createAcceptInvitationHandler(
     }
 
     if (token === 'inv-already-member-token') {
-      const payload: JoinClassroomResponsePayload = {
+      const payload: AcceptInvitationResponsePayload = {
         classroomId: 'classroom-demo-1',
         membershipId: 'membership-student-1',
         role: 'STUDENT',
         desk: { id: 'desk-1', deskIndex: 1 },
         alreadyMember: true,
+        ...options.response,
+      };
+      return HttpResponse.json(payload, { status: options.status ?? 200 });
+    }
+
+    if (
+      token === 'inv-valid-parent-token' ||
+      token === 'inv-already-parent-token'
+    ) {
+      const existingOwner = redeemedByAuth.get(token);
+      if (existingOwner && existingOwner !== auth) {
+        return createErrorEnvelopeResponse(400, {
+          code: 'BAD_REQUEST',
+          message: 'Invitation has already been consumed',
+          correlationId: 'msw-accept-consumed',
+        });
+      }
+      const alreadyMember =
+        token === 'inv-already-parent-token' || existingOwner === auth;
+      redeemedByAuth.set(token, auth);
+      const payload: AcceptInvitationResponsePayload = {
+        classroomId: 'classroom-demo-1',
+        membershipId: null,
+        role: 'PARENT',
+        desk: null,
+        deskIndex: null,
+        childId: '4e5f6a7b-0000-4000-8000-000000000009',
+        parentLinkId: '6e5f6a7b-0000-4000-8000-000000000001',
+        alreadyMember,
         ...options.response,
       };
       return HttpResponse.json(payload, { status: options.status ?? 200 });
@@ -3427,7 +3716,7 @@ export function createAcceptInvitationHandler(
     const alreadyMember = existingOwner === auth;
     redeemedByAuth.set(token, auth);
 
-    const payload: JoinClassroomResponsePayload = {
+    const payload: AcceptInvitationResponsePayload = {
       classroomId: 'classroom-demo-1',
       membershipId: 'membership-student-1',
       role: 'STUDENT',
@@ -6364,8 +6653,12 @@ export const defaultHandlers: readonly HttpHandler[] = [
   http.get(`${TEST_API_BASE_URL}/notifications`, () =>
     HttpResponse.json({ items: [], page: 1, pageSize: 20, total: 0 }),
   ),
-  // The chat dock polls the inbox from the app shell: quiet by default.
+  // The chat dock polls the inbox and staff family threads from the app shell:
+  // quiet by default.
   http.get(`${TEST_API_BASE_URL}/chats`, () =>
+    HttpResponse.json({ items: [] }),
+  ),
+  http.get(`${TEST_API_BASE_URL}/me/family-threads`, () =>
     HttpResponse.json({ items: [] }),
   ),
   createClassroomDesksHandler('*', {
@@ -8701,4 +8994,440 @@ export function createClassroomEquipmentStore(
     },
     getCounts: () => ({ ...counts }),
   };
+}
+
+export type FamilyLinkPayload = components['schemas']['FamilyLinkDto'];
+export type FamilyLinksResponsePayload =
+  components['schemas']['FamilyLinksResponseDto'];
+export type FamilyReportCardItemPayload =
+  components['schemas']['ReportCardItemDto'];
+
+export interface FamilyMetricsSummaryPayload {
+  readonly connectedSeconds: number;
+  readonly submissionCount: number;
+  readonly messageCount: number;
+  readonly gradedCount: number;
+  readonly ungradedCount: number;
+  readonly pendingCount: number;
+  readonly averageScorePercent: number | null;
+}
+
+export interface FamilyReportCardPayload {
+  readonly link: FamilyLinkPayload;
+  readonly items: readonly FamilyReportCardItemPayload[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
+  readonly metrics: FamilyMetricsSummaryPayload;
+}
+
+export interface FamilyLinksHandlerOptions {
+  readonly baseUrl?: string;
+  readonly items?: readonly FamilyLinkPayload[];
+  readonly status?: number;
+  readonly delayMs?: number;
+  readonly onRequest?: (request: Request) => void;
+}
+
+export function createFamilyLinksHandler(
+  options: FamilyLinksHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = (options.baseUrl ?? TEST_API_BASE_URL).replace(/\/+$/, '');
+  const status = options.status ?? 200;
+
+  return http.get(`${baseUrl}/me/parent-links`, async ({ request }) => {
+    options.onRequest?.(request);
+    if (options.delayMs !== undefined && options.delayMs > 0) {
+      await delay(options.delayMs);
+    }
+
+    if (status === 401) {
+      return createErrorEnvelopeResponse(401, {
+        code: 'UNAUTHENTICATED',
+        message: 'Unauthorized',
+        correlationId: 'req-family-links-401',
+      });
+    }
+
+    if (status >= 400) {
+      return createErrorEnvelopeResponse(status, {
+        code: 'INTERNAL_ERROR',
+        message: 'Raw backend failure for family links',
+        correlationId: `req-family-links-${status}`,
+      });
+    }
+
+    return HttpResponse.json({
+      items: [...(options.items ?? [])],
+    } satisfies FamilyLinksResponsePayload);
+  });
+}
+
+export interface FamilyReportCardHandlerOptions {
+  readonly baseUrl?: string;
+  readonly linkId?: string;
+  readonly link?: FamilyLinkPayload;
+  readonly items?: readonly FamilyReportCardItemPayload[];
+  readonly metrics?: FamilyMetricsSummaryPayload;
+  readonly status?: number;
+  readonly delayMs?: number;
+  readonly onRequest?: (request: Request, linkId: string) => void;
+}
+
+const DEFAULT_FAMILY_METRICS: FamilyMetricsSummaryPayload = {
+  connectedSeconds: 0,
+  submissionCount: 0,
+  messageCount: 0,
+  gradedCount: 0,
+  ungradedCount: 0,
+  pendingCount: 0,
+  averageScorePercent: null,
+};
+
+export function createFamilyReportCardHandler(
+  options: FamilyReportCardHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = (options.baseUrl ?? TEST_API_BASE_URL).replace(/\/+$/, '');
+  const status = options.status ?? 200;
+
+  return http.get(
+    `${baseUrl}/me/parent-links/:linkId/report-card`,
+    async ({ params, request }) => {
+      const linkId = String(params.linkId ?? '');
+      if (options.linkId !== undefined && linkId !== options.linkId) {
+        return;
+      }
+
+      options.onRequest?.(request, linkId);
+      if (options.delayMs !== undefined && options.delayMs > 0) {
+        await delay(options.delayMs);
+      }
+
+      if (status === 403) {
+        return createErrorEnvelopeResponse(403, {
+          code: 'FORBIDDEN',
+          message:
+            'Parent viewing is disabled while the classroom is in adult education mode',
+          correlationId: 'req-family-report-card-403',
+        });
+      }
+
+      if (status === 404) {
+        return createErrorEnvelopeResponse(404, {
+          code: 'NOT_FOUND',
+          message: 'Parent link not found',
+          correlationId: 'req-family-report-card-404',
+        });
+      }
+
+      if (status >= 400) {
+        return createErrorEnvelopeResponse(status, {
+          code: 'INTERNAL_ERROR',
+          message: 'Raw backend failure for report card',
+          correlationId: `req-family-report-card-${status}`,
+        });
+      }
+
+      const url = new URL(request.url);
+      const rawPage = Number(url.searchParams.get('page') ?? '1');
+      const rawPageSize = Number(url.searchParams.get('pageSize') ?? '20');
+      const page =
+        Number.isFinite(rawPage) && rawPage >= 1 ? Math.trunc(rawPage) : 1;
+      const pageSize =
+        Number.isFinite(rawPageSize) && rawPageSize >= 1
+          ? Math.trunc(rawPageSize)
+          : 20;
+
+      const allItems = options.items ?? [];
+      const start = (page - 1) * pageSize;
+      const pageItems = allItems.slice(start, start + pageSize);
+
+      const fallbackLink: FamilyLinkPayload = options.link ?? {
+        id: linkId,
+        classroomId: '00000000-0000-4000-8000-000000000301',
+        classroomName: 'Aula 1',
+        classroomSubject: null,
+        schoolId: null,
+        adultMode: false,
+        childId: '00000000-0000-4000-8000-000000000401',
+        childDisplayName: 'Estudiante',
+        createdAt: '2026-11-20T12:00:00.000Z',
+      };
+
+      const payload: FamilyReportCardPayload = {
+        link: fallbackLink,
+        items: pageItems,
+        page,
+        pageSize,
+        total: allItems.length,
+        metrics: options.metrics ?? DEFAULT_FAMILY_METRICS,
+      };
+
+      return HttpResponse.json(payload);
+    },
+  );
+}
+
+export type ParentLinkMessagePayload =
+  components['schemas']['ParentLinkMessageDto'];
+export type ParentLinkMessagesResponsePayload =
+  components['schemas']['ParentLinkMessagesResponseDto'];
+
+export interface ParentLinkMessagesHandlerOptions {
+  readonly baseUrl?: string;
+  readonly linkId?: string;
+  readonly link?: FamilyLinkPayload;
+  readonly items?:
+    | readonly ParentLinkMessagePayload[]
+    | (() => readonly ParentLinkMessagePayload[]);
+  readonly status?: number;
+  readonly delayMs?: number;
+  readonly onRequest?: (request: Request, linkId: string) => void;
+}
+
+export function createParentLinkMessagesHandler(
+  options: ParentLinkMessagesHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = (options.baseUrl ?? TEST_API_BASE_URL).replace(/\/+$/, '');
+  const status = options.status ?? 200;
+
+  return http.get(
+    `${baseUrl}/parent-links/:linkId/messages`,
+    async ({ params, request }) => {
+      const linkId = String(params.linkId ?? '');
+      if (options.linkId !== undefined && linkId !== options.linkId) {
+        return;
+      }
+
+      options.onRequest?.(request, linkId);
+      if (options.delayMs !== undefined && options.delayMs > 0) {
+        await delay(options.delayMs);
+      }
+
+      if (status === 403) {
+        return createErrorEnvelopeResponse(403, {
+          code: 'FORBIDDEN',
+          message:
+            'Parent messaging is disabled while the classroom is in adult education mode',
+          correlationId: 'req-parent-link-messages-403',
+        });
+      }
+
+      if (status === 404) {
+        return createErrorEnvelopeResponse(404, {
+          code: 'NOT_FOUND',
+          message: 'Parent link not found',
+          correlationId: 'req-parent-link-messages-404',
+        });
+      }
+
+      if (status >= 400) {
+        return createErrorEnvelopeResponse(status, {
+          code: 'INTERNAL_ERROR',
+          message: 'Raw backend failure for parent link messages',
+          correlationId: `req-parent-link-messages-${status}`,
+        });
+      }
+
+      const url = new URL(request.url);
+      const rawPage = Number(url.searchParams.get('page') ?? '1');
+      const rawPageSize = Number(url.searchParams.get('pageSize') ?? '30');
+      const page =
+        Number.isFinite(rawPage) && rawPage >= 1 ? Math.trunc(rawPage) : 1;
+      const pageSize =
+        Number.isFinite(rawPageSize) && rawPageSize >= 1
+          ? Math.min(50, Math.trunc(rawPageSize))
+          : 30;
+
+      const allItems =
+        typeof options.items === 'function'
+          ? options.items()
+          : (options.items ?? []);
+      const start = (page - 1) * pageSize;
+      const pageItems = allItems.slice(start, start + pageSize);
+
+      const fallbackLink: FamilyLinkPayload = options.link ?? {
+        id: linkId,
+        classroomId: '00000000-0000-4000-8000-000000000301',
+        classroomName: 'Aula 1',
+        classroomSubject: null,
+        schoolId: null,
+        adultMode: false,
+        childId: '00000000-0000-4000-8000-000000000401',
+        childDisplayName: 'Estudiante',
+        createdAt: '2026-11-20T12:00:00.000Z',
+      };
+
+      const payload: ParentLinkMessagesResponsePayload = {
+        link: fallbackLink,
+        items: [...pageItems],
+        page,
+        pageSize,
+        total: allItems.length,
+      };
+
+      return HttpResponse.json(payload);
+    },
+  );
+}
+
+export interface SendParentLinkMessageHandlerOptions {
+  readonly baseUrl?: string;
+  readonly linkId?: string;
+  readonly authorId?: string;
+  readonly authorDisplayName?: string;
+  readonly authorRole?: 'PARENT' | 'STAFF';
+  readonly status?: number;
+  readonly delayMs?: number;
+  readonly onMessageCreated?: (message: ParentLinkMessagePayload) => void;
+  readonly onRequest?: (
+    request: Request,
+    linkId: string,
+    body: unknown,
+  ) => void;
+}
+
+export function createSendParentLinkMessageHandler(
+  options: SendParentLinkMessageHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = (options.baseUrl ?? TEST_API_BASE_URL).replace(/\/+$/, '');
+  const status = options.status ?? 201;
+  let seq = 1;
+
+  return http.post(
+    `${baseUrl}/parent-links/:linkId/messages`,
+    async ({ params, request }) => {
+      const linkId = String(params.linkId ?? '');
+      if (options.linkId !== undefined && linkId !== options.linkId) {
+        return;
+      }
+
+      const rawBody = (await request.json().catch(() => null)) as {
+        body?: unknown;
+      } | null;
+      options.onRequest?.(request, linkId, rawBody);
+
+      if (options.delayMs !== undefined && options.delayMs > 0) {
+        await delay(options.delayMs);
+      }
+
+      if (status === 400) {
+        return createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Raw backend validation error for parent message',
+          correlationId: 'req-send-parent-link-message-400',
+        });
+      }
+
+      if (status === 403) {
+        return createErrorEnvelopeResponse(403, {
+          code: 'FORBIDDEN',
+          message:
+            'Parent messaging is disabled while the classroom is in adult education mode',
+          correlationId: 'req-send-parent-link-message-403',
+        });
+      }
+
+      if (status === 404) {
+        return createErrorEnvelopeResponse(404, {
+          code: 'NOT_FOUND',
+          message: 'Parent link not found',
+          correlationId: 'req-send-parent-link-message-404',
+        });
+      }
+
+      if (status >= 400) {
+        return createErrorEnvelopeResponse(status, {
+          code: 'INTERNAL_ERROR',
+          message: 'Raw backend failure sending parent link message',
+          correlationId: `req-send-parent-link-message-${status}`,
+        });
+      }
+
+      const bodyText =
+        typeof rawBody?.body === 'string' ? rawBody.body.trim() : '';
+      if (bodyText === '' || bodyText.length > 2000) {
+        return createErrorEnvelopeResponse(400, {
+          code: 'VALIDATION_FAILED',
+          message: 'Message body must be 1..2000 characters',
+          correlationId: 'req-send-parent-link-message-400-body',
+        });
+      }
+
+      const created: ParentLinkMessagePayload = {
+        id: `99999999-9999-4999-8999-${String(seq).padStart(12, '0')}`,
+        parentLinkId: linkId,
+        authorId: options.authorId ?? '00000000-0000-4000-8000-000000000090',
+        authorDisplayName: options.authorDisplayName ?? 'Laura Martínez',
+        authorRole: options.authorRole ?? 'PARENT',
+        body: bodyText,
+        createdAt: new Date(Date.UTC(2026, 10, 25, 15, seq, 0)).toISOString(),
+      };
+      seq += 1;
+      options.onMessageCreated?.(created);
+
+      return HttpResponse.json(created, { status: 201 });
+    },
+  );
+}
+
+export interface StaffFamilyThreadPayload {
+  readonly id: string;
+  readonly classroomId: string;
+  readonly classroomName: string;
+  readonly parentId: string;
+  readonly parentDisplayName: string;
+  readonly childId: string;
+  readonly childDisplayName: string;
+  readonly lastMessageBody: string | null;
+  readonly lastMessageAt: string | null;
+  readonly lastMessageAuthorRole: 'PARENT' | 'STAFF' | null;
+}
+
+export interface StaffFamilyThreadsHandlerOptions {
+  readonly baseUrl?: string;
+  readonly items?:
+    | readonly StaffFamilyThreadPayload[]
+    | (() => readonly StaffFamilyThreadPayload[]);
+  readonly status?: number;
+  readonly delayMs?: number;
+  readonly onRequest?: (request: Request) => void;
+}
+
+export function createStaffFamilyThreadsHandler(
+  options: StaffFamilyThreadsHandlerOptions = {},
+): HttpHandler {
+  const baseUrl = (options.baseUrl ?? TEST_API_BASE_URL).replace(/\/+$/, '');
+  const status = options.status ?? 200;
+
+  return http.get(`${baseUrl}/me/family-threads`, async ({ request }) => {
+    options.onRequest?.(request);
+
+    if (options.delayMs !== undefined && options.delayMs > 0) {
+      await delay(options.delayMs);
+    }
+
+    if (status === 401) {
+      return createErrorEnvelopeResponse(401, {
+        code: 'UNAUTHENTICATED',
+        message: 'Raw backend unauthenticated error for staff family threads',
+        correlationId: 'req-staff-family-threads-401',
+      });
+    }
+
+    if (status >= 400) {
+      return createErrorEnvelopeResponse(status, {
+        code: 'INTERNAL_ERROR',
+        message: 'Raw backend failure for staff family threads',
+        correlationId: `req-staff-family-threads-${status}`,
+      });
+    }
+
+    const items =
+      typeof options.items === 'function'
+        ? options.items()
+        : (options.items ?? []);
+
+    return HttpResponse.json({ items }, { status: 200 });
+  });
 }

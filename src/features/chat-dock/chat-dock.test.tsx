@@ -18,9 +18,15 @@ import { profile } from '@/session/test-fixtures';
 import {
   createChatInboxStore,
   createClassroomDetailHandler,
+  createParentLinkMessagesHandler,
+  createSendParentLinkMessageHandler,
+  createStaffFamilyThreadsHandler,
   TEST_API_BASE_URL,
   type ChatInboxStoreMessage,
+  type ParentLinkMessagePayload,
+  type StaffFamilyThreadPayload,
 } from '@/test/msw/handlers';
+import { familyMessages } from '../family/messages';
 import { mswServer } from '@/test/msw/server';
 import { render } from '@/test/render';
 import { createLiveRealtimeHarness } from '@/test/realtime/live-realtime-harness';
@@ -604,5 +610,186 @@ describe('ChatDock', () => {
         Object.defineProperty(globalThis, 'sessionStorage', original);
       }
     }
+  });
+
+  it('shows the Familias section for staff, opens a parent thread window, sends a reply, minimizes and closes cleanly', async () => {
+    const linkId = '7e5f6a7b-0000-4000-8000-000000000011';
+    const parentId = '00000000-0000-4000-8000-000000000090';
+    const childId = '4e5f6a7b-0000-4000-8000-000000000009';
+    const threadMessages: ParentLinkMessagePayload[] = [
+      {
+        id: '88888888-8888-4888-8888-000000000101',
+        parentLinkId: linkId,
+        authorId: parentId,
+        authorDisplayName: 'Laura Gómez',
+        authorRole: 'PARENT',
+        body: 'Hola profe, ¿Valentina entregó el TP?',
+        createdAt: '2026-11-24T14:00:00.000Z',
+      },
+    ];
+    let familyThreads: StaffFamilyThreadPayload[] = [
+      {
+        id: linkId,
+        classroomId: CLASSROOM_A,
+        classroomName: 'Matemática',
+        parentId,
+        parentDisplayName: 'Laura Gómez',
+        childId,
+        childDisplayName: 'Valentina Gómez',
+        lastMessageBody: threadMessages[0].body,
+        lastMessageAt: threadMessages[0].createdAt,
+        lastMessageAuthorRole: 'PARENT',
+      },
+      {
+        id: '7e5f6a7b-0000-4000-8000-000000000012',
+        classroomId: CLASSROOM_B,
+        classroomName: 'Lengua',
+        parentId: '00000000-0000-4000-8000-000000000091',
+        parentDisplayName: 'Carlos Ruiz',
+        childId: '4e5f6a7b-0000-4000-8000-000000000010',
+        childDisplayName: 'Mateo Ruiz',
+        lastMessageBody: null,
+        lastMessageAt: null,
+        lastMessageAuthorRole: null,
+      },
+    ];
+
+    setup();
+    mswServer.use(
+      createStaffFamilyThreadsHandler({ items: () => familyThreads }),
+      createParentLinkMessagesHandler({
+        linkId,
+        items: () => threadMessages,
+      }),
+      createSendParentLinkMessageHandler({
+        linkId,
+        authorId: USER_ID,
+        authorDisplayName: profile.displayName,
+        authorRole: 'STAFF',
+        onMessageCreated: (created) => {
+          threadMessages.push(created);
+          familyThreads = familyThreads.map((t) =>
+            t.id === linkId
+              ? {
+                  ...t,
+                  lastMessageBody: created.body,
+                  lastMessageAt: created.createdAt,
+                  lastMessageAuthorRole: 'STAFF',
+                }
+              : t,
+          );
+        },
+      }),
+    );
+
+    await openList();
+
+    expect(
+      await screen.findByRole('heading', { name: 'Familias' }),
+    ).toBeVisible();
+    const familiesList = screen.getByRole('list', {
+      name: 'Conversaciones con familias',
+    });
+    const lauraButton = within(familiesList).getByRole('button', {
+      name: /Laura Gómez.*Valentina Gómez · Matemática.*Hola profe/,
+    });
+    expect(lauraButton).toBeVisible();
+    expect(
+      within(familiesList).getByRole('button', {
+        name: /Carlos Ruiz.*Mateo Ruiz · Lengua.*Sin mensajes todavía/,
+      }),
+    ).toBeVisible();
+
+    fireEvent.click(lauraButton);
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Mensajes con Laura Gómez',
+    });
+    expect(
+      await within(dialog).findByText('Hola profe, ¿Valentina entregó el TP?'),
+    ).toBeVisible();
+
+    const textarea = within(dialog).getByLabelText(
+      familyMessages.messaging.composer.label,
+    ) as HTMLTextAreaElement;
+    fireEvent.change(textarea, {
+      target: { value: 'Sí Laura, lo entregó ayer.' },
+    });
+    fireEvent.click(
+      within(dialog).getByRole('button', {
+        name: familyMessages.messaging.composer.submitAction,
+      }),
+    );
+
+    expect(
+      await within(dialog).findByText('Sí Laura, lo entregó ayer.'),
+    ).toBeVisible();
+    await waitFor(() => {
+      expect(
+        within(familiesList).getByText('Sí Laura, lo entregó ayer.'),
+      ).toBeVisible();
+    });
+
+    // Minimize and restore.
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: 'Minimizar el chat' }),
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+    const bar = screen.getByRole('region', {
+      name: 'Mensajes con Laura Gómez',
+    });
+    fireEvent.click(
+      within(bar).getByRole('button', { name: 'Expandir el chat' }),
+    );
+    const reopened = await screen.findByRole('dialog', {
+      name: 'Mensajes con Laura Gómez',
+    });
+
+    // Close restores focus to the family list item.
+    fireEvent.click(
+      within(reopened).getByRole('button', { name: 'Cerrar el chat' }),
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => {
+      expect(lauraButton).toHaveFocus();
+    });
+  });
+
+  it('renders the dock when classroom inbox is empty but family threads exist, and switches mutually exclusively with classroom chats', async () => {
+    const linkId = '7e5f6a7b-0000-4000-8000-000000000013';
+    setup({ empty: true });
+    mswServer.use(
+      createStaffFamilyThreadsHandler({
+        items: [
+          {
+            id: linkId,
+            classroomId: CLASSROOM_A,
+            classroomName: 'Matemática',
+            parentId: '00000000-0000-4000-8000-000000000090',
+            parentDisplayName: 'Laura Gómez',
+            childId: '4e5f6a7b-0000-4000-8000-000000000009',
+            childDisplayName: 'Valentina Gómez',
+            lastMessageBody: null,
+            lastMessageAt: null,
+            lastMessageAuthorRole: null,
+          },
+        ],
+      }),
+      createParentLinkMessagesHandler({ linkId, items: [] }),
+    );
+
+    await openList();
+    expect(
+      await screen.findByRole('heading', { name: 'Familias' }),
+    ).toBeVisible();
+    const familiesList = screen.getByRole('list', {
+      name: 'Conversaciones con familias',
+    });
+    fireEvent.click(
+      within(familiesList).getByRole('button', { name: /Laura Gómez/ }),
+    );
+    expect(
+      await screen.findByRole('dialog', { name: 'Mensajes con Laura Gómez' }),
+    ).toBeVisible();
   });
 });

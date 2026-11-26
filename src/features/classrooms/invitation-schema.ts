@@ -19,17 +19,22 @@ export const invitationRoleSchema = z.enum([
   'ADMIN',
   'TEACHER',
   'STUDENT',
+  'PARENT',
 ]);
+export const emailInvitationRoleSchema = z.enum(['STUDENT', 'PARENT']);
 export const invitationStateSchema = z.enum([
   'PENDING',
   'USED',
   'REVOKED',
   'EXPIRED',
 ]);
+export const parentLinkStateSchema = z.enum(['ACTIVE', 'INACTIVE']);
 
 export type InvitationKind = z.infer<typeof invitationKindSchema>;
 export type InvitationRole = z.infer<typeof invitationRoleSchema>;
+export type EmailInvitationRole = z.infer<typeof emailInvitationRoleSchema>;
 export type InvitationState = z.infer<typeof invitationStateSchema>;
+export type ParentLinkState = z.infer<typeof parentLinkStateSchema>;
 
 export type CreateClassroomInvitationDto =
   components['schemas']['CreateClassroomInvitationDto'];
@@ -38,18 +43,25 @@ export type RevokeInvitationResponseDto =
   components['schemas']['RevokeInvitationResponseDto'];
 export type RevokeJoinCodeResponseDto =
   operations['ClassroomsController_revokeJoinCode']['responses'][200]['content']['application/json'];
+export type ClassroomParentLinkDto =
+  components['schemas']['ClassroomParentLinkDto'];
+export type ClassroomParentLinksResponseDto =
+  components['schemas']['ClassroomParentLinksResponseDto'];
 
 /**
  * Narrow adaptation for `ClassroomInvitationResponseDto` (`schema.generated.ts`
- * emits `targetEmail?: Record<string, never> | null` and `maxUses?: Record<string, never> | null`
+ * emits `targetEmail?: Record<string, never> | null`, `maxUses?: Record<string, never> | null`,
+ * `childId?: Record<string, never> | null`, and `childDisplayName?: Record<string, never> | null`
  * from Swagger `nullable: true`).
  */
 export type ClassroomInvitationDto = Omit<
   components['schemas']['ClassroomInvitationResponseDto'],
-  'targetEmail' | 'maxUses'
+  'targetEmail' | 'maxUses' | 'childId' | 'childDisplayName'
 > & {
   readonly targetEmail: string | null;
   readonly maxUses: number | null;
+  readonly childId: string | null;
+  readonly childDisplayName: string | null;
 };
 
 /**
@@ -57,10 +69,12 @@ export type ClassroomInvitationDto = Omit<
  */
 export type CreatedClassroomInvitationDto = Omit<
   components['schemas']['CreatedClassroomInvitationResponseDto'],
-  'targetEmail' | 'maxUses'
+  'targetEmail' | 'maxUses' | 'childId' | 'childDisplayName'
 > & {
   readonly targetEmail: string | null;
   readonly maxUses: number | null;
+  readonly childId: string | null;
+  readonly childDisplayName: string | null;
 };
 
 export interface PaginatedClassroomInvitationsDto {
@@ -100,48 +114,84 @@ export const JOIN_CODE_EXPIRES_PRESET_SECONDS: Readonly<
   '30d': 2_592_000,
 };
 
-export const sendInvitationFormSchema = z.object({
-  email: z
-    .string()
-    .superRefine((raw, ctx) => {
-      if (FORBIDDEN_CONTROL_CHARACTERS.test(raw)) {
-        ctx.addIssue({
-          code: 'custom',
-          message:
-            classroomMessages.invitations.email.validation.emailControlChars,
-        });
-        return;
-      }
-      const trimmed = raw.trim();
-      if (trimmed.length === 0) {
-        ctx.addIssue({
-          code: 'custom',
-          message: classroomMessages.invitations.email.validation.emailRequired,
-        });
-        return;
-      }
-      if (trimmed.length > INVITATION_EMAIL_MAX_LENGTH) {
-        ctx.addIssue({
-          code: 'custom',
-          message: classroomMessages.invitations.email.validation.emailTooLong,
-        });
-        return;
-      }
-      const emailCheck = z.email().safeParse(trimmed);
-      if (!emailCheck.success) {
-        ctx.addIssue({
-          code: 'custom',
-          message: classroomMessages.invitations.email.validation.emailInvalid,
-        });
-      }
-    })
-    .transform((raw) => raw.trim()),
-});
+export const sendInvitationFormSchema = z
+  .object({
+    email: z
+      .string()
+      .superRefine((raw, ctx) => {
+        if (FORBIDDEN_CONTROL_CHARACTERS.test(raw)) {
+          ctx.addIssue({
+            code: 'custom',
+            message:
+              classroomMessages.invitations.email.validation.emailControlChars,
+          });
+          return;
+        }
+        const trimmed = raw.trim();
+        if (trimmed.length === 0) {
+          ctx.addIssue({
+            code: 'custom',
+            message:
+              classroomMessages.invitations.email.validation.emailRequired,
+          });
+          return;
+        }
+        if (trimmed.length > INVITATION_EMAIL_MAX_LENGTH) {
+          ctx.addIssue({
+            code: 'custom',
+            message:
+              classroomMessages.invitations.email.validation.emailTooLong,
+          });
+          return;
+        }
+        const emailCheck = z.email().safeParse(trimmed);
+        if (!emailCheck.success) {
+          ctx.addIssue({
+            code: 'custom',
+            message:
+              classroomMessages.invitations.email.validation.emailInvalid,
+          });
+        }
+      })
+      .transform((raw) => raw.trim()),
+    role: emailInvitationRoleSchema,
+    childId: z.string().transform((raw) => raw.trim()),
+  })
+  .superRefine((values, ctx) => {
+    if (values.role === 'PARENT' && values.childId.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['childId'],
+        message: classroomMessages.invitations.email.validation.childRequired,
+      });
+    }
+  });
 
 export type SendInvitationFormInput = z.input<typeof sendInvitationFormSchema>;
 export type SendInvitationFormOutput = z.output<
   typeof sendInvitationFormSchema
 >;
+
+/** Maps validated email-invitation form values into `CreateClassroomInvitationDto`. */
+export function toCreateClassroomInvitationPayload(
+  values: SendInvitationFormOutput,
+  options: { readonly adultMode?: boolean } = {},
+): CreateClassroomInvitationDto {
+  const effectiveRole: EmailInvitationRole = options.adultMode
+    ? 'STUDENT'
+    : values.role;
+  if (effectiveRole === 'PARENT') {
+    return {
+      email: values.email,
+      role: 'PARENT',
+      childId: values.childId,
+    };
+  }
+  return {
+    email: values.email,
+    role: 'STUDENT',
+  };
+}
 
 export const generateJoinCodeFormSchema = z.object({
   maxUses: z
@@ -219,6 +269,8 @@ const classroomInvitationFields = {
   kind: invitationKindSchema,
   targetEmail: optionalNullableString,
   role: invitationRoleSchema,
+  childId: optionalNullableString,
+  childDisplayName: optionalNullableString,
   maxUses: optionalNullableMaxUses,
   useCount: z.number().int().min(0),
   state: invitationStateSchema,
@@ -272,4 +324,20 @@ export const revokeJoinCodeResponseSchema: z.ZodType<RevokeJoinCodeResponseDto> 
   z.object({
     success: z.boolean().optional(),
     message: z.string().optional(),
+  });
+
+export const classroomParentLinkSchema: z.ZodType<ClassroomParentLinkDto> =
+  z.object({
+    id: z.string().min(1),
+    parentId: z.string().min(1),
+    parentDisplayName: z.string().min(1),
+    childId: z.string().min(1),
+    childDisplayName: z.string().min(1),
+    state: parentLinkStateSchema,
+    createdAt: z.string().min(1),
+  });
+
+export const classroomParentLinksResponseSchema: z.ZodType<ClassroomParentLinksResponseDto> =
+  z.object({
+    items: z.array(classroomParentLinkSchema),
   });

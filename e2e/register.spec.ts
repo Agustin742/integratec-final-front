@@ -75,7 +75,7 @@ test('completes SCHOOL registration with server confirmation and transitions to 
     .getByLabel(authMessages.fields.email.label)
     .fill('Directora@Escuela4.edu.ar');
   await main
-    .getByLabel(authMessages.fields.password.label)
+    .getByLabel(authMessages.fields.password.label, { exact: true })
     .fill('ClaveSegura2026');
   await main
     .getByLabel(authMessages.fields.schoolName.label)
@@ -125,32 +125,75 @@ test('completes SCHOOL registration with server confirmation and transitions to 
   expect(pageErrors).toEqual([]);
 });
 
-test('routes INVITATION choice to /invitations/accept without sending a registration request', async ({
+test('preselects INVITEE when ?next=/invitations/accept and completes registration into the invitation route', async ({
   page,
 }) => {
   const { cspViolations, pageErrors } = await attachRuntimeMonitors(page);
-  let registerRequests = 0;
+  let capturedBody: Record<string, unknown> | null = null;
 
   await page.route('**/auth/register', async (route) => {
-    registerRequests += 1;
-    await route.abort();
+    capturedBody = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'user-e2e-invitee',
+        email: 'invitado@ejemplo.edu.ar',
+        displayName: 'Lucas Gómez',
+        path: 'INVITEE',
+        createdAt: '2026-11-26T12:00:00.000Z',
+        session: {
+          accessToken: 'synthetic-invitee-access',
+          refreshToken: 'synthetic-invitee-refresh',
+          tokenType: 'Bearer',
+          expiresIn: 900,
+        },
+      }),
+    });
   });
 
-  await page.goto('./register');
-  const main = page.getByRole('main');
+  await page.route('**/users/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'user-e2e-invitee',
+        email: 'invitado@ejemplo.edu.ar',
+        displayName: 'Lucas Gómez',
+        avatar: {
+          bodyId: 'male',
+          hairId: 'classic-short',
+          topId: 'hoodie',
+          hairColor: '#6C4D48',
+          clothingColor: '#5B4F96',
+        },
+      }),
+    });
+  });
 
-  await main
-    .locator('label', { hasText: authMessages.paths.options.INVITATION.title })
-    .click();
+  await page.goto(
+    './register?next=%2Finvitations%2Faccept%3Ftoken%3Dinv-e2e-parent-token',
+  );
+  const main = page.getByRole('main');
 
   await expect(
     main.getByText(authMessages.invitationNotice.heading),
   ).toBeVisible();
-  await expect(main.getByLabel(authMessages.fields.email.label)).toHaveCount(0);
+  await expect(
+    main.getByLabel(authMessages.fields.schoolName.label),
+  ).toHaveCount(0);
 
   await main
-    .getByRole('link', { name: authMessages.invitationNotice.cta })
-    .click();
+    .getByLabel(authMessages.fields.displayName.label)
+    .fill('Lucas Gómez');
+  await main
+    .getByLabel(authMessages.fields.email.label)
+    .fill('invitado@ejemplo.edu.ar');
+  await main
+    .getByLabel(authMessages.fields.password.label, { exact: true })
+    .fill('ClaveSegura2026');
+
+  await main.getByRole('button', { name: authMessages.actions.submit }).click();
 
   await expect(page).toHaveURL(/\/invitations\/accept$/);
   await expect(
@@ -159,7 +202,12 @@ test('routes INVITATION choice to /invitations/accept without sending a registra
       name: messages.pages.invitationAccept.title,
     }),
   ).toBeVisible();
-  expect(registerRequests).toBe(0);
+  expect(capturedBody).toEqual({
+    path: 'INVITEE',
+    displayName: 'Lucas Gómez',
+    email: 'invitado@ejemplo.edu.ar',
+    password: 'ClaveSegura2026',
+  });
   expect(cspViolations).toEqual([]);
   expect(pageErrors).toEqual([]);
 });

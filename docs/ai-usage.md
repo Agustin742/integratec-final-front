@@ -4,6 +4,46 @@ Course declaration of AI use in the development process (see [course requirement
 
 > Status: partial evidence recorded. Sections marked _Pending_ still require team input and human review.
 
+## PR #151 family-message reception and E2E corrections
+
+- **Tools and scope:** el Gentleman and Antigravity coordinated a read-only
+  audit, bounded implementation, E2E regression fixes, and independent read-only
+  verification on isolated branch `fix/151-family-message-refresh`
+  (fast-forwarded onto PR #151 head `c4ecd4b9`); no PR approval or publication
+  is implied yet.
+- **Detected problems and corrections:**
+  - Open histories did not refresh for remote replies despite green GitHub CI
+    (whose tests covered local sends only). Adding query-local 30s foreground
+    REST polling and window-focus recovery fixed incoming-reply reception while
+    preserving user/link scope, drafts, and selected pagination; see the
+    [message refresh guide](ui-chat.md#parent-teacher-message-refresh).
+  - Independent verification of the first draft caught a terminal `403`/`404`
+    eviction/reactivation race and query type-inference issue; fixed by placing
+    `queryFn` before `enabled`/`refetchInterval`, guarding `removeQueries` with
+    `query.getObserversCount() === 0` while mounted, purging on unmount, and
+    pinning same-key rerender behavior in `parent-link-messages-thread.test.tsx`.
+  - Local Playwright E2E execution (not run by GitHub Actions CI) exposed
+    unstubbed `GET /me/family-threads` requests from `ChatDock`,
+    `getByLabel('Contraseña')` strict-mode collisions from `PasswordInput`'s
+    visibility toggle button, and a stale `INVITATION` registration test; all
+    three were fixed across the affected `e2e/*.spec.ts` files.
+- **Verification and limits:** Isolated Node 22.23.4 checks on `c4ecd4b9` +
+  local fixes passed `pnpm lint`, `pnpm typecheck`, `11` focused Vitest suites
+  (`136/136`, including `17/17` in `parent-link-messages-thread.test.tsx`),
+  `pnpm assets:check` (`197` models), production `pnpm build` +
+  `pnpm security:check`, `pnpm build:e2e`, `pnpm format:check`,
+  `scripts/ci/check_docs.py` (`123` files), Python CI tests (`10/10` with Git
+  Bash + Node 22), `git diff --check`, and independent read-only verification
+  (**PASS**). Full `pnpm test` passed `206/207` files / `2,264/2,265` tests with
+  one 5s parallel-load timeout in `invitation-accept-page.test.tsx:662` that
+  passed `17/17` on isolated rerun (`src/` unchanged since). Full hardware D3D11
+  Playwright (`playwright.hw.config.ts`) passed `170/174` (`1` skipped; all fixed
+  specs passed desktop + mobile, and the 3 failures in `performance-offer.spec.ts`
+  under 20x CPU throttling passed `3/3` on desktop rerun while mobile hit the
+  pre-existing `develop` cold `FPS=0` startup race). All unit/RTL/Playwright
+  checks use synthetic/MSW responses; remote PR #151 still awaits commit/push,
+  human review, and real-backend / two-browser integration.
+
 ## Avatar Character Animations (`male/body.glb` and `female/body.glb`, 16 canonical clips)
 
 - **Tools and scope:** Antigravity and headless Blender 5.2.2 LTS (`--background`) plus Node GLB verification/trimming (`odd/scripts/blender/author_avatar_animations.py`, `trim_rest_channels.mjs`, `render_avatar_animations.py` — untracked) completed all 16 Section 1 **Animations** items from [asset wishlist](art/asset-wishlist.md#animations) ([guide](art/avatar-animations.md)) on `feat/avatar-animations` in `odd/worktrees/avatar-animations`, leaving `src/features/world/avatar/` runtime code and all existing wearables untouched.

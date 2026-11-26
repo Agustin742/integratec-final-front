@@ -20,6 +20,7 @@ import { expectAccessible } from '@/test/accessibility';
 import {
   TEST_API_BASE_URL,
   createClassroomContextHandler,
+  createClassroomParentLinksHandler,
   createClassroomRosterStore,
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
@@ -192,6 +193,64 @@ describe('ClassroomMembersPanel', () => {
     await waitFor(() => expect(screen.getByText('Marta Gómez')).toBeVisible());
     expect(
       screen.getByRole('tab', { name: copy.invitationsTab }),
+    ).toBeVisible();
+    expect(screen.getByRole('tab', { name: copy.familiesTab })).toBeVisible();
+  });
+
+  test('staff see 3 tabs and clicking Familias renders linked guardians with Mensajes button', async () => {
+    const store = createClassroomRosterStore({
+      classroomId: CLASSROOM_ID,
+      initialStudents: [],
+    });
+    mswServer.use(
+      createClassroomContextHandler(CLASSROOM_ID, {
+        myRole: 'TEACHER',
+        capabilities: ['publish_content', 'invite_members', 'list_directory'],
+      }),
+      directoryHandler(),
+      ...store.handlers,
+      createClassroomParentLinksHandler({
+        classroomId: CLASSROOM_ID,
+        items: [
+          {
+            id: '6e5f6a7b-0000-4000-8000-000000000099',
+            parentId: '00000000-0000-4000-8000-000000000090',
+            parentDisplayName: 'Laura Gómez',
+            childId: '4e5f6a7b-0000-4000-8000-000000000009',
+            childDisplayName: 'Valentina Gómez',
+            state: 'ACTIVE',
+            createdAt: '2026-11-18T12:00:00.000Z',
+          },
+        ],
+      }),
+    );
+    renderMembers();
+
+    const rosterTab = await screen.findByRole('tab', { name: copy.rosterTab });
+    const invitationsTab = screen.getByRole('tab', {
+      name: copy.invitationsTab,
+    });
+    const familiesTab = screen.getByRole('tab', { name: copy.familiesTab });
+    expect(rosterTab).toBeVisible();
+    expect(invitationsTab).toBeVisible();
+    expect(familiesTab).toBeVisible();
+
+    fireEvent.mouseDown(familiesTab);
+    fireEvent.click(familiesTab);
+
+    expect(
+      await screen.findByRole('heading', {
+        name: classroomMessages.invitations.parentLinks.heading,
+      }),
+    ).toBeVisible();
+    expect(await screen.findByText('Laura Gómez')).toBeVisible();
+    expect(
+      screen.getByRole('button', {
+        name: classroomMessages.invitations.parentLinks.messagesAriaLabel(
+          'Laura Gómez',
+          'Valentina Gómez',
+        ),
+      }),
     ).toBeVisible();
   });
 

@@ -1,7 +1,8 @@
-import type { KeyboardEvent } from 'react';
+import { useId, type KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { formatDayLabel, formatTimeOfDay, getSchoolDayKey } from '@/lib/dates';
 import { cn } from '@/lib/utils';
+import type { StaffFamilyThreadDto } from '../family/family-schema';
 import type { ChatInboxItemDto } from '../chat-inbox/chat-inbox-schema';
 import { CloseIcon } from './chat-dock-icons';
 import { chatDockMessages as messages } from './messages';
@@ -38,6 +39,8 @@ export interface ChatDockListProps {
   readonly userId: string;
   readonly items: readonly ChatInboxItemDto[];
   readonly activeId: string | null;
+  readonly familyThreads?: readonly StaffFamilyThreadDto[];
+  readonly activeFamilyLinkId?: string | null;
   /** `true` hides the sheet on small screens while a conversation covers it. */
   readonly covered: boolean;
   /** Plays the enter animation, or the exit one while it closes. */
@@ -45,31 +48,43 @@ export interface ChatDockListProps {
   readonly closing?: boolean;
   readonly onAnimationEnd?: () => void;
   readonly onSelect: (classroomId: string) => void;
+  readonly onSelectFamilyThread?: (familyLinkId: string) => void;
   readonly onClose: () => void;
   readonly registerItem: (
     classroomId: string,
+    element: HTMLButtonElement | null,
+  ) => void;
+  readonly registerFamilyItem?: (
+    familyLinkId: string,
     element: HTMLButtonElement | null,
   ) => void;
 }
 
 /**
  * Chat list of the dock: one button per classroom chat, latest activity first
- * (the server order). Above `sm` it is a panel stacked over the launcher; on
- * small screens it is a full-screen sheet with its own close button.
+ * (the server order), followed by a "Familias" section when the staff user has
+ * active parent-teacher threads. Above `sm` it is a panel stacked over the
+ * launcher; on small screens it is a full-screen sheet with its own close
+ * button.
  */
 export function ChatDockList({
   id,
   userId,
   items,
   activeId,
+  familyThreads = [],
+  activeFamilyLinkId = null,
   covered,
   animated = false,
   closing = false,
   onAnimationEnd,
   onSelect,
+  onSelectFamilyThread,
   onClose,
   registerItem,
+  registerFamilyItem,
 }: ChatDockListProps) {
+  const familiesHeadingId = useId();
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (closing) return;
     if (event.key === 'Escape' && !event.defaultPrevented) {
@@ -116,64 +131,138 @@ export function ChatDockList({
           <CloseIcon />
         </Button>
       </div>
-      <ul aria-label={messages.listLabel} className="min-h-0 overflow-y-auto">
-        {items.map((item) => {
-          const last = item.lastMessage;
-          const author =
-            last === null
-              ? null
-              : last.authorId === userId
-                ? messages.you
-                : last.authorDisplayName;
-          return (
-            <li
-              key={item.classroomId}
-              className="border-b border-edge last:border-b-0"
-            >
-              <button
-                type="button"
-                ref={(element) => {
-                  registerItem(item.classroomId, element);
-                }}
-                aria-current={
-                  item.classroomId === activeId ? 'true' : undefined
-                }
-                onClick={() => {
-                  onSelect(item.classroomId);
-                }}
-                className={cn(
-                  'flex min-h-14 w-full cursor-pointer items-start gap-2 px-3 py-2 text-left hover:bg-tray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
-                  item.classroomId === activeId && 'bg-muted/60',
-                )}
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-baseline justify-between gap-2">
-                    <span className="truncate text-sm font-semibold">
-                      {item.classroomName}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {items.length > 0 ? (
+          <ul aria-label={messages.listLabel}>
+            {items.map((item) => {
+              const last = item.lastMessage;
+              const author =
+                last === null
+                  ? null
+                  : last.authorId === userId
+                    ? messages.you
+                    : last.authorDisplayName;
+              return (
+                <li
+                  key={item.classroomId}
+                  className="border-b border-edge last:border-b-0"
+                >
+                  <button
+                    type="button"
+                    ref={(element) => {
+                      registerItem(item.classroomId, element);
+                    }}
+                    aria-current={
+                      item.classroomId === activeId ? 'true' : undefined
+                    }
+                    onClick={() => {
+                      onSelect(item.classroomId);
+                    }}
+                    className={cn(
+                      'flex min-h-14 w-full cursor-pointer items-start gap-2 px-3 py-2 text-left hover:bg-tray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+                      item.classroomId === activeId && 'bg-muted/60',
+                    )}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline justify-between gap-2">
+                        <span className="truncate text-sm font-semibold">
+                          {item.classroomName}
+                        </span>
+                        {last !== null ? (
+                          <time
+                            dateTime={last.createdAt}
+                            className="shrink-0 text-xs text-muted-foreground"
+                          >
+                            {formatListTime(last.createdAt)}
+                          </time>
+                        ) : null}
+                      </span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {last !== null && author !== null
+                          ? messages.lastMessage(author, last.bodyPreview)
+                          : messages.noMessagesYet}
+                      </span>
                     </span>
-                    {last !== null ? (
-                      <time
-                        dateTime={last.createdAt}
-                        className="shrink-0 text-xs text-muted-foreground"
-                      >
-                        {formatListTime(last.createdAt)}
-                      </time>
-                    ) : null}
-                  </span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {last !== null && author !== null
-                      ? messages.lastMessage(author, last.bodyPreview)
-                      : messages.noMessagesYet}
-                  </span>
-                </span>
-                <span className="mt-0.5 shrink-0">
-                  <UnreadBadge count={item.unreadCount} />
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+                    <span className="mt-0.5 shrink-0">
+                      <UnreadBadge count={item.unreadCount} />
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+
+        {familyThreads.length > 0 ? (
+          <div
+            className={cn(items.length > 0 && 'border-t border-edge')}
+            aria-labelledby={familiesHeadingId}
+          >
+            <h3
+              id={familiesHeadingId}
+              className="border-b border-edge bg-tray/50 px-3 py-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+            >
+              {messages.familiesSectionTitle}
+            </h3>
+            <ul aria-label={messages.familiesListLabel}>
+              {familyThreads.map((thread) => {
+                const isActive = thread.id === activeFamilyLinkId;
+                const preview =
+                  thread.lastMessageBody !== null &&
+                  thread.lastMessageBody.trim() !== ''
+                    ? thread.lastMessageBody
+                    : messages.familyNoMessagesYet;
+                return (
+                  <li
+                    key={thread.id}
+                    className="border-b border-edge last:border-b-0"
+                  >
+                    <button
+                      type="button"
+                      ref={(element) => {
+                        registerFamilyItem?.(thread.id, element);
+                      }}
+                      aria-current={isActive ? 'true' : undefined}
+                      onClick={() => {
+                        onSelectFamilyThread?.(thread.id);
+                      }}
+                      className={cn(
+                        'flex min-h-14 w-full cursor-pointer items-start gap-2 px-3 py-2 text-left hover:bg-tray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+                        isActive && 'bg-muted/60',
+                      )}
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-baseline justify-between gap-2">
+                          <span className="truncate text-sm font-semibold">
+                            {thread.parentDisplayName}
+                          </span>
+                          {thread.lastMessageAt !== null ? (
+                            <time
+                              dateTime={thread.lastMessageAt}
+                              className="shrink-0 text-xs text-muted-foreground"
+                            >
+                              {formatListTime(thread.lastMessageAt)}
+                            </time>
+                          ) : null}
+                        </span>
+                        <span className="block truncate text-xs font-medium text-foreground/80">
+                          {messages.familySubtitle(
+                            thread.childDisplayName,
+                            thread.classroomName,
+                          )}
+                        </span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {preview}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }

@@ -60,9 +60,12 @@ export const assignedDeskSchema = z.object({
 
 export const joinClassroomResponseSchema = z.object({
   classroomId: z.string().trim().min(1),
-  membershipId: z.string().trim().min(1),
-  role: z.enum(['TEACHER', 'STUDENT']),
+  membershipId: z.string().trim().min(1).nullable(),
+  role: z.enum(['TEACHER', 'STUDENT', 'PARENT']),
   desk: assignedDeskSchema.nullable(),
+  deskIndex: z.number().int().min(1).nullable().optional(),
+  childId: z.string().trim().min(1).nullable().optional(),
+  parentLinkId: z.string().trim().min(1).nullable().optional(),
   alreadyMember: z.boolean(),
 });
 

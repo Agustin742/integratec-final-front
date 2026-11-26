@@ -150,7 +150,7 @@ test('unauthenticated invitation visitor signs in, returns with token scrubbed, 
     .getByLabel(authMessages.login.fields.email.label)
     .fill('estudiante@ejemplo.com');
   await page
-    .getByLabel(authMessages.login.fields.password.label)
+    .getByLabel(authMessages.login.fields.password.label, { exact: true })
     .fill('ClaveSegura123');
   await page
     .getByRole('button', { name: authMessages.login.actions.submit })

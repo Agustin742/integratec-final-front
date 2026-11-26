@@ -16,7 +16,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Input, PasswordInput } from '@/components/ui/input';
 import { useSessionService } from '@/session/provider';
 import { authMessages } from './messages';
 import {
@@ -387,9 +387,8 @@ function PasswordResetConfirmView({
           description={copy.fields.newPassword.description}
         >
           {(fieldProps) => (
-            <Input
+            <PasswordInput
               {...fieldProps}
-              type="password"
               autoComplete="new-password"
               placeholder={copy.fields.newPassword.placeholder}
             />
