@@ -1,5 +1,13 @@
 # Tracker — Alejo
 
+## 2026-11-26 — PR145 local develop integration (#141)
+
+- **Status:** in-progress
+- **Area / files:** Local integration branch `fix/141-pr145-develop-integration`; conflict areas pending merge inspection.
+- **Change:** Integrating current `origin/develop` into the four verified correction commits in an isolated clean worktree, preserving previous audit screenshots and other worktrees.
+- **Reason:** User explicitly authorized the previously deferred integration and conflict resolution.
+- **Next step:** Resolve conflicts without discarding either branch, run integrated verification and independent review, and record a local merge commit. No push or PR merge authorized.
+
 ## 2026-11-26 — PR145 corrections and call UI evidence (#141)
 
 - **Status:** completed (local correction stage; develop merge and publishing deferred)
