@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-25 — Avatar customization rework (#149)
+
+- **Status:** completed (design not reviewed)
+- **Area / files:** `src/features/profile/`, `src/features/inventory/profile-inventory-section.tsx`, `src/features/world/preview/use-show-step.ts`, `docs/routing.md`
+- **Change:** The profile avatar section is now one customization workspace: large animated front preview, choices grouped by category, and the per-classroom inventory inside it, with the preview wearing that classroom's accessories.
+- **Reason:** The customization area had never had its visual rework.
+- **Verification:** Strict TDD on the touched test files, lint, typecheck, build and `security:check`. No visual review; `docs/assets/profile/` screenshots are stale.
+- **Next step:** Visual review at 1280px and 360px, then refresh the screenshots.
+
 ## 2026-11-25 — Review fixes for the welcome scene, desk map and bot skins (#149)
 
 - **Status:** completed

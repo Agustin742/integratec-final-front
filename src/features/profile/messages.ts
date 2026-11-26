@@ -55,6 +55,15 @@ export const profileMessages = {
   },
   avatar: {
     heading: 'Avatar base',
+    categoriesLabel: 'Categorías de personalización',
+    categories: {
+      body: 'Figura',
+      hair: 'Pelo',
+      clothing: 'Ropa',
+      accessories: 'Accesorios',
+    },
+    accessoriesNote:
+      'Los accesorios se equipan por aula y se aplican al instante. La vista previa muestra los del aula elegida.',
     description:
       'Elegí cómo te ven en el aula. Los cambios son un borrador hasta que los guardes.',
     previewHeading: 'Vista previa',

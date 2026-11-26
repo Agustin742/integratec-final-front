@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useState } from 'react';
+import { useDeferredValue, useState } from 'react';
 import type { Avatar } from '@/features/profile/avatar-options';
 import { AvatarModel } from '../avatar/avatar-model';
 import { GlbAsset } from '../glb-asset';
@@ -6,25 +6,13 @@ import { usePrefersReducedMotion } from '../use-prefers-reduced-motion';
 import { WorldCanvas } from '../world-canvas';
 import { WarmLighting } from '../world-lighting';
 import { planPreviewScene, type RandomSource } from './preview-scene-plan';
+import { useShowStep } from './use-show-step';
 
-/** Time on each body animation; the outfit changes every second step. */
-export const PREVIEW_STEP_MS = 3500;
+/** The outfit changes every second step. */
+export { PREVIEW_STEP_MS } from './use-show-step';
 /** Own cache scope: leaving the public screens frees every preview model. */
 const SCOPE_KEY = 'auth-preview';
 const BACKGROUND = '#FFF9EB';
-
-/** Steps through the show; stays on the first one under reduced motion. */
-function useShowStep(running: boolean): number {
-  const [step, setStep] = useState(0);
-  useEffect(() => {
-    if (!running) return;
-    const timer = setInterval(() => {
-      if (!document.hidden) setStep((current) => current + 1);
-    }, PREVIEW_STEP_MS);
-    return () => clearInterval(timer);
-  }, [running]);
-  return running ? step : 0;
-}
 
 /** Keeps the previous outfit on screen while the next one downloads. */
 function Character({

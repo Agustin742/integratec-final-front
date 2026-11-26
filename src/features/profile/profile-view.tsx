@@ -6,7 +6,6 @@ import {
   StaleDataNotice,
 } from '@/components/feedback/states';
 import { useSessionSnapshot } from '@/session/provider';
-import { ProfileInventorySection } from '@/features/inventory/profile-inventory-section';
 import { StreakAndBadgesSection } from '@/features/points/streak-and-badges-section';
 import { AvatarForm } from './avatar-form';
 import { DisplayNameForm } from './display-name-form';
@@ -120,7 +119,6 @@ export function ProfileView({ title }: ProfileViewProps) {
             onDirtyChange={onAvatarDirty}
           />
           <StreakAndBadgesSection key={`gamification-${profile.id}`} />
-          <ProfileInventorySection key={`inventory-${profile.id}`} />
         </>
       )}
     </section>

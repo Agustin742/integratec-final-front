@@ -18,6 +18,8 @@ import { SessionProvider } from '@/session/provider';
 import { expectAccessible } from '@/test/accessibility';
 import {
   TEST_API_BASE_URL,
+  createClassroomDetailHandler,
+  createClassroomEquipmentStore,
   createClassroomListHandler,
   createLoginHandler,
   createLogoutHandler,
@@ -33,11 +35,25 @@ import { profileMessages } from './messages';
 
 // jsdom has no WebGL: the page behaves as on a device without 3D, so these
 // tests cover the form with the 2D preview. The 3D wiring has its own tests.
+// `keep` lets one test watch what the 3D preview is asked to draw.
+const preview3d = vi.hoisted(() => ({
+  keep: false,
+  equipped: undefined as unknown,
+}));
 vi.mock('./avatar-preview-3d', async () => {
   const { useEffect } = await import('react');
   return {
-    AvatarPreview3D: ({ onUnavailable }: { onUnavailable: () => void }) => {
-      useEffect(() => onUnavailable(), [onUnavailable]);
+    AvatarPreview3D: ({
+      equipped,
+      onUnavailable,
+    }: {
+      equipped?: unknown;
+      onUnavailable: () => void;
+    }) => {
+      preview3d.equipped = equipped;
+      useEffect(() => {
+        if (!preview3d.keep) onUnavailable();
+      }, [onUnavailable]);
       return null;
     },
   };
@@ -59,6 +75,8 @@ afterEach(() => {
   window.sessionStorage.clear();
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
+  preview3d.keep = false;
+  preview3d.equipped = undefined;
 });
 
 afterAll(() => {
@@ -747,5 +765,83 @@ describe('Profile page (/profile)', () => {
     } finally {
       process.off('unhandledRejection', onUnhandled);
     }
+  });
+});
+
+describe('Profile customization', () => {
+  const CLASSROOM_ID = '00000000-0000-4000-8000-000000000057';
+
+  test('offers every category and moves focus to the chosen one', async () => {
+    await renderProfile(createOwnProfileStore());
+    await waitForProfile();
+    const nav = within(avatarSection()).getByRole('navigation', {
+      name: copy.avatar.categoriesLabel,
+    });
+
+    for (const label of Object.values(copy.avatar.categories)) {
+      expect(
+        within(nav).getByRole('button', { name: label }),
+      ).toBeInTheDocument();
+    }
+    fireEvent.click(
+      within(nav).getByRole('button', { name: copy.avatar.categories.hair }),
+    );
+
+    expect(
+      within(avatarSection()).getByRole('heading', {
+        name: copy.avatar.categories.hair,
+      }),
+    ).toHaveFocus();
+  });
+
+  test('keeps the classroom accessories in the same area and shows them on the preview', async () => {
+    preview3d.keep = true;
+    const store = createClassroomEquipmentStore({
+      classroomId: CLASSROOM_ID,
+      initialSlots: {
+        hand: {
+          slot: 'hand',
+          shopItemId: '00000000-0000-4000-8000-000000001001',
+          shopItemCode: 'hand_mate',
+          shopItemName: 'Mate',
+          kind: 'AVATAR_ACCESSORY',
+        },
+      },
+    });
+    await renderProfile(createOwnProfileStore());
+    mswServer.use(
+      createClassroomListHandler({
+        items: [
+          {
+            id: CLASSROOM_ID,
+            name: 'Aula de prueba',
+            subject: null,
+            schoolId: null,
+            independentTeacherId: '00000000-0000-4000-8000-000000000001',
+            adultMode: false,
+            chatMuted: false,
+            collaborationLocked: false,
+            gamesDisabled: false,
+            tutorBotSkin: 'none',
+            myRole: 'STUDENT',
+            capabilities: [],
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      }),
+      createClassroomDetailHandler(CLASSROOM_ID, { myRole: 'STUDENT' }),
+      ...store.handlers,
+    );
+    await waitForProfile();
+
+    expect(
+      within(avatarSection()).getByRole('heading', {
+        name: 'Inventario por aula',
+      }),
+    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(preview3d.equipped).toMatchObject({ hand: 'hand_mate' });
+    });
   });
 });

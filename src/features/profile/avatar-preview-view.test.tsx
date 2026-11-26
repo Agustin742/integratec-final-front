@@ -1,6 +1,7 @@
 import { act, render, screen } from '@testing-library/react';
-import { beforeEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { AvatarModelProps, WorldCanvasProps } from '@/features/world';
+import { PREVIEW_STEP_MS } from '@/features/world/preview/use-show-step';
 import { describeAvatar, type Avatar } from './avatar-options';
 import { AvatarPreviewView } from './avatar-preview-view';
 import { profileMessages } from './messages';
@@ -53,7 +54,7 @@ test('shows the draft avatar in a 3D host named like the 2D preview', async () =
     framing: 'avatar',
     scopeKey: 'profile-avatar-preview',
   });
-  expect(world.model).toMatchObject({ avatar, animation: 'Idle' });
+  expect(world.model).toMatchObject({ avatar, animation: 'Wave' });
   expect(container.querySelector('[data-avatar-preview]')).toBeNull();
 });
 
@@ -103,4 +104,41 @@ test('falls back to the 2D preview when the body model fails, and retries 3D for
     />,
   );
   expect(await screen.findByTestId('canvas-3d')).toBeInTheDocument();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
+
+const step = () => act(() => vi.advanceTimersByTime(PREVIEW_STEP_MS));
+
+test('waves, rests and waves again, wearing the equipped accessories', async () => {
+  const equipped = { hand: 'hand_mate', neck: 'neck_scarf', ears: null };
+  const { rerender } = render(<AvatarPreviewView avatar={avatar} />);
+  await screen.findByTestId('canvas-3d');
+  vi.useFakeTimers();
+  rerender(<AvatarPreviewView avatar={avatar} equipped={equipped} />);
+  expect(world.model).toMatchObject({ equipped });
+});
+
+test('alternates the wave with the idle pose', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  render(<AvatarPreviewView avatar={avatar} />);
+  await screen.findByTestId('canvas-3d');
+  const clips = [world.model?.animation];
+  for (let i = 0; i < 3; i += 1) {
+    step();
+    clips.push(world.model?.animation);
+  }
+  expect(clips).toEqual(['Wave', 'Idle', 'Idle', 'Wave']);
+});
+
+test('holds the idle pose under reduced motion', async () => {
+  vi.stubGlobal('matchMedia', () => ({ matches: true }));
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  render(<AvatarPreviewView avatar={avatar} />);
+  await screen.findByTestId('canvas-3d');
+  step();
+  expect(world.model).toMatchObject({ animation: 'Idle' });
 });

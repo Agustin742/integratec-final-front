@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { classroomListQueryKey } from '@/api/query-keys';
 import {
@@ -13,12 +13,22 @@ import { InventoryPanel } from './inventory-panel';
 
 const msgs = inventoryMessages.profile;
 
+export interface ProfileInventorySectionProps {
+  /** Id of the heading, so the customization categories can focus it. */
+  readonly headingId?: string;
+  /** Reports the classroom on screen, empty when there is none. */
+  readonly onClassroomChange?: (classroomId: string) => void;
+}
+
 /**
- * Profile-page wrapper for the classroom-scoped inventory selector.
- * Lets students pick one of their enrolled student classrooms and manage
- * avatar/desk equipment from `/profile`.
+ * Accessories part of the profile customization: students pick one of their
+ * enrolled student classrooms and manage avatar/desk equipment from
+ * `/profile`.
  */
-export function ProfileInventorySection() {
+export function ProfileInventorySection({
+  headingId = 'profile-inventory-heading',
+  onClassroomChange,
+}: ProfileInventorySectionProps = {}) {
   const { client } = useSessionService();
   const snapshot = useSessionSnapshot();
   const userId = snapshot.status === 'authenticated' ? snapshot.user.id : null;
@@ -51,19 +61,24 @@ export function ProfileInventorySection() {
     ? selectedClassroomId
     : (studentClassrooms[0]?.id ?? '');
 
+  useEffect(() => {
+    onClassroomChange?.(activeClassroomId);
+  }, [activeClassroomId, onClassroomChange]);
+
   return (
     <section
-      aria-labelledby="profile-inventory-heading"
-      className="space-y-4 rounded-2xl border border-edge bg-card/70 p-5"
+      aria-labelledby={headingId}
+      className="space-y-4 border-t border-edge pt-4"
     >
       <div className="space-y-1">
-        <h3
-          id="profile-inventory-heading"
-          className="font-display text-lg font-bold text-foreground"
+        <h4
+          id={headingId}
+          tabIndex={-1}
+          className="font-display text-base font-semibold text-foreground"
         >
           {msgs.heading}
-        </h3>
-        <p className="text-xs text-muted-foreground">{msgs.description}</p>
+        </h4>
+        <p className="text-sm text-muted-foreground">{msgs.description}</p>
       </div>
 
       {classroomsQuery.isPending && classroomsQuery.data === undefined ? (

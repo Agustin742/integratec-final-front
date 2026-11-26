@@ -10,6 +10,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ProfileInventorySection } from '../inventory/profile-inventory-section';
 import { AvatarPreviewView } from './avatar-preview-view';
 import {
   AVATAR_FIELDS,
@@ -24,12 +25,14 @@ import {
   type Avatar,
 } from './avatar-options';
 import { ChoiceGroup } from './choice-group';
+import { CategoryNav, CategorySection } from './customization-categories';
 import { profileMessages } from './messages';
 import { avatarFormSchema } from './profile-schema';
 import { isAbortError, saveAvatar } from './profile-service';
 import { useAvatarStyles } from './use-avatar-styles';
 import { SaveStatusBadge, type SaveStatus } from './save-status';
 import type { ProfileSectionProps } from './section-props';
+import { usePreviewEquipment } from './use-preview-equipment';
 import { useSessionService } from '@/session/provider';
 
 const copy = profileMessages.avatar;
@@ -42,6 +45,15 @@ export function AvatarForm({
 }: ProfileSectionProps) {
   const { client } = useSessionService();
   const headingId = useId();
+  const idPrefix = useId();
+  const categoryIds = {
+    body: `${idPrefix}-body`,
+    hair: `${idPrefix}-hair`,
+    clothing: `${idPrefix}-clothing`,
+    accessories: `${idPrefix}-accessories`,
+  };
+  const [classroomId, setClassroomId] = useState('');
+  const equipped = usePreviewEquipment(classroomId);
   const [announcement, setAnnouncement] = useState('');
   const [adjusted, setAdjusted] = useState(false);
   const confirmed = profile.avatar;
@@ -178,158 +190,182 @@ export function AvatarForm({
         <p className="text-sm text-muted-foreground">{copy.description}</p>
       </div>
 
-      <form
-        noValidate
-        onSubmit={handleSubmit}
-        className="grid gap-6 md:grid-cols-[minmax(0,14rem)_minmax(0,1fr)]"
-      >
-        <div className="space-y-3 md:row-span-2">
-          <h4 className="font-display text-sm font-semibold text-foreground">
-            {copy.previewHeading}
-          </h4>
+      {/* A flex column on phones, so the preview can stick while choosing. */}
+      <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] md:gap-6 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+        <div className="sticky top-0 z-10 -mx-5 space-y-2 border-b border-edge bg-card px-5 py-3 md:top-4 md:mx-0 md:self-start md:border-0 md:p-0">
+          <h4 className="sr-only">{copy.previewHeading}</h4>
           <div
-            className="mx-auto w-40 rounded-2xl border border-edge bg-tray/60 p-3 md:w-full"
+            className="mx-auto w-44 rounded-2xl border border-edge bg-tray/60 p-2 md:w-full md:p-3"
             data-avatar-preview-frame={isDirty ? 'draft' : 'saved'}
           >
-            <AvatarPreviewView avatar={draft} />
+            <AvatarPreviewView avatar={draft} equipped={equipped} />
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-2 md:justify-start">
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <Badge variant={isDirty ? 'warning' : 'success'}>
               {isDirty ? copy.previewDraft : copy.previewSaved}
             </Badge>
           </div>
-          <p className="text-xs text-muted-foreground">{copy.previewNote}</p>
+          <p className="hidden text-center text-xs text-muted-foreground md:block">
+            {copy.previewNote}
+          </p>
         </div>
 
-        <div className="space-y-5">
-          <FormRootError form={form} headingLevel="h4" title={copy.rootTitle} />
-          {styles.status === 'error' && (
-            <Alert variant="info" role="status">
-              <AlertDescription>{copy.stylesUnavailable}</AlertDescription>
-            </Alert>
-          )}
-          {hasLockedStyles && (
-            <p className="text-xs text-muted-foreground">
-              {copy.styleLockedHint}
-            </p>
-          )}
-          {adjusted && (
-            <Alert variant="info" role="status">
-              <AlertDescription>{copy.adjusted}</AlertDescription>
-            </Alert>
-          )}
+        {/* Scroll margins keep focused choices clear of the stuck preview. */}
+        <div className="min-w-0 space-y-4 [&_button]:scroll-mt-80 [&_h4]:scroll-mt-80 [&_input]:scroll-mt-80 [&_label]:scroll-mt-80 md:[&_button]:scroll-mt-4 md:[&_h4]:scroll-mt-4 md:[&_input]:scroll-mt-4 md:[&_label]:scroll-mt-4">
+          <CategoryNav headingIds={categoryIds} />
 
-          <Controller
-            control={form.control}
-            name="bodyId"
-            render={({ field, fieldState }) => (
-              <ChoiceGroup
-                legend={copy.groups.bodyId}
-                name={field.name}
-                options={BODY_OPTIONS}
-                value={field.value}
-                onChange={changeBody}
-                onBlur={field.onBlur}
-                disabled={isSubmitting}
-                error={fieldState.error?.message}
-              />
+          <form noValidate onSubmit={handleSubmit} className="space-y-4">
+            <FormRootError
+              form={form}
+              headingLevel="h4"
+              title={copy.rootTitle}
+            />
+            {styles.status === 'error' && (
+              <Alert variant="info" role="status">
+                <AlertDescription>{copy.stylesUnavailable}</AlertDescription>
+              </Alert>
             )}
-          />
-          <Controller
-            control={form.control}
-            name="hairId"
-            render={({ field, fieldState }) => (
-              <ChoiceGroup
-                legend={copy.groups.hairId}
-                name={field.name}
-                options={hairOptions}
-                lockedLabel={copy.styleLockedLabel}
-                value={field.value}
-                onChange={(value) => {
-                  field.onChange(value);
-                  setAdjusted(false);
-                }}
-                onBlur={field.onBlur}
-                disabled={isSubmitting}
-                error={fieldState.error?.message}
-              />
+            {hasLockedStyles && (
+              <p className="text-xs text-muted-foreground">
+                {copy.styleLockedHint}
+              </p>
             )}
-          />
-          <Controller
-            control={form.control}
-            name="hairColor"
-            render={({ field, fieldState }) => (
-              <ChoiceGroup
-                legend={copy.groups.hairColor}
-                name={field.name}
-                options={HAIR_COLOR_OPTIONS}
-                value={field.value}
-                onChange={field.onChange}
-                onBlur={field.onBlur}
-                swatch
-                disabled={isSubmitting}
-                error={fieldState.error?.message}
-              />
+            {adjusted && (
+              <Alert variant="info" role="status">
+                <AlertDescription>{copy.adjusted}</AlertDescription>
+              </Alert>
             )}
-          />
-          <Controller
-            control={form.control}
-            name="topId"
-            render={({ field, fieldState }) => (
-              <ChoiceGroup
-                legend={copy.groups.topId}
-                name={field.name}
-                options={topOptions}
-                lockedLabel={copy.styleLockedLabel}
-                value={field.value}
-                onChange={(value) => {
-                  field.onChange(value);
-                  setAdjusted(false);
-                }}
-                onBlur={field.onBlur}
-                disabled={isSubmitting}
-                error={fieldState.error?.message}
+
+            <CategorySection category="body" headingId={categoryIds.body}>
+              <Controller
+                control={form.control}
+                name="bodyId"
+                render={({ field, fieldState }) => (
+                  <ChoiceGroup
+                    legend={copy.groups.bodyId}
+                    name={field.name}
+                    options={BODY_OPTIONS}
+                    value={field.value}
+                    onChange={changeBody}
+                    onBlur={field.onBlur}
+                    disabled={isSubmitting}
+                    error={fieldState.error?.message}
+                  />
+                )}
               />
-            )}
-          />
-          <Controller
-            control={form.control}
-            name="clothingColor"
-            render={({ field, fieldState }) => (
-              <ChoiceGroup
-                legend={copy.groups.clothingColor}
-                name={field.name}
-                options={CLOTHING_COLOR_OPTIONS}
-                value={field.value}
-                onChange={field.onChange}
-                onBlur={field.onBlur}
-                swatch
-                disabled={isSubmitting}
-                error={fieldState.error?.message}
+            </CategorySection>
+            <CategorySection category="hair" headingId={categoryIds.hair}>
+              <Controller
+                control={form.control}
+                name="hairId"
+                render={({ field, fieldState }) => (
+                  <ChoiceGroup
+                    legend={copy.groups.hairId}
+                    name={field.name}
+                    options={hairOptions}
+                    lockedLabel={copy.styleLockedLabel}
+                    value={field.value}
+                    onChange={(value) => {
+                      field.onChange(value);
+                      setAdjusted(false);
+                    }}
+                    onBlur={field.onBlur}
+                    disabled={isSubmitting}
+                    error={fieldState.error?.message}
+                  />
+                )}
               />
-            )}
+              <Controller
+                control={form.control}
+                name="hairColor"
+                render={({ field, fieldState }) => (
+                  <ChoiceGroup
+                    legend={copy.groups.hairColor}
+                    name={field.name}
+                    options={HAIR_COLOR_OPTIONS}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    swatch
+                    disabled={isSubmitting}
+                    error={fieldState.error?.message}
+                  />
+                )}
+              />
+            </CategorySection>
+            <CategorySection
+              category="clothing"
+              headingId={categoryIds.clothing}
+            >
+              <Controller
+                control={form.control}
+                name="topId"
+                render={({ field, fieldState }) => (
+                  <ChoiceGroup
+                    legend={copy.groups.topId}
+                    name={field.name}
+                    options={topOptions}
+                    lockedLabel={copy.styleLockedLabel}
+                    value={field.value}
+                    onChange={(value) => {
+                      field.onChange(value);
+                      setAdjusted(false);
+                    }}
+                    onBlur={field.onBlur}
+                    disabled={isSubmitting}
+                    error={fieldState.error?.message}
+                  />
+                )}
+              />
+              <Controller
+                control={form.control}
+                name="clothingColor"
+                render={({ field, fieldState }) => (
+                  <ChoiceGroup
+                    legend={copy.groups.clothingColor}
+                    name={field.name}
+                    options={CLOTHING_COLOR_OPTIONS}
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    swatch
+                    disabled={isSubmitting}
+                    error={fieldState.error?.message}
+                  />
+                )}
+              />
+            </CategorySection>
+
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-edge bg-card/95 px-4 py-3 shadow-ambient md:sticky md:bottom-0 md:z-10">
+              <Button
+                type="submit"
+                busy={isSubmitting}
+                disabled={!isDirty && !isSubmitting}
+              >
+                {isSubmitting ? copy.submitting : copy.submit}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={!isDirty || isSubmitting}
+                onClick={discard}
+              >
+                {copy.discard}
+              </Button>
+              <SaveStatusBadge status={status} announcement={announcement} />
+            </div>
+          </form>
+
+          {/* Outside the form: equipping saves at once, per classroom. */}
+          <p className="text-sm text-muted-foreground">
+            {copy.accessoriesNote}
+          </p>
+          <ProfileInventorySection
+            headingId={categoryIds.accessories}
+            onClassroomChange={setClassroomId}
           />
         </div>
-
-        <div className="flex flex-wrap items-center gap-3 md:col-start-2">
-          <Button
-            type="submit"
-            busy={isSubmitting}
-            disabled={!isDirty && !isSubmitting}
-          >
-            {isSubmitting ? copy.submitting : copy.submit}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={!isDirty || isSubmitting}
-            onClick={discard}
-          >
-            {copy.discard}
-          </Button>
-          <SaveStatusBadge status={status} announcement={announcement} />
-        </div>
-      </form>
+      </div>
     </section>
   );
 }
