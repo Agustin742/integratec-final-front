@@ -334,6 +334,46 @@ describe('ClassroomSettingsPanel', () => {
     expect(saveButton()).toBeEnabled();
   });
 
+  it('shows a 400 tutor bot skin error on its group and clears it on change', async () => {
+    mswServer.use(
+      createUpdateClassroomHandler({
+        classroomId: CLASSROOM_ID,
+        error: {
+          status: 400,
+          body: {
+            code: 'VALIDATION_FAILED',
+            message: 'Validation failed',
+            correlationId: 'corr-settings-skin',
+            details: [
+              {
+                field: 'tutorBotSkin',
+                messages: ['Esa apariencia no está disponible.'],
+              },
+            ],
+          },
+        },
+      }),
+    );
+    renderSettings({ detail: { tutorBotSkin: 'graduate' } });
+    await nameField();
+    const group = screen.getByRole('group', { name: 'Apariencia del robot' });
+
+    fireEvent.click(within(group).getByRole('radio', { name: 'Gamer' }));
+    fireEvent.click(saveButton());
+
+    expect(await within(group).findByRole('alert')).toHaveTextContent(
+      'Esa apariencia no está disponible.',
+    );
+    expect(group).toHaveAccessibleDescription(
+      'Esa apariencia no está disponible.',
+    );
+
+    fireEvent.click(within(group).getByRole('radio', { name: 'Graduación' }));
+    await waitFor(() =>
+      expect(within(group).queryByRole('alert')).not.toBeInTheDocument(),
+    );
+  });
+
   it('shows a form-level error on 403 without losing the edits', async () => {
     mswServer.use(
       createUpdateClassroomHandler({

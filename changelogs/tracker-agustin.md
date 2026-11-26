@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-26 — Show tutor bot skin server errors (#149)
+
+- **Status:** completed
+- **Area / files:** `src/features/classrooms/settings/`
+- **Change:** The tutor bot skin group shows its server validation error and clears it on change.
+- **Reason:** A rejected skin made the save fail silently.
+- **Verification:** Strict TDD; settings panel tests, lint, typecheck, prettier.
+- **Next step:** None.
+
 ## 2026-11-26 — Keep the preview avatar while an accessory loads (#149)
 
 - **Status:** completed

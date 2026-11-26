@@ -323,7 +323,7 @@ export function ClassroomSettingsForm({
         <Controller
           control={form.control}
           name="tutorBotSkin"
-          render={({ field }) => (
+          render={({ field, fieldState }) => (
             <ChoiceGroup
               legend={settingsMessages.sections.tutorBot.legend}
               name={field.name}
@@ -332,12 +332,14 @@ export function ClassroomSettingsForm({
                 label: settingsMessages.sections.tutorBot.options[value],
               }))}
               value={field.value}
+              error={fieldState.error?.message}
               disabled={isSubmitting}
               onBlur={field.onBlur}
               onChange={(next) => {
                 setJustSaved(false);
                 field.onChange(next);
                 form.clearErrors('root.serverError');
+                form.clearErrors('tutorBotSkin');
               }}
             />
           )}
