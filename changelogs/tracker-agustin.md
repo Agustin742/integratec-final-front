@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-26 — Remove the on-screen gestures button (#149)
+
+- **Status:** completed
+- **Area / files:** `src/features/classrooms/`, `docs/realtime-client.md`
+- **Change:** The emote wheel opens with Space only; the floating button was removed.
+- **Reason:** Owner review: the button looked disconnected from the rest of the app.
+- **Verification:** Emote and classroom stage tests, lint, typecheck.
+- **Next step:** Touch devices have no way to open the wheel; decide where to place a trigger.
+
 ## 2026-11-26 — Avatar emotes in the 3D classroom (#149)
 
 - **Status:** completed (not visually checked)

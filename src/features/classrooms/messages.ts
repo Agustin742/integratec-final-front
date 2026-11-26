@@ -623,8 +623,6 @@ export const classroomMessages = {
     },
   },
   emotes: {
-    openWheel: 'Abrir ruleta de gestos',
-    triggerLabel: 'Gestos',
     wheelLabel: 'Gestos',
     cooldown: 'Esperá unos segundos para repetir un gesto.',
     names: {

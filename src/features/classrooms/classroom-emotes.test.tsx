@@ -2,8 +2,6 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ClassroomEmotes } from './classroom-emotes';
 
-const OPEN = 'Abrir ruleta de gestos';
-const trigger = () => screen.getByRole('button', { name: OPEN });
 const wheel = () => screen.queryByRole('dialog', { name: 'Gestos' });
 const choice = (name: string) => screen.getByRole('button', { name });
 /** `false` when the press was consumed (`preventDefault`). */
@@ -54,7 +52,6 @@ describe('ClassroomEmotes (#154)', () => {
       screen.getByLabelText('largo'),
       screen.getByTestId('edit'),
       screen.getByRole('button', { name: 'otro' }),
-      trigger(),
     ]) {
       expect(pressSpace(target)).toBe(true);
     }
@@ -71,17 +68,22 @@ describe('ClassroomEmotes (#154)', () => {
     dialog.remove();
   });
 
-  it('disables the button and Space while unavailable', () => {
-    setup(false);
-    expect(trigger()).toBeDisabled();
+  it('renders no button, only the wheel once Space opens it', () => {
+    setup();
+    expect(screen.getAllByRole('button')).toHaveLength(1);
     pressSpace();
+    expect(screen.getAllByRole('button')).toHaveLength(6);
+  });
+
+  it('ignores Space while unavailable', () => {
+    setup(false);
+    expect(pressSpace()).toBe(true);
     expect(wheel()).not.toBeInTheDocument();
   });
 
   it('moves with arrows and Tab, closes with Escape and returns focus', () => {
     setup();
-    trigger().focus();
-    fireEvent.click(trigger());
+    pressSpace();
     fireEvent.keyDown(choice('Saludar'), { key: 'ArrowRight' });
     expect(choice('Festejar')).toHaveFocus();
     fireEvent.keyDown(choice('Festejar'), { key: 'ArrowLeft' });
@@ -91,18 +93,18 @@ describe('ClassroomEmotes (#154)', () => {
     expect(choice('Saludar')).toHaveFocus();
     fireEvent.keyDown(choice('Saludar'), { key: 'Escape' });
     expect(wheel()).not.toBeInTheDocument();
-    expect(trigger()).toHaveFocus();
+    expect(document.body).toHaveFocus();
   });
 
   it('sends the pick and disables the choices during the cooldown', () => {
     vi.useFakeTimers();
     const { onSelect } = setup();
-    fireEvent.click(trigger());
+    pressSpace();
     fireEvent.click(choice('Bailar'));
     expect(onSelect).toHaveBeenCalledExactlyOnceWith('Dance');
     expect(wheel()).not.toBeInTheDocument();
 
-    fireEvent.click(trigger());
+    pressSpace();
     expect(choice('Saludar')).toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(choice('Saludar'));
     expect(onSelect).toHaveBeenCalledTimes(1);

@@ -1,6 +1,5 @@
 import {
   useEffect,
-  useId,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -30,11 +29,7 @@ function ownsSpace(target: EventTarget | null): boolean {
 
 const copy = classroomMessages.emotes;
 
-const ICON_PATHS: Record<AvatarEmote | 'trigger', readonly string[]> = {
-  trigger: [
-    'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Z',
-    'M8.5 14.5c1 1.3 2.2 2 3.5 2s2.500-.7 3.500-2M9 9.5h.01M15 9.5h.01',
-  ],
+const ICON_PATHS: Record<AvatarEmote, readonly string[]> = {
   Wave: [
     'M8 13V6a1.5 1.5 0 0 1 3 0v5V4.500a1.500 1.500 0 0 1 3 0V11V6a1.500 1.500 0 0 1 3 0v8a7 7 0 0 1-12.500 4L4 13.500a1.500 1.500 0 0 1 2.500-1.500L8 13.500',
     'M19 3c1 .7 1.700 1.700 2 3',
@@ -56,7 +51,7 @@ const ICON_PATHS: Record<AvatarEmote | 'trigger', readonly string[]> = {
   ],
 };
 
-function EmoteIcon({ icon }: { readonly icon: AvatarEmote | 'trigger' }) {
+function EmoteIcon({ icon }: { readonly icon: AvatarEmote }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -100,14 +95,13 @@ export interface ClassroomEmotesProps {
 }
 
 /**
- * Emote wheel of the 3D classroom (#154): Space or the button opens it. The
+ * Emote wheel of the 3D classroom (#154): Space opens it. The
  * avatar only plays once the room announces the emote, so this just sends.
  * Choices stay disabled for the server cooldown, which drops early attempts.
  */
 export function ClassroomEmotes({ available, onSelect }: ClassroomEmotesProps) {
   const [open, setOpen] = useState(false);
   const [coolingDown, setCoolingDown] = useState(false);
-  const wheelId = useId();
   const wheelRef = useRef<HTMLDivElement>(null);
   const invokerRef = useRef<HTMLElement | null>(null);
 
@@ -203,66 +197,45 @@ export function ClassroomEmotes({ available, onSelect }: ClassroomEmotesProps) {
     closeWheel();
   };
 
+  if (!open) return null;
+
   return (
-    <>
-      <button
-        type="button"
-        aria-label={copy.openWheel}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls={open ? wheelId : undefined}
-        aria-keyshortcuts="Space"
-        disabled={!available}
-        onClick={openWheel}
-        className={cn(
-          CARD,
-          FOCUS_RING,
-          'motion-press flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-2xl px-3 disabled:cursor-not-allowed disabled:opacity-50',
-        )}
+    <div className="fixed inset-0 z-20 flex items-center justify-center">
+      <div
+        ref={wheelRef}
+        role="dialog"
+        aria-label={copy.wheelLabel}
+        className="relative size-76 motion-safe:animate-dialog-in"
       >
-        <EmoteIcon icon="trigger" />
-        <span className="max-sm:sr-only">{copy.triggerLabel}</span>
-      </button>
-      {open && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center">
-          <div
-            ref={wheelRef}
-            id={wheelId}
-            role="dialog"
-            aria-label={copy.wheelLabel}
-            className="relative size-76 motion-safe:animate-dialog-in"
+        {AVATAR_EMOTES.map((emote, index) => (
+          <button
+            key={emote}
+            type="button"
+            aria-disabled={coolingDown}
+            onClick={() => pick(emote)}
+            onKeyDown={handleKeyDown}
+            style={slotPosition(index)}
+            className={cn(
+              CARD,
+              FOCUS_RING,
+              'motion-colors absolute flex size-20 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-1 rounded-full p-1 text-center text-xs leading-tight aria-disabled:cursor-not-allowed aria-disabled:opacity-50',
+            )}
           >
-            {AVATAR_EMOTES.map((emote, index) => (
-              <button
-                key={emote}
-                type="button"
-                aria-disabled={coolingDown}
-                onClick={() => pick(emote)}
-                onKeyDown={handleKeyDown}
-                style={slotPosition(index)}
-                className={cn(
-                  CARD,
-                  FOCUS_RING,
-                  'motion-colors absolute flex size-20 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-1 rounded-full p-1 text-center text-xs leading-tight aria-disabled:cursor-not-allowed aria-disabled:opacity-50',
-                )}
-              >
-                <EmoteIcon icon={emote} />
-                {copy.names[emote]}
-              </button>
-            ))}
-            <p
-              role="status"
-              className={cn(
-                coolingDown
-                  ? 'pointer-events-none absolute inset-x-0 -bottom-6 mx-auto w-max max-w-full rounded-xl bg-card px-3 py-1 text-center text-xs text-card-foreground shadow-panel'
-                  : 'sr-only',
-              )}
-            >
-              {coolingDown ? copy.cooldown : ''}
-            </p>
-          </div>
-        </div>
-      )}
-    </>
+            <EmoteIcon icon={emote} />
+            {copy.names[emote]}
+          </button>
+        ))}
+        <p
+          role="status"
+          className={cn(
+            coolingDown
+              ? 'pointer-events-none absolute inset-x-0 -bottom-6 mx-auto w-max max-w-full rounded-xl bg-card px-3 py-1 text-center text-xs text-card-foreground shadow-panel'
+              : 'sr-only',
+          )}
+        >
+          {coolingDown ? copy.cooldown : ''}
+        </p>
+      </div>
+    </div>
   );
 }
