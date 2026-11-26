@@ -104,7 +104,7 @@ None currently active. The legacy pre-`#25` uncompressed `public/models/avatars/
 
 ## Welcome scene on the public screens
 
-`/login`, `/register`, `/password-reset` and `/invitations/accept` share one brand panel, which shows an animated front view ([`src/features/world/preview/`](../src/features/world/preview/)). The classroom keeps its own top-down view, and the profile customization preview is separate.
+`/login`, `/register`, `/password-reset` and `/invitations/accept` share one brand panel, which shows an animated front view ([`preview-scene.tsx`](../src/features/world/preview/preview-scene.tsx)). The classroom keeps its own top-down view, and the profile customization preview is separate.
 
 - **Content:** a random character from the profile catalogs, in one outfit, waves, plays one of `Cheer`, `Clap` or `Dance` (only positive gestures on public screens), rests on `Idle` and repeats. Character, outfit and scenery are drawn once per page load and change only on reload.
 - **Face:** slightly happy, like the profile preview ([resting face](art/avatar-animations.md#resting-face)).
