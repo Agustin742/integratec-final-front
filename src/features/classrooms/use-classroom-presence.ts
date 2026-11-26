@@ -72,6 +72,8 @@ export interface ClassroomPresence {
   readonly remoteParticipants: readonly RemoteClassroomParticipant[];
   /** Synced pet and tutor bot; empty without a live connection. */
   readonly npcs: ReadonlyMap<string, NpcView>;
+  /** Synced bot skin; `undefined` while the room has not reported one. */
+  readonly liveTutorBotSkin: string | undefined;
   readonly reconnect: () => Promise<boolean>;
   readonly sendIntent: (intent: AvatarInput) => void;
   /** Asks the server to react to E / click on an NPC (`npc:interact`). */
@@ -585,6 +587,9 @@ export function useClassroomPresence({
     reconnect: realtime.reconnect,
     sendIntent,
     npcs,
+    liveTutorBotSkin: hasPresenceParticipants
+      ? realtime.tutorBotSkin
+      : undefined,
     interactNpc,
   };
 }

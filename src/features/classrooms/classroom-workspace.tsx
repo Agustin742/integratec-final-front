@@ -6,6 +6,7 @@ import {
   useState,
   type RefObject,
 } from 'react';
+import { toTutorBotSkin } from '@/realtime/contracts.generated';
 import {
   Link,
   Outlet,
@@ -350,6 +351,9 @@ function WorkspaceContext({
             remoteParticipants={presence.remoteParticipants}
             onIntentChange={presence.sendIntent}
             npcs={presence.npcs}
+            tutorBotSkin={toTutorBotSkin(
+              presence.liveTutorBotSkin ?? classroom.tutorBotSkin,
+            )}
             resolveNpcPhrase={resolveNpcPhrase}
             onInteractNpc={presence.interactNpc}
             onSustainedLowFps={beginPerformanceOffer}

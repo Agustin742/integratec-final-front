@@ -73,6 +73,7 @@ function buildDetail(id: string, overrides: Partial<Detail> = {}): Detail {
     chatMuted: false,
     collaborationLocked: false,
     gamesDisabled: false,
+    tutorBotSkin: 'none',
     myRole: 'STUDENT',
     capabilities: ['chat_classmates', 'list_directory'],
     availablePanels: ['activities', 'chat', 'grades'],
@@ -466,6 +467,42 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
           [REMOTE_STUDENT_ID, null],
         ]),
       );
+    });
+  });
+
+  test('dresses the bot with the REST skin until the room value arrives', async () => {
+    const { sdk } = setupPresenceWorkspace({
+      detailOverrides: () => ({ tutorBotSkin: 'graduate' }),
+    });
+    await expandPresence();
+    await waitFor(() => {
+      expect(sdk.roomFor(CLASSROOM_A)).toBeDefined();
+    });
+    const room = sdk.roomFor(CLASSROOM_A)!;
+    await waitFor(() => {
+      expect(stage.props?.tutorBotSkin).toBe('graduate');
+    });
+
+    act(() => {
+      room.setAvatar({
+        userId: profile.id,
+        displayName: profile.displayName,
+        role: 'STUDENT',
+      });
+      (room.state as unknown as { tutorBotSkin: string }).tutorBotSkin = 'boca';
+      room.emitStateChange();
+    });
+    await waitFor(() => {
+      expect(stage.props?.tutorBotSkin).toBe('boca');
+    });
+
+    act(() => {
+      (room.state as unknown as { tutorBotSkin: string }).tutorBotSkin =
+        'pirate';
+      room.emitStateChange();
+    });
+    await waitFor(() => {
+      expect(stage.props?.tutorBotSkin).toBe('none');
     });
   });
 

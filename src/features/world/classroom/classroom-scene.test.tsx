@@ -149,6 +149,11 @@ describe('ClassroomScene', () => {
     expect(placements.some((p) => p.moduleId === 'teacher-desk')).toBe(true);
   });
 
+  test('dresses the tutor bot with the classroom skin', () => {
+    render(<ClassroomScene scopeKey="room-1" tutorBotSkin="boca" />);
+    expect(nav.botProps).toMatchObject({ skin: 'boca' });
+  });
+
   test('draws each desk decor on top of its desk', () => {
     render(
       <ClassroomScene

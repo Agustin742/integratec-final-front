@@ -104,6 +104,8 @@ export interface RealtimeSnapshot {
   readonly reason: RealtimeFailureReason | null;
   readonly message: string | null;
   readonly participants: ReadonlyMap<string, RealtimeParticipant>;
+  /** Synced tutor bot skin; absent until the room reports one. */
+  readonly tutorBotSkin?: string | undefined;
   /** Synced pet and tutor bot, keyed by NPC id. */
   readonly npcs: ReadonlyMap<string, NpcView>;
   readonly controls: RealtimeClassroomControls;
@@ -346,6 +348,13 @@ function readParticipants(
     );
   });
   return next;
+}
+
+function readTutorBotSkin(
+  state: ClassroomState | undefined,
+): string | undefined {
+  const skin: unknown = state?.tutorBotSkin;
+  return typeof skin === 'string' && skin !== '' ? skin : undefined;
 }
 
 function readNpcs(
@@ -685,6 +694,7 @@ export function createClassroomRealtimeClient(
       message: null,
       participants: readParticipants(room.state),
       npcs: readNpcs(room.state),
+      tutorBotSkin: readTutorBotSkin(room.state),
       controls: readControls(room.state),
     });
 
@@ -701,6 +711,7 @@ export function createClassroomRealtimeClient(
         message: snapshot.message,
         participants: readParticipants(state, snapshot.participants),
         npcs: readNpcs(state, snapshot.npcs),
+        tutorBotSkin: readTutorBotSkin(state),
         controls: readControls(state),
       });
     });
@@ -748,6 +759,7 @@ export function createClassroomRealtimeClient(
         message: realtimeMessages.reconnecting,
         participants: snapshot.participants,
         npcs: snapshot.npcs,
+        tutorBotSkin: snapshot.tutorBotSkin,
         controls: DEFAULT_CONTROLS,
       });
 

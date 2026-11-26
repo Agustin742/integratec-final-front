@@ -85,6 +85,7 @@ function classroomResponse(
     chatMuted: false,
     collaborationLocked: false,
     gamesDisabled: false,
+    tutorBotSkin: 'none',
     myRole: role,
     capabilities,
     availablePanels: ['material'],

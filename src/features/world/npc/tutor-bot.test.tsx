@@ -13,7 +13,11 @@ import {
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from '@/test/render';
-import { clearAssetCache, setGlbLoaderForTests } from '../asset-cache';
+import {
+  clearAssetCache,
+  getAssetCacheSize,
+  setGlbLoaderForTests,
+} from '../asset-cache';
 import { createNpcLivePositions } from '../classroom/npc-live-position';
 import type { NpcView } from './npc-view';
 import { skinnedGltf, skinnedMeshes } from './skinned-fixture.test-utils';
@@ -304,5 +308,54 @@ describe('TutorBot phrase bubble', () => {
     expect(onSpeech).not.toHaveBeenCalledWith(
       expect.objectContaining({ seq: 2 }),
     );
+  });
+});
+
+describe('TutorBot skins', () => {
+  /** A bot with the hideable torso, and skins sharing its one bone. */
+  function botWithSkins(failing: readonly string[] = []) {
+    const loaded: string[] = [];
+    setGlbLoaderForTests({
+      loadAsync: (url: string) => {
+        loaded.push(url);
+        if (failing.some((part) => url.includes(part))) {
+          return Promise.reject(new Error('missing skin'));
+        }
+        const model = skinnedGltf(1, CLIPS);
+        const mesh = model.scene.getObjectByName('Part_0')!;
+        mesh.name = url.includes('/skins/') ? 'BotSkin_Test' : 'Bot_Torso';
+        return Promise.resolve(model);
+      },
+    });
+    return loaded;
+  }
+  const torso = (handle: TutorBotHandle) =>
+    handle.group.getObjectByName('Bot_Torso');
+  const worn = (handle: TutorBotHandle) =>
+    handle.group.getObjectByName('BotSkin_Test');
+
+  it('wears the chosen skin and restores the bot when it changes', async () => {
+    const loaded = botWithSkins();
+    const { ui, handle } = await setup(home, { skin: 'boca' });
+    await waitFor(() => expect(worn(handle)).toBeDefined());
+    expect(loaded).toContain('/models/bot/skins/skin-boca.glb');
+    expect(torso(handle)?.visible).toBe(false);
+
+    ui.rerender(<TutorBot npc={home} skin="none" />);
+
+    expect(worn(handle)).toBeUndefined();
+    expect(torso(handle)?.visible).toBe(true);
+    // Only the base bot stays cached: the removed skin is disposed.
+    expect(getAssetCacheSize()).toBe(1);
+  });
+
+  it('keeps the default bot when the skin cannot load', async () => {
+    const loaded = botWithSkins(['/skins/']);
+    const { handle } = await setup(home, { skin: 'gamer' });
+    await waitFor(() => expect(loaded).toHaveLength(2));
+    await act(async () => {});
+
+    expect(worn(handle)).toBeUndefined();
+    expect(torso(handle)?.visible).toBe(true);
   });
 });

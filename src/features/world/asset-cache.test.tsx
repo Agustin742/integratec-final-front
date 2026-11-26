@@ -1,3 +1,4 @@
+import { TextureLoader } from 'three';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import vm from 'node:vm';
@@ -392,5 +393,22 @@ describe('asset-cache & GlbAsset', () => {
     expect(screen.queryByTestId('flaky-error')).not.toBeInTheDocument();
     expect(loadAsync).toHaveBeenCalledTimes(2);
     expect(getAssetCacheSize()).toBe(1);
+  });
+});
+
+describe('embedded textures under the CSP', () => {
+  it('load through an image element even where ImageBitmap exists', async () => {
+    // ImageBitmapLoader fetches the `blob:` URL, which `connect-src` blocks.
+    vi.stubGlobal('createImageBitmap', () => Promise.resolve({}));
+    const loader = createConfiguredGltfLoader();
+
+    const gltf = await loader.parseAsync(
+      JSON.stringify({ asset: { version: '2.0' } }),
+      '',
+    );
+
+    expect(gltf.parser.textureLoader).toBeInstanceOf(TextureLoader);
+    vi.unstubAllGlobals();
+    clearAssetCache({ disposeDecoders: true });
   });
 });

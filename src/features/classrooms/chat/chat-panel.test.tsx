@@ -937,6 +937,7 @@ describe('ChatPanel (#51, read side)', () => {
         chatMuted: false,
         collaborationLocked: false,
         gamesDisabled: false,
+        tutorBotSkin: 'none',
         myRole: 'STUDENT',
         capabilities: [
           'participate_activities',

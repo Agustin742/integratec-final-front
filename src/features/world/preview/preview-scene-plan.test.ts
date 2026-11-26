@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { resolveAvatarParts } from '../avatar/avatar-parts';
@@ -20,14 +20,6 @@ function seeded(seed: number): () => number {
 
 const publicFile = (url: string) =>
   resolve(process.cwd(), 'public', url.slice(1));
-
-/** Embedded textures load through `blob:` fetches, which the CSP blocks. */
-function embeddedImages(url: string): number {
-  const buffer = readFileSync(publicFile(url));
-  const json = buffer.subarray(20, 20 + buffer.readUInt32LE(12));
-  const document = JSON.parse(json.toString('utf8')) as { images?: unknown[] };
-  return document.images?.length ?? 0;
-}
 
 describe('planPreviewScene', () => {
   it('is fully determined by the random source', () => {
@@ -60,7 +52,6 @@ describe('planPreviewScene', () => {
         const parts = resolveAvatarParts(avatar);
         for (const url of [parts.bodyUrl, parts.hairUrl!, parts.topUrl!]) {
           expect(existsSync(publicFile(url))).toBe(true);
-          expect(embeddedImages(url)).toBe(0);
         }
       }
     }
@@ -74,10 +65,9 @@ describe('planPreviewScene', () => {
     );
   });
 
-  it('only uses existing scenery models without embedded textures', () => {
+  it('only uses existing scenery models', () => {
     for (const url of PREVIEW_SCENERY_URLS) {
       expect(existsSync(publicFile(url))).toBe(true);
-      expect(embeddedImages(url)).toBe(0);
     }
   });
 

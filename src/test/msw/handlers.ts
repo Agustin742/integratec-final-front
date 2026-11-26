@@ -13,12 +13,9 @@ export type ClassroomDetailPayload =
   components['schemas']['ClassroomDetailResponseDto'];
 export type ClassroomContextPayload =
   components['schemas']['ClassroomContextResponseDto'];
-export type ClassroomDeskPayload = components['schemas']['ClassroomDeskDto'] & {
-  readonly deskDecor?: components['schemas']['EquippedSlotDto'] | null;
-};
-export type ClassroomDeskMapPayload = {
-  readonly items: ClassroomDeskPayload[];
-};
+export type ClassroomDeskPayload = components['schemas']['ClassroomDeskDto'];
+export type ClassroomDeskMapPayload =
+  components['schemas']['ClassroomDeskMapDto'];
 export type AcceptInvitationPayload =
   components['schemas']['AcceptInvitationDto'];
 export type JoinClassroomWithCodePayload =
@@ -167,6 +164,7 @@ export function createClassroomDetailHandler(
     capabilities: [],
     deskCount: 0,
     pet: null,
+    tutorBotSkin: 'none',
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -581,6 +579,7 @@ export function createCreateClassroomHandler(
       chatMuted: false,
       collaborationLocked: false,
       gamesDisabled: false,
+      tutorBotSkin: 'none',
       myRole: 'TEACHER',
       capabilities: [
         'configure_classroom',
@@ -682,6 +681,7 @@ export function createUpdateClassroomHandler(
       independentTeacherId: '00000000-0000-4000-8000-000000000001',
       adultMode: body.adultMode ?? false,
       chatMuted: body.chatMuted ?? false,
+      tutorBotSkin: body.tutorBotSkin ?? 'none',
       collaborationLocked: body.collaborationLocked ?? false,
       gamesDisabled: body.gamesDisabled ?? false,
       myRole: 'TEACHER',
@@ -3133,6 +3133,7 @@ export function createClassroomContextHandler(
     chatMuted: false,
     collaborationLocked: false,
     gamesDisabled: false,
+    tutorBotSkin: 'none',
     myRole: 'STUDENT',
     capabilities: [
       'participate_activities',

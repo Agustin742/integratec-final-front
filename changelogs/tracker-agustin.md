@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-25 — Tutor bot skins and selector (#149)
+
+- **Status:** completed (not visually checked)
+- **Area / files:** `src/features/world/npc/`, `src/features/world/asset-cache.ts`, `src/features/classrooms/` (settings, schema, presence, 3D stage, desk schema), `src/realtime/`, `src/api/schema.generated.ts`, `src/test/msw/handlers.ts`, `docs/3d-assets.md`
+- **Change:** Staff pick the bot skin in classroom settings; the bot wears the synced value. Embedded textures now load through an image element, so skinned and cat textures work under the unchanged CSP. Contracts synced from back `ff6cb8e`, replacing the local `deskDecor` type.
+- **Reason:** The seven merged skins were unused; back counterpart integratec-final-back#154.
+- **Verification:** Strict TDD on the touched test files, lint, typecheck and `security:check`. Full suite, e2e and visual review not run.
+- **Next step:** Visual review of each skin and of the cat texture in a real browser.
+
 ## 2026-11-25 — Animated 3D welcome scene on the public screens (#149)
 
 - **Status:** completed (not visually checked)

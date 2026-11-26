@@ -62,6 +62,7 @@ export interface Classroom3DStageProps {
   readonly onIntentChange?: ((intent: AvatarInput) => void) | undefined;
   /** Synced NPC state by id; the tutor bot rests at home while it is absent. */
   readonly npcs?: NpcViews | undefined;
+  readonly tutorBotSkin?: string | undefined;
   /** Text of an NPC phrase reaction, resolved from its synced phrase id. */
   readonly resolveNpcPhrase?:
     ((npc: NpcView) => string | undefined) | undefined;
@@ -154,6 +155,7 @@ export function Classroom3DStage({
   remoteParticipants,
   onIntentChange,
   npcs,
+  tutorBotSkin,
   resolveNpcPhrase,
   onInteractNpc,
   onSustainedLowFps,
@@ -176,6 +178,7 @@ export function Classroom3DStage({
       remoteParticipants={remoteParticipants}
       onIntentChange={onIntentChange}
       npcs={npcs}
+      tutorBotSkin={tutorBotSkin}
       resolveNpcPhrase={resolveNpcPhrase}
       onInteractNpc={onInteractNpc}
       onSustainedLowFps={onSustainedLowFps}
@@ -222,6 +225,7 @@ function Classroom3DStageContent({
   remoteParticipants,
   onIntentChange,
   npcs,
+  tutorBotSkin,
   resolveNpcPhrase,
   onInteractNpc = NOOP_INTERACT_NPC,
   onSustainedLowFps,
@@ -242,6 +246,7 @@ function Classroom3DStageContent({
     readonly RemoteClassroomParticipant[] | undefined;
   readonly onIntentChange?: ((intent: AvatarInput) => void) | undefined;
   readonly npcs?: NpcViews | undefined;
+  readonly tutorBotSkin?: string | undefined;
   readonly resolveNpcPhrase?:
     ((npc: NpcView) => string | undefined) | undefined;
   readonly onInteractNpc?: ((npcId: string) => void) | undefined;
@@ -520,6 +525,7 @@ function Classroom3DStageContent({
                   anchorProximityPrompt(promptAnchorRef.current, anchor)
                 }
                 npcs={npcs}
+                tutorBotSkin={tutorBotSkin}
                 resolveNpcPhrase={resolveNpcPhrase}
                 onNpcSpeech={setNpcSpeech}
                 onNpcSpeechAnchor={(anchor) =>

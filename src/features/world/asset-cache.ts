@@ -2,6 +2,7 @@ import {
   Material,
   SkinnedMesh,
   Texture,
+  TextureLoader,
   WebGLRenderTarget,
   type Object3D,
   type WebGLRenderer,
@@ -133,6 +134,13 @@ export function createConfiguredGltfLoader(
   loader.setDRACOLoader(draco);
   loader.setKTX2Loader(ktx2);
   loader.setMeshoptDecoder(MeshoptDecoder);
+  // Embedded textures are `blob:` URLs. The default `ImageBitmapLoader`
+  // fetches them, which the CSP `connect-src` blocks; an image element falls
+  // under `img-src`, which already allows `blob:`.
+  loader.register((parser) => {
+    parser.textureLoader = new TextureLoader(parser.options.manager);
+    return { name: 'AULA_csp_image_textures' };
+  });
   return loader;
 }
 

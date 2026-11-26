@@ -42,6 +42,8 @@ export interface ClassroomWorldProps extends Pick<
   onProximityAnchor?: ((anchor: ProximityAnchor) => void) | undefined;
   /** Synced NPC state by id (pet, tutor bot); the bot rests at home without it. */
   npcs?: NpcViews | undefined;
+  /** Skin of the tutor bot; the default bot without one. */
+  tutorBotSkin?: string | undefined;
   resolveNpcPhrase?: ((npc: NpcView) => string | undefined) | undefined;
   onNpcSpeech?: ((speech: NpcSpeech | undefined) => void) | undefined;
   onNpcSpeechAnchor?: ((anchor: ProximityAnchor) => void) | undefined;
@@ -79,6 +81,7 @@ export function ClassroomWorld({
   onProximityChange,
   onProximityAnchor,
   npcs,
+  tutorBotSkin,
   resolveNpcPhrase,
   onNpcSpeech,
   onNpcSpeechAnchor,
@@ -126,6 +129,7 @@ export function ClassroomWorld({
         onProximityChange={onProximityChange}
         onProximityAnchor={onProximityAnchor}
         npcs={npcs}
+        tutorBotSkin={tutorBotSkin}
         resolveNpcPhrase={resolveNpcPhrase}
         onNpcSpeech={onNpcSpeech}
         onNpcSpeechAnchor={onNpcSpeechAnchor}

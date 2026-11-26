@@ -85,6 +85,8 @@ export interface ClassroomSceneProps {
    * in front of the bot station, so the scene never lacks one.
    */
   npcs?: NpcViews | undefined;
+  /** Skin of the tutor bot; the default bot without one. */
+  tutorBotSkin?: string | undefined;
   /** Text for an NPC phrase reaction (resolved from its synced phrase id). */
   resolveNpcPhrase?: ((npc: NpcView) => string | undefined) | undefined;
   /** Phrase an NPC is saying now, or undefined once it fades. */
@@ -124,6 +126,7 @@ export function ClassroomScene({
   onProximityChange,
   onProximityAnchor,
   npcs,
+  tutorBotSkin,
   resolveNpcPhrase,
   onNpcSpeech,
   onNpcSpeechAnchor,
@@ -269,6 +272,7 @@ export function ClassroomScene({
         <ClassroomPet npc={pet} scopeKey={scopeKey} positions={npcPositions} />
         <TutorBot
           npc={bot}
+          skin={tutorBotSkin}
           phraseText={botPhrase}
           scopeKey={scopeKey}
           positions={npcPositions}

@@ -18,7 +18,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
+import { TUTOR_BOT_SKINS } from '@/realtime/contracts.generated';
 import { useSessionService } from '@/session/provider';
+import { ChoiceGroup } from '../../profile/choice-group';
 import {
   CLASSROOM_NAME_MAX_LENGTH,
   CLASSROOM_SUBJECT_MAX_LENGTH,
@@ -141,6 +143,7 @@ export function ClassroomSettingsForm({
                 subject: saved.subject,
                 adultMode: saved.adultMode,
                 chatMuted: saved.chatMuted,
+                tutorBotSkin: saved.tutorBotSkin,
                 updatedAt: saved.updatedAt,
               },
         );
@@ -196,7 +199,13 @@ export function ClassroomSettingsForm({
       }
     },
     {
-      knownFields: ['name', 'subject', 'adultMode', 'chatMuted'],
+      knownFields: [
+        'name',
+        'subject',
+        'adultMode',
+        'chatMuted',
+        'tutorBotSkin',
+      ],
     },
   );
 
@@ -301,6 +310,34 @@ export function ClassroomSettingsForm({
           name="chatMuted"
           disabled={isSubmitting}
           onChangeInteraction={() => setJustSaved(false)}
+        />
+      </SettingsSection>
+
+      <SettingsSection
+        title={settingsMessages.sections.tutorBot.title}
+        description={settingsMessages.sections.tutorBot.description}
+      >
+        <Controller
+          control={form.control}
+          name="tutorBotSkin"
+          render={({ field }) => (
+            <ChoiceGroup
+              legend={settingsMessages.sections.tutorBot.legend}
+              name={field.name}
+              options={TUTOR_BOT_SKINS.map((value) => ({
+                value,
+                label: settingsMessages.sections.tutorBot.options[value],
+              }))}
+              value={field.value}
+              disabled={isSubmitting}
+              onBlur={field.onBlur}
+              onChange={(next) => {
+                setJustSaved(false);
+                field.onChange(next);
+                form.clearErrors('root.serverError');
+              }}
+            />
+          )}
         />
       </SettingsSection>
 

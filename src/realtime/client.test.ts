@@ -1233,3 +1233,25 @@ describe('createClassroomRealtimeClient (#23)', () => {
     client.dispose();
   });
 });
+
+describe('synced tutor bot skin', () => {
+  it('follows the room state', async () => {
+    const { auth } = createFakeAuth('valid-token');
+    const sdk = createFakeSdk();
+    const room = new FakeRoom({ classroomId: CLASSROOM_A });
+    sdk.setJoinHandler(async () => room);
+    const client = createClassroomRealtimeClient({
+      auth,
+      realtimeUrl: 'wss://realtime.example.invalid',
+      createSdkClient: sdk.createSdkClient,
+    });
+    await client.connect(CLASSROOM_A);
+    expect(client.getSnapshot().tutorBotSkin).toBeUndefined();
+
+    (room.state as unknown as { tutorBotSkin: string }).tutorBotSkin = 'gamer';
+    room.emitStateChange();
+
+    expect(client.getSnapshot().tutorBotSkin).toBe('gamer');
+    client.dispose();
+  });
+});

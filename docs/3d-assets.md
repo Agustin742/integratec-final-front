@@ -112,4 +112,12 @@ None currently active. The legacy pre-`#25` uncompressed `public/models/avatars/
 - **Fallback:** without WebGL, after a lost context, or when the chunk or the body fails, the box stays empty and decorative. A scenery piece that fails is left out.
 - **Motion:** under `prefers-reduced-motion` the character holds one `Idle` pose and one outfit. The canvas renders on demand and pauses while hidden or offscreen.
 - **Resources:** composed outfits are disposed on every change; cached models are freed when the visitor leaves these screens.
-- **CSP:** only models without embedded textures are used, because textures load through `blob:` fetches that `connect-src` blocks. A unit test checks the scenery and character files.
+- **CSP:** the scenery and character models have no embedded textures. Models that do are covered by [embedded textures and the CSP](#embedded-textures-and-the-csp).
+
+## Embedded textures and the CSP
+
+`GLTFLoader` turns an embedded image into a `blob:` URL. Its default `ImageBitmapLoader` fetches that URL, which the CSP `connect-src` blocks. The shared loader in [`asset-cache.ts`](../src/features/world/asset-cache.ts) reads textures through `TextureLoader` instead: an image element, covered by `img-src 'self' data: blob:`. The policy is unchanged.
+
+## Tutor bot skins
+
+Classroom staff choose the skin in the classroom settings panel (`Robot tutor`). The value synced by the room wins over the REST one, and an unknown value shows the default bot. [`tutor-bot-skin.ts`](../src/features/world/npc/tutor-bot-skin.ts) follows the [art contract](art/tutor-bot-skins.md): it binds a copy of the skin to the bot bones by name and hides the base meshes it covers, which are therefore never merged. Taking a skin off restores them and frees the skin's own cache scope. A skin that cannot load or does not fit the rig leaves the default bot.

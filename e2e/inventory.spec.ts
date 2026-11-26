@@ -42,6 +42,7 @@ const classroomContext: ClassroomContext = {
   chatMuted: false,
   collaborationLocked: false,
   gamesDisabled: false,
+  tutorBotSkin: 'none',
   myRole: 'STUDENT',
   capabilities: ['participate_activities'],
   availablePanels: ['activities', 'grades', 'shop', 'members'],

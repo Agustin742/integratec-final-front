@@ -109,6 +109,39 @@ describe('ClassroomSettingsPanel', () => {
     expect(screen.getByText('Todo guardado')).toBeVisible();
   });
 
+  it('lets staff choose the tutor bot skin and saves it', async () => {
+    const bodies: UpdateClassroomRequestPayload[] = [];
+    mswServer.use(
+      createUpdateClassroomHandler({
+        onRequest: (_request, _id, body) => {
+          bodies.push(body);
+        },
+      }),
+    );
+    const { queryClient } = renderSettings({
+      detail: { tutorBotSkin: 'graduate' },
+    });
+    await nameField();
+    const group = screen.getByRole('group', { name: 'Apariencia del robot' });
+    expect(within(group).getAllByRole('radio')).toHaveLength(8);
+    expect(
+      within(group).getByRole('radio', { name: 'Graduación' }),
+    ).toBeChecked();
+
+    fireEvent.click(within(group).getByRole('radio', { name: 'Gamer' }));
+    fireEvent.click(saveButton());
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ tutorBotSkin: 'gamer' });
+    await waitFor(() => {
+      expect(
+        queryClient.getQueryData<{ tutorBotSkin: string }>(
+          classroomDetailQueryKey(profile.id, CLASSROOM_ID),
+        )?.tutorBotSkin,
+      ).toBe('gamer');
+    });
+  });
+
   it('validates the name inline and does not send an invalid body', async () => {
     const onRequest = vi.fn();
     mswServer.use(createUpdateClassroomHandler({ onRequest }));
@@ -143,6 +176,7 @@ describe('ClassroomSettingsPanel', () => {
           chatMuted: body.chatMuted ?? false,
           collaborationLocked: body.collaborationLocked ?? false,
           gamesDisabled: body.gamesDisabled ?? false,
+          tutorBotSkin: 'none',
           myRole: 'TEACHER',
           capabilities: STAFF_CAPABILITIES,
           deskCount: 0,

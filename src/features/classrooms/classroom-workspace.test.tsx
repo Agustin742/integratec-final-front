@@ -35,6 +35,7 @@ const detail = (id: string): Detail => ({
   chatMuted: true,
   collaborationLocked: true,
   gamesDisabled: false,
+  tutorBotSkin: 'none',
   myRole: 'PARENT',
   capabilities: ['message_teacher'],
   deskCount: 0,

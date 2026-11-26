@@ -77,6 +77,7 @@ const validListItem: ClassroomListItemPayload = {
   chatMuted: false,
   collaborationLocked: false,
   gamesDisabled: false,
+  tutorBotSkin: 'none',
   myRole: 'TEACHER',
   capabilities: teacherCapabilities,
   createdAt: '2026-11-17T20:00:00.000Z',

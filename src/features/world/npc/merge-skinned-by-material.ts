@@ -83,15 +83,19 @@ interface Candidate {
  * node name and index), array-material meshes, and any group that cannot be
  * merged cleanly. Source geometries are shared with the cached GLB and are
  * never mutated; the merged geometries are new and are returned so the owner
- * can dispose them. Call it before the raycast/culling flags are set.
+ * can dispose them. Call it before the raycast/culling flags are set. Meshes
+ * named in `keep` also stay apart, so they can be hidden by name later.
  */
-export function mergeSkinnedByMaterial(root: Object3D): SkinnedMesh[] {
+export function mergeSkinnedByMaterial(
+  root: Object3D,
+  keep: ReadonlySet<string> = new Set(),
+): SkinnedMesh[] {
   root.updateMatrixWorld(true);
   const groups = new Map<string, Candidate[]>();
   root.traverse((node) => {
     const mesh = node as SkinnedMesh;
     if (!mesh.isSkinnedMesh || Array.isArray(mesh.material)) return;
-    if (hasMorphTargets(mesh)) return;
+    if (hasMorphTargets(mesh) || keep.has(mesh.name)) return;
     const geometry = drawnGeometry(mesh, hasTexture(mesh.material as Material));
     const key = mergeKey(mesh, geometry);
     const members = groups.get(key);

@@ -115,6 +115,7 @@ test('student views activities inbox in school timeZone, captures responsive vie
         chatMuted: false,
         collaborationLocked: false,
         gamesDisabled: false,
+        tutorBotSkin: 'none',
         myRole: 'STUDENT',
         capabilities: studentCapabilities,
         availablePanels: ['activities'],
