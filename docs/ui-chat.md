@@ -239,6 +239,27 @@ returns no chats for them) and users without chats.
   never a second window (or a second room join) for the same chat elsewhere on
   the screen. Everywhere else it behaves as above.
 
+## Parent-teacher message refresh
+
+The family area, staff family dialog, and family dock window share
+`ParentLinkMessagesThread`. Unlike classroom chat, this thread reconciles
+persisted history through authorized REST reads, not classroom realtime events.
+
+- **Incoming replies.** While mounted and visible, the selected history page
+  refreshes every 30 seconds and on window focus. This is polling, not instant
+  delivery; the staff inbox preview refresh is separate from the open history.
+- **Pagination and drafts.** Refresh keeps the reader on the selected page and
+  preserves unsent text. If a reply starts a new page, refreshed pagination lets
+  the reader navigate to it without jumping away from older messages.
+- **Access and lifecycle.** Queries remain scoped to the user, parent link, and
+  page. Terminal adult-mode or missing-link errors hide history and the composer
+  and stop periodic reads. Unmounting releases the refresh timer. Existing
+  submission reconciliation remains responsible for locally sent messages.
+- **Verification.** Component tests simulate persisted remote replies without a
+  local send for both roles, including pagination, draft preservation, terminal
+  access errors, and unmount cleanup. MSW tests do not establish real backend or
+  two-browser integration.
+
 ## All-chats page and navbar entry
 
 `src/features/chat-page/` (page body, navbar link, copy) and

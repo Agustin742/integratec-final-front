@@ -1,5 +1,11 @@
 import { QueryClient } from '@tanstack/react-query';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import {
   afterAll,
   afterEach,
@@ -45,6 +51,7 @@ afterEach(() => {
   window.sessionStorage.clear();
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 afterAll(() => {
@@ -69,6 +76,17 @@ function makeMessage(
     createdAt: new Date(Date.UTC(2026, 10, 20, 12, index, 0)).toISOString(),
     ...overrides,
   };
+}
+
+function useRefreshTimers() {
+  // Keep Date and timeouts real for the session, MSW, and UI waits.
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+}
+
+async function advanceRefreshInterval(milliseconds = 30_000) {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(milliseconds);
+  });
 }
 
 function renderThread(
@@ -111,19 +129,218 @@ function renderThread(
     },
   });
 
-  return render(
+  const thread = (title?: string) => (
     <SessionProvider service={session}>
       <ParentLinkMessagesThread
         userId={userId}
         linkId={linkId}
         viewerRole={props.viewerRole ?? 'PARENT'}
+        title={title}
       />
-    </SessionProvider>,
-    { queryClient },
+    </SessionProvider>
   );
+  const result = render(thread(), { queryClient });
+  return {
+    ...result,
+    rerenderThread: () => result.rerender(thread('Conversación actualizada')),
+  };
 }
 
 describe('ParentLinkMessagesThread', () => {
+  test.each(['PARENT', 'STAFF'] as const)(
+    'receives remote replies for %s without sending and preserves the draft',
+    async (viewerRole) => {
+      useRefreshTimers();
+      const messages = [makeMessage(1)];
+      const reads = vi.fn();
+      const sends = vi.fn();
+      mswServer.use(
+        createParentLinkMessagesHandler({
+          linkId,
+          items: () => messages,
+          onRequest: reads,
+        }),
+        createSendParentLinkMessageHandler({ linkId, onRequest: sends }),
+      );
+      const { unmount } = renderThread({
+        viewerRole,
+        userId: viewerRole === 'PARENT' ? parentUserId : staffUserId,
+      });
+      await screen.findByText('Mensaje número 1');
+      const textarea = screen.getByLabelText(
+        familyMessages.messaging.composer.label,
+      );
+      fireEvent.change(textarea, { target: { value: 'Borrador sin enviar' } });
+      messages.push(
+        makeMessage(2, {
+          authorRole: viewerRole === 'PARENT' ? 'STAFF' : 'PARENT',
+          body: 'Respuesta remota nueva',
+        }),
+      );
+
+      await advanceRefreshInterval();
+      expect(
+        await screen.findByText('Respuesta remota nueva'),
+      ).toBeInTheDocument();
+      expect(textarea).toHaveValue('Borrador sin enviar');
+      expect(sends).not.toHaveBeenCalled();
+      unmount();
+      const readCount = reads.mock.calls.length;
+      await advanceRefreshInterval(60_000);
+      expect(reads).toHaveBeenCalledTimes(readCount);
+    },
+  );
+
+  test('refreshes pagination for a remote reply across a page boundary without moving the reader', async () => {
+    useRefreshTimers();
+    const messages = Array.from(
+      { length: PARENT_LINK_MESSAGES_PAGE_SIZE },
+      (_, index) => makeMessage(index + 1),
+    );
+    mswServer.use(
+      createParentLinkMessagesHandler({ linkId, items: () => messages }),
+    );
+    renderThread();
+    await screen.findByText('Mensaje número 1');
+    messages.push(makeMessage(31, { body: 'Respuesta en página nueva' }));
+    await advanceRefreshInterval();
+    const next = await screen.findByRole('button', { name: /Siguiente/i });
+    expect(screen.getByText('Mensaje número 1')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Respuesta en página nueva'),
+    ).not.toBeInTheDocument();
+    fireEvent.click(next);
+    expect(
+      await screen.findByText('Respuesta en página nueva'),
+    ).toBeInTheDocument();
+    messages.push(makeMessage(32, { body: 'Otra respuesta en página actual' }));
+    await advanceRefreshInterval();
+    expect(
+      await screen.findByText('Otra respuesta en página actual'),
+    ).toBeInTheDocument();
+  });
+
+  test.each([403, 404])(
+    'hides previously loaded history and stops refreshing after terminal read %s',
+    async (status) => {
+      useRefreshTimers();
+      const reads = vi.fn();
+      mswServer.use(
+        createParentLinkMessagesHandler({ linkId, items: [makeMessage(1)] }),
+      );
+      renderThread();
+      await screen.findByText('Mensaje número 1');
+      mswServer.use(
+        createParentLinkMessagesHandler({ linkId, status, onRequest: reads }),
+      );
+      await advanceRefreshInterval();
+      await screen.findByRole('heading', {
+        name:
+          status === 403
+            ? familyMessages.errors.adultModeTitle
+            : familyMessages.errors.notFoundTitle,
+      });
+      expect(screen.queryByText('Mensaje número 1')).not.toBeInTheDocument();
+      expect(
+        screen.queryByLabelText(familyMessages.messaging.composer.label),
+      ).not.toBeInTheDocument();
+      await advanceRefreshInterval(60_000);
+      expect(reads).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each([403, 404])(
+    'keeps terminal read %s stable after same-key rerender and focus',
+    async (status) => {
+      useRefreshTimers();
+      const reads = vi.fn();
+      mswServer.use(
+        createParentLinkMessagesHandler({ linkId, status, onRequest: reads }),
+      );
+      const { rerenderThread } = renderThread();
+      const heading =
+        status === 403
+          ? familyMessages.errors.adultModeTitle
+          : familyMessages.errors.notFoundTitle;
+      await screen.findByRole('heading', { name: heading });
+      expect(reads).toHaveBeenCalledTimes(1);
+      rerenderThread();
+      expect(
+        screen.getByRole('heading', { name: heading }),
+      ).toBeInTheDocument();
+      await advanceRefreshInterval(60_000);
+      fireEvent(window, new Event('visibilitychange'));
+      expect(
+        screen.getByRole('heading', { name: heading }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByLabelText(familyMessages.messaging.composer.label),
+      ).not.toBeInTheDocument();
+      expect(reads).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test('recovers remote replies when the tab returns to the foreground', async () => {
+    const messages = [makeMessage(1)];
+    mswServer.use(
+      createParentLinkMessagesHandler({ linkId, items: () => messages }),
+    );
+    renderThread();
+    await screen.findByText('Mensaje número 1');
+    const visibility = vi.spyOn(document, 'visibilityState', 'get');
+    visibility.mockReturnValue('hidden');
+    fireEvent(window, new Event('visibilitychange'));
+    messages.push(makeMessage(2, { body: 'Respuesta durante ausencia' }));
+    visibility.mockReturnValue('visible');
+    fireEvent(window, new Event('visibilitychange'));
+    expect(
+      await screen.findByText('Respuesta durante ausencia'),
+    ).toBeInTheDocument();
+  });
+
+  test.each([403, 404])(
+    'stops refreshing after terminal write %s',
+    async (status) => {
+      useRefreshTimers();
+      const reads = vi.fn();
+      mswServer.use(
+        createParentLinkMessagesHandler({
+          linkId,
+          items: [makeMessage(1)],
+          onRequest: reads,
+        }),
+        createSendParentLinkMessageHandler({ linkId, status }),
+      );
+      renderThread();
+      await screen.findByText('Mensaje número 1');
+      fireEvent.change(
+        screen.getByLabelText(familyMessages.messaging.composer.label),
+        {
+          target: { value: 'Consulta pendiente' },
+        },
+      );
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: familyMessages.messaging.composer.submitAction,
+        }),
+      );
+      await screen.findByRole('heading', {
+        name:
+          status === 403
+            ? familyMessages.errors.adultModeTitle
+            : familyMessages.errors.notFoundTitle,
+      });
+      expect(screen.queryByText('Mensaje número 1')).not.toBeInTheDocument();
+      expect(
+        screen.queryByLabelText(familyMessages.messaging.composer.label),
+      ).not.toBeInTheDocument();
+      const readCount = reads.mock.calls.length;
+      await advanceRefreshInterval(60_000);
+      fireEvent(window, new Event('visibilitychange'));
+      expect(reads).toHaveBeenCalledTimes(readCount);
+    },
+  );
+
   test('renders loading state, empty state, and passes accessibility checks', async () => {
     mswServer.use(
       createParentLinkMessagesHandler({

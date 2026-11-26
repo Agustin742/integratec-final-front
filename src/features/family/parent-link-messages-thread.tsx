@@ -44,6 +44,15 @@ import {
 import { familyMessages } from './messages';
 
 export const PARENT_LINK_MESSAGES_PAGE_SIZE = 30;
+// Match the staff inbox cadence; refresh only the reader's selected page.
+const PARENT_LINK_MESSAGES_REFRESH_INTERVAL_MS = 30_000;
+
+function isTerminalMessagesAccessError(error: unknown): boolean {
+  return (
+    isFamilyServiceError(error) &&
+    (error.kind === 'adult-mode' || error.kind === 'not-found')
+  );
+}
 
 export interface ParentLinkMessagesThreadProps {
   readonly userId: string;
@@ -158,6 +167,16 @@ export function ParentLinkMessagesThread({
         { page, pageSize: PARENT_LINK_MESSAGES_PAGE_SIZE },
         { signal },
       ),
+    enabled: (query) =>
+      terminalWriteError === null &&
+      !isTerminalMessagesAccessError(query.state.error),
+    refetchInterval: (query) =>
+      terminalWriteError !== null ||
+      isTerminalMessagesAccessError(query.state.error)
+        ? false
+        : PARENT_LINK_MESSAGES_REFRESH_INTERVAL_MS,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
 
   const queryDomainError = isFamilyServiceError(messagesQuery.error)
@@ -178,8 +197,12 @@ export function ParentLinkMessagesThread({
       return;
     }
     terminalCleanupRef.current = { userId, linkId };
+    const matchesMessages = createParentLinkMessagesPredicate(userId, linkId);
     queryClient.removeQueries({
-      predicate: createParentLinkMessagesPredicate(userId, linkId),
+      // Disabled observers are inactive too: retain their terminal error until
+      // unmount so an ordinary rerender cannot rebuild and restart the query.
+      predicate: (query) =>
+        matchesMessages(query) && query.getObserversCount() === 0,
       type: 'inactive',
     });
     const errorToken = terminalWriteError ?? messagesQuery.error;
