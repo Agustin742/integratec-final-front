@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { buttonStyles } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { classroomMessages } from './messages';
@@ -19,6 +20,8 @@ export interface ClassroomWorldHudProps {
   readonly onFocusInteractable: (id: string | undefined) => void;
   /** Opens a classroom panel from a floating button (focus returns to it). */
   readonly onOpenPanel: (key: string, invoker: HTMLElement) => void;
+  /** Extra rail item (the voice call), rendered as a sibling of the right-hand features. */
+  readonly callAction?: ReactNode;
 }
 
 type FloatingPanelKey =
@@ -86,7 +89,7 @@ const RIGHT_PANELS: readonly FloatingPanelItem[] = [
 ];
 
 // Each panel button is its own floating card, so it reads as a button at rest.
-const PANEL_BUTTON_CLASS =
+export const PANEL_BUTTON_CLASS =
   'motion-press pointer-events-auto flex min-h-11 min-w-11 items-center gap-2 rounded-2xl border border-edge bg-card/85 px-3 font-display text-sm font-semibold text-card-foreground shadow-panel backdrop-blur-md hover:bg-card focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring max-sm:justify-center max-sm:px-0 sm:min-w-36';
 
 /**
@@ -105,11 +108,13 @@ export function ClassroomWorldHud({
   canOpenPanel,
   onFocusInteractable,
   onOpenPanel,
+  callAction,
 }: ClassroomWorldHudProps) {
   const renderGroup = (
     items: readonly FloatingPanelItem[],
     label: string,
     side: 'left' | 'right',
+    extra?: ReactNode,
   ) => {
     const visible = items
       .map((item) => ({
@@ -122,7 +127,7 @@ export function ClassroomWorldHud({
             : item.targetId,
       }))
       .filter((item) => canOpenPanel(item.key));
-    if (visible.length === 0) return null;
+    if (visible.length === 0 && !extra) return null;
     return (
       <nav
         aria-label={label}
@@ -161,6 +166,7 @@ export function ClassroomWorldHud({
               </li>
             );
           })}
+          {extra ? <li className="empty:hidden">{extra}</li> : null}
         </ul>
       </nav>
     );
@@ -177,6 +183,7 @@ export function ClassroomWorldHud({
         RIGHT_PANELS,
         classroomMessages.viewMode.immersive.communityPanelsLabel,
         'right',
+        callAction,
       )}
 
       {/* Bottom-center, clear of the presence pill (left) and the chat dock

@@ -19,6 +19,12 @@ import { NotFoundPage } from '@/app/pages/not-found-page';
 import { useDocumentTitle } from '@/app/router/document-title';
 import { ErrorState, LoadingState } from '@/components/feedback/states';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  ClassCallButton,
+  FocusModeNotice,
+  IncomingCallListener,
+  useWorldLocked,
+} from '@/features/calls';
 import { WalletIndicator } from '@/features/points/wallet-indicator';
 import { Button, buttonStyles } from '@/components/ui/button';
 import {
@@ -29,6 +35,7 @@ import { useSessionCleanup, useSessionSnapshot } from '@/session/provider';
 import { BackToListLink } from './back-to-list-link';
 import { Classroom2DLayout } from './classroom-2d-layout';
 import { Classroom3DStage, clearLoadedWorldAssets } from './classroom-3d-stage';
+import { PANEL_BUTTON_CLASS } from './classroom-3d-hud';
 import { Classroom3DTopBar } from './classroom-3d-top-bar';
 import { useClassroomViewMode } from './classroom-mode-store';
 import { ClassroomPresenceBar } from './classroom-presence-bar';
@@ -172,6 +179,12 @@ function WorkspaceContext({
   const isParent =
     context.status === 'ready' && context.classroom.myRole === 'PARENT';
   const modeToggleEnabled = context.status === 'ready' && !isParent;
+  // Teacher focus mode hides the 3D world from students (the server also
+  // rejects their movement); the canvas is not mounted while it is on.
+  const worldLocked = useWorldLocked(
+    modeToggleEnabled && !isRevoked ? classroomId : null,
+    context.status === 'ready' ? context.classroom.myRole : '',
+  );
   const handleLostAccess = useCallback(() => {
     if (scopeKey !== '') {
       setRevokedScopeKey(scopeKey);
@@ -298,7 +311,26 @@ function WorkspaceContext({
     Array.isArray(keys) && keys.every((key) => typeof key === 'string')
       ? { confirmed: true as const, keys }
       : { confirmed: false as const };
-  const immersive = !isParent && mode === '3d';
+  const immersive = !isParent && mode === '3d' && !worldLocked;
+  // The voice call is one more item of the classroom feature rail (3D) and
+  // features list (2D), styled like its siblings; never a navbar action.
+  const call3d = isParent ? null : (
+    <ClassCallButton
+      classroomId={classroomId}
+      classroomName={classroom.name}
+      canStart={classroom.capabilities.includes('moderate_chat')}
+      appearance="rail"
+      className={PANEL_BUTTON_CLASS}
+    />
+  );
+  const call2d = isParent ? null : (
+    <ClassCallButton
+      classroomId={classroomId}
+      classroomName={classroom.name}
+      canStart={classroom.capabilities.includes('moderate_chat')}
+      appearance="tile"
+    />
+  );
   const joinAlert = joinOutcome && (
     <Alert
       variant={joinOutcome.alreadyMember ? 'info' : 'success'}
@@ -353,11 +385,13 @@ function WorkspaceContext({
         fallbackFocus={() => heading.current ?? safeFocus.current}
         immersive={immersive}
       >
+        {!isParent && <IncomingCallListener classroomId={classroomId} />}
         {immersive ? (
           <Classroom3DStage
             headingRef={activeViewHeadingRef}
             scopeKey={classroomId}
             classroomId={classroomId}
+            callAction={call3d}
             petName={classroom.pet?.name ?? null}
             selfPose={presence.selfPose}
             selfEquipped={presence.selfEquipped}
@@ -457,7 +491,7 @@ function WorkspaceContext({
                     </p>
                   </div>
                 </div>
-                {!isParent && (
+                {!isParent && !worldLocked && (
                   <div className="flex flex-wrap items-center gap-2.5">
                     {/* Visual cue only: aria-keyshortcuts on the button already announces Alt+M. */}
                     <span
@@ -492,6 +526,7 @@ function WorkspaceContext({
               )}
             </header>
             {joinAlert}
+            {worldLocked && <FocusModeNotice />}
             {isParent ? (
               <div className="min-w-0 space-y-4 rounded-2xl border border-edge bg-card p-5 text-card-foreground shadow-panel">
                 <div className="space-y-1.5">
@@ -514,6 +549,7 @@ function WorkspaceContext({
             ) : (
               <Classroom2DLayout
                 classroomId={classroomId}
+                callAction={call2d}
                 panels={panels}
                 headingRef={activeViewHeadingRef}
               />

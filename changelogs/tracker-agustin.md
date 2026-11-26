@@ -90,6 +90,15 @@
 - **Verification:** Strict TDD on the touched test files, lint and typecheck. Full suite, build, e2e and visual review not run.
 - **Next step:** Visual check of the face, backdrop and frame on `/login` and the profile preview.
 
+## 2026-11-25 — Avatar voice calls (#141)
+
+- **Status:** completed (pending CI and merge of the PR)
+- **Area / files:** `src/features/calls/` (engine, stage, controls, teacher panel, in-call chat), `src/features/classrooms/` (side-rail call entry, member "Llamar", focus mode), `src/features/chat-dock/`, `src/features/chat-page/`, `src/app/router/app-shell.tsx`, `src/realtime/`, `src/config/security-headers.ts`, `customHttp.yml`, `docs/voice-calls.md`, `docs/security.md`, `docs/threat-model.md`
+- **Change:** Voice-only calls where each participant appears as their customized 3D avatar in an adaptive grid of rounded tiles: WebRTC peer-to-peer audio (STUN only), blink, breathing, speaking ring and head nod, reactions (body clip plus face morph). Classroom group calls with teacher moderation (focus mode that hides the 3D world, mute all, per-student mute, allow self-unmute) and 1:1 calls from the member directory. `microphone=(self)` in Permissions-Policy. Merged `develop` (modular avatar catalog, new animations) and synced contracts.
+- **Reason:** Free voice calls on the current deploy (Amplify plus one EC2 running Colyseus); back counterpart integratec-final-back#149.
+- **Verification:** Per-task strict TDD, lint and typecheck; once before the PR `--changed origin/develop`, build and `security:check`; native review on each task; manual test by Agustin with two sessions (audio, framing, reactions, teacher panel). Screenshots skipped (docs only).
+- **Next step:** CI green and merge.
+
 ## 2026-11-25 — Avatar customization rework (#149)
 
 - **Status:** completed (design not reviewed)

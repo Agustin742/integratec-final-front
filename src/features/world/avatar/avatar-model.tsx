@@ -14,6 +14,7 @@ import {
   LoopOnce,
   LoopRepeat,
   type AnimationAction,
+  type Object3D,
 } from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Avatar } from '@/features/profile/avatar-options';
@@ -29,6 +30,13 @@ import {
 
 /** Blend time between two body clips; short so starting to move feels instant. */
 export const AVATAR_CROSSFADE_SECONDS = 0.2;
+
+/** Handed to `onReady` once the avatar is composed. */
+export interface AvatarReadyInfo {
+  readonly root: Object3D;
+  /** Every clip the avatar can play, including `fallbackClipsUrl` ones. */
+  readonly clipNames: readonly string[];
+}
 
 /** One request to play a clip once; a new `seq` (above 0) plays it again. */
 export interface AvatarEmotePlay {
@@ -60,6 +68,13 @@ export interface AvatarModelProps {
   readonly onBodyError?: (error: unknown) => void;
   /** Parts left out because they failed to load or do not fit the body. */
   readonly onPartsSkipped?: (parts: readonly AvatarPartKind[]) => void;
+  /**
+   * Another body GLB whose clips fill the names the avatar's own body lacks
+   * (bodies share the canonical skeleton). Ignored if it fails to load.
+   */
+  readonly fallbackClipsUrl?: string;
+  /** Lets a host drive the composed avatar procedurally (bones, morph targets). */
+  readonly onReady?: (info: AvatarReadyInfo) => void;
 }
 
 class BodyErrorBoundary extends Component<
@@ -134,6 +149,8 @@ function LoadedAvatar({
   emoteBlocked = false,
   face = 'neutral',
   onPartsSkipped,
+  fallbackClipsUrl,
+  onReady,
 }: Omit<AvatarModelProps, 'fallback' | 'errorFallback' | 'onBodyError'>) {
   // The plan is rebuilt per render, but only its content (not the identity of
   // `equipped`, which realtime recreates on every state patch) drives the
@@ -141,6 +158,10 @@ function LoadedAvatar({
   const plan = planAvatarParts(avatar, equipped);
   const body = read(plan.bodyUrl, scopeKey);
   const reads = plan.parts.map((part) => read(part.url, scopeKey));
+  const extraClips =
+    fallbackClipsUrl && fallbackClipsUrl !== plan.bodyUrl
+      ? read(fallbackClipsUrl, scopeKey)
+      : null;
 
   // A part that failed stays out of the avatar; evict it on unmount so a
   // later mount retries the download.
@@ -158,14 +179,15 @@ function LoadedAvatar({
   }, [failedKey, scopeKey]);
 
   if (body.status === 'failed') throw body.error;
-  const pending = [body, ...reads].flatMap((item) =>
-    item.status === 'pending' ? [item.promise] : [],
+  const pending = [body, ...reads, extraClips].flatMap((item) =>
+    item?.status === 'pending' ? [item.promise] : [],
   );
   if (pending.length > 0) {
     throw Promise.all(pending.map((promise) => promise.catch(() => undefined)));
   }
 
   const bodyGltf = (body as Extract<Read, { status: 'ready' }>).gltf;
+  const extraGltf = extraClips?.status === 'ready' ? extraClips.gltf : null;
   const loaded = plan.parts.flatMap((part, index) => {
     const item = reads[index];
     return item?.status === 'ready' ? [{ part, gltf: item.gltf }] : [];
@@ -249,20 +271,29 @@ function LoadedAvatar({
       advancingRef.current = false;
     };
   }, [composed]);
-  const clipNames = useMemo(
-    () => bodyGltf.animations.map((clip) => clip.name),
-    [bodyGltf],
-  );
+  const clips = useMemo(() => {
+    const own = bodyGltf.animations;
+    if (!extraGltf) return own;
+    const names = new Set(own.map((clip) => clip.name));
+    return [...own, ...extraGltf.animations.filter((c) => !names.has(c.name))];
+  }, [bodyGltf, extraGltf]);
+  const clipNames = useMemo(() => clips.map((clip) => clip.name), [clips]);
+  const onReadyRef = useRef(onReady);
+  useEffect(() => {
+    onReadyRef.current = onReady;
+  }, [onReady]);
+  useEffect(() => {
+    onReadyRef.current?.({ root: composed.root, clipNames });
+  }, [composed, clipNames]);
   useEffect(() => {
     const mixer = mixerRef.current;
     if (!mixer) return;
     const emoteClip = emoteName
-      ? AnimationClip.findByName(bodyGltf.animations, emoteName)
+      ? AnimationClip.findByName(clips, emoteName)
       : null;
     const name = resolveClip(animation, clipNames);
     const clip =
-      emoteClip ??
-      (name ? AnimationClip.findByName(bodyGltf.animations, name) : null);
+      emoteClip ?? (name ? AnimationClip.findByName(clips, name) : null);
     const previous = actionRef.current;
     const seq = emoteClip ? emoteSeq : 0;
     const restarted = seq !== playingSeqRef.current;
@@ -327,7 +358,7 @@ function LoadedAvatar({
     emoteName,
     emoteSeq,
     reducedMotion,
-    bodyGltf,
+    clips,
     clipNames,
     composed,
     invalidate,

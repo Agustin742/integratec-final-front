@@ -1,8 +1,8 @@
 import { MapSchema } from '@colyseus/schema';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { Avatar } from './avatar.generated';
 import { AvatarAppearance } from './avatar-appearance.generated';
+import { Avatar } from './avatar.generated';
 import { EquippedItemView } from './equipped-item-view.generated';
 import { Npc } from './npc.generated';
 import {
@@ -583,6 +583,39 @@ describe('createClassroomRealtimeClient (#23)', () => {
     client.dispose();
   });
 
+  it('sends a schema-validated message only while connected and exposes the call flags (#141)', async () => {
+    const { auth } = createFakeAuth('valid-token');
+    const sdk = createFakeSdk();
+    const room = new FakeRoom({ classroomId: CLASSROOM_A });
+    sdk.setJoinHandler(async () => room);
+    const client = createClassroomRealtimeClient({
+      auth,
+      realtimeUrl: 'wss://realtime.example.invalid',
+      createSdkClient: sdk.createSdkClient,
+    });
+    const schema = z.object({ callerUserId: z.string() });
+
+    expect(client.send('call:decline', schema, { callerUserId: 'a' })).toBe(
+      false,
+    );
+    await client.connect(CLASSROOM_A);
+    expect(client.send('call:decline', schema, { callerUserId: 'a' })).toBe(
+      true,
+    );
+    expect(client.send('call:decline', schema, { nope: 1 })).toBe(false);
+    expect(room.sentMessages).toEqual([
+      { type: 'call:decline', payload: { callerUserId: 'a' } },
+    ]);
+
+    Object.assign(room.state, { classCallActive: true, focusMode: true });
+    room.emitStateChange();
+    expect(client.getSnapshot().controls).toMatchObject({
+      classCallActive: true,
+      focusMode: true,
+    });
+    client.dispose();
+  });
+
   it('maps synced NPCs into the snapshot and follows state changes (#138)', async () => {
     const { auth } = createFakeAuth('valid-token');
     const sdk = createFakeSdk();
@@ -719,7 +752,6 @@ describe('createClassroomRealtimeClient (#23)', () => {
     ]);
     expect(client.interactNpc('dragon')).toBe(false);
     expect(room.sentMessages).toHaveLength(1);
-
     client.dispose();
   });
 

@@ -49,6 +49,8 @@ const CONTROL_KEYS = [
   'chatMuted',
   'collaborationLocked',
   'gamesDisabled',
+  'classCallActive',
+  'focusMode',
   'frozen',
 ] as const;
 

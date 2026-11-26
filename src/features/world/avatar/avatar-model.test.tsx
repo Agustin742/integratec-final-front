@@ -604,6 +604,46 @@ describe('AvatarModel', () => {
     });
   });
 
+  it('reports the composed root and merges clips from the fallback body', async () => {
+    const MALE_BODY = '/models/avatars/male/body.glb';
+    setGlbLoaderForTests({
+      loadAsync: vi.fn(async (url: string) =>
+        makeGltf(
+          url === BODY
+            ? ['Idle', 'Wave']
+            : url === MALE_BODY
+              ? ['Idle', 'Happy']
+              : [],
+        ),
+      ),
+    });
+    const onReady = vi.fn();
+    await mount(
+      <AvatarModel
+        avatar={avatar}
+        fallbackClipsUrl={MALE_BODY}
+        onReady={onReady}
+      />,
+    );
+    const info = onReady.mock.calls.at(-1)?.[0];
+    expect(info.root).toBe(lastComposed().root);
+    expect([...info.clipNames].sort()).toEqual(['Happy', 'Idle', 'Wave']);
+  });
+
+  it('keeps rendering when the fallback clips fail to load', async () => {
+    const MALE_BODY = '/models/avatars/male/body.glb';
+    useLoader([MALE_BODY], ['Idle']);
+    const onReady = vi.fn();
+    await mount(
+      <AvatarModel
+        avatar={avatar}
+        fallbackClipsUrl={MALE_BODY}
+        onReady={onReady}
+      />,
+    );
+    expect(onReady.mock.calls.at(-1)?.[0].clipNames).toEqual(['Idle']);
+  });
+
   describe('emotes (#154)', () => {
     beforeEach(() => {
       useLoader([], ['Idle', 'Wave']);

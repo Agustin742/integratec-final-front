@@ -103,7 +103,7 @@ describe('buildSecurityHeaders, renderCustomHttpYaml, and parseCustomHttpYaml', 
     expect(headers['X-Content-Type-Options']).toBe('nosniff');
     expect(headers['Referrer-Policy']).toBe('strict-origin-when-cross-origin');
     expect(headers['Permissions-Policy']).toBe(
-      'accelerometer=(), autoplay=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), usb=()',
+      'accelerometer=(), autoplay=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(self), midi=(), payment=(), usb=()',
     );
     expect(headers['X-Frame-Options']).toBe('DENY');
     expect(headers['Strict-Transport-Security']).toBe(

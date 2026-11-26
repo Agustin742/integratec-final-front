@@ -39,6 +39,19 @@ const createShowcaseRoute = (): RouteObject | null =>
       }
     : null;
 
+// Keep fixture data and its heavy scene imports unreachable in production.
+const createCallShowcaseRoute = (): RouteObject | null =>
+  __UI_SHOWCASE__
+    ? {
+        path: `${SHOWCASE_PATH.slice(1)}/calls`,
+        HydrateFallback: AppHydrateFallback,
+        lazy: {
+          Component: async () =>
+            (await import('../call-showcase')).CallShowcase,
+        },
+      }
+    : null;
+
 export type AppRoutesOptions = {
   showcase?: boolean;
   /** Extra routes mounted in the protected branch (tests and future areas). */
@@ -54,6 +67,7 @@ export function createAppRoutes({
   protectedRoutes = [],
 }: AppRoutesOptions = {}): RouteObject[] {
   const showcaseRoute = showcase ? createShowcaseRoute() : null;
+  const callShowcaseRoute = showcase ? createCallShowcaseRoute() : null;
   return [
     {
       // Root route: no chrome of its own, so it still renders if a layout throws.
@@ -118,6 +132,8 @@ export function createAppRoutes({
             },
           ],
         },
+        // A full-screen visual fixture, not an authenticated call or app shell.
+        ...(callShowcaseRoute ? [callShowcaseRoute] : []),
         {
           // Application layout route without a path: the shell wraps every child.
           Component: AppShell,

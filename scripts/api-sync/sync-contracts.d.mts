@@ -6,6 +6,9 @@ export const BACKEND_ARTIFACT_PATHS: Readonly<{
   contracts: string;
   realtimeState: string;
   realtimeAvatar: string;
+  realtimeCallState: string;
+  realtimeCallParticipant: string;
+  realtimeCallContracts: string;
   realtimeNpc: string;
   realtimeAppearance: string;
   realtimeEquippedItem: string;
@@ -16,6 +19,9 @@ export const FRONTEND_OUTPUT_PATHS: Readonly<{
   contracts: string;
   realtimeState: string;
   realtimeAvatar: string;
+  realtimeCallState: string;
+  realtimeCallParticipant: string;
+  realtimeCallContracts: string;
   realtimeNpc: string;
   realtimeAppearance: string;
   realtimeEquippedItem: string;
@@ -89,6 +95,8 @@ export function generateOpenApiTypes(
   openApiDocument: Record<string, unknown>,
   artifactPath?: string,
 ): Promise<string>;
+
+export function extractCallContracts(rawSource: string): string | null;
 
 export function formatPulledTypeArtifact(
   rawSource: string,

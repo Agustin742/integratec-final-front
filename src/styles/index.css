@@ -146,3 +146,23 @@
     filter: none !important;
   }
 }
+
+/* Call stage: glowing border for the participant who is speaking. Reduced
+   motion collapses it to the final (static) ring through the rule above. */
+@keyframes call-speaking-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px var(--accent),
+      0 0 10px 2px color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px var(--accent),
+      0 0 22px 6px color-mix(in srgb, var(--accent) 70%, transparent);
+  }
+}
+
+.call-tile-speaking {
+  animation: call-speaking-glow 1.4s ease-in-out infinite;
+}

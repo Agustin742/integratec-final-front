@@ -13,7 +13,7 @@ export type SecurityHeaderName = (typeof SECURITY_HEADER_NAMES)[number];
 export type SecurityHeaders = Readonly<Record<SecurityHeaderName, string>>;
 
 export const PERMISSIONS_POLICY_VALUE =
-  'accelerometer=(), autoplay=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), usb=()';
+  'accelerometer=(), autoplay=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(self), midi=(), payment=(), usb=()';
 
 export const STRICT_TRANSPORT_SECURITY_VALUE =
   'max-age=63072000; includeSubDomains';

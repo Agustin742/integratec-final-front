@@ -255,6 +255,31 @@ test('serves the component showcase at /dev/ui when it is enabled', async () => 
   noShowcaseLink();
 });
 
+function routeAtPath(
+  routes: RouteObject[],
+  path: string,
+): RouteObject | undefined {
+  for (const route of routes) {
+    if (route.path === path) return route;
+    const child = routeAtPath(route.children ?? [], path);
+    if (child) return child;
+  }
+  return undefined;
+}
+
+test('registers the call fixture as a separate lazy showcase route only when enabled', () => {
+  const enabled = routeAtPath(
+    createAppRoutes({ showcase: true }),
+    'dev/ui/calls',
+  );
+  expect(enabled).toBeDefined();
+  expect(enabled?.lazy).toEqual({ Component: expect.any(Function) });
+  expect(enabled?.Component).toBeUndefined();
+  expect(
+    routeAtPath(createAppRoutes({ showcase: false }), 'dev/ui/calls'),
+  ).toBeUndefined();
+});
+
 test('does not register the showcase route when it is disabled', async () => {
   await renderAt('/dev/ui', { showcase: false });
 
