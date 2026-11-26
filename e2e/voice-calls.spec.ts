@@ -163,14 +163,53 @@ test('visual fixture: production call stage, teacher panel and keyboard controls
       exact: true,
     }),
   ).toBeVisible();
-  await expect(
-    page.getByRole('button', { name: copy.emotes, exact: true }),
-  ).toHaveAccessibleName(copy.emotes);
+  const emotesButton = page.getByRole('button', {
+    name: copy.emotes,
+    exact: true,
+  });
+  await expect(emotesButton).toHaveAccessibleName(copy.emotes);
   await expect(
     page.getByRole('button', { name: copy.leave, exact: true }),
   ).toBeInViewport({ ratio: 1 });
   await expect(
     page.getByRole('button', { name: copy.endClass, exact: true }),
   ).toBeInViewport({ ratio: 1 });
+
+  // Open the reaction menu after baseline captures to verify all 13 options,
+  // SVG-only icons, bounded menu scrolling, and local avatar animation wiring.
+  await emotesButton.click();
+  const menu = page.getByRole('menu');
+  await expect(menu).toBeVisible();
+  // Wait for Radix Popper's post-measure placement (tolerating subpixel ratio rounding).
+  await expect(menu).toBeInViewport({ ratio: 0.99 });
+  const menuBox = await menu.boundingBox();
+  expect(menuBox).not.toBeNull();
+  expect(menuBox!.x).toBeGreaterThanOrEqual(0);
+  expect(menuBox!.y).toBeGreaterThanOrEqual(0);
+  expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(width);
+  expect(menuBox!.y + menuBox!.height).toBeLessThanOrEqual(800);
+  const items = page.getByRole('menuitem');
+  await expect(items).toHaveCount(13);
+  const itemAudit = await items.evaluateAll((elements) =>
+    elements.map((el) => ({
+      text: el.textContent ?? '',
+      hasSvg: el.querySelector('svg') !== null,
+    })),
+  );
+  for (const item of itemAudit) {
+    expect(item.hasSvg).toBe(true);
+    expect(item.text).not.toMatch(/\p{Extended_Pictographic}/u);
+  }
+  expect(
+    await page.evaluate(() => ({
+      horizontal: document.documentElement.scrollWidth <= window.innerWidth,
+      vertical: document.documentElement.scrollHeight <= window.innerHeight,
+    })),
+  ).toEqual({ horizontal: true, vertical: true });
+  await page.getByRole('menuitem', { name: copy.emoteLabels.dance }).click();
+  await expectFits(page);
+  await expect(page.getByLabel('Última reacción simulada')).toHaveText(
+    'dance:1',
+  );
   expect(failures).toEqual([]);
 });

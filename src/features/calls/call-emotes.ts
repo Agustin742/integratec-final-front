@@ -1,5 +1,6 @@
-export type EmoteName =
-  'wave' | 'happy' | 'sad' | 'angry' | 'think' | 'celebrate';
+import type { CallEmote } from '@/realtime/call-contracts.generated';
+
+export type EmoteName = CallEmote;
 export type FaceMorph = 'Happy' | 'Sad' | 'Angry';
 
 export interface EmotePlan {
@@ -22,6 +23,13 @@ const CLIPS: Readonly<Record<EmoteName, readonly string[]>> = {
   angry: [],
   think: ['Think', 'ThinkStart'],
   celebrate: ['Cheer', 'Celebrate'],
+  'raise-hand': ['RaiseHand'],
+  clap: ['Clap'],
+  nod: ['Nod'],
+  'shake-head': ['ShakeHead'],
+  dance: ['Dance'],
+  explain: ['TeacherExplain'],
+  point: ['TeacherPoint'],
 };
 
 const MORPHS: Readonly<Record<EmoteName, FaceMorph | null>> = {
@@ -31,6 +39,13 @@ const MORPHS: Readonly<Record<EmoteName, FaceMorph | null>> = {
   angry: 'Angry',
   think: null,
   celebrate: 'Happy',
+  'raise-hand': null,
+  clap: 'Happy',
+  nod: null,
+  'shake-head': null,
+  dance: 'Happy',
+  explain: null,
+  point: null,
 };
 
 /** Clip lengths are not exposed by the avatar, so each emote holds a fixed time. */
@@ -41,6 +56,13 @@ export const EMOTE_DURATION_SECONDS: Readonly<Record<EmoteName, number>> = {
   angry: 2.6,
   think: 3,
   celebrate: 2.8,
+  'raise-hand': 2.5,
+  clap: 3,
+  nod: 1.5,
+  'shake-head': 1.7,
+  dance: 4,
+  explain: 3.5,
+  point: 2,
 };
 
 function isEmote(value: string): value is EmoteName {
@@ -53,9 +75,8 @@ export function emoteMorph(emote: string): FaceMorph | null {
 
 /**
  * Chooses how to show an emote. `available` is every clip the avatar can play
- * (its own plus the shared male clips), so a female body still gets Happy, Sad
- * and Angry; with no clip at all, or under reduced motion, only the face
- * morph runs.
+ * (its own plus the fallback body clips when configured); with no clip at all,
+ * or under reduced motion, only the face morph runs.
  */
 export function planEmote(
   emote: string,

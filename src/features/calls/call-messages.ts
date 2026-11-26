@@ -42,6 +42,13 @@ export const callMessages = {
     angry: 'Enojo',
     think: 'Pensar',
     celebrate: 'Celebrar',
+    'raise-hand': 'Levantar la mano',
+    clap: 'Aplaudir',
+    nod: 'Asentir',
+    'shake-head': 'Negar',
+    dance: 'Bailar',
+    explain: 'Explicar',
+    point: 'Señalar',
   } satisfies Record<CallEmote, string>,
   panel: {
     title: 'Controles de la clase',

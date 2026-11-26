@@ -106,6 +106,35 @@ const EMOTE_PATHS: Record<CallEmote, ReactNode> = {
   celebrate: (
     <path d="M12 3v3M5 6l2 2M19 6l-2 2M3 13h3M18 13h3M8 21l2-9 5 5-7 4Zm0 0 8-1" />
   ),
+  'raise-hand': (
+    <path d="M8 12V6a1.5 1.5 0 0 1 3 0v4m0-5.5a1.5 1.5 0 0 1 3 0V10m0-3.5a1.5 1.5 0 0 1 3 0V14a6 6 0 0 1-6 6h-1a5 5 0 0 1-5-5v-3a1.5 1.5 0 0 1 3 0" />
+  ),
+  clap: (
+    <path d="M7 14 4 11a1.5 1.5 0 0 1 2.1-2.1L9 11.8l1.2-4.3a1.5 1.5 0 0 1 2.9.8L12 12.5l3.8-2.6a1.5 1.5 0 0 1 1.7 2.5L13 17a5 5 0 0 1-6-3ZM15 4v2M19 6l-1.5 1.5" />
+  ),
+  nod: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m8.5 12.5 2.5 2.5 4.5-5" />
+    </>
+  ),
+  'shake-head': (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m9 9 6 6M15 9l-6 6" />
+    </>
+  ),
+  dance: (
+    <>
+      <path d="M9 18V6l10-2v12" />
+      <circle cx="6.5" cy="18" r="2.5" />
+      <circle cx="16.5" cy="16" r="2.5" />
+    </>
+  ),
+  explain: <path d="M4 5h16v10H4zM12 15v5M8 20h8M8 9h8M8 12h5" />,
+  point: (
+    <path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11h5.5a1.5 1.5 0 0 1 0 3H12l1.5 2.5a1.5 1.5 0 0 1-2.6 1.5L7 14.5V11h2Z" />
+  ),
 };
 
 export function EmoteIcon({ emote }: { readonly emote: CallEmote }) {

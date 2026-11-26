@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { CallView } from '@/features/calls/call-view';
 import type { CallParticipantState } from '@/features/calls/call-session';
-import type { CallModerate } from '@/realtime/call-contracts.generated';
+import type {
+  CallEmote,
+  CallModerate,
+} from '@/realtime/call-contracts.generated';
 import { useDocumentTitle } from './router/document-title';
 
 const copy = {
@@ -9,6 +12,7 @@ const copy = {
   boundary:
     'Muestra visual con participantes ficticios. Sin conexión ni audio real.',
   request: 'Última solicitud simulada',
+  emote: 'Última reacción simulada',
 } as const;
 
 const participants: readonly CallParticipantState[] = [
@@ -65,9 +69,19 @@ export function CallShowcase() {
   useDocumentTitle(copy.title);
   const [muted, setMuted] = useState(false);
   const [request, setRequest] = useState<CallModerate | null>(null);
+  const [emoteState, setEmoteState] = useState<{
+    readonly emote: CallEmote | '';
+    readonly emoteSeq: number;
+  }>({ emote: '', emoteSeq: 0 });
   const snapshot = participants.map((participant) =>
     participant.isSelf
-      ? { ...participant, muted, selfMuted: muted }
+      ? {
+          ...participant,
+          muted,
+          selfMuted: muted,
+          emote: emoteState.emote,
+          emoteSeq: emoteState.emoteSeq,
+        }
       : participant,
   );
 
@@ -76,6 +90,9 @@ export function CallShowcase() {
       <p className="sr-only">{copy.boundary}</p>
       <output className="sr-only" aria-label={copy.request}>
         {request ? JSON.stringify(request) : ''}
+      </output>
+      <output className="sr-only" aria-label={copy.emote}>
+        {emoteState.emote ? `${emoteState.emote}:${emoteState.emoteSeq}` : ''}
       </output>
       <CallView
         title={copy.title}
@@ -95,7 +112,12 @@ export function CallShowcase() {
         getLevel={getLevel}
         onToggleMute={() => setMuted((value) => !value)}
         onModerate={setRequest}
-        onSendEmote={noAction}
+        onSendEmote={(emote) =>
+          setEmoteState((current) => ({
+            emote,
+            emoteSeq: current.emoteSeq + 1,
+          }))
+        }
         onLeave={noAction}
         onEndCall={noAction}
         onResumeAudio={noAction}

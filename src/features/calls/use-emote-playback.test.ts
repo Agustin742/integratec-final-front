@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEmotePlayback } from './use-emote-playback';
 
-const CLIPS = ['Idle', 'Wave', 'Happy', 'Think', 'Cheer'];
+const CLIPS = ['Idle', 'Wave', 'Happy', 'Think', 'Cheer', 'Dance', 'RaiseHand'];
 
 type Props = { emote: string; seq: number; reduced?: boolean };
 
@@ -58,17 +58,27 @@ describe('useEmotePlayback', () => {
     expect(result.current).toEqual({ animation: 'Idle', morph: 'Happy' });
   });
 
+  it('plays newly added dance clip with Happy morph and returns to idle', () => {
+    const { result, rerender } = setup({ emote: '', seq: 0 });
+    rerender({ emote: 'dance', seq: 1 });
+    expect(result.current).toEqual({ animation: 'Dance', morph: 'Happy' });
+    act(() => {
+      vi.advanceTimersByTime(4000);
+    });
+    expect(result.current).toEqual({ animation: 'Idle', morph: null });
+  });
+
   it('returns to idle when an unknown emote follows a running one', () => {
     const { result, rerender } = setup({ emote: '', seq: 0 });
     rerender({ emote: 'wave', seq: 1 });
     expect(result.current.animation).toBe('Wave');
-    rerender({ emote: 'dance', seq: 2 });
+    rerender({ emote: 'backflip', seq: 2 });
     expect(result.current).toEqual({ animation: 'Idle', morph: null });
   });
 
   it('ignores unknown emotes', () => {
     const { result, rerender } = setup({ emote: '', seq: 0 });
-    rerender({ emote: 'dance', seq: 1 });
+    rerender({ emote: 'backflip', seq: 1 });
     expect(result.current).toEqual({ animation: 'Idle', morph: null });
   });
 });

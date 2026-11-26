@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EMOTE_DURATION_SECONDS, emoteMorph, planEmote } from './call-emotes';
 
-// Clip names shipped in the body GLBs (develop #144). Happy/Angry are face-only.
+// Clip names shipped in the body GLBs. Happy/Angry are face-only.
 const MALE = [
   'Idle',
   'Wave',
@@ -11,8 +11,28 @@ const MALE = [
   'Sad',
   'Happy',
   'Angry',
+  'RaiseHand',
+  'Clap',
+  'Nod',
+  'ShakeHead',
+  'Dance',
+  'TeacherExplain',
+  'TeacherPoint',
 ];
-const FEMALE_OWN = ['Idle', 'Wave', 'Think', 'Cheer'];
+const FEMALE_OWN = [
+  'Idle',
+  'Wave',
+  'Think',
+  'Cheer',
+  'Sad',
+  'RaiseHand',
+  'Clap',
+  'Nod',
+  'ShakeHead',
+  'Dance',
+  'TeacherExplain',
+  'TeacherPoint',
+];
 
 describe('planEmote', () => {
   it('plays the matching clip when the body has it', () => {
@@ -55,15 +75,63 @@ describe('planEmote', () => {
     expect(planEmote('think', MALE, false)?.clip).toBe('Think');
   });
 
+  it('plays all 7 newly wired expressive character clips', () => {
+    expect(planEmote('raise-hand', FEMALE_OWN, false)).toEqual({
+      clip: 'RaiseHand',
+      morph: null,
+      seconds: EMOTE_DURATION_SECONDS['raise-hand'],
+    });
+    expect(planEmote('clap', MALE, false)).toEqual({
+      clip: 'Clap',
+      morph: 'Happy',
+      seconds: EMOTE_DURATION_SECONDS.clap,
+    });
+    expect(planEmote('nod', FEMALE_OWN, false)).toEqual({
+      clip: 'Nod',
+      morph: null,
+      seconds: EMOTE_DURATION_SECONDS.nod,
+    });
+    expect(planEmote('shake-head', MALE, false)).toEqual({
+      clip: 'ShakeHead',
+      morph: null,
+      seconds: EMOTE_DURATION_SECONDS['shake-head'],
+    });
+    expect(planEmote('dance', FEMALE_OWN, false)).toEqual({
+      clip: 'Dance',
+      morph: 'Happy',
+      seconds: EMOTE_DURATION_SECONDS.dance,
+    });
+    expect(planEmote('explain', MALE, false)).toEqual({
+      clip: 'TeacherExplain',
+      morph: null,
+      seconds: EMOTE_DURATION_SECONDS.explain,
+    });
+    expect(planEmote('point', FEMALE_OWN, false)).toEqual({
+      clip: 'TeacherPoint',
+      morph: null,
+      seconds: EMOTE_DURATION_SECONDS.point,
+    });
+  });
+
   it('is face morph only under reduced motion', () => {
     const plan = planEmote('happy', MALE, true);
     expect(plan?.clip).toBeNull();
     expect(plan?.morph).toBe('Happy');
+    expect(planEmote('dance', MALE, true)).toEqual({
+      clip: null,
+      morph: 'Happy',
+      seconds: EMOTE_DURATION_SECONDS.dance,
+    });
+    expect(planEmote('raise-hand', MALE, true)).toEqual({
+      clip: null,
+      morph: null,
+      seconds: EMOTE_DURATION_SECONDS['raise-hand'],
+    });
   });
 
   it('ignores unknown emotes', () => {
     expect(planEmote('', MALE, false)).toBeNull();
-    expect(planEmote('dance', MALE, false)).toBeNull();
+    expect(planEmote('backflip', MALE, false)).toBeNull();
   });
 });
 

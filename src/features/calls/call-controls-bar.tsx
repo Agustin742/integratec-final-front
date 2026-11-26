@@ -84,7 +84,11 @@ export function CallControlsBar({
               <ReactionIcon />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="center" side="top">
+          <DropdownMenuContent
+            align="center"
+            side="top"
+            className="max-h-[min(24rem,calc(100dvh-8rem))] overflow-y-auto"
+          >
             {CALL_EMOTES.map((emote) => (
               <DropdownMenuItem key={emote} onSelect={() => onSendEmote(emote)}>
                 <EmoteIcon emote={emote} />

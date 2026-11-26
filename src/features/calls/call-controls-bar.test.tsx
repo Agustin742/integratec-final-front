@@ -59,14 +59,14 @@ describe('CallControlsBar', () => {
     expect(screen.getByText(/No hay micrófono disponible/)).toBeInTheDocument();
   });
 
-  it('offers the six emotes and sends the chosen one', () => {
+  it('offers all 13 emotes and sends the chosen one', () => {
     const props = setup();
     fireEvent.keyDown(screen.getByRole('button', { name: 'Reacción' }), {
       key: 'Enter',
     });
-    expect(screen.getAllByRole('menuitem')).toHaveLength(6);
-    fireEvent.click(screen.getByRole('menuitem', { name: /Celebrar/ }));
-    expect(props.onSendEmote).toHaveBeenCalledWith('celebrate');
+    expect(screen.getAllByRole('menuitem')).toHaveLength(13);
+    fireEvent.click(screen.getByRole('menuitem', { name: /Bailar/ }));
+    expect(props.onSendEmote).toHaveBeenCalledWith('dance');
   });
 
   it('labels the emote button Reacción with an icon, no emoji, and a tooltip', () => {
@@ -83,7 +83,7 @@ describe('CallControlsBar', () => {
       key: 'Enter',
     });
     const items = screen.getAllByRole('menuitem');
-    expect(items).toHaveLength(6);
+    expect(items).toHaveLength(13);
     for (const item of items) {
       expect(item.querySelector('svg')).not.toBeNull();
       expect(item.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
@@ -95,6 +95,13 @@ describe('CallControlsBar', () => {
       'Enojo',
       'Pensar',
       'Celebrar',
+      'Levantar la mano',
+      'Aplaudir',
+      'Asentir',
+      'Negar',
+      'Bailar',
+      'Explicar',
+      'Señalar',
     ]);
   });
 
