@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-26 — Profile streak uses the real gamification route (#149)
+
+- **Status:** completed
+- **Area / files:** `src/features/points/`, `src/test/msw/handlers.ts`, `e2e/{profile,daily-review}.spec.ts`, `docs/streak-and-badges.md`
+- **Change:** The streak reads `GET /gamification/me` with generated types; schema, mocks and the hidden badge showcase follow the real contract (earned badges only).
+- **Reason:** `/profile` always failed to load the streak: the client called a route that does not exist.
+- **Verification:** Strict TDD (service test failed first); touched test files, lint and typecheck. No full suite, build or e2e.
+- **Next step:** Check `/profile` against the running backend.
+
 ## 2026-11-26 — Profile page redesign (#149)
 
 - **Status:** completed (not visually checked)

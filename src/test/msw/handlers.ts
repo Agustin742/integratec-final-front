@@ -6646,21 +6646,8 @@ export function createClassroomMetricsHandler(
   );
 }
 
-export interface StreakBadgePayloadItem {
-  readonly id: string;
-  readonly code: string;
-  readonly name: string;
-  readonly description: string;
-  readonly unlocked: boolean;
-  readonly unlockedAt: string | null;
-}
-
-export interface OwnStreakAndBadgesPayload {
-  readonly currentStreak: number;
-  readonly bestStreak: number;
-  readonly lastQualifiedDate: string | null;
-  readonly badges: readonly StreakBadgePayloadItem[];
-}
+export type OwnStreakAndBadgesPayload =
+  components['schemas']['GamificationSummaryDto'];
 
 export interface CreateOwnStreakAndBadgesHandlerOptions {
   readonly baseUrl?: string;
@@ -6669,21 +6656,19 @@ export interface CreateOwnStreakAndBadgesHandlerOptions {
 }
 
 export const DEFAULT_STREAK_AND_BADGES_PAYLOAD: OwnStreakAndBadgesPayload = {
-  currentStreak: 0,
-  bestStreak: 0,
-  lastQualifiedDate: null,
+  streak: { currentStreak: 0, bestStreak: 0, lastQualifyingDay: null },
   badges: [],
 };
 
 /**
- * Contract-faithful MSW handler for `GET /users/me/streak-and-badges` (`HU-GAM-002`).
+ * Contract-faithful MSW handler for `GET /gamification/me` (`HU-GAM-002`).
  */
 export function createOwnStreakAndBadgesHandler(
   options: CreateOwnStreakAndBadgesHandlerOptions = {},
 ): HttpHandler {
   const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
   const payload = options.payload ?? DEFAULT_STREAK_AND_BADGES_PAYLOAD;
-  return http.get(`${baseUrl}/users/me/streak-and-badges`, () => {
+  return http.get(`${baseUrl}/gamification/me`, () => {
     if (options.error === 'network') {
       return HttpResponse.error();
     }

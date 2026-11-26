@@ -49,20 +49,22 @@ export function StreakSummary() {
         <span>
           {streak.currentLabel}:{' '}
           <strong className="text-foreground">
-            {streak.daysCount(data.currentStreak)}
+            {streak.daysCount(data.streak.currentStreak)}
           </strong>
         </span>
         <span>
           {streak.bestLabel}:{' '}
           <strong className="text-foreground">
-            {streak.daysCount(data.bestStreak)}
+            {streak.daysCount(data.streak.bestStreak)}
           </strong>
         </span>
-        {data.lastQualifiedDate !== null && (
-          <span>{streak.lastQualifiedLabel(data.lastQualifiedDate)}</span>
+        {data.streak.lastQualifyingDay !== null && (
+          <span>
+            {streak.lastQualifiedLabel(data.streak.lastQualifyingDay)}
+          </span>
         )}
       </p>
-      {data.currentStreak === 0 && <p>{streak.zeroHint}</p>}
+      {data.streak.currentStreak === 0 && <p>{streak.zeroHint}</p>}
     </div>
   );
 }

@@ -102,12 +102,14 @@ async function setupAuthSession(page: Page) {
   await page.route(`${apiOrigin}/me/classrooms`, (route) =>
     route.fulfill({ json: { items: [], page: 1, pageSize: 20, total: 0 } }),
   );
-  await page.route(`${apiOrigin}/users/me/streak-and-badges`, (route) =>
+  await page.route(`${apiOrigin}/gamification/me`, (route) =>
     route.fulfill({
       json: {
-        currentStreak: 4,
-        bestStreak: 9,
-        lastQualifiedDate: '2026-11-18',
+        streak: {
+          currentStreak: 4,
+          bestStreak: 9,
+          lastQualifyingDay: '2026-11-18',
+        },
         badges: [],
       },
     }),

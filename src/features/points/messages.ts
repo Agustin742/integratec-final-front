@@ -74,11 +74,9 @@ export const pointsMessages = {
       emptyTitle: 'Todavía no tenés medallas disponibles',
       emptyDescription:
         'Cuando el servidor registre logros o medallas desbloqueables, van a aparecer acá.',
-      unlockedLabel: 'Desbloqueada',
-      lockedLabel: 'Bloqueada',
-      unlockedAtPrefix: 'Obtenida el',
-      summaryCount: (unlocked: number, total: number) =>
-        `${unlocked} de ${total} desbloqueadas`,
+      awardedAtPrefix: 'Obtenida el',
+      summaryCount: (earned: number) =>
+        earned === 1 ? '1 obtenida' : `${earned} obtenidas`,
     },
   },
 } as const;

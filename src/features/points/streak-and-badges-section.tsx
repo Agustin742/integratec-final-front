@@ -54,9 +54,9 @@ export function StreakAndBadgesSection() {
             />
           )}
           <StreakIndicator
-            currentStreak={data.currentStreak}
-            bestStreak={data.bestStreak}
-            lastQualifiedDate={data.lastQualifiedDate}
+            currentStreak={data.streak.currentStreak}
+            bestStreak={data.streak.bestStreak}
+            lastQualifiedDate={data.streak.lastQualifyingDay}
           />
           <BadgeShowcase badges={data.badges} />
         </div>
