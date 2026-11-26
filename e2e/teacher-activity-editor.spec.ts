@@ -131,6 +131,9 @@ async function interceptClassroomApi(
     if (url.pathname === '/chats' && request.method() === 'GET') {
       return route.fulfill({ json: { items: [] } });
     }
+    if (url.pathname === '/me/family-threads' && request.method() === 'GET') {
+      return route.fulfill({ json: { items: [] } });
+    }
     if (url.pathname === '/notifications' && request.method() === 'GET') {
       return route.fulfill({
         json: { items: [], page: 1, pageSize: 20, total: 0 },

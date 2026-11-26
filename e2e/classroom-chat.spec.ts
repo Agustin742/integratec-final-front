@@ -234,6 +234,13 @@ test.beforeEach(async ({ page, baseURL }) => {
     }
     if (
       url.origin === apiOrigin &&
+      url.pathname === '/me/family-threads' &&
+      request.method() === 'GET'
+    ) {
+      return route.fulfill({ json: { items: [] } });
+    }
+    if (
+      url.origin === apiOrigin &&
       url.pathname === '/notifications' &&
       request.method() === 'GET'
     ) {

@@ -95,7 +95,7 @@ test('signs in, reloads authenticated home screen, and clears protected state on
     .getByLabel(authMessages.login.fields.email.label)
     .fill('Ana@Example.com');
   await page
-    .getByLabel(authMessages.login.fields.password.label)
+    .getByLabel(authMessages.login.fields.password.label, { exact: true })
     .fill('ClaveSegura123');
 
   const submitButton = page.getByRole('button', {
@@ -179,6 +179,7 @@ test('shows a generic error on 401 login, keeps email, and clears password', asy
   const emailInput = page.getByLabel(authMessages.login.fields.email.label);
   const passwordInput = page.getByLabel(
     authMessages.login.fields.password.label,
+    { exact: true },
   );
 
   await emailInput.fill('ana@example.com');
@@ -261,7 +262,7 @@ for (const signedIn of [false, true]) {
         .getByLabel(authMessages.login.fields.email.label)
         .fill('ana@example.com');
       await page
-        .getByLabel(authMessages.login.fields.password.label)
+        .getByLabel(authMessages.login.fields.password.label, { exact: true })
         .fill('SyntheticPassword123');
       await page
         .getByRole('button', { name: authMessages.login.actions.submit })
@@ -299,6 +300,7 @@ for (const signedIn of [false, true]) {
     await page.goto('./password-reset?token=valid-reset-token-123456');
     const passwordInput = page.getByLabel(
       authMessages.passwordReset.confirm.fields.newPassword.label,
+      { exact: true },
     );
     await expect(passwordInput).toBeVisible();
     await expect(page).toHaveURL(/\/password-reset$/);
@@ -341,6 +343,7 @@ for (const signedIn of [false, true]) {
     await expect(
       page.getByLabel(
         authMessages.passwordReset.confirm.fields.newPassword.label,
+        { exact: true },
       ),
     ).toBeVisible();
     await expect(page).toHaveURL(/\/password-reset\?next=%2F$/);

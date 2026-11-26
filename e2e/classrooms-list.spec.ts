@@ -224,6 +224,13 @@ test('teacher creates and configures a classroom, navigates to F16 workspace, an
     }
     if (
       url.origin === apiOrigin &&
+      url.pathname === '/me/family-threads' &&
+      request.method() === 'GET'
+    ) {
+      return route.fulfill({ json: { items: [] } });
+    }
+    if (
+      url.origin === apiOrigin &&
       url.pathname === '/notifications' &&
       request.method() === 'GET'
     ) {
@@ -436,6 +443,13 @@ test('student sees enrolled classroom link without create or configure controls'
     if (
       url.origin === apiOrigin &&
       url.pathname === '/chats' &&
+      request.method() === 'GET'
+    ) {
+      return route.fulfill({ json: { items: [] } });
+    }
+    if (
+      url.origin === apiOrigin &&
+      url.pathname === '/me/family-threads' &&
       request.method() === 'GET'
     ) {
       return route.fulfill({ json: { items: [] } });
