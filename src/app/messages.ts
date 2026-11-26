@@ -1,5 +1,5 @@
 export const messages = {
-  title: 'IntegrarTec',
+  title: 'Bankito',
   auth: {
     tagline:
       'Un aula virtual con presencia: clases, material, actividades y seguimiento en un solo lugar.',
@@ -12,7 +12,7 @@ export const messages = {
     register: {
       title: 'Crear cuenta',
       description:
-        'Elegí cómo vas a usar IntegrarTec y creá tu cuenta para empezar.',
+        'Elegí cómo vas a usar Bankito y creá tu cuenta para empezar.',
     },
     passwordReset: {
       title: 'Restablecer contraseña',
