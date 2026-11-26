@@ -16,7 +16,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Input, PasswordInput } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useSessionService } from '@/session/provider';
 import { authMessages } from './messages';
@@ -385,9 +385,8 @@ export function RegisterForm({ title }: RegisterFormProps) {
             description={authMessages.fields.password.description}
           >
             {(fieldProps) => (
-              <Input
+              <PasswordInput
                 {...fieldProps}
-                type="password"
                 autoComplete="new-password"
                 placeholder={authMessages.fields.password.placeholder}
               />

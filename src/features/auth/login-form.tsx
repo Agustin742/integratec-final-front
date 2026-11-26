@@ -17,7 +17,7 @@ import {
 } from '@/components/forms/form-primitives';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Input, PasswordInput } from '@/components/ui/input';
 import type { LoginFailureReason } from '@/session/controller';
 import { useSessionService } from '@/session/provider';
 import {
@@ -167,9 +167,8 @@ export function LoginForm({ title }: LoginFormProps) {
           label={authMessages.login.fields.password.label}
         >
           {(fieldProps) => (
-            <Input
+            <PasswordInput
               {...fieldProps}
-              type="password"
               autoComplete="current-password"
               placeholder={authMessages.login.fields.password.placeholder}
             />

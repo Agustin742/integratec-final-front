@@ -5,8 +5,9 @@ import { expectAccessible } from '@/test/accessibility';
 import { render } from '@/test/render';
 import { Button } from './button';
 import { Field } from './field';
-import { Input } from './input';
+import { Input, PasswordInput } from './input';
 import { Label } from './label';
+import { uiMessages } from './ui-messages';
 
 const copy = {
   save: 'Guardar',
@@ -194,5 +195,62 @@ describe('Input, Label and Field', () => {
     expect(second.id).not.toBe(first.id);
     expect(second).toHaveAccessibleDescription(copy.description);
     expect(second).not.toHaveAttribute('aria-invalid', 'true');
+  });
+});
+
+describe('PasswordInput', () => {
+  test('toggles password visibility without submitting forms, exposing accessible attributes', async () => {
+    const submit = vi.fn((event: React.SubmitEvent<HTMLFormElement>) =>
+      event.preventDefault(),
+    );
+    const ref = createRef<HTMLInputElement>();
+    const { container } = render(
+      <form onSubmit={submit}>
+        <Label htmlFor="password-field">Contraseña</Label>
+        <PasswordInput
+          id="password-field"
+          ref={ref}
+          defaultValue="ClaveSecreta123"
+        />
+      </form>,
+    );
+
+    const input = screen.getByLabelText('Contraseña');
+    expect(input).toHaveAttribute('type', 'password');
+    expect(input).toHaveValue('ClaveSecreta123');
+    expect(ref.current).toBe(input);
+
+    const toggle = screen.getByRole('button', {
+      name: uiMessages.showPassword,
+    });
+    expect(toggle).toHaveAttribute('type', 'button');
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(toggle);
+
+    expect(submit).not.toHaveBeenCalled();
+    expect(input).toHaveAttribute('type', 'text');
+    expect(input).toHaveValue('ClaveSecreta123');
+    expect(toggle).toHaveAttribute('aria-label', uiMessages.hidePassword);
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(toggle);
+
+    expect(input).toHaveAttribute('type', 'password');
+    expect(toggle).toHaveAttribute('aria-label', uiMessages.showPassword);
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+    await expectAccessible(container);
+  });
+
+  test('integrates with Field for labels and descriptions', () => {
+    render(
+      <Field label="Clave" description="Al menos 8 caracteres.">
+        {(controlProps) => <PasswordInput {...controlProps} />}
+      </Field>,
+    );
+    const input = screen.getByLabelText('Clave');
+    expect(input).toHaveAttribute('type', 'password');
+    expect(input).toHaveAccessibleDescription('Al menos 8 caracteres.');
   });
 });
