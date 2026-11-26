@@ -11,6 +11,10 @@ const mocks = vi.hoisted(() => {
   const loadGlbAsset = vi.fn();
   const cloneSkeleton = vi.fn((scene: unknown) => scene);
   const updateMatrixWorld = vi.fn();
+  const forceContextLoss = vi.fn();
+  const composeAvatar = vi.fn();
+  const disposeComposed = vi.fn();
+  const expandByPoint = vi.fn();
   let lost = false;
   const listeners = new Map<
     string,
@@ -32,6 +36,10 @@ const mocks = vi.hoisted(() => {
     disposeMaterial,
     renderListsDispose,
     rendererDispose,
+    forceContextLoss,
+    composeAvatar,
+    disposeComposed,
+    expandByPoint,
     render,
     toDataURL,
     clearAssetCache,
@@ -48,6 +56,9 @@ const mocks = vi.hoisted(() => {
       for (const cb of listeners.get(type) ?? []) {
         cb({ preventDefault: () => {} });
       }
+    },
+    emitFirst: (type: string) => {
+      listeners.get(type)?.[0]?.({ preventDefault: () => {} });
     },
     resetListeners: () => listeners.clear(),
   };
@@ -81,6 +92,10 @@ vi.mock('three', () => {
     }
   }
   class Box3 {
+    expandByPoint(point: unknown) {
+      mocks.expandByPoint(point);
+      return this;
+    }
     setFromObject() {
       return this;
     }
@@ -95,9 +110,11 @@ vi.mock('three', () => {
     }
   }
   class Vector3 {
-    x = 0;
-    y = 0;
-    z = 0;
+    constructor(
+      public x = 0,
+      public y = 0,
+      public z = 0,
+    ) {}
   }
   class Color {
     constructor(public hex: string) {}
@@ -124,6 +141,7 @@ vi.mock('three', () => {
     render = mocks.render;
     renderLists = { dispose: mocks.renderListsDispose };
     dispose = mocks.rendererDispose;
+    forceContextLoss = mocks.forceContextLoss;
     getContext() {
       return { isContextLost: mocks.isLost };
     }
@@ -150,6 +168,9 @@ vi.mock('three/examples/jsm/utils/SkeletonUtils.js', () => ({
 
 vi.mock('@/features/world/avatar/compose-avatar', () => ({
   ACCESSORY_TINT_MATERIAL: 'AvatarAccessoryTint',
+  HAIR_TINT_MATERIAL: 'AvatarHairTint',
+  TOP_TINT_MATERIAL: 'AvatarTopTint',
+  composeAvatar: mocks.composeAvatar,
 }));
 
 vi.mock('@/features/world/asset-cache', () => ({
@@ -162,6 +183,7 @@ import { Group } from 'three';
 import {
   disposePreviewRenderer,
   renderGlbThumbnail,
+  renderWornThumbnail,
 } from './item-preview-renderer';
 
 describe('item-preview-renderer', () => {
@@ -181,6 +203,92 @@ describe('item-preview-renderer', () => {
     mocks.loadGlbAsset.mockResolvedValue({
       scene: new Group(),
     });
+    mocks.forceContextLoss.mockClear();
+    mocks.disposeComposed.mockClear();
+    mocks.expandByPoint.mockClear();
+    mocks.composeAvatar.mockReset();
+    mocks.composeAvatar.mockReturnValue({
+      root: new Group(),
+      skippedParts: [],
+      dispose: mocks.disposeComposed,
+    });
+  });
+
+  const worn = (part: 'hair' | 'top', id: string) => ({
+    type: 'worn' as const,
+    part,
+    url: `/models/avatars/shared/${id}.glb`,
+    bodyUrl: '/models/avatars/male/body.glb',
+    tint: '#6C4D48',
+  });
+
+  it('composes the part on the body and releases the composed copy', async () => {
+    await expect(renderWornThumbnail(worn('top', 'a'))).resolves.toBe(
+      'data:image/png;base64,OK',
+    );
+    expect(mocks.composeAvatar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        parts: [
+          expect.objectContaining({
+            key: 'top',
+            tints: { AvatarTopTint: '#6C4D48' },
+          }),
+        ],
+      }),
+    );
+    expect(mocks.disposeComposed).toHaveBeenCalledTimes(1);
+    expect(mocks.expandByPoint).not.toHaveBeenCalled();
+  });
+
+  it('keeps the head in the frame of a hair style', async () => {
+    await renderWornThumbnail(worn('hair', 'b'));
+    expect(mocks.expandByPoint).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the body cached until the renderer is disposed', async () => {
+    await renderWornThumbnail(worn('hair', 'c'));
+    expect(mocks.loadGlbAsset).toHaveBeenCalledWith(
+      '/models/avatars/male/body.glb',
+      { scopeKey: 'shop-preview-body' },
+    );
+    expect(mocks.clearAssetCache).not.toHaveBeenCalledWith({
+      scopeKey: 'shop-preview-body',
+    });
+    disposePreviewRenderer();
+    expect(mocks.clearAssetCache).toHaveBeenCalledWith({
+      scopeKey: 'shop-preview-body',
+    });
+  });
+
+  it('fails instead of drawing a bare body when the part does not fit', async () => {
+    mocks.composeAvatar.mockReturnValueOnce({
+      root: new Group(),
+      skippedParts: ['top'],
+      dispose: mocks.disposeComposed,
+    });
+    await expect(renderWornThumbnail(worn('top', 'e'))).rejects.toThrow(
+      /does not fit/,
+    );
+    expect(mocks.disposeComposed).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases the WebGL context when disposed', async () => {
+    await renderGlbThumbnail('/models/avatars/male/release.glb');
+    disposePreviewRenderer();
+    expect(mocks.forceContextLoss).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores the late loss event of a released renderer', async () => {
+    await renderGlbThumbnail('/models/avatars/male/old.glb');
+    disposePreviewRenderer();
+    mocks.loadGlbAsset.mockImplementationOnce(async () => {
+      // Only the first, already released, renderer's listener fires.
+      mocks.emitFirst('webglcontextlost');
+      return { scene: new Group() };
+    });
+    await expect(
+      renderGlbThumbnail('/models/avatars/male/after.glb'),
+    ).resolves.toBe('data:image/png;base64,OK');
   });
 
   it('configures KTX2, disposes cloned tinted materials, and clears asset cache', async () => {

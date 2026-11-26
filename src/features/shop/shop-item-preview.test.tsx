@@ -1,10 +1,16 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ShopItemPreview } from './shop-item-preview';
+import { AvatarThumbnail, ShopItemPreview } from './shop-item-preview';
 import type { ShopCatalogItemDto } from './shop-schema';
 
-const renderGlbThumbnail = vi.hoisted(() => vi.fn());
-vi.mock('./item-preview-renderer', () => ({ renderGlbThumbnail }));
+const { renderGlbThumbnail, renderWornThumbnail } = vi.hoisted(() => ({
+  renderGlbThumbnail: vi.fn(),
+  renderWornThumbnail: vi.fn(),
+}));
+vi.mock('./item-preview-renderer', () => ({
+  renderGlbThumbnail,
+  renderWornThumbnail,
+}));
 
 function makeItem(overrides: Partial<ShopCatalogItemDto> = {}) {
   return {
@@ -27,6 +33,7 @@ function makeItem(overrides: Partial<ShopCatalogItemDto> = {}) {
 describe('ShopItemPreview', () => {
   beforeEach(() => {
     renderGlbThumbnail.mockReset();
+    renderWornThumbnail.mockReset();
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -105,6 +112,59 @@ describe('ShopItemPreview', () => {
     expect(renderGlbThumbnail).toHaveBeenCalledWith(
       '/models/scenes/classroom/desk-decor/plant.glb',
       undefined,
+    );
+  });
+
+  it('renders a style item worn by the preview body', async () => {
+    renderWornThumbnail.mockResolvedValue('data:image/png;base64,EEEE');
+    render(
+      <ShopItemPreview
+        item={makeItem({
+          kind: 'AVATAR_STYLE',
+          code: 'top_vest',
+          name: 'Chaleco',
+          metadata: { styleType: 'top', styleId: 'vest' },
+        })}
+      />,
+    );
+    await screen.findByRole('img', { name: 'Vista previa de Chaleco' });
+    expect(renderWornThumbnail).toHaveBeenCalledWith({
+      type: 'worn',
+      part: 'top',
+      url: '/models/avatars/male/top-vest.glb',
+      bodyUrl: '/models/avatars/male/body.glb',
+      tint: '#5B4F96',
+    });
+  });
+
+  it('draws a non-empty illustration when a style render fails', async () => {
+    renderWornThumbnail.mockRejectedValue(new Error('no webgl'));
+    render(
+      <ShopItemPreview
+        item={makeItem({ kind: 'AVATAR_STYLE', code: 'hair_braid' })}
+      />,
+    );
+    const illustration = await screen.findByRole('img', {
+      name: 'Ilustración de Gorra azul',
+    });
+    expect(illustration).not.toBeEmptyDOMElement();
+  });
+
+  it('exposes the same thumbnail by style id and body', async () => {
+    renderWornThumbnail.mockResolvedValue('data:image/png;base64,FFFF');
+    render(
+      <AvatarThumbnail
+        item={{ type: 'hair', id: 'braid' }}
+        bodyId="female"
+        name="Trenza"
+      />,
+    );
+    await screen.findByRole('img', { name: 'Vista previa de Trenza' });
+    expect(renderWornThumbnail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: '/models/avatars/shared/hair-braid.glb',
+        bodyUrl: '/models/avatars/female/body.glb',
+      }),
     );
   });
 

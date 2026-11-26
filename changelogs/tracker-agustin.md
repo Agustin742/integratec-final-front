@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-26 — Shop previews for hair styles and tops (#149)
+
+- **Status:** completed (not visually checked)
+- **Area / files:** `src/features/shop/`, `docs/classroom-shop.md`
+- **Change:** Hair styles and tops render worn by the avatar body instead of an illustration; `AvatarThumbnail` exposes the same thumbnails by style id or accessory code and body. The preview renderer now releases its WebGL context when idle.
+- **Reason:** Students could not see what they were buying.
+- **Verification:** Strict TDD on the touched test files, lint and typecheck. No full suite, build, e2e or visual review.
+- **Next step:** Visual check of the framing in the shop.
+
 ## 2026-11-26 — Welcome scene face, outfit and backdrop fixes (#149)
 
 - **Status:** completed (not visually checked)

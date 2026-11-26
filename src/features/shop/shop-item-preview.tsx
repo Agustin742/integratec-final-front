@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { cn } from '@/lib/utils';
-import { resolveItemPreview } from './item-preview-source';
+import type { AvatarBodyId } from '@/features/world/avatar/accessory-catalog';
+import {
+  resolveAvatarPreview,
+  resolveItemPreview,
+  type AvatarPreviewRef,
+  type ItemPreviewSource,
+} from './item-preview-source';
 import { shopMessages } from './messages';
 import type { ShopCatalogItemDto, ShopItemKind } from './shop-schema';
 
@@ -20,6 +26,7 @@ const STROKE = 'var(--palette-ink)';
 function KindIllustration({ kind }: { readonly kind: ShopItemKind }) {
   switch (kind) {
     case 'AVATAR_ACCESSORY':
+    case 'AVATAR_STYLE':
       return (
         <>
           <circle cx="32" cy="24" r="11" fill="var(--palette-sand)" />
@@ -115,44 +122,43 @@ function KindIllustration({ kind }: { readonly kind: ShopItemKind }) {
 }
 
 function Illustration({
-  item,
-  className,
+  kind,
+  name,
 }: {
-  readonly item: PreviewItem;
-  readonly className?: string;
+  readonly kind: ShopItemKind;
+  readonly name: string;
 }): ReactElement {
   return (
     <svg
       role="img"
-      aria-label={shopMessages.preview.illustrationAlt(item.name)}
+      aria-label={shopMessages.preview.illustrationAlt(name)}
       viewBox="0 0 64 64"
-      className={cn('size-2/3', className)}
+      className="size-2/3"
     >
-      <KindIllustration kind={item.kind} />
+      <KindIllustration kind={kind} />
     </svg>
   );
 }
 
-export interface ShopItemPreviewProps {
-  readonly item: PreviewItem;
-  readonly className?: string;
+interface PreviewImageProps {
+  readonly source: ItemPreviewSource;
+  /** Illustration shown without a model or when rendering fails. */
+  readonly kind: ShopItemKind;
+  readonly name: string;
+  readonly className?: string | undefined;
 }
 
 /**
- * Square preview of what a shop item actually is. Avatar accessories and desk
- * decor render their real GLB once into a static `<img>` (single shared
- * offscreen renderer, lazily, only when the card is near the viewport); other
- * kinds and render failures show a category illustration.
+ * Renders the model once into a static `<img>` (single shared offscreen
+ * renderer, lazily, only when near the viewport).
  */
-export function ShopItemPreview({ item, className }: ShopItemPreviewProps) {
-  const source = resolveItemPreview(item);
-  const glbUrl = source.type === 'glb' ? source.url : null;
-  const tint = source.type === 'glb' ? source.tint : undefined;
+function PreviewImage({ source, kind, name, className }: PreviewImageProps) {
+  const previewKey =
+    source.type === 'illustration' ? null : JSON.stringify(source);
   const hostRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(
     () => typeof IntersectionObserver === 'undefined',
   );
-  const previewKey = glbUrl === null ? null : `${glbUrl}|${tint ?? ''}`;
   const [rendered, setRendered] = useState<
     | { readonly key: string; readonly status: 'ready'; readonly src: string }
     | { readonly key: string; readonly status: 'failed' }
@@ -160,7 +166,7 @@ export function ShopItemPreview({ item, className }: ShopItemPreviewProps) {
   >(null);
 
   useEffect(() => {
-    if (glbUrl === null || visible) return;
+    if (previewKey === null || visible) return;
     const host = hostRef.current;
     if (host === null) return;
     const observer = new IntersectionObserver(
@@ -174,13 +180,23 @@ export function ShopItemPreview({ item, className }: ShopItemPreviewProps) {
     );
     observer.observe(host);
     return () => observer.disconnect();
-  }, [glbUrl, visible]);
+  }, [previewKey, visible]);
 
   useEffect(() => {
-    if (glbUrl === null || previewKey === null || !visible) return;
+    if (previewKey === null || !visible) return;
     let cancelled = false;
+    // The key is the serialized source, so the effect only re-runs when what
+    // is drawn changes.
+    const target = JSON.parse(previewKey) as Exclude<
+      ItemPreviewSource,
+      { type: 'illustration' }
+    >;
     import('./item-preview-renderer')
-      .then(({ renderGlbThumbnail }) => renderGlbThumbnail(glbUrl, tint))
+      .then((renderer) =>
+        target.type === 'worn'
+          ? renderer.renderWornThumbnail(target)
+          : renderer.renderGlbThumbnail(target.url, target.tint),
+      )
       .then(
         (src) => {
           if (!cancelled) {
@@ -196,7 +212,7 @@ export function ShopItemPreview({ item, className }: ShopItemPreviewProps) {
     return () => {
       cancelled = true;
     };
-  }, [glbUrl, previewKey, tint, visible]);
+  }, [previewKey, visible]);
 
   const state: PreviewState =
     previewKey !== null && rendered?.key === previewKey
@@ -213,12 +229,12 @@ export function ShopItemPreview({ item, className }: ShopItemPreviewProps) {
         className,
       )}
     >
-      {glbUrl === null || state.status === 'failed' ? (
-        <Illustration item={item} />
+      {previewKey === null || state.status === 'failed' ? (
+        <Illustration kind={kind} name={name} />
       ) : state.status === 'ready' ? (
         <img
           src={state.src}
-          alt={shopMessages.preview.alt(item.name)}
+          alt={shopMessages.preview.alt(name)}
           width={256}
           height={256}
           decoding="async"
@@ -233,5 +249,51 @@ export function ShopItemPreview({ item, className }: ShopItemPreviewProps) {
         </div>
       )}
     </div>
+  );
+}
+
+export interface ShopItemPreviewProps {
+  readonly item: PreviewItem;
+  readonly className?: string;
+}
+
+/**
+ * Square preview of what a shop item actually is: avatar accessories and desk
+ * decor alone, hair styles and tops worn by a body; other kinds and render
+ * failures show a category illustration.
+ */
+export function ShopItemPreview({ item, className }: ShopItemPreviewProps) {
+  return (
+    <PreviewImage
+      source={resolveItemPreview(item)}
+      kind={item.kind}
+      name={item.name}
+      className={className}
+    />
+  );
+}
+
+export interface AvatarThumbnailProps {
+  readonly item: AvatarPreviewRef;
+  readonly bodyId: AvatarBodyId;
+  /** Used in the image's accessible name. */
+  readonly name: string;
+  readonly className?: string;
+}
+
+/** The shop's thumbnail for any hair style, top or accessory on a body. */
+export function AvatarThumbnail({
+  item,
+  bodyId,
+  name,
+  className,
+}: AvatarThumbnailProps) {
+  return (
+    <PreviewImage
+      source={resolveAvatarPreview(item, bodyId)}
+      kind={item.type === 'accessory' ? 'AVATAR_ACCESSORY' : 'AVATAR_STYLE'}
+      name={name}
+      className={className}
+    />
   );
 }
