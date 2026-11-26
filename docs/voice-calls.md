@@ -2,7 +2,7 @@
 
 Voice-only calls for a classroom (a class call run by a moderator) and between two members of the same classroom (a direct 1:1 call). Nobody shares video: each participant appears as their own 3D avatar. The server never carries or records audio. The server side (rooms, signaling, moderation, limits, close codes) is described in the backend `docs/voice-calls.md`; this page covers the client in `src/features/calls/`.
 
-Status: implemented and covered by unit and component tests with fake WebRTC and fake realtime peers. Real-browser, multi-device behavior is verified by hand; screenshots are added separately.
+Status: implemented and covered by unit and component tests with fake WebRTC and fake realtime peers. The reproducible visual fixture passed both browser projects; its three PNGs were generated and visually inspected. Live multi-device behavior still requires separate verification.
 
 ## What users see
 
@@ -35,6 +35,48 @@ Status: implemented and covered by unit and component tests with fake WebRTC and
 - **Autoplay unlock.** The Permissions-Policy sets `autoplay=()`, so remote audio playback is primed inside the user's join or answer click. If the browser still rejects `play()`, an "enable audio" fallback is shown.
 - **Focus mode on the client.** `focus-mode.tsx` hides the world for students while the classroom state reports a class call with focus mode on. The server also ignores student movement, so hiding the world is a convenience and not the enforcement.
 - **Dropped connections are not resumed.** The server removes a dropped participant immediately, so the client rejoins a class call once (`MAX_REJOIN_ATTEMPTS`) instead of renegotiating a held seat.
+
+## Reproduce visual evidence (not a live call)
+
+Open `/dev/ui/calls` in development or the `showcase` build. This separate lazy route renders the **production `CallView`, `CallStage`, `TeacherPanel`, and controls**, using the real modular avatar GLBs. The existing `__UI_SHOWCASE__` build-time gate excludes the route import and fixture data from production builds; no production call implementation or authentication behavior is replaced.
+
+The Spanish title identifies a local sample. Two synthetic participants (teacher and student) receive deterministic typed props. Microphone toggling changes only local display state; moderation records a simulated request without changing the supplied snapshot. Reactions, leave, end, and audio-unlock handlers are no-ops. The fixture does not join Colyseus, request microphone access, send media, or prove authorization, signaling, audio quality, or live moderation enforcement.
+
+### Run and inspect
+
+With the repository's Node 22 and pnpm 10 toolchain and installed dependencies, run from the repository root (POSIX/Git Bash syntax; public sample endpoints only):
+
+```bash
+VITE_APP_ENV=test VITE_API_BASE_URL=https://api.example.invalid VITE_REALTIME_URL=wss://realtime.example.invalid pnpm build:e2e
+pnpm exec playwright test e2e/voice-calls.spec.ts
+```
+
+The existing `desktop` and `mobile` projects capture 1280×800 and 360×800 respectively. The test observes successful body/hair/top GLB responses and actual WebGL indexed geometry submissions matching those assets, rather than sleeping or treating canvas creation as avatar readiness. It checks viewport overflow, participant labels, keyboard microphone and teacher controls, and request-only moderation state. It requires working WebGL2; a 2D fallback is not accepted as visual evidence.
+
+**Capture status: desktop and mobile checks passed (2/2); generated PNGs inspected by the coding agent.** Avatars, readable controls, and panel placement are visible; team visual approval and independent fixture review are still pending. The test writes only these new paths:
+
+- [1280×800 stage, teacher panel, and controls](./assets/voice-calls/fixture-panel-1280.png).
+- [360×800 unobscured avatar stage and controls](./assets/voice-calls/fixture-stage-360.png).
+- [360×800 expanded teacher panel and controls](./assets/voice-calls/fixture-panel-360.png). The production mobile panel overlays the stage, so both mobile states are captured.
+
+These are visual-fixture checks, not full call-flow end-to-end coverage. Inspect the generated PNGs for actual avatar appearance, readable text, and panel/control placement before treating them as delivered evidence. No mobile frame-rate or real-device performance result is claimed.
+
+## Correction verification checkpoint
+
+The classroom retry correction and request-only moderation feedback have independent scoped reviews. The visual fixture has browser evidence but its independent review was unavailable due to quota; this checkpoint is **not merge approval**.
+
+| Check | Observed result |
+| --- | --- |
+| Lint, typecheck, production build, security build check, assets | Passed |
+| Production fixture exclusion | Passed: no fixture module or unique fixture data in built JavaScript |
+| Unit suite | 2257 passed; one security-lint test exceeded its 15-second timeout |
+| Full browser suite | 167 passed, 8 failed, 1 skipped; retry and both visual fixture cases passed |
+| Python CI tests, documentation links, whitespace | Passed: 10 Python tests and 124 Markdown files |
+| Formatting | Three new files corrected after failed check; subsequent global check exceeded 30 seconds, so no final pass claimed |
+
+Browser failures affect Michi interaction, classroom invitations, inventory equip/rejection, and teacher regrading, on both viewports. Michi/invitation failures were also observed on the earlier develop baseline; the inventory/regrading failures remain unattributed. Their snapshots show the slow-3D offer, but that does not establish causation. No timeout was increased and no failing expectation was weakened. The earlier context-stream abort assertion passed in this full run, without proving why it failed in the earlier focused batch.
+
+The develop merge and seven conflicts remain explicitly deferred. Screenshots and fixes are local; live audio/signaling verification, team visual approval, and the unavailable independent fixture review must not be inferred from these checks.
 
 ## Limits
 

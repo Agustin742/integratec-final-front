@@ -4,6 +4,12 @@ Course declaration of AI use in the development process (see [course requirement
 
 > Status: partial evidence recorded. Sections marked _Pending_ still require team input and human review.
 
+## PR145 call corrections and visual evidence
+
+- **Tools and scope:** el Gentleman in Pi coordinated bounded source investigation, workers, independent scoped reviews, Vitest and Playwright to correct duplicate classroom reads and premature moderation-success announcements. A showcase-only route renders the production call components with synthetic participants and real avatar assets; see [voice-call evidence and verification limits](voice-calls.md#correction-verification-checkpoint).
+- **Useful result:** Retry behavior passed the full workspace browser spec (24/24); moderation compatibility passed 89 tests; visual evidence passed desktop/mobile (2/2) and produced three inspected PNGs. Production bundle checks found no showcase fixture module or unique fixture data.
+- **Detected problems and limitations:** The global suite is not green: one unit timeout and eight browser failures remain recorded in the linked guide. Formatting corrections were applied, but the subsequent check timed out. Independent review of the screenshot fixture was unavailable due to quota. Screenshots do not prove live audio or signaling; no merge or publishing was performed.
+
 ## Avatar Character Animations (`male/body.glb` and `female/body.glb`, 16 canonical clips)
 
 - **Tools and scope:** Antigravity and headless Blender 5.2.2 LTS (`--background`) plus Node GLB verification/trimming (`odd/scripts/blender/author_avatar_animations.py`, `trim_rest_channels.mjs`, `render_avatar_animations.py` — untracked) completed all 16 Section 1 **Animations** items from [asset wishlist](art/asset-wishlist.md#animations) ([guide](art/avatar-animations.md)) on `feat/avatar-animations` in `odd/worktrees/avatar-animations`, leaving `src/features/world/avatar/` runtime code and all existing wearables untouched.
