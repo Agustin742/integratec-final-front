@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { Outlet } from 'react-router';
 import { SkipLink } from '@/components/layout/skip-link';
 import { Toast } from '@/components/ui/toast';
+import { PreviewScene } from '@/features/world/preview/preview-scene';
 import { messages } from '../messages';
 import { MAIN_CONTENT_ID } from './focus-on-navigation';
 
@@ -11,8 +12,8 @@ import { MAIN_CONTENT_ID } from './focus-on-navigation';
  *
  * The brand panel comes first in the DOM, so on a phone it stacks above the
  * content and on a wide screen it sits on the right. It only holds a heading
- * and a placeholder for the 3D classroom model, so nothing in it needs a tab stop and the skip link
- * jumps straight to `main`. The `h1` is the product name, as in the shell;
+ * and a decorative 3D scene, so nothing in it needs a tab stop and the skip
+ * link jumps straight to `main`. The `h1` is the product name, as in the shell;
  * pages keep `h2` for their own title.
  *
  * `[data-auth-slot]` is the form column: the feature screens (#27, #28, #31)
@@ -37,13 +38,10 @@ export function AuthLayout() {
               {messages.auth.tagline}
             </p>
           </div>
-          {/* Placeholder until the 3D classroom model is available. */}
-          <p
-            data-classroom-placeholder
-            className="flex aspect-[16/9] w-full max-w-2xl items-center justify-center rounded-3xl border-2 border-dashed border-primary-foreground/40 px-6 text-center text-base font-medium text-primary-foreground/80"
-          >
-            {messages.auth.classroomPlaceholder}
-          </p>
+          {/* Fixed box, so the form never moves while the scene loads. */}
+          <div className="aspect-[16/9] w-full max-w-2xl overflow-hidden rounded-[2rem] ring-4 ring-primary-foreground/20">
+            <PreviewScene label={messages.auth.previewLabel} />
+          </div>
         </header>
         <main
           id={MAIN_CONTENT_ID}

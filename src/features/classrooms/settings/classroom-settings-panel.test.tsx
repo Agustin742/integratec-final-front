@@ -109,6 +109,62 @@ describe('ClassroomSettingsPanel', () => {
     expect(screen.getByText('Todo guardado')).toBeVisible();
   });
 
+  it('lets staff choose the tutor bot skin and saves it', async () => {
+    const bodies: UpdateClassroomRequestPayload[] = [];
+    mswServer.use(
+      createUpdateClassroomHandler({
+        onRequest: (_request, _id, body) => {
+          bodies.push(body);
+        },
+      }),
+    );
+    const { queryClient } = renderSettings({
+      detail: { tutorBotSkin: 'graduate' },
+    });
+    await nameField();
+    const group = screen.getByRole('group', { name: 'Apariencia del robot' });
+    expect(within(group).getAllByRole('radio')).toHaveLength(8);
+    expect(
+      within(group).getByRole('radio', { name: 'Graduación' }),
+    ).toBeChecked();
+
+    fireEvent.click(within(group).getByRole('radio', { name: 'Gamer' }));
+    fireEvent.click(saveButton());
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ tutorBotSkin: 'gamer' });
+    await waitFor(() => {
+      expect(
+        queryClient.getQueryData<{ tutorBotSkin: string }>(
+          classroomDetailQueryKey(profile.id, CLASSROOM_ID),
+        )?.tutorBotSkin,
+      ).toBe('gamer');
+    });
+  });
+
+  it('never overwrites a skin it does not know when staff change something else', async () => {
+    const bodies: UpdateClassroomRequestPayload[] = [];
+    mswServer.use(
+      createUpdateClassroomHandler({
+        onRequest: (_request, _id, body) => {
+          bodies.push(body);
+        },
+      }),
+    );
+    renderSettings({
+      detail: {
+        tutorBotSkin: 'pirate' as ClassroomDetailPayload['tutorBotSkin'],
+      },
+    });
+
+    fireEvent.change(await nameField(), { target: { value: 'Física 5to A' } });
+    fireEvent.click(saveButton());
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ name: 'Física 5to A' });
+    expect(bodies[0]).not.toHaveProperty('tutorBotSkin');
+  });
+
   it('validates the name inline and does not send an invalid body', async () => {
     const onRequest = vi.fn();
     mswServer.use(createUpdateClassroomHandler({ onRequest }));
@@ -143,6 +199,7 @@ describe('ClassroomSettingsPanel', () => {
           chatMuted: body.chatMuted ?? false,
           collaborationLocked: body.collaborationLocked ?? false,
           gamesDisabled: body.gamesDisabled ?? false,
+          tutorBotSkin: 'none',
           myRole: 'TEACHER',
           capabilities: STAFF_CAPABILITIES,
           deskCount: 0,
@@ -275,6 +332,46 @@ describe('ClassroomSettingsPanel', () => {
     ).toBeVisible();
     expect(name).toHaveValue('Nombre nuevo');
     expect(saveButton()).toBeEnabled();
+  });
+
+  it('shows a 400 tutor bot skin error on its group and clears it on change', async () => {
+    mswServer.use(
+      createUpdateClassroomHandler({
+        classroomId: CLASSROOM_ID,
+        error: {
+          status: 400,
+          body: {
+            code: 'VALIDATION_FAILED',
+            message: 'Validation failed',
+            correlationId: 'corr-settings-skin',
+            details: [
+              {
+                field: 'tutorBotSkin',
+                messages: ['Esa apariencia no está disponible.'],
+              },
+            ],
+          },
+        },
+      }),
+    );
+    renderSettings({ detail: { tutorBotSkin: 'graduate' } });
+    await nameField();
+    const group = screen.getByRole('group', { name: 'Apariencia del robot' });
+
+    fireEvent.click(within(group).getByRole('radio', { name: 'Gamer' }));
+    fireEvent.click(saveButton());
+
+    expect(await within(group).findByRole('alert')).toHaveTextContent(
+      'Esa apariencia no está disponible.',
+    );
+    expect(group).toHaveAccessibleDescription(
+      'Esa apariencia no está disponible.',
+    );
+
+    fireEvent.click(within(group).getByRole('radio', { name: 'Graduación' }));
+    await waitFor(() =>
+      expect(within(group).queryByRole('alert')).not.toBeInTheDocument(),
+    );
   });
 
   it('shows a form-level error on 403 without losing the edits', async () => {

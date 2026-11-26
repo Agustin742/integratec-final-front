@@ -1,14 +1,15 @@
 import type { Avatar } from '@/features/profile/avatar-options';
 
 /**
- * Pure catalog and rules for equippable avatar accessories (head, face, back).
- * No rendering here: the composer receives the results as part inputs.
- * Rules come from docs/art/{head-accessories-everyday,head-accessories-special,
- * back-accessories,face-accessories}.md and are checked against the GLBs.
+ * Pure catalog and rules for equippable avatar accessories (head, face, back,
+ * hand, neck, ears). No rendering here: the composer receives the results as
+ * part inputs. Rules come from docs/art/{head-accessories-everyday,
+ * head-accessories-special,back-accessories,face-accessories,hand-items,
+ * neck-ears}.md and are checked against the GLBs.
  */
 
 export type AvatarBodyId = Avatar['bodyId'];
-export type AccessorySlot = 'head' | 'face' | 'back';
+export type AccessorySlot = 'head' | 'face' | 'back' | 'hand' | 'neck' | 'ears';
 
 export interface AccessorySpec {
   /** Shop item code, `<slot>_<asset id with "-" replaced by "_">`. */
@@ -23,10 +24,29 @@ export interface AccessorySpec {
 
 const AVATARS_ROOT = '/models/avatars';
 
-/** Items that fit every body (and everything under head/face). */
+/** Back items that fit every body. */
 const SHARED_BACK_ASSETS: ReadonlySet<string> = new Set(['wings']);
 
-/** `[slot, assetId, fixedColor]`; colors come from the art-direction palette. */
+/** Ear items were exported with the neck prefix (`neck-ears.md`). */
+const FILE_PREFIX: Readonly<Record<AccessorySlot, string>> = {
+  head: 'head',
+  face: 'face',
+  back: 'back',
+  hand: 'hand',
+  neck: 'neck',
+  ears: 'neck',
+};
+
+/** Neck items, and back items except wings, are fitted to each body. */
+function isShared(slot: AccessorySlot, assetId: string): boolean {
+  if (slot === 'neck') return false;
+  return slot !== 'back' || SHARED_BACK_ASSETS.has(assetId);
+}
+
+/**
+ * `[slot, assetId, fixedColor]`; colors come from the art-direction palette
+ * and are mirrored by the backend shop seed.
+ */
 const ACCESSORY_ROWS: readonly (readonly [AccessorySlot, string, string])[] = [
   ['head', 'headband', '#F5B5AB'],
   ['head', 'cap', '#75B7DA'],
@@ -49,6 +69,25 @@ const ACCESSORY_ROWS: readonly (readonly [AccessorySlot, string, string])[] = [
   ['back', 'guitar', '#AF7B52'],
   ['back', 'superhero-cape', '#E66861'],
   ['back', 'wings', '#FFF9EB'],
+  ['hand', 'pencil', '#F7D86B'],
+  ['hand', 'book', '#5B4F96'],
+  ['hand', 'ruler', '#A9E7F4'],
+  ['hand', 'mug', '#E66861'],
+  ['hand', 'phone', '#353849'],
+  ['hand', 'mate', '#AF7B52'],
+  ['hand', 'magnifying-glass', '#75B7DA'],
+  ['hand', 'paintbrush', '#C77DAA'],
+  ['hand', 'tablet', '#62CFC7'],
+  ['hand', 'trophy', '#F7D86B'],
+  ['neck', 'scarf', '#E66861'],
+  ['neck', 'necklace', '#B5A7D6'],
+  ['neck', 'bow-tie', '#5B4F96'],
+  ['neck', 'lanyard-badge', '#62CFC7'],
+  ['neck', 'bandana', '#7EBA8B'],
+  ['neck', 'achievement-medal', '#F7D86B'],
+  ['ears', 'earrings', '#F5B5AB'],
+  ['ears', 'star-earrings', '#F7D86B'],
+  ['ears', 'ear-cuffs', '#B5A7D6'],
 ];
 
 function buildSpec(
@@ -56,14 +95,14 @@ function buildSpec(
   assetId: string,
   fixedColor: string,
 ): AccessorySpec {
-  const shared = slot !== 'back' || SHARED_BACK_ASSETS.has(assetId);
+  const folder = isShared(slot, assetId) ? 'shared' : null;
+  const file = `${FILE_PREFIX[slot]}-${assetId}.glb`;
   return {
     code: `${slot}_${assetId.replaceAll('-', '_')}`,
     slot,
     assetId,
     fixedColor,
-    url: (bodyId) =>
-      `${AVATARS_ROOT}/${shared ? 'shared' : bodyId}/${slot}-${assetId}.glb`,
+    url: (bodyId) => `${AVATARS_ROOT}/${folder ?? bodyId}/${file}`,
   };
 }
 

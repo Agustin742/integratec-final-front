@@ -8,7 +8,7 @@ import {
   MeshStandardMaterial,
 } from 'three';
 import type { Avatar } from '@/features/profile/avatar-options';
-import { AvatarModel } from '../avatar/avatar-model';
+import { AvatarModel, type AvatarEmotePlay } from '../avatar/avatar-model';
 import type { AvatarEquipped } from '../avatar/avatar-part-plan';
 import type { Pose } from '../movement';
 import { animationFor, placeAvatar } from './local-avatar-frame';
@@ -83,6 +83,8 @@ export interface RemoteClassroomParticipant {
   readonly avatar?: Avatar | undefined;
   /** Accessory shop codes worn in this classroom. */
   readonly equipped?: AvatarEquipped | undefined;
+  /** Emote the room announced for this member, while it lasts. */
+  readonly emote?: AvatarEmotePlay | undefined;
 }
 
 export interface RemoteAvatarProps {
@@ -91,6 +93,7 @@ export interface RemoteAvatarProps {
   readonly targetPose: Pose;
   readonly avatar?: Avatar | undefined;
   readonly equipped?: AvatarEquipped | undefined;
+  readonly emote?: AvatarEmotePlay | undefined;
   readonly scopeKey?: string | undefined;
 }
 
@@ -122,6 +125,7 @@ export function RemoteAvatar({
   targetPose,
   avatar,
   equipped,
+  emote,
   scopeKey,
 }: RemoteAvatarProps) {
   const root = useMemo(() => {
@@ -218,6 +222,8 @@ export function RemoteAvatar({
           equipped={equipped}
           scopeKey={scopeKey}
           animation={animationFor(moving)}
+          emote={emote}
+          emoteBlocked={moving}
           fallback={<PlaceholderBody reconnecting={reconnecting} />}
           errorFallback={<PlaceholderBody reconnecting={reconnecting} />}
         />

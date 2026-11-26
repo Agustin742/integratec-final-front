@@ -1,15 +1,21 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ShopItemPreview } from './shop-item-preview';
+import { AvatarThumbnail, ShopItemPreview } from './shop-item-preview';
 import type { ShopCatalogItemDto } from './shop-schema';
 
-const renderGlbThumbnail = vi.hoisted(() => vi.fn());
-vi.mock('./item-preview-renderer', () => ({ renderGlbThumbnail }));
+const { renderGlbThumbnail, renderWornThumbnail } = vi.hoisted(() => ({
+  renderGlbThumbnail: vi.fn(),
+  renderWornThumbnail: vi.fn(),
+}));
+vi.mock('./item-preview-renderer', () => ({
+  renderGlbThumbnail,
+  renderWornThumbnail,
+}));
 
 function makeItem(overrides: Partial<ShopCatalogItemDto> = {}) {
   return {
     id: 'item-1',
-    code: 'cap_blue',
+    code: 'head_cap',
     name: 'Gorra azul',
     description: '',
     kind: 'AVATAR_ACCESSORY',
@@ -27,6 +33,7 @@ function makeItem(overrides: Partial<ShopCatalogItemDto> = {}) {
 describe('ShopItemPreview', () => {
   beforeEach(() => {
     renderGlbThumbnail.mockReset();
+    renderWornThumbnail.mockReset();
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -46,8 +53,8 @@ describe('ShopItemPreview', () => {
     );
     await waitFor(() =>
       expect(renderGlbThumbnail).toHaveBeenCalledWith(
-        '/models/avatars/male/accessory-cap.glb',
-        undefined,
+        '/models/avatars/shared/head-cap.glb',
+        '#75B7DA',
       ),
     );
 
@@ -59,7 +66,7 @@ describe('ShopItemPreview', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  it('tints the model with the item color metadata', async () => {
+  it('tints the model with the color the avatar wears', async () => {
     renderGlbThumbnail.mockResolvedValue('data:image/png;base64,CCCC');
     render(
       <ShopItemPreview
@@ -70,8 +77,8 @@ describe('ShopItemPreview', () => {
     );
     await screen.findByRole('img', { name: 'Vista previa de Gorra azul' });
     expect(renderGlbThumbnail).toHaveBeenCalledWith(
-      '/models/avatars/male/accessory-cap.glb',
-      '#1E3A8A',
+      '/models/avatars/shared/head-cap.glb',
+      '#75B7DA',
     );
   });
 
@@ -87,20 +94,94 @@ describe('ShopItemPreview', () => {
     ).toBeInTheDocument();
   });
 
-  it('uses an illustration directly for items without a model', () => {
+  it('renders the model of a desk decor item', async () => {
+    renderGlbThumbnail.mockResolvedValue('data:image/png;base64,DDDD');
     render(
       <ShopItemPreview
         item={makeItem({
           kind: 'DESK_UPGRADE',
           code: 'desk_plant',
           name: 'Planta de escritorio',
-          metadata: { assetId: 'desk_plant' },
+          metadata: { assetId: 'plant', slot: 'desk_decor' },
+        })}
+      />,
+    );
+    await screen.findByRole('img', {
+      name: 'Vista previa de Planta de escritorio',
+    });
+    expect(renderGlbThumbnail).toHaveBeenCalledWith(
+      '/models/scenes/classroom/desk-decor/plant.glb',
+      undefined,
+    );
+  });
+
+  it('renders a style item worn by the preview body', async () => {
+    renderWornThumbnail.mockResolvedValue('data:image/png;base64,EEEE');
+    render(
+      <ShopItemPreview
+        item={makeItem({
+          kind: 'AVATAR_STYLE',
+          code: 'top_vest',
+          name: 'Chaleco',
+          metadata: { styleType: 'top', styleId: 'vest' },
+        })}
+      />,
+    );
+    await screen.findByRole('img', { name: 'Vista previa de Chaleco' });
+    expect(renderWornThumbnail).toHaveBeenCalledWith({
+      type: 'worn',
+      part: 'top',
+      url: '/models/avatars/male/top-vest.glb',
+      bodyUrl: '/models/avatars/male/body.glb',
+      tint: '#5B4F96',
+    });
+  });
+
+  it('draws a non-empty illustration when a style render fails', async () => {
+    renderWornThumbnail.mockRejectedValue(new Error('no webgl'));
+    render(
+      <ShopItemPreview
+        item={makeItem({ kind: 'AVATAR_STYLE', code: 'hair_braid' })}
+      />,
+    );
+    const illustration = await screen.findByRole('img', {
+      name: 'Ilustración de Gorra azul',
+    });
+    expect(illustration).not.toBeEmptyDOMElement();
+  });
+
+  it('exposes the same thumbnail by style id and body', async () => {
+    renderWornThumbnail.mockResolvedValue('data:image/png;base64,FFFF');
+    render(
+      <AvatarThumbnail
+        item={{ type: 'hair', id: 'braid' }}
+        bodyId="female"
+        name="Trenza"
+      />,
+    );
+    await screen.findByRole('img', { name: 'Vista previa de Trenza' });
+    expect(renderWornThumbnail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: '/models/avatars/shared/hair-braid.glb',
+        bodyUrl: '/models/avatars/female/body.glb',
+      }),
+    );
+  });
+
+  it('uses an illustration directly for items without a model', () => {
+    render(
+      <ShopItemPreview
+        item={makeItem({
+          kind: 'DESK_UPGRADE',
+          code: 'desk_mystery',
+          name: 'Adorno de escritorio',
+          metadata: {},
         })}
       />,
     );
     expect(renderGlbThumbnail).not.toHaveBeenCalled();
     expect(
-      screen.getByRole('img', { name: 'Ilustración de Planta de escritorio' }),
+      screen.getByRole('img', { name: 'Ilustración de Adorno de escritorio' }),
     ).toBeInTheDocument();
   });
 
@@ -145,7 +226,7 @@ describe('ShopItemPreview', () => {
         item={makeItem({
           id: 'item-2',
           name: 'Gorra roja',
-          metadata: { slot: 'head', assetId: 'cap', color: '#DC2626' },
+          code: 'head_beanie',
         })}
       />,
     );

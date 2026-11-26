@@ -1,5 +1,95 @@
 # Tracker — Agustin
 
+## 2026-11-26 — Show tutor bot skin server errors (#149)
+
+- **Status:** completed
+- **Area / files:** `src/features/classrooms/settings/`
+- **Change:** The tutor bot skin group shows its server validation error and clears it on change.
+- **Reason:** A rejected skin made the save fail silently.
+- **Verification:** Strict TDD; settings panel tests, lint, typecheck, prettier.
+- **Next step:** None.
+
+## 2026-11-26 — Keep the preview avatar while an accessory loads (#149)
+
+- **Status:** completed
+- **Area / files:** `src/features/profile/`
+- **Change:** The 3D preview defers the equipped accessories together with the avatar.
+- **Reason:** Equipping an uncached accessory replaced the whole avatar with the placeholder capsule.
+- **Verification:** Strict TDD; preview 3D test, lint, typecheck, prettier.
+- **Next step:** None.
+
+## 2026-11-26 — Locked styles without a classroom shop (#149)
+
+- **Status:** completed
+- **Area / files:** `src/features/profile/`
+- **Change:** Locked hair and top cards only link to the shop when there is a student classroom; otherwise they stay locked without a link.
+- **Reason:** The link led to the home page for teachers, users without a classroom, and while the list was loading or had failed.
+- **Verification:** Strict TDD; profile page tests, lint, typecheck, prettier.
+- **Next step:** None.
+
+## 2026-11-26 — Emote wheel focus and announcements (#149)
+
+- **Status:** completed
+- **Area / files:** `src/features/classrooms/`
+- **Change:** Pressing a gap of the wheel keeps focus; one always-mounted live region announces the cooldown and a short-lived send failure.
+- **Reason:** Keyboard controls stopped working after a gap press, and screen readers missed the status.
+- **Verification:** Strict TDD; emote tests, lint, typecheck, prettier.
+- **Next step:** Visual check of the status position and of presses inside the wheel.
+
+## 2026-11-26 — Remove the on-screen gestures button (#149)
+
+- **Status:** completed
+- **Area / files:** `src/features/classrooms/`, `docs/realtime-client.md`
+- **Change:** The emote wheel opens with Space only; the floating button was removed.
+- **Reason:** Owner review: the button looked disconnected from the rest of the app.
+- **Verification:** Emote and classroom stage tests, lint, typecheck.
+- **Next step:** Touch devices have no way to open the wheel; decide where to place a trigger.
+
+## 2026-11-26 — Avatar emotes in the 3D classroom (#149)
+
+- **Status:** completed (not visually checked)
+- **Area / files:** `src/features/classrooms/`, `src/features/world/{avatar,classroom}/`, `src/realtime/`, `docs/realtime-client.md`
+- **Change:** Space or a button opens a wheel with five gestures (Wave, Cheer, Clap, Dance, RaiseHand); the room announces them to everyone and each avatar plays the clip once. Moving cancels it; the contract constants mirror `packages/contracts`.
+- **Reason:** Members can express themselves in the live classroom.
+- **Verification:** Strict TDD; touched test files, lint and typecheck. No full suite, build, e2e or visual review.
+- **Next step:** Visual check with two users against the backend that has `avatar:emote`.
+
+## 2026-11-26 — Profile streak uses the real gamification route (#149)
+
+- **Status:** completed
+- **Area / files:** `src/features/points/`, `src/test/msw/handlers.ts`, `e2e/{profile,daily-review}.spec.ts`, `docs/streak-and-badges.md`
+- **Change:** The streak reads `GET /gamification/me` with generated types; schema, mocks and the hidden badge showcase follow the real contract (earned badges only).
+- **Reason:** `/profile` always failed to load the streak: the client called a route that does not exist.
+- **Verification:** Strict TDD (service test failed first); touched test files, lint and typecheck. No full suite, build or e2e.
+- **Next step:** Check `/profile` against the running backend.
+
+## 2026-11-26 — Profile page redesign (#149)
+
+- **Status:** completed (not visually checked)
+- **Area / files:** `src/features/{profile,inventory,points}/`, `e2e/profile.spec.ts`, `docs/{routing,ui-inventory,streak-and-badges}.md`
+- **Change:** Sticky avatar preview beside a name field and Cuerpo/Pelo/Ropa/Accesorios tabs; picture cards with clear chosen and locked states; locked items link to the shop; accessories one part at a time with a clear classroom and instant save; streak and email moved to a small footer; medals hidden (code kept).
+- **Reason:** The owner rejected the previous page: weak hierarchy, no item previews and a poor selector.
+- **Verification:** Strict TDD on the profile page tests; inventory panel tests, lint and typecheck. No full suite, build, e2e (spec updated, not run) or visual review.
+- **Next step:** Visual check at desktop and 360px.
+
+## 2026-11-26 — Shop previews for hair styles and tops (#149)
+
+- **Status:** completed (not visually checked)
+- **Area / files:** `src/features/shop/`, `docs/classroom-shop.md`
+- **Change:** Hair styles and tops render worn by the avatar body instead of an illustration; `AvatarThumbnail` exposes the same thumbnails by style id or accessory code and body. The preview renderer now releases its WebGL context when idle.
+- **Reason:** Students could not see what they were buying.
+- **Verification:** Strict TDD on the touched test files, lint and typecheck. No full suite, build, e2e or visual review.
+- **Next step:** Visual check of the framing in the shop.
+
+## 2026-11-26 — Welcome scene face, outfit and backdrop fixes (#149)
+
+- **Status:** completed (not visually checked)
+- **Area / files:** `src/features/world/{avatar,preview}/`, `src/features/world/world-canvas.tsx`, `src/features/profile/avatar-preview-3d.tsx`, `src/app/router/auth-layout.tsx`, `src/styles/`, `docs/`
+- **Change:** Avatars rest on a neutral face (slightly happy on the welcome scene and profile preview); public gestures are Wave, Cheer, Clap and Dance; the outfit no longer cycles and the character and scenery change only on reload; a warm gradient backdrop replaces the near-white one.
+- **Reason:** Characters looked sad because both body GLBs ship with `Sad` on; the outfit changed while the page was open; the scene's near-white clear color looked bad.
+- **Verification:** Strict TDD on the touched test files, lint and typecheck. Full suite, build, e2e and visual review not run.
+- **Next step:** Visual check of the face, backdrop and frame on `/login` and the profile preview.
+
 ## 2026-11-25 — Avatar voice calls (#141)
 
 - **Status:** completed (pending CI and merge of the PR)
@@ -8,6 +98,68 @@
 - **Reason:** Free voice calls on the current deploy (Amplify plus one EC2 running Colyseus); back counterpart integratec-final-back#149.
 - **Verification:** Per-task strict TDD, lint and typecheck; once before the PR `--changed origin/develop`, build and `security:check`; native review on each task; manual test by Agustin with two sessions (audio, framing, reactions, teacher panel). Screenshots skipped (docs only).
 - **Next step:** CI green and merge.
+
+## 2026-11-25 — Avatar customization rework (#149)
+
+- **Status:** completed (design not reviewed)
+- **Area / files:** `src/features/profile/`, `src/features/inventory/profile-inventory-section.tsx`, `src/features/world/preview/use-show-step.ts`, `docs/routing.md`
+- **Change:** The profile avatar section is now one customization workspace: large animated front preview, choices grouped by category, and the per-classroom inventory inside it, with the preview wearing that classroom's accessories.
+- **Reason:** The customization area had never had its visual rework.
+- **Verification:** Strict TDD on the touched test files, lint, typecheck, build and `security:check`. No visual review; `docs/assets/profile/` screenshots are stale.
+- **Next step:** Visual review at 1280px and 360px, then refresh the screenshots.
+
+## 2026-11-25 — Review fixes for the welcome scene, desk map and bot skins (#149)
+
+- **Status:** completed
+- **Area / files:** `src/features/world/preview/`, `src/features/world/npc/`, `src/features/classrooms/{desks,settings}/`, `src/realtime/client.test.ts`, `docs/3d-assets.md`
+- **Change:** Wide side pieces are shrunk to fit the 16:9 frame; an unexpected `deskDecor` value only empties its own desk. Added coverage for every character model and for clearing a synced desk decor. Parts a bot skin hides now stay unmerged although they load as groups, and settings send the skin only when changed.
+- **Reason:** Review findings: cut-off scenery, one bad desk failing the whole map, skins not hiding the real bot parts and unrelated saves resetting an unknown skin.
+- **Verification:** Touched tests, lint and typecheck. Not checked visually.
+- **Next step:** F5 customization rework.
+
+## 2026-11-25 — Tutor bot skins and selector (#149)
+
+- **Status:** completed (not visually checked)
+- **Area / files:** `src/features/world/npc/`, `src/features/world/asset-cache.ts`, `src/features/classrooms/` (settings, schema, presence, 3D stage, desk schema), `src/realtime/`, `src/api/schema.generated.ts`, `src/test/msw/handlers.ts`, `docs/3d-assets.md`
+- **Change:** Staff pick the bot skin in classroom settings; the bot wears the synced value. Embedded textures now load through an image element, so skinned and cat textures work under the unchanged CSP. Contracts synced from back `ff6cb8e`, replacing the local `deskDecor` type.
+- **Reason:** The seven merged skins were unused; back counterpart integratec-final-back#154.
+- **Verification:** Strict TDD on the touched test files, lint, typecheck and `security:check`. Full suite, e2e and visual review not run.
+- **Next step:** Visual review of each skin and of the cat texture in a real browser.
+
+## 2026-11-25 — Animated 3D welcome scene on the public screens (#149)
+
+- **Status:** completed (not visually checked)
+- **Area / files:** `src/features/world/preview/`, `src/features/world/{camera,world-canvas}.ts*`, `src/app/router/auth-layout.tsx`, `docs/{3d-assets,routing}.md`
+- **Change:** The auth layout's placeholder is now a front view with a random character that waves, animates and changes outfits beside random scenery, lazy-loaded with a quiet fallback.
+- **Reason:** Preview areas had no 3D scene.
+- **Verification:** Strict TDD on the touched test files, lint, typecheck, build and `security:check`. Full suite, e2e and visual review not run.
+- **Next step:** Visual review of framing and scenery positions at 1280px and 360px.
+
+## 2026-11-25 — Desk decor on each student's desk (#149)
+
+- **Status:** completed (not visually checked)
+- **Area / files:** `src/features/world/classroom/` (`desk-decor.ts`, kit manifest, scene), `src/features/classrooms/` (desk map schema, presence, 3D stage), `src/realtime/client.ts`, `src/features/shop/item-preview-source.ts`, `src/test/msw/handlers.ts`, `docs/art/classroom-desk-decor.md`
+- **Change:** Each desk shows the student's equipped `desk_decor` item (synced value first, desk map otherwise) and the shop previews the same seven models.
+- **Reason:** Desk upgrades were not visible anywhere; back counterpart integratec-final-back#154.
+- **Verification:** Strict TDD on the touched test files, lint and typecheck. Full suite, build, e2e and visual review not run.
+- **Next step:** Visual review; run `pnpm api:sync` to replace the local `deskDecor` type extension.
+
+## 2026-11-25 — Equip hand, neck and ear accessories from the inventory (#149)
+
+- **Status:** completed
+- **Area / files:** `src/features/inventory/`, `src/api/schema.generated.ts`, `src/realtime/contracts.generated.ts`, `src/test/msw/handlers.ts`, appearance fixtures in `src/realtime/client.test.ts`, `src/features/classrooms/classroom-presence.test.tsx` and `e2e/inventory.spec.ts`, `docs/ui-inventory.md`
+- **Change:** The inventory offers `Mano`, `Cuello` and `Orejas` rows to equip and unequip; types were regenerated from back commit `cb46656` (`pnpm api:sync --backend-dir`), which also brings the already published `INVITEE` registration path.
+- **Reason:** Students could buy these accessories but not wear them; back counterpart integratec-final-back#154.
+- **Verification:** Strict TDD on the touched test files, lint and typecheck. Full suite, build, e2e and visual evidence not run.
+- **Next step:** Deploy together with the back API and realtime services; refresh inventory screenshots during visual review.
+
+## 2026-11-25 — Hand, neck and ear accessories and shop 3D preview (#149)
+
+- **Status:** completed
+- **Area / files:** `src/features/world/avatar/`, `src/features/shop/`, `src/realtime/client.ts`, `src/features/classrooms/use-classroom-presence.ts`, `docs/art/{hand-items,neck-ears}.md`
+- **Change:** Added the `hand`, `neck` and `ears` slots to the avatar catalog (19 items, colors mirroring the shop seed), the part plan and the synced equipped codes; the shop preview now resolves every accessory from that catalog by shop code, tints only `AvatarAccessoryTint` and poses skinned meshes.
+- **Reason:** The merged assets are unused and shop accessory previews fail; back counterpart integratec-final-back#154.
+- **Next step:** Equip and inventory UI (entry above).
 
 ## 2026-11-25 — Study guide bot material contract fix
 

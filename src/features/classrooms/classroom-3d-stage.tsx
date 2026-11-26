@@ -11,12 +11,21 @@ import {
   type RefObject,
 } from 'react';
 import { useNavigate } from 'react-router';
-import { CLASSROOM_LAYOUT, type AvatarInput } from '@/realtime';
+import {
+  CLASSROOM_LAYOUT,
+  type AvatarEmote,
+  type AvatarInput,
+} from '@/realtime';
+import type { AvatarEmotePlay } from '../world/avatar/avatar-model';
 import type {
   AvatarEquipped,
   Pose,
   RemoteClassroomParticipant,
 } from '../world';
+import {
+  resolveDeskDecor,
+  type LiveDeskDecor,
+} from '../world/classroom/desk-decor';
 import {
   deriveClassroomInteractables,
   indexClassroomInteractables,
@@ -35,6 +44,7 @@ import {
   canTargetByProximity,
   proximityActionLabel,
 } from './classroom-proximity';
+import { ClassroomEmotes } from './classroom-emotes';
 import { useClassroomDesks } from './desks/classroom-desks-api';
 import { classroomMessages } from './messages';
 import { useOptionalClassroomPanels } from './panels/classroom-panels';
@@ -49,6 +59,8 @@ export interface Classroom3DStageProps {
   readonly petName?: string | null;
   readonly selfPose?: Pose | undefined;
   readonly selfEquipped?: AvatarEquipped | undefined;
+  /** Synced desk decor of connected members; wins over the desk map. */
+  readonly liveDeskDecor?: LiveDeskDecor | undefined;
   readonly connectionKey?: string | undefined;
   readonly frozen?: boolean | undefined;
   readonly remoteParticipants?:
@@ -56,6 +68,7 @@ export interface Classroom3DStageProps {
   readonly onIntentChange?: ((intent: AvatarInput) => void) | undefined;
   /** Synced NPC state by id; the tutor bot rests at home while it is absent. */
   readonly npcs?: NpcViews | undefined;
+  readonly tutorBotSkin?: string | undefined;
   /** Text of an NPC phrase reaction, resolved from its synced phrase id. */
   readonly resolveNpcPhrase?:
     ((npc: NpcView) => string | undefined) | undefined;
@@ -64,6 +77,11 @@ export interface Classroom3DStageProps {
    * the synced NPC map). The realtime layer sends `npc:interact` from here.
    */
   readonly onInteractNpc?: ((npcId: string) => void) | undefined;
+  /** Emotes can be sent right now (live connection). */
+  readonly canEmote?: boolean | undefined;
+  readonly onSendEmote?: ((emote: AvatarEmote) => boolean) | undefined;
+  /** Emote the local avatar is playing, as announced by the room. */
+  readonly selfEmote?: AvatarEmotePlay | undefined;
   /** Fired when the canvas measures sustained low fps (#56). */
   readonly onSustainedLowFps?: () => void;
   /**
@@ -144,13 +162,18 @@ export function Classroom3DStage({
   petName,
   selfPose,
   selfEquipped,
+  liveDeskDecor,
   connectionKey,
   frozen,
   remoteParticipants,
   onIntentChange,
   npcs,
+  tutorBotSkin,
   resolveNpcPhrase,
   onInteractNpc,
+  canEmote,
+  onSendEmote,
+  selfEmote,
   onSustainedLowFps,
   topSlot,
   presenceSlot,
@@ -166,13 +189,18 @@ export function Classroom3DStage({
       petName={petName}
       selfPose={selfPose}
       selfEquipped={selfEquipped}
+      liveDeskDecor={liveDeskDecor}
       connectionKey={connectionKey}
       frozen={frozen}
       remoteParticipants={remoteParticipants}
       onIntentChange={onIntentChange}
       npcs={npcs}
+      tutorBotSkin={tutorBotSkin}
       resolveNpcPhrase={resolveNpcPhrase}
       onInteractNpc={onInteractNpc}
+      canEmote={canEmote}
+      onSendEmote={onSendEmote}
+      selfEmote={selfEmote}
       onSustainedLowFps={onSustainedLowFps}
       topSlot={topSlot}
       presenceSlot={presenceSlot}
@@ -190,6 +218,8 @@ const INTERACTABLES_BY_ID = indexClassroomInteractables(ALL_INTERACTABLES);
 
 /** Without a realtime connection (previews, tests) interacting with an NPC does nothing. */
 const NOOP_INTERACT_NPC = (): void => undefined;
+
+const NOOP_SEND_EMOTE = (): boolean => false;
 
 /** Pet greetings fade on their own; errors with a retry never do. */
 const PET_FEEDBACK_MS = 3500;
@@ -212,13 +242,18 @@ function Classroom3DStageContent({
   petName,
   selfPose,
   selfEquipped,
+  liveDeskDecor,
   connectionKey,
   frozen,
   remoteParticipants,
   onIntentChange,
   npcs,
+  tutorBotSkin,
   resolveNpcPhrase,
   onInteractNpc = NOOP_INTERACT_NPC,
+  canEmote = false,
+  onSendEmote = NOOP_SEND_EMOTE,
+  selfEmote,
   onSustainedLowFps,
   topSlot,
   presenceSlot,
@@ -230,15 +265,21 @@ function Classroom3DStageContent({
   readonly petName?: string | null;
   readonly selfPose?: Pose | undefined;
   readonly selfEquipped?: AvatarEquipped | undefined;
+  /** Synced desk decor of connected members; wins over the desk map. */
+  readonly liveDeskDecor?: LiveDeskDecor | undefined;
   readonly connectionKey?: string | undefined;
   readonly frozen?: boolean | undefined;
   readonly remoteParticipants?:
     readonly RemoteClassroomParticipant[] | undefined;
   readonly onIntentChange?: ((intent: AvatarInput) => void) | undefined;
   readonly npcs?: NpcViews | undefined;
+  readonly tutorBotSkin?: string | undefined;
   readonly resolveNpcPhrase?:
     ((npc: NpcView) => string | undefined) | undefined;
   readonly onInteractNpc?: ((npcId: string) => void) | undefined;
+  readonly canEmote?: boolean | undefined;
+  readonly onSendEmote?: ((emote: AvatarEmote) => boolean) | undefined;
+  readonly selfEmote?: AvatarEmotePlay | undefined;
   readonly onSustainedLowFps?: () => void;
   readonly topSlot?: ReactNode;
   readonly presenceSlot?: ReactNode;
@@ -255,6 +296,10 @@ function Classroom3DStageContent({
   const navigate = useNavigate();
   const panels = useOptionalClassroomPanels();
   const desks = useClassroomDesks(classroomId, classroomId.trim().length > 0);
+  const deskDecor = useMemo(
+    () => resolveDeskDecor(desks.items, liveDeskDecor),
+    [desks.items, liveDeskDecor],
+  );
 
   const [highlightedId, setHighlightedId] = useState<string | undefined>(
     undefined,
@@ -493,6 +538,8 @@ function Classroom3DStageContent({
                 scopeKey={scopeKey}
                 selfPose={selfPose}
                 selfEquipped={selfEquipped}
+                selfEmote={selfEmote}
+                deskDecor={deskDecor}
                 connectionKey={connectionKey}
                 frozen={frozen}
                 remoteParticipants={remoteParticipants}
@@ -510,6 +557,7 @@ function Classroom3DStageContent({
                   anchorProximityPrompt(promptAnchorRef.current, anchor)
                 }
                 npcs={npcs}
+                tutorBotSkin={tutorBotSkin}
                 resolveNpcPhrase={resolveNpcPhrase}
                 onNpcSpeech={setNpcSpeech}
                 onNpcSpeechAnchor={(anchor) =>
@@ -547,7 +595,11 @@ function Classroom3DStageContent({
             </p>
           )}
         </div>
-        <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4">
+        <div className="absolute bottom-3 left-3 flex flex-col items-start gap-2 sm:bottom-4 sm:left-4">
+          <ClassroomEmotes
+            available={canEmote && !interactionLocked}
+            onSelect={onSendEmote}
+          />
           {presenceSlot}
         </div>
         <ProximityPrompt

@@ -134,6 +134,7 @@ const teacherPayload: ClassroomDetailPayload = {
   chatMuted: false,
   collaborationLocked: false,
   gamesDisabled: false,
+  tutorBotSkin: 'none',
   myRole: 'TEACHER',
   capabilities: ['moderate_chat'],
   deskCount: 0,

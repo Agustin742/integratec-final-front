@@ -6,6 +6,10 @@ import { Avatar } from './avatar.generated';
 import { EquippedItemView } from './equipped-item-view.generated';
 import { Npc } from './npc.generated';
 import {
+  AVATAR_EMOTE_COOLDOWN_MS,
+  AVATAR_EMOTE_MESSAGE,
+  AVATAR_EMOTED_EVENT,
+  AVATAR_EMOTES,
   AVATAR_INPUT_MESSAGE,
   CLASSROOM_ROOM_NAME,
   CLOSE_CODE_ACCESS_REVOKED,
@@ -682,6 +686,9 @@ describe('createClassroomRealtimeClient (#23)', () => {
     };
     appearance.items.set('head', item('head', 'head_crown'));
     appearance.items.set('back', item('back', 'back_wings'));
+    appearance.items.set('hand', item('hand', 'hand_mate'));
+    appearance.items.set('neck', item('neck', 'neck_scarf'));
+    appearance.items.set('ears', item('ears', 'ears_earrings'));
     avatar.appearance = appearance;
     sdk.setJoinHandler(async () => room);
     const client = createClassroomRealtimeClient({
@@ -693,7 +700,14 @@ describe('createClassroomRealtimeClient (#23)', () => {
     await client.connect(CLASSROOM_A);
     expect(
       client.getSnapshot().participants.get('schema-user')?.avatar?.equipped,
-    ).toEqual({ head: 'head_crown', face: null, back: 'back_wings' });
+    ).toEqual({
+      head: 'head_crown',
+      face: null,
+      back: 'back_wings',
+      hand: 'hand_mate',
+      neck: 'neck_scarf',
+      ears: 'ears_earrings',
+    });
 
     client.dispose();
   });
@@ -738,6 +752,38 @@ describe('createClassroomRealtimeClient (#23)', () => {
     ]);
     expect(client.interactNpc('dragon')).toBe(false);
     expect(room.sentMessages).toHaveLength(1);
+    client.dispose();
+  });
+
+  it('sends only a listed avatar emote while connected (#154)', async () => {
+    const { auth } = createFakeAuth('valid-token');
+    const sdk = createFakeSdk();
+    const room = new FakeRoom({ classroomId: CLASSROOM_A });
+    sdk.setJoinHandler(async () => room);
+    const client = createClassroomRealtimeClient({
+      auth,
+      realtimeUrl: 'wss://realtime.example.invalid',
+      createSdkClient: sdk.createSdkClient,
+    });
+
+    expect(AVATAR_EMOTES).toEqual([
+      'Wave',
+      'Cheer',
+      'Clap',
+      'Dance',
+      'RaiseHand',
+    ]);
+    expect(AVATAR_EMOTE_MESSAGE).toBe('avatar:emote');
+    expect(AVATAR_EMOTED_EVENT).toBe('avatar:emoted');
+    expect(AVATAR_EMOTE_COOLDOWN_MS).toBe(3000);
+    expect(client.sendEmote('Wave')).toBe(false);
+    await client.connect(CLASSROOM_A);
+    expect(client.sendEmote('Wave')).toBe(true);
+    expect(client.sendEmote('Backflip' as 'Wave')).toBe(false);
+    expect(room.sentMessages).toEqual([
+      { type: AVATAR_EMOTE_MESSAGE, payload: { emote: 'Wave' } },
+    ]);
+
     client.dispose();
   });
 
@@ -1105,7 +1151,7 @@ describe('createClassroomRealtimeClient (#23)', () => {
     client.dispose();
   });
 
-  it('exposes the equipped head, face and back item codes of a participant', async () => {
+  it('exposes the equipped accessory item codes of a participant', async () => {
     const { auth } = createFakeAuth('valid-token');
     const sdk = createFakeSdk();
     const room = new FakeRoom({ classroomId: CLASSROOM_A });
@@ -1139,6 +1185,9 @@ describe('createClassroomRealtimeClient (#23)', () => {
         face: null,
         back: item('back', 'back_wings'),
         desk_decor: item('desk_decor', 'desk_plant'),
+        hand: null,
+        neck: item('neck', 'neck_bandana'),
+        ears: null,
       },
     });
     sdk.setJoinHandler(async () => room);
@@ -1151,7 +1200,18 @@ describe('createClassroomRealtimeClient (#23)', () => {
     await client.connect(CLASSROOM_A);
     expect(
       client.getSnapshot().participants.get('equipped-user')?.avatar?.equipped,
-    ).toEqual({ head: 'head_crown', face: null, back: 'back_wings' });
+    ).toEqual({
+      head: 'head_crown',
+      face: null,
+      back: 'back_wings',
+      hand: null,
+      neck: 'neck_bandana',
+      ears: null,
+    });
+    expect(
+      client.getSnapshot().participants.get('equipped-user')?.avatar
+        ?.deskDecorCode,
+    ).toBe('desk_plant');
 
     client.dispose();
   });
@@ -1186,6 +1246,9 @@ describe('createClassroomRealtimeClient (#23)', () => {
         face: null,
         back: null,
         desk_decor: null,
+        hand: null,
+        neck: null,
+        ears: null,
       },
     });
     sdk.setJoinHandler(async () => room);
@@ -1235,6 +1298,76 @@ describe('createClassroomRealtimeClient (#23)', () => {
       rotation: 1.2,
     });
 
+    client.dispose();
+  });
+});
+
+describe('synced tutor bot skin', () => {
+  it('follows the room state', async () => {
+    const { auth } = createFakeAuth('valid-token');
+    const sdk = createFakeSdk();
+    const room = new FakeRoom({ classroomId: CLASSROOM_A });
+    sdk.setJoinHandler(async () => room);
+    const client = createClassroomRealtimeClient({
+      auth,
+      realtimeUrl: 'wss://realtime.example.invalid',
+      createSdkClient: sdk.createSdkClient,
+    });
+    await client.connect(CLASSROOM_A);
+    expect(client.getSnapshot().tutorBotSkin).toBeUndefined();
+
+    (room.state as unknown as { tutorBotSkin: string }).tutorBotSkin = 'gamer';
+    room.emitStateChange();
+
+    expect(client.getSnapshot().tutorBotSkin).toBe('gamer');
+    client.dispose();
+  });
+});
+
+describe('synced desk decor', () => {
+  it('follows a participant who only has desk_decor, until it is cleared', async () => {
+    const { auth } = createFakeAuth('valid-token');
+    const sdk = createFakeSdk();
+    const room = new FakeRoom({ classroomId: CLASSROOM_A });
+    room.setAvatar('decor-user', { displayName: 'Valentina', role: 'STUDENT' });
+    const appearance = (
+      items: Record<string, unknown>,
+    ): Record<string, unknown> => ({
+      bodyId: 'female',
+      hairId: 'afro',
+      topId: 'hoodie',
+      hairColor: '#AF6D63',
+      clothingColor: '#7EBA8B',
+      items,
+    });
+    const synced = room.state.avatars.get('decor-user') as unknown as Omit<
+      Avatar,
+      'appearance'
+    > & { appearance?: unknown };
+    setLooseAppearance(
+      synced,
+      appearance({
+        desk_decor: { slot: 'desk_decor', shopItemCode: 'desk_lamp' },
+      }),
+    );
+    sdk.setJoinHandler(async () => room);
+    const client = createClassroomRealtimeClient({
+      auth,
+      realtimeUrl: 'wss://realtime.example.invalid',
+      createSdkClient: sdk.createSdkClient,
+    });
+    const avatar = () =>
+      client.getSnapshot().participants.get('decor-user')?.avatar;
+
+    await client.connect(CLASSROOM_A);
+    expect(avatar()?.deskDecorCode).toBe('desk_lamp');
+    expect(avatar()?.equipped).toBeUndefined();
+
+    setLooseAppearance(synced, appearance({}));
+    room.emitStateChange();
+
+    expect(avatar()).toBeDefined();
+    expect(avatar()?.deskDecorCode).toBeUndefined();
     client.dispose();
   });
 });

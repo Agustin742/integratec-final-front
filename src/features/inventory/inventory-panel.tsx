@@ -9,7 +9,7 @@ import {
   type RefObject,
 } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import { ApiError } from '@/api/errors';
 import {
   classroomEquipmentQueryKey,
@@ -24,10 +24,22 @@ import {
   StaleDataNotice,
 } from '@/components/feedback/states';
 import { Button } from '@/components/ui/button';
+import type { AvatarBodyId } from '@/features/world/avatar/accessory-catalog';
 import { cn } from '@/lib/utils';
 import { useSessionService, useSessionSnapshot } from '@/session/provider';
 import { useClassroomContext } from '../classrooms/use-classroom-capabilities';
-import type { StudentPurchaseDto } from '../shop/shop-schema';
+import {
+  CHOICE_GRID_CLASS,
+  choiceCardClass,
+  CornerMark,
+  LockGlyph,
+} from '../profile/choice-card';
+import { profileMessages } from '../profile/messages';
+import { AvatarThumbnail, ShopItemPreview } from '../shop/shop-item-preview';
+import type {
+  ShopCatalogItemDto,
+  StudentPurchaseDto,
+} from '../shop/shop-schema';
 import { listAllShopItems, listAllShopPurchases } from '../shop/shop-service';
 import { getSlotLabel, inventoryMessages } from './inventory-messages';
 import {
@@ -57,6 +69,18 @@ export interface InventoryPanelProps {
    * leave off when embedded (shop dialog tab, profile) so focus is not stolen.
    */
   readonly focusHeadingOnMount?: boolean;
+  /**
+   * Profile presentation: picture cards, one part at a time, and the items not
+   * yet owned shown locked with a link to the shop.
+   */
+  readonly pictures?: PictureOptions;
+}
+
+export interface PictureOptions {
+  readonly bodyId: AvatarBodyId;
+  /** Pictures are only drawn while the panel is on screen. */
+  readonly active: boolean;
+  readonly shopHref: string;
 }
 
 type SlotMutationStatus = 'idle' | 'pending' | 'confirmed' | 'rejected';
@@ -83,6 +107,7 @@ function deduplicatePurchases(
 export function InventoryPanel({
   classroomId: explicitClassroomId,
   focusHeadingOnMount = false,
+  pictures,
 }: InventoryPanelProps = {}) {
   const { classroomId: routeClassroomId } = useParams();
   const classroomId = (explicitClassroomId ?? routeClassroomId ?? '').trim();
@@ -96,6 +121,7 @@ export function InventoryPanel({
       classroomId={classroomId}
       userId={userId}
       focusHeadingOnMount={focusHeadingOnMount}
+      pictures={pictures}
     />
   );
 }
@@ -104,17 +130,21 @@ interface InventoryPanelScopedProps {
   readonly classroomId: string;
   readonly userId: string | null;
   readonly focusHeadingOnMount: boolean;
+  readonly pictures: PictureOptions | undefined;
 }
 
 function InventoryPanelScoped({
   classroomId,
   userId,
   focusHeadingOnMount,
+  pictures,
 }: InventoryPanelScopedProps) {
   const { client } = useSessionService();
   const queryClient = useQueryClient();
   const context = useClassroomContext(classroomId);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
+  const [activeSlot, setActiveSlot] = useState<EquippedSlotName>(SLOT_NAMES[0]);
+  const compact = pictures !== undefined;
 
   const isStudent =
     context.status === 'ready' && context.classroom.myRole === 'STUDENT';
@@ -196,6 +226,9 @@ function InventoryPanelScoped({
       head: [],
       face: [],
       back: [],
+      hand: [],
+      neck: [],
+      ears: [],
       desk_decor: [],
     };
     for (const purchase of uniquePurchases) {
@@ -214,9 +247,25 @@ function InventoryPanelScoped({
     (slot) => purchasesBySlot[slot].length > 0,
   );
 
+  // Items of this classroom's shop the student could still buy.
+  const lockedItems = useMemo(() => {
+    const bought = new Set(uniquePurchases.map((p) => p.shopItemId));
+    return (catalogQuery.data?.items ?? []).flatMap((item) => {
+      const slot = resolveItemSlot(item.kind, item.metadata);
+      return slot !== null &&
+        !item.ownedByStudent &&
+        item.isImplemented &&
+        item.isPurchasable &&
+        !bought.has(item.id)
+        ? [{ slot, item }]
+        : [];
+    });
+  }, [catalogQuery.data?.items, uniquePurchases]);
+  const hasLockedCards = compact && lockedItems.length > 0;
+
   if (context.status === 'pending') {
     return (
-      <PanelShell headingRef={headingRef}>
+      <PanelShell headingRef={headingRef} compact={compact}>
         <LoadingState label={msgs.panel.loading} />
       </PanelShell>
     );
@@ -224,7 +273,7 @@ function InventoryPanelScoped({
 
   if (context.status === 'error') {
     return (
-      <PanelShell headingRef={headingRef}>
+      <PanelShell headingRef={headingRef} compact={compact}>
         <ErrorState
           title={msgs.errors.loadTitle}
           description={msgs.errors.loadError}
@@ -236,7 +285,7 @@ function InventoryPanelScoped({
 
   if (!isStudent) {
     return (
-      <PanelShell headingRef={headingRef}>
+      <PanelShell headingRef={headingRef} compact={compact}>
         <EmptyState
           title={msgs.panel.studentOnlyTitle}
           description={msgs.panel.studentOnlyDescription}
@@ -251,7 +300,7 @@ function InventoryPanelScoped({
     (catalogQuery.isLoading && catalogQuery.data === undefined)
   ) {
     return (
-      <PanelShell headingRef={headingRef}>
+      <PanelShell headingRef={headingRef} compact={compact}>
         <LoadingState label={msgs.panel.loading} />
       </PanelShell>
     );
@@ -267,7 +316,7 @@ function InventoryPanelScoped({
     const userMessage =
       err instanceof ApiError ? err.userMessage : msgs.errors.loadError;
     return (
-      <PanelShell headingRef={headingRef}>
+      <PanelShell headingRef={headingRef} compact={compact}>
         <ErrorState
           title={msgs.errors.loadTitle}
           description={userMessage}
@@ -283,9 +332,9 @@ function InventoryPanelScoped({
 
   const equipment = equipmentQuery.data;
 
-  if (uniquePurchases.length === 0) {
+  if (uniquePurchases.length === 0 && !hasLockedCards) {
     return (
-      <PanelShell headingRef={headingRef}>
+      <PanelShell headingRef={headingRef} compact={compact}>
         <EmptyState
           title={msgs.empty.title}
           description={msgs.empty.description}
@@ -294,9 +343,9 @@ function InventoryPanelScoped({
     );
   }
 
-  if (!hasEquipablePurchases) {
+  if (!hasEquipablePurchases && !hasLockedCards) {
     return (
-      <PanelShell headingRef={headingRef}>
+      <PanelShell headingRef={headingRef} compact={compact}>
         <EmptyState
           title={msgs.empty.noEquipableTitle}
           description={msgs.empty.noEquipableDescription}
@@ -311,7 +360,11 @@ function InventoryPanelScoped({
     (catalogQuery.isError && catalogQuery.data !== undefined);
 
   return (
-    <PanelShell headingRef={headingRef} description={msgs.panel.description}>
+    <PanelShell
+      headingRef={headingRef}
+      description={msgs.panel.description}
+      compact={compact}
+    >
       {hasStaleError ? (
         <StaleDataNotice
           title={msgs.panel.staleTitle}
@@ -324,11 +377,57 @@ function InventoryPanelScoped({
         />
       ) : null}
 
+      {compact && (
+        <div
+          role="group"
+          aria-label={msgs.profile.slotsLabel}
+          className="flex flex-wrap gap-2"
+        >
+          {SLOT_NAMES.map((slot) => (
+            <button
+              key={slot}
+              type="button"
+              aria-pressed={slot === activeSlot}
+              onClick={() => setActiveSlot(slot)}
+              className={cn(
+                'motion-colors inline-flex min-h-11 items-center gap-1 rounded-full border-2 px-3 text-sm font-semibold focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                slot === activeSlot
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-edge bg-card text-foreground hover:bg-tray-hover',
+              )}
+            >
+              {slot === 'desk_decor'
+                ? msgs.profile.deskShort
+                : getSlotLabel(slot)}
+              {equipment?.slots[slot] ? (
+                <>
+                  <CheckIcon className="size-3" />
+                  <span className="sr-only">{msgs.profile.hasEquipped}</span>
+                </>
+              ) : null}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-col gap-4">
         {SLOT_NAMES.map((slot) => {
-          return (
+          const row = (
             <SlotRow
               key={slot}
+              pictures={
+                pictures && {
+                  ...pictures,
+                  active: pictures.active && slot === activeSlot,
+                }
+              }
+              locked={
+                compact
+                  ? lockedItems
+                      .filter((entry) => entry.slot === slot)
+                      .map((entry) => entry.item)
+                  : []
+              }
               slot={slot}
               equippedItem={equipment?.slots[slot] ?? null}
               purchases={purchasesBySlot[slot]}
@@ -362,6 +461,14 @@ function InventoryPanelScoped({
               }}
             />
           );
+          // Hidden rows stay mounted, so a pending or rejected equip is kept.
+          return compact ? (
+            <div key={slot} hidden={slot !== activeSlot}>
+              {row}
+            </div>
+          ) : (
+            row
+          );
         })}
       </div>
     </PanelShell>
@@ -371,6 +478,8 @@ function InventoryPanelScoped({
 interface PanelShellProps {
   readonly headingRef: RefObject<HTMLHeadingElement | null>;
   readonly description?: string;
+  /** The surrounding page already names the panel: heading for readers only. */
+  readonly compact?: boolean;
   readonly children: ReactNode;
 }
 
@@ -378,10 +487,15 @@ interface PanelShellProps {
  * Single shell for every panel state, so the heading element survives
  * loading -> ready transitions (focus and reading position are kept).
  */
-function PanelShell({ headingRef, description, children }: PanelShellProps) {
+function PanelShell({
+  headingRef,
+  description,
+  compact = false,
+  children,
+}: PanelShellProps) {
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
+    <div className={cn('flex flex-col', compact ? 'gap-3' : 'gap-6')}>
+      <div className={compact ? 'sr-only' : 'flex flex-col gap-1'}>
         <h2
           ref={headingRef}
           className="font-display text-xl font-semibold text-foreground"
@@ -405,6 +519,39 @@ interface SlotRowProps {
   readonly classroomId: string;
   readonly onEquipmentConfirmed: (updated: EquipmentStateDto) => void;
   readonly onReconcile: () => void;
+  readonly pictures: PictureOptions | undefined;
+  readonly locked: readonly ShopCatalogItemDto[];
+}
+
+/** Decorative: the card's text already names the item. */
+function ItemPicture({
+  slot,
+  code,
+  name,
+  pictures,
+}: {
+  readonly slot: EquippedSlotName;
+  readonly code: string;
+  readonly name: string;
+  readonly pictures: PictureOptions;
+}) {
+  return (
+    <span aria-hidden="true" className="block aspect-square w-full">
+      {!pictures.active ? null : slot === 'desk_decor' ? (
+        <ShopItemPreview
+          item={{ kind: 'DESK_UPGRADE', code, name, metadata: {} }}
+          className="rounded-xl"
+        />
+      ) : (
+        <AvatarThumbnail
+          item={{ type: 'accessory', code }}
+          bodyId={pictures.bodyId}
+          name={name}
+          className="rounded-xl"
+        />
+      )}
+    </span>
+  );
 }
 
 function CheckIcon({ className }: { readonly className?: string }) {
@@ -448,6 +595,8 @@ function SlotRow({
   classroomId,
   onEquipmentConfirmed,
   onReconcile,
+  pictures,
+  locked,
 }: SlotRowProps) {
   const { client } = useSessionService();
   const headingId = useId();
@@ -565,7 +714,10 @@ function SlotRow({
   return (
     <section
       aria-labelledby={headingId}
-      className="flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-surface p-4"
+      className={cn(
+        'flex min-w-0 flex-col gap-3',
+        !pictures && 'rounded-xl border border-border bg-surface p-4',
+      )}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3
@@ -591,68 +743,140 @@ function SlotRow({
         ) : null}
       </div>
 
-      {purchases.length === 0 ? (
+      {purchases.length === 0 && locked.length === 0 ? (
         <p className="text-sm text-muted-foreground">{msgs.empty.slotHint}</p>
       ) : (
         <div
-          role="radiogroup"
-          aria-labelledby={headingId}
-          className="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2"
+          className={
+            pictures
+              ? CHOICE_GRID_CLASS
+              : 'grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2'
+          }
         >
-          {purchases.map((purchase, index) => {
-            const isChecked = purchase.shopItemId === equippedId;
-            return (
-              <button
-                key={purchase.shopItemId}
-                ref={(node) => {
-                  if (node) {
-                    tileRefs.current.set(purchase.shopItemId, node);
-                  } else {
-                    tileRefs.current.delete(purchase.shopItemId);
-                  }
-                }}
-                type="button"
-                role="radio"
-                aria-checked={isChecked}
-                aria-disabled={isPending ? true : undefined}
-                data-item-name={purchase.shopItemName}
-                tabIndex={purchase.shopItemId === tabStopId ? 0 : -1}
-                onClick={() => handleSelect(purchase.shopItemId)}
-                onKeyDown={(event) => handleKeyDown(event, index)}
-                className={cn(
-                  'flex min-h-24 min-w-0 flex-col justify-between gap-2 rounded-xl border-2 p-3 text-left transition-colors focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring aria-disabled:cursor-wait aria-disabled:opacity-70',
-                  isChecked
-                    ? 'border-success-foreground bg-success text-success-foreground'
-                    : 'border-edge bg-card text-card-foreground hover:bg-tray-hover',
-                )}
-              >
-                <span className="flex items-start justify-between gap-2">
-                  <span className="min-w-0 break-words text-sm font-semibold">
-                    {purchase.shopItemName}
-                  </span>
-                  <span
-                    aria-hidden="true"
+          {purchases.length > 0 && (
+            <div
+              role="radiogroup"
+              aria-labelledby={headingId}
+              className="contents"
+            >
+              {purchases.map((purchase, index) => {
+                const isChecked = purchase.shopItemId === equippedId;
+                return (
+                  <button
+                    key={purchase.shopItemId}
+                    ref={(node) => {
+                      if (node) {
+                        tileRefs.current.set(purchase.shopItemId, node);
+                      } else {
+                        tileRefs.current.delete(purchase.shopItemId);
+                      }
+                    }}
+                    type="button"
+                    role="radio"
+                    aria-checked={isChecked}
+                    aria-disabled={isPending ? true : undefined}
+                    data-item-name={purchase.shopItemName}
+                    tabIndex={purchase.shopItemId === tabStopId ? 0 : -1}
+                    onClick={() => handleSelect(purchase.shopItemId)}
+                    onKeyDown={(event) => handleKeyDown(event, index)}
                     className={cn(
-                      'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border-2',
-                      isChecked
-                        ? 'border-success-foreground bg-success-foreground text-success'
-                        : 'border-field-border bg-background',
+                      'focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring aria-disabled:cursor-wait aria-disabled:opacity-70',
+                      pictures
+                        ? choiceCardClass({ selected: isChecked })
+                        : cn(
+                            'flex min-h-24 min-w-0 flex-col justify-between gap-2 rounded-xl border-2 p-3 text-left transition-colors',
+                            isChecked
+                              ? 'border-success-foreground bg-success text-success-foreground'
+                              : 'border-edge bg-card text-card-foreground hover:bg-tray-hover',
+                          ),
                     )}
                   >
-                    {isChecked ? <CheckIcon className="size-3" /> : null}
+                    {pictures ? (
+                      <>
+                        <span className="relative block w-full p-1">
+                          <ItemPicture
+                            slot={slot}
+                            code={purchase.shopItemCode}
+                            name={purchase.shopItemName}
+                            pictures={pictures}
+                          />
+                          {isChecked && <CornerMark kind="selected" />}
+                        </span>
+                        <span className="flex flex-1 items-center justify-center self-center px-1 pb-2 text-sm leading-tight font-semibold">
+                          {purchase.shopItemName}
+                        </span>
+                        {isChecked && (
+                          <span className="w-full bg-primary py-1 text-xs font-bold text-primary-foreground">
+                            {msgs.actions.equipped}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex items-start justify-between gap-2">
+                          <span className="min-w-0 break-words text-sm font-semibold">
+                            {purchase.shopItemName}
+                          </span>
+                          <span
+                            aria-hidden="true"
+                            className={cn(
+                              'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border-2',
+                              isChecked
+                                ? 'border-success-foreground bg-success-foreground text-success'
+                                : 'border-field-border bg-background',
+                            )}
+                          >
+                            {isChecked ? (
+                              <CheckIcon className="size-3" />
+                            ) : null}
+                          </span>
+                        </span>
+                        <span className="flex min-h-5 items-center gap-1 text-sm font-semibold">
+                          {isChecked ? (
+                            <>
+                              <CheckIcon />
+                              {msgs.actions.equipped}
+                            </>
+                          ) : null}
+                        </span>
+                      </>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {pictures &&
+            locked.map((item) => (
+              <Link
+                key={item.id}
+                to={pictures.shopHref}
+                aria-label={profileMessages.avatar.shopLinkLabel(item.name)}
+                className={cn(
+                  choiceCardClass({ selected: false, locked: true }),
+                  'focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                )}
+              >
+                <span className="relative block p-1">
+                  <span className="block opacity-55 grayscale">
+                    <ItemPicture
+                      slot={slot}
+                      code={item.code}
+                      name={item.name}
+                      pictures={pictures}
+                    />
                   </span>
+                  <CornerMark kind="locked" />
                 </span>
-                <span className="flex min-h-5 items-center gap-1 text-sm font-semibold">
-                  {isChecked ? (
-                    <>
-                      <CheckIcon />
-                      {msgs.actions.equipped}
-                    </>
-                  ) : null}
+                <span className="flex flex-1 items-center justify-center px-1 pb-2 text-sm leading-tight font-semibold">
+                  {item.name}
                 </span>
-              </button>
-            );
-          })}
+                <span className="flex items-center justify-center gap-1 bg-tray py-1 text-xs font-bold underline underline-offset-2">
+                  <LockGlyph className="size-3" />
+                  {profileMessages.avatar.shopCta}
+                </span>
+              </Link>
+            ))}
         </div>
       )}
 

@@ -1,11 +1,11 @@
 # Inventory Selector (`HU-ESP-004`, part 1/2)
 
-The 2D inventory selector lets enrolled students inspect their classroom-scoped purchased avatar accessories (`head`, `face`, `back`) and desk upgrades (`desk_decor`) and equip or unequip them per slot against the NestJS equipment endpoints.
+The 2D inventory selector lets enrolled students inspect their classroom-scoped purchased avatar accessories (`head`, `face`, `back`, `hand`, `neck`, `ears`) and desk upgrades (`desk_decor`) and equip or unequip them per slot against the NestJS equipment endpoints.
 
 ## Access points
 
 - **Classroom workspace (`shop` panel):** Open the `Tienda del aula` panel (2D mode or 3D stage) and switch to the **Mi inventario** tab (`ShopPanel` -> `InventoryPanel`).
-- **Profile (`/profile`):** The **Inventario por aula** section (`ProfileInventorySection`) lists the user's enrolled student classrooms and mounts `InventoryPanel` for the selected classroom.
+- **Profile (`/profile`):** The **Inventario por aula** section (`ProfileInventorySection`) lists the user's enrolled student classrooms and mounts `InventoryPanel` for the selected classroom with its `pictures` presentation: item thumbnails, one part at a time (`Parte a equipar` buttons), and unbought shop items shown locked with a link to the shop. The shop tab keeps the plain tiles.
 
 ## Behavior and authority
 

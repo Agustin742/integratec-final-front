@@ -15,9 +15,10 @@ export const profileMessages = {
   page: {
     title: 'Mi perfil',
     subtitle:
-      'Cambiá tu nombre y la apariencia base de tu avatar. Lo que guardes se mantiene en todos tus dispositivos.',
+      'Armá tu avatar y elegí tu nombre. Lo que guardes se mantiene en todos tus dispositivos.',
     emailLabel: 'Correo de la cuenta',
     emailNote: 'El correo no se puede editar desde acá.',
+    footerLabel: 'Tu racha y tu cuenta',
   },
   loading: 'Cargando tu perfil...',
   loadError: {
@@ -55,8 +56,22 @@ export const profileMessages = {
   },
   avatar: {
     heading: 'Avatar base',
-    description:
-      'Elegí cómo te ven en el aula. Los cambios son un borrador hasta que los guardes.',
+    categoriesLabel: 'Categorías de personalización',
+    categories: {
+      body: 'Cuerpo',
+      hair: 'Pelo',
+      clothing: 'Ropa',
+      accessories: 'Accesorios',
+    },
+    accessoriesNote:
+      'Los accesorios se guardan solos, apenas los equipás o los sacás.',
+    saveScopeNote:
+      'Cuerpo, pelo y ropa son un borrador: se guardan juntos con «Guardar avatar».',
+    chosen: 'Elegido',
+    shopCta: 'Ver en la tienda',
+    shopLinkLabel: (name: string) => `Ver ${name} en la tienda`,
+    previewClassroom: (classroom: string) =>
+      `Con los accesorios de ${classroom}`,
     previewHeading: 'Vista previa',
     previewNote:
       'Vista previa de tu selección. Si tu dispositivo no puede mostrar 3D, ves una versión 2D simplificada.',

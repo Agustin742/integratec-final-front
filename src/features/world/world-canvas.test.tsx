@@ -28,6 +28,7 @@ const renderer = vi.hoisted(() => ({
   failure: new Error('creation failed'),
   delayOnCreated: false,
   created: undefined as CanvasProps['onCreated'],
+  params: undefined as { alpha?: boolean } | undefined,
 }));
 const state = {
   camera: new OrthographicCamera(),
@@ -39,7 +40,8 @@ vi.mock('three', async (original) => ({
   WebGLRenderer: class {
     capabilities = { isWebGL2: true };
     extensions = { has: () => false, get: () => null };
-    constructor() {
+    constructor(params: { alpha?: boolean }) {
+      renderer.params = params;
       if (renderer.fail) throw renderer.failure;
     }
   },
@@ -448,4 +450,12 @@ test('centers the fallback below the floating top bar when fill is true', () => 
     'p-4',
     'pt-28',
   );
+});
+test('keeps the canvas opaque unless a transparent one is requested', () => {
+  const opaque = render(<WorldCanvas label="Technical world" />);
+  expect(renderer.params?.alpha).toBe(false);
+  opaque.unmount();
+
+  render(<WorldCanvas label="Decorative world" transparent />);
+  expect(renderer.params?.alpha).toBe(true);
 });

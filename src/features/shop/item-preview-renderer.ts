@@ -5,20 +5,34 @@ import {
   Mesh,
   MeshStandardMaterial,
   DirectionalLight,
+  type Object3D,
   PerspectiveCamera,
   SRGBColorSpace,
   Scene,
   Vector3,
   WebGLRenderer,
 } from 'three';
+import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import {
   clearAssetCache,
   configureKtx2RendererSupport,
   loadGlbAsset,
 } from '@/features/world/asset-cache';
+import {
+  ACCESSORY_TINT_MATERIAL,
+  composeAvatar,
+  HAIR_TINT_MATERIAL,
+  TOP_TINT_MATERIAL,
+} from '@/features/world/avatar/compose-avatar';
+import type { WornPreviewSource } from './item-preview-source';
 
 const PREVIEW_SIZE = 256;
 const SCOPE_KEY = 'shop-preview';
+/** Kept while the renderer lives: every style preview reuses the same body. */
+const BODY_SCOPE_KEY = 'shop-preview-body';
+/** Head bounds in body space, so that any hair style is framed on the head. */
+const HEAD_MIN = [-0.36, 0.8, -0.3] as const;
+const HEAD_MAX = [0.36, 1.28, 0.35] as const;
 const IDLE_DISPOSE_MS = 1500;
 
 const thumbnails = new Map<string, Promise<string>>();
@@ -37,10 +51,15 @@ function clearIdleTimer(): void {
 
 export function disposePreviewRenderer(): void {
   clearIdleTimer();
+  clearAssetCache({ scopeKey: BODY_SCOPE_KEY });
   if (renderer !== null) {
-    renderer.renderLists.dispose();
-    renderer.dispose();
+    const released = renderer;
     renderer = null;
+    released.renderLists.dispose();
+    released.dispose();
+    // `dispose` alone leaves the context alive until garbage collection, and
+    // browsers cap how many can exist.
+    released.forceContextLoss();
   }
   contextLost = false;
 }
@@ -73,10 +92,11 @@ function getRenderer(): WebGLRenderer {
     next.setClearColor(0x000000, 0);
     next.domElement.addEventListener('webglcontextlost', (event) => {
       event.preventDefault();
-      contextLost = true;
+      // A released renderer reports its own forced loss later: ignore it.
+      if (renderer === next) contextLost = true;
     });
     next.domElement.addEventListener('webglcontextrestored', () => {
-      contextLost = false;
+      if (renderer === next) contextLost = false;
     });
     configureKtx2RendererSupport(next);
     renderer = next;
@@ -84,16 +104,85 @@ function getRenderer(): WebGLRenderer {
   return renderer;
 }
 
-async function renderOnce(url: string, tint?: string): Promise<string> {
+/** What one job draws, and how to release what it created for it. */
+interface Subject {
+  readonly object: Object3D;
+  readonly frame: Box3;
+  dispose(): void;
+}
+
+async function loadModel(url: string, tint?: string): Promise<Subject> {
+  const gltf = await loadGlbAsset(url, { scopeKey: SCOPE_KEY });
+  // Accessories are skinned: a plain clone would keep the source bones, and
+  // unposed bones would misplace both the meshes and the framing box.
+  const model = cloneSkeleton(gltf.scene) as typeof gltf.scene;
+  model.updateMatrixWorld(true);
+  const clonedMaterials: MeshStandardMaterial[] = [];
+  if (tint !== undefined) {
+    model.traverse((node) => {
+      if (
+        node instanceof Mesh &&
+        node.material instanceof MeshStandardMaterial &&
+        node.material.name === ACCESSORY_TINT_MATERIAL
+      ) {
+        const cloned = node.material.clone();
+        cloned.color = new Color(tint);
+        clonedMaterials.push(cloned);
+        node.material = cloned;
+      }
+    });
+  }
+  return {
+    object: model,
+    frame: new Box3().setFromObject(model),
+    dispose: () => clonedMaterials.forEach((material) => material.dispose()),
+  };
+}
+
+/** Body wearing the part, framed on the part (and on the head for hair). */
+async function loadWorn(source: WornPreviewSource): Promise<Subject> {
+  const [body, part] = await Promise.all([
+    loadGlbAsset(source.bodyUrl, { scopeKey: BODY_SCOPE_KEY }),
+    loadGlbAsset(source.url, { scopeKey: SCOPE_KEY }),
+  ]);
+  // Parts are authored in body space, so their own bounds frame the avatar.
+  const placed = cloneSkeleton(part.scene);
+  placed.updateMatrixWorld(true);
+  const frame = new Box3().setFromObject(placed);
+  if (source.part === 'hair') {
+    frame.expandByPoint(new Vector3(...HEAD_MIN));
+    frame.expandByPoint(new Vector3(...HEAD_MAX));
+  }
+  const tintMaterial =
+    source.part === 'hair' ? HAIR_TINT_MATERIAL : TOP_TINT_MATERIAL;
+  const avatar = composeAvatar({
+    body: body.scene,
+    parts: [
+      {
+        key: source.part,
+        scene: part.scene,
+        tints: { [tintMaterial]: source.tint },
+      },
+    ],
+  });
+  if (avatar.skippedParts.length > 0) {
+    avatar.dispose();
+    throw new Error(`Preview part does not fit the body: ${source.url}`);
+  }
+  avatar.root.updateMatrixWorld(true);
+  return { object: avatar.root, frame, dispose: () => avatar.dispose() };
+}
+
+async function renderOnce(load: () => Promise<Subject>): Promise<string> {
   clearIdleTimer();
   activeJobs += 1;
-  const gl = getRenderer();
   let scene: Scene | null = null;
-  let model: Awaited<ReturnType<typeof loadGlbAsset>>['scene'] | null = null;
-  const clonedMaterials: MeshStandardMaterial[] = [];
+  let subject: Subject | null = null;
+  let gl: WebGLRenderer | null = null;
 
   try {
-    const gltf = await loadGlbAsset(url, { scopeKey: SCOPE_KEY });
+    gl = getRenderer();
+    subject = await load();
     if (contextLost || gl.getContext().isContextLost()) {
       disposePreviewRenderer();
       throw new Error('WebGL context lost before rendering shop preview.');
@@ -104,25 +193,10 @@ async function renderOnce(url: string, tint?: string): Promise<string> {
     const key = new DirectionalLight(0xfff3dc, 2.4);
     key.position.set(2, 3, 4);
     scene.add(key);
+    scene.add(subject.object);
 
-    model = gltf.scene.clone(true);
-    if (tint !== undefined) {
-      model.traverse((node) => {
-        if (
-          node instanceof Mesh &&
-          node.material instanceof MeshStandardMaterial
-        ) {
-          const cloned = node.material.clone();
-          cloned.color = new Color(tint);
-          clonedMaterials.push(cloned);
-          node.material = cloned;
-        }
-      });
-    }
-    scene.add(model);
-    const box = new Box3().setFromObject(model);
-    const center = box.getCenter(new Vector3());
-    const size = box.getSize(new Vector3());
+    const center = subject.frame.getCenter(new Vector3());
+    const size = subject.frame.getSize(new Vector3());
     const radius = Math.max(size.x, size.y, size.z, 0.001) / 2;
     const camera = new PerspectiveCamera(30, 1, 0.01, 100);
     const distance = (radius / Math.sin((camera.fov * Math.PI) / 360)) * 1.1;
@@ -140,13 +214,11 @@ async function renderOnce(url: string, tint?: string): Promise<string> {
     }
     return gl.domElement.toDataURL('image/png');
   } finally {
-    if (scene !== null && model !== null) {
-      scene.remove(model);
+    if (scene !== null && subject !== null) {
+      scene.remove(subject.object);
     }
-    for (const material of clonedMaterials) {
-      material.dispose();
-    }
-    gl.renderLists.dispose();
+    subject?.dispose();
+    gl?.renderLists.dispose();
     clearAssetCache({ scopeKey: SCOPE_KEY });
     activeJobs -= 1;
     if (activeJobs === 0) {
@@ -155,20 +227,14 @@ async function renderOnce(url: string, tint?: string): Promise<string> {
   }
 }
 
-/**
- * Renders one GLB to a PNG data URL on a single shared offscreen renderer.
- * Renders are serialized and cached per URL, so a grid of cards never owns a
- * live WebGL canvas: each preview is a static `<img>`. `tint` is the item's
- * `metadata.color`, applied to the model's base color.
- */
-export function renderGlbThumbnail(
-  url: string,
-  tint?: string,
+/** Serializes jobs on the single renderer and caches each result. */
+function enqueue(
+  cacheKey: string,
+  load: () => Promise<Subject>,
 ): Promise<string> {
-  const cacheKey = `${url}|${tint ?? ''}`;
   const cached = thumbnails.get(cacheKey);
   if (cached) return cached;
-  const job = queue.then(() => renderOnce(url, tint));
+  const job = queue.then(() => renderOnce(load));
   queue = job.catch(() => undefined);
   const promise = job.catch((error: unknown) => {
     thumbnails.delete(cacheKey);
@@ -176,4 +242,26 @@ export function renderGlbThumbnail(
   });
   thumbnails.set(cacheKey, promise);
   return promise;
+}
+
+/**
+ * Renders one GLB to a PNG data URL on a single shared offscreen renderer.
+ * Renders are serialized and cached per URL, so a grid of cards never owns a
+ * live WebGL canvas: each preview is a static `<img>`. `tint` colors only the
+ * `AvatarAccessoryTint` material, as on the avatar.
+ */
+export function renderGlbThumbnail(
+  url: string,
+  tint?: string,
+): Promise<string> {
+  return enqueue(`${url}|${tint ?? ''}`, () => loadModel(url, tint));
+}
+
+/** Same as `renderGlbThumbnail`, for a hair style or top worn by a body. */
+export function renderWornThumbnail(
+  source: WornPreviewSource,
+): Promise<string> {
+  return enqueue(`${source.bodyUrl}|${source.url}|${source.tint}`, () =>
+    loadWorn(source),
+  );
 }

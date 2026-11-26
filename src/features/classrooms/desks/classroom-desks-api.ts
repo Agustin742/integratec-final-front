@@ -17,11 +17,27 @@ z.config({ jitless: true });
 export type ClassroomDeskDto = components['schemas']['ClassroomDeskDto'];
 export type ClassroomDeskMapDto = components['schemas']['ClassroomDeskMapDto'];
 
+const deskDecorSchema = z.object({
+  slot: z.literal('desk_decor'),
+  shopItemId: z.string().min(1),
+  shopItemCode: z.string().min(1),
+  shopItemName: z.string().min(1),
+  kind: z.enum([
+    'CLASSROOM_ITEM',
+    'AVATAR_ACCESSORY',
+    'AVATAR_STYLE',
+    'DESK_UPGRADE',
+    'PET_ACCESSORY',
+  ]),
+});
+
 const classroomDeskSchema: z.ZodType<ClassroomDeskDto> = z.object({
   id: z.string().min(1),
   deskIndex: z.number().int().min(1),
   membershipId: z.string().min(1).nullable(),
   userId: z.string().min(1).nullable(),
+  // One unexpected value must not lose the map: that desk shows no decor.
+  deskDecor: deskDecorSchema.nullable().default(null).catch(null),
 });
 
 export const classroomDeskMapSchema: z.ZodType<ClassroomDeskMapDto> = z.object({

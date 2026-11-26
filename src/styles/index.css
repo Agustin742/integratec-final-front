@@ -70,6 +70,15 @@
   }
 }
 
+/* Warm backdrop behind the welcome scene's see-through canvas. */
+@utility stage-backdrop {
+  background: linear-gradient(
+    to bottom,
+    var(--stage-sky) 40%,
+    var(--stage-floor)
+  );
+}
+
 /* Resin key: a hard bevel in the darker shade set by --key, plus a lavender ambient shadow. */
 @utility key-bevel {
   --bevel-depth: 3px;

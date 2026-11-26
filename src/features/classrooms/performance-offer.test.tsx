@@ -41,6 +41,7 @@ function buildDetail(id: string): Detail {
     chatMuted: true,
     collaborationLocked: false,
     gamesDisabled: false,
+    tutorBotSkin: 'none',
     myRole: 'STUDENT',
     capabilities: ['view_metrics', 'participate_activities'],
     availablePanels: ['activities', 'grades'],

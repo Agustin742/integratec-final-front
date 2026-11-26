@@ -474,7 +474,10 @@ describe('ShopPanel (#48)', () => {
       classroomId: CLASSROOM_ID,
       initialBalance: 250,
       initialItems: [
-        makeItem({ metadata: { slot: 'head', assetId: 'cap' } }),
+        makeItem({
+          code: 'head_cap',
+          metadata: { slot: 'head', assetId: 'cap' },
+        }),
         makeItem({
           id: ITEM_LAMP_ID,
           code: 'desk-lamp',

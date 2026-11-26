@@ -1,11 +1,13 @@
 # Daily Study Streak and Badge Showcase
 
-Implements [issue #47](https://github.com/Agustin742/integratec-final-front/issues/47) (`HU-GAM-002`): reusable `StreakIndicator` and `BadgeShowcase` components integrated into `ProfileView` (`/profile`).
+Implements [issue #47](https://github.com/Agustin742/integratec-final-front/issues/47) (`HU-GAM-002`): reusable `StreakIndicator` and `BadgeShowcase` components for the profile.
+
+`/profile` currently shows only the streak, as a small footer line (`StreakSummary`, `src/features/points/streak-summary.tsx`). Medals are hidden in the interface: `StreakAndBadgesSection` and `BadgeShowcase` remain in the code, tested, but no screen renders them. The data and contract below are unchanged.
 
 ## Architecture and Contract
 
 - **Query key & isolation:** `ownStreakAndBadgesQueryKey(userId)` (`src/api/query-keys.ts`) scopes cached streak and badge data by `userId`.
-- **Provisional contract (`back#33`):** Because `Agustin742/integratec-final-back#33` is still open, `fetchOwnStreakAndBadges` (`src/features/points/streak-badge-service.ts`) consumes `GET /users/me/streak-and-badges` (`{ currentStreak, bestStreak, lastQualifiedDate, badges }`) validated with jitless Zod schemas (`src/features/points/streak-badge-schema.ts`) and backed by `createOwnStreakAndBadgesHandler` (`src/test/msw/handlers.ts`) until `back#33` lands in `src/api/schema.generated.ts`.
+- **Contract:** `fetchOwnStreakAndBadges` (`src/features/points/streak-badge-service.ts`) consumes `GET /gamification/me` (`{ streak: { currentStreak, bestStreak, lastQualifyingDay }, badges }`), typed from `src/api/schema.generated.ts`, validated with jitless Zod schemas (`src/features/points/streak-badge-schema.ts`) and backed by `createOwnStreakAndBadgesHandler` (`src/test/msw/handlers.ts`). The server returns earned badges only; there is no locked-badge catalog.
 - **Server-authoritative display:** The client never increments streaks on login, never computes day boundaries (`America/Argentina/Buenos_Aires`), and never awards or simulates badges. Initial load failures render `ErrorState` with retry instead of fabricating `0` values; background refresh failures show `StaleDataNotice`.
 - **Components:** `StreakIndicator` (`src/features/points/streak-indicator.tsx`) and `BadgeShowcase` (`src/features/points/badge-showcase.tsx`) are composed inside `StreakAndBadgesSection` (`src/features/points/streak-and-badges-section.tsx`) and ready for reuse in the report card (`#46`).
 

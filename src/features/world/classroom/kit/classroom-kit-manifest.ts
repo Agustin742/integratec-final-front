@@ -1,13 +1,15 @@
 /**
  * Modular classroom kit manifest: module id -> public GLB URL
  * (`docs/art/classroom-shell.md`, `docs/art/classroom-furniture.md`,
- * `docs/art/classroom-interactive.md`, `docs/art/classroom-decoration.md`).
+ * `docs/art/classroom-interactive.md`, `docs/art/classroom-decoration.md`,
+ * `docs/art/classroom-desk-decor.md`).
  * Assets are Draco-compressed, +Y up, face +Z, 1 unit = 1 m, transforms applied.
  */
 const SHELL_BASE = '/models/scenes/classroom/shell';
 const FURNITURE_BASE = '/models/scenes/classroom/furniture';
 const INTERACTIVE_BASE = '/models/scenes/classroom/interactive';
 const DECORATION_BASE = '/models/scenes/classroom/decoration';
+const DESK_DECOR_BASE = '/models/scenes/classroom/desk-decor';
 
 export const CLASSROOM_SHELL_MODULES = {
   'baseboard-cutaway': `${SHELL_BASE}/baseboard-cutaway.glb`,
@@ -67,11 +69,23 @@ export const CLASSROOM_DECORATION_MODULES = {
   'wall-posters': `${DECORATION_BASE}/wall-posters.glb`,
 } as const;
 
+/** Shop desk upgrades, one per student desk (`docs/art/classroom-desk-decor.md`). */
+export const CLASSROOM_DESK_DECOR_MODULES = {
+  'desk-decor-figurine': `${DESK_DECOR_BASE}/figurine.glb`,
+  'desk-decor-lamp': `${DESK_DECOR_BASE}/lamp.glb`,
+  'desk-decor-mini-globe': `${DESK_DECOR_BASE}/mini-globe.glb`,
+  'desk-decor-mug': `${DESK_DECOR_BASE}/mug.glb`,
+  'desk-decor-photo-frame': `${DESK_DECOR_BASE}/photo-frame.glb`,
+  'desk-decor-plant': `${DESK_DECOR_BASE}/plant.glb`,
+  'desk-decor-puzzle-cube': `${DESK_DECOR_BASE}/puzzle-cube.glb`,
+} as const;
+
 export const CLASSROOM_KIT_MANIFEST = {
   ...CLASSROOM_SHELL_MODULES,
   ...CLASSROOM_FURNITURE_MODULES,
   ...CLASSROOM_INTERACTIVE_MODULES,
   ...CLASSROOM_DECORATION_MODULES,
+  ...CLASSROOM_DESK_DECOR_MODULES,
 } as const;
 
 export type ClassroomKitModuleId = keyof typeof CLASSROOM_KIT_MANIFEST;

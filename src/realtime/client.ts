@@ -2,6 +2,9 @@ import { Client } from '@colyseus/sdk';
 import { z } from 'zod';
 import { getPublicConfig } from '../config/public-config';
 import {
+  AVATAR_EMOTE_MESSAGE,
+  AVATAR_EMOTES,
+  avatarEmoteSchema,
   AVATAR_INPUT_MESSAGE,
   avatarInputSchema,
   CLASSROOM_ROOM_NAME,
@@ -13,6 +16,8 @@ import {
   CLOSE_REASON_VERIFICATION_UNAVAILABLE,
   NPC_INTERACT_MESSAGE,
   npcInteractSchema,
+  type AvatarEmote,
+  type AvatarEmoted,
   type AvatarInput,
   type ClassroomJoinOptions,
 } from './contracts.generated';
@@ -39,6 +44,12 @@ export const realtimeMessages = {
   connectionFailed: 'No se pudo conectar con el aula en vivo.',
 } as const;
 
+/** Incoming `avatar:emoted`; unlisted emotes are ignored. */
+export const avatarEmotedSchema: z.ZodType<AvatarEmoted> = z.object({
+  userId: z.string().min(1),
+  emote: z.enum(AVATAR_EMOTES),
+});
+
 export type RealtimeConnectionStatus =
   | 'connecting'
   | 'connected'
@@ -60,6 +71,9 @@ export interface RealtimeEquippedCodes {
   readonly head: string | null;
   readonly face: string | null;
   readonly back: string | null;
+  readonly hand: string | null;
+  readonly neck: string | null;
+  readonly ears: string | null;
 }
 
 export interface RealtimeAvatarAppearance {
@@ -70,6 +84,8 @@ export interface RealtimeAvatarAppearance {
   readonly clothingColor: string;
   /** Present only when at least one accessory slot is equipped. */
   readonly equipped?: RealtimeEquippedCodes | undefined;
+  /** Shop item code of the `desk_decor` slot, present only when equipped. */
+  readonly deskDecorCode?: string | undefined;
 }
 
 export interface RealtimeClassroomControls {
@@ -103,6 +119,8 @@ export interface RealtimeSnapshot {
   readonly reason: RealtimeFailureReason | null;
   readonly message: string | null;
   readonly participants: ReadonlyMap<string, RealtimeParticipant>;
+  /** Synced tutor bot skin; absent until the room reports one. */
+  readonly tutorBotSkin?: string | undefined;
   /** Synced pet and tutor bot, keyed by NPC id. */
   readonly npcs: ReadonlyMap<string, NpcView>;
   readonly controls: RealtimeClassroomControls;
@@ -160,6 +178,8 @@ export interface ClassroomRealtimeClient {
   send<T>(type: string, schema: z.ZodType<T>, payload: unknown): boolean;
   /** Asks the server to react to this member pressing E at an NPC. */
   interactNpc(npcId: string): boolean;
+  /** Asks the server to play an emote on this member's avatar. */
+  sendEmote(emote: AvatarEmote): boolean;
   onMessage<T>(
     type: string,
     schema: z.ZodType<T>,
@@ -264,10 +284,20 @@ function readParticipantAppearance(
   if (!base) {
     return undefined;
   }
-  const equipped = parseEquippedCodes(
-    (appearance as { items?: unknown }).items,
-  );
-  return equipped ? Object.freeze({ ...base, equipped }) : base;
+  const items = (appearance as { items?: unknown }).items;
+  const equipped = parseEquippedCodes(items);
+  const deskDecorCode =
+    typeof items === 'object' && items !== null
+      ? readItemCode(items as Record<string, unknown>, 'desk_decor')
+      : null;
+  if (!equipped && !deskDecorCode) {
+    return base;
+  }
+  return Object.freeze({
+    ...base,
+    ...(equipped ? { equipped } : {}),
+    ...(deskDecorCode ? { deskDecorCode } : {}),
+  });
 }
 
 /** Reads one slot from a synced `MapSchema`/`Map` (`get`) or a plain record. */
@@ -296,8 +326,11 @@ function parseEquippedCodes(items: unknown): RealtimeEquippedCodes | undefined {
     head: readItemCode(record, 'head'),
     face: readItemCode(record, 'face'),
     back: readItemCode(record, 'back'),
+    hand: readItemCode(record, 'hand'),
+    neck: readItemCode(record, 'neck'),
+    ears: readItemCode(record, 'ears'),
   });
-  return equipped.head || equipped.face || equipped.back ? equipped : undefined;
+  return Object.values(equipped).some(Boolean) ? equipped : undefined;
 }
 
 function toFiniteCoordinate(value: unknown, fallback = 0): number {
@@ -334,6 +367,13 @@ function readParticipants(
     );
   });
   return next;
+}
+
+function readTutorBotSkin(
+  state: ClassroomState | undefined,
+): string | undefined {
+  const skin: unknown = state?.tutorBotSkin;
+  return typeof skin === 'string' && skin !== '' ? skin : undefined;
 }
 
 function readNpcs(
@@ -683,6 +723,7 @@ export function createClassroomRealtimeClient(
       message: null,
       participants: readParticipants(room.state),
       npcs: readNpcs(room.state),
+      tutorBotSkin: readTutorBotSkin(room.state),
       controls: readControls(room.state),
     });
 
@@ -699,6 +740,7 @@ export function createClassroomRealtimeClient(
         message: snapshot.message,
         participants: readParticipants(state, snapshot.participants),
         npcs: readNpcs(state, snapshot.npcs),
+        tutorBotSkin: readTutorBotSkin(state),
         controls: readControls(state),
       });
     });
@@ -746,6 +788,7 @@ export function createClassroomRealtimeClient(
         message: realtimeMessages.reconnecting,
         participants: snapshot.participants,
         npcs: snapshot.npcs,
+        tutorBotSkin: snapshot.tutorBotSkin,
         controls: DEFAULT_CONTROLS,
       });
 
@@ -1081,6 +1124,18 @@ export function createClassroomRealtimeClient(
         return false;
       }
       activeRoom.send(NPC_INTERACT_MESSAGE, parsed.data);
+      return true;
+    },
+    sendEmote(emote) {
+      if (disposed || snapshot.status !== 'connected' || !activeRoom) {
+        return false;
+      }
+      // An unlisted payload would close the connection (4002).
+      const parsed = avatarEmoteSchema.safeParse({ emote });
+      if (!parsed.success) {
+        return false;
+      }
+      activeRoom.send(AVATAR_EMOTE_MESSAGE, parsed.data);
       return true;
     },
     onMessage(type, schema, handler) {

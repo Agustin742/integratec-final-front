@@ -36,6 +36,10 @@ Complete Section 1 **Animations** clip suite (`16` canonical clips + `4` transit
 | Teacher: explain at the board | `TeacherExplain` | `3.500` s | `31` / `31` | **New** — open single-hand and balanced two-hand lecturing gestures with subtle torso turn |
 | Teacher: point | `TeacherPoint` | `2.000` s | `29` / `29` | **New** — purposeful torso turn and extended right-arm pointing silhouette with 2 emphasis beats |
 
+## Resting face
+
+Both body GLBs ship with the `Sad` facial morph on (`0.72`). Avatar composition ([`compose-avatar.ts`](../../src/features/world/avatar/compose-avatar.ts)) overrides it on each avatar's own clone: neutral everywhere (`Blink`, `Happy`, `Sad`, `Angry` at `0`), and slightly happy (`Happy` `0.4`) on the welcome scene and the profile preview. `Sad`, `Angry`, `Happy` and `Blink` clips still drive the morphs when played, and the face returns to rest when they stop. The GLB files are unchanged.
+
 ## Legacy Clip Migration Verification
 
 Per [modular avatar assets](../../rules/modular-avatar-assets.md#animations-and-facial-expressions):
