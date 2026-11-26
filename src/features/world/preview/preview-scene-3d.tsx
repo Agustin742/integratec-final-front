@@ -1,38 +1,29 @@
-import { useDeferredValue, useState } from 'react';
-import type { Avatar } from '@/features/profile/avatar-options';
+import { useState } from 'react';
 import { AvatarModel } from '../avatar/avatar-model';
 import { GlbAsset } from '../glb-asset';
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion';
 import { WorldCanvas } from '../world-canvas';
 import { WarmLighting } from '../world-lighting';
-import { planPreviewScene, type RandomSource } from './preview-scene-plan';
+import {
+  planPreviewScene,
+  type PreviewScenePlan,
+  type RandomSource,
+} from './preview-scene-plan';
 import { useShowStep } from './use-show-step';
 
-/** The outfit changes every second step. */
 export { PREVIEW_STEP_MS } from './use-show-step';
 /** Own cache scope: leaving the public screens frees every preview model. */
 const SCOPE_KEY = 'auth-preview';
-const BACKGROUND = '#FFF9EB';
 
-/** Keeps the previous outfit on screen while the next one downloads. */
-function Character({
-  avatar,
-  animation,
-  onUnavailable,
-}: {
-  readonly avatar: Avatar;
-  readonly animation: string;
-  readonly onUnavailable: () => void;
-}) {
-  const shown = useDeferredValue(avatar);
-  return (
-    <AvatarModel
-      avatar={shown}
-      animation={animation}
-      scopeKey={SCOPE_KEY}
-      onBodyError={onUnavailable}
-    />
-  );
+/**
+ * One draw per page load (and per random source), so coming back to a public
+ * screen without reloading shows the same character and scenery.
+ */
+const plans = new WeakMap<RandomSource, PreviewScenePlan>();
+function pagePlan(random: RandomSource): PreviewScenePlan {
+  const plan = plans.get(random) ?? planPreviewScene(random);
+  plans.set(random, plan);
+  return plan;
 }
 
 export interface PreviewScene3DProps {
@@ -43,21 +34,20 @@ export interface PreviewScene3DProps {
 }
 
 /**
- * Front view of a random character that waves, plays a second animation and
- * changes outfits, with scenery beside it. The plan is drawn once per mount,
- * so each page load differs. Loaded lazily by `PreviewScene`.
+ * Front view of a random character that waves and plays a second gesture, with
+ * scenery beside it. Character, outfit and scenery stay the same until the
+ * page reloads. Loaded lazily by `PreviewScene`.
  */
 export function PreviewScene3D({
   label,
   random = Math.random,
   onUnavailable,
 }: PreviewScene3DProps) {
-  const [plan] = useState(() => planPreviewScene(random));
+  const [plan] = useState(() => pagePlan(random));
   const reducedMotion = usePrefersReducedMotion();
   const step = useShowStep(!reducedMotion);
   const clips = ['Wave', plan.extraClip, 'Idle'];
   const animation = reducedMotion ? 'Idle' : clips[step % clips.length]!;
-  const avatar = plan.avatars[Math.floor(step / 2) % plan.avatars.length]!;
 
   return (
     <WorldCanvas
@@ -65,17 +55,20 @@ export function PreviewScene3D({
       role="img"
       framing="preview"
       scopeKey={SCOPE_KEY}
-      hostClassName="h-full"
+      // The warm backdrop is CSS behind a see-through canvas.
+      hostClassName="stage-backdrop h-full"
+      transparent
       canvasClassName="h-full w-full"
       loading={null}
       onUnavailable={onUnavailable}
     >
-      <color attach="background" args={[BACKGROUND]} />
       <WarmLighting />
-      <Character
-        avatar={avatar}
+      <AvatarModel
+        avatar={plan.avatar}
+        face="happy"
         animation={animation}
-        onUnavailable={onUnavailable}
+        scopeKey={SCOPE_KEY}
+        onBodyError={onUnavailable}
       />
       {plan.pieces.map((piece) => (
         <GlbAsset

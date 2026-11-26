@@ -106,12 +106,14 @@ None currently active. The legacy pre-`#25` uncompressed `public/models/avatars/
 
 `/login`, `/register`, `/password-reset` and `/invitations/accept` share one brand panel, which shows an animated front view ([`src/features/world/preview/`](../src/features/world/preview/)). The classroom keeps its own top-down view, and the profile customization preview is separate.
 
-- **Content:** a random character from the profile catalogs waves, plays one of `Cheer`, `Clap`, `Think`, `Nod` or `Dance`, rests on `Idle` and repeats; it changes outfit every second step. Each visit draws four outfits once, so cycling never keeps downloading.
+- **Content:** a random character from the profile catalogs, in one outfit, waves, plays one of `Cheer`, `Clap` or `Dance` (only positive gestures on public screens), rests on `Idle` and repeats. Character, outfit and scenery are drawn once per page load and change only on reload.
+- **Face:** slightly happy, like the profile preview ([resting face](art/avatar-animations.md#resting-face)).
+- **Backdrop:** a CSS gradient from a cream sky (`--stage-sky`) to a sand floor (`--stage-floor`) behind a transparent canvas, in a rounded frame on the green panel. The classroom canvas stays opaque.
 - **Scenery:** one of the five classroom theme corners behind the character, or two pieces from the hallway, schoolyard, library or lab beside it. The hallway also lays a runner rug and the schoolyard a ground tile under the character. Wide pieces are shrunk just enough to stay inside the 16:9 frame. Every page load draws again; randomness is injected through `PreviewScene`'s `random` prop.
 - **Loading:** `PreviewScene` imports no Three.js. The scene is a lazy chunk, requested only when the browser has WebGL 2. The panel box has a fixed aspect ratio, so the form never waits or moves.
 - **Fallback:** without WebGL, after a lost context, or when the chunk or the body fails, the box stays empty and decorative. A scenery piece that fails is left out.
-- **Motion:** under `prefers-reduced-motion` the character holds one `Idle` pose and one outfit. The canvas renders on demand and pauses while hidden or offscreen.
-- **Resources:** composed outfits are disposed on every change; cached models are freed when the visitor leaves these screens.
+- **Motion:** under `prefers-reduced-motion` the character holds one `Idle` pose. The canvas renders on demand and pauses while hidden or offscreen.
+- **Resources:** the composed avatar is disposed with the scene; cached models are freed when the visitor leaves these screens.
 - **CSP:** the scenery and character models have no embedded textures. Models that do are covered by [embedded textures and the CSP](#embedded-textures-and-the-csp).
 
 ## Embedded textures and the CSP

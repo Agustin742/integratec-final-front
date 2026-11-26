@@ -51,6 +51,8 @@ export interface WorldCanvasProps {
   canvasClassName?: string;
   /** Extra classes for the landmark host that wraps the canvas box. */
   hostClassName?: string;
+  /** Lets the host's CSS background show behind the scene. */
+  transparent?: boolean;
   /**
    * Centers the fallback below a floating top bar when filling a full-screen
    * host (#128).
@@ -112,6 +114,7 @@ export function WorldCanvas({
   role = 'region',
   canvasClassName,
   hostClassName,
+  transparent = false,
   fill = false,
   description,
   loading,
@@ -204,7 +207,7 @@ export function WorldCanvas({
       const renderer = new WebGLRenderer({
         ...defaults,
         antialias: true,
-        alpha: false,
+        alpha: transparent,
       });
       renderer.outputColorSpace = SRGBColorSpace;
       renderer.toneMapping = ACESFilmicToneMapping;

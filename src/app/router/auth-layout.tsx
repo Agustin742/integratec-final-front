@@ -39,7 +39,7 @@ export function AuthLayout() {
             </p>
           </div>
           {/* Fixed box, so the form never moves while the scene loads. */}
-          <div className="aspect-[16/9] w-full max-w-2xl overflow-hidden rounded-3xl">
+          <div className="aspect-[16/9] w-full max-w-2xl overflow-hidden rounded-[2rem] ring-4 ring-primary-foreground/20">
             <PreviewScene label={messages.auth.previewLabel} />
           </div>
         </header>

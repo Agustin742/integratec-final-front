@@ -14,7 +14,11 @@ import { evictRejectedGlbAsset, readCachedGlbAsset } from '../asset-cache';
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion';
 import { resolveClip } from '../classroom/local-avatar-frame';
 import { planAvatarParts, type AvatarEquipped } from './avatar-part-plan';
-import { composeAvatar, type AvatarPartKind } from './compose-avatar';
+import {
+  composeAvatar,
+  type AvatarFace,
+  type AvatarPartKind,
+} from './compose-avatar';
 
 /** Blend time between two body clips; short so starting to move feels instant. */
 export const AVATAR_CROSSFADE_SECONDS = 0.2;
@@ -29,6 +33,8 @@ export interface AvatarModelProps {
   readonly scale?: number | readonly [number, number, number];
   /** Clip name in the body GLB (for example `Idle`); static when absent. */
   readonly animation?: string;
+  /** Face at rest; neutral when absent. */
+  readonly face?: AvatarFace;
   /** Rendered inside the scene while the files load. */
   readonly fallback?: ReactNode;
   /** Rendered inside the scene when the body cannot load. */
@@ -107,6 +113,7 @@ function LoadedAvatar({
   rotation,
   scale,
   animation,
+  face = 'neutral',
   onPartsSkipped,
 }: Omit<AvatarModelProps, 'fallback' | 'errorFallback' | 'onBodyError'>) {
   // The plan is rebuilt per render, but only its content (not the identity of
@@ -158,6 +165,7 @@ function LoadedAvatar({
     () =>
       composeAvatar({
         body: bodyGltf.scene,
+        face,
         parts: loaded.map(({ part, gltf }) => ({
           key: part.key,
           scene: gltf.scene,
@@ -168,7 +176,7 @@ function LoadedAvatar({
       }),
     // `loaded` is fully described by `compositionKey`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [bodyGltf, compositionKey],
+    [bodyGltf, compositionKey, face],
   );
   useEffect(() => () => composed.dispose(), [composed]);
 

@@ -32,6 +32,7 @@ function DeferredAvatar({
       equipped={equipped}
       scopeKey={PREVIEW_SCOPE}
       animation={animation}
+      face="happy"
       fallback={<AvatarPlaceholder />}
       onBodyError={onBodyError}
     />

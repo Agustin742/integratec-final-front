@@ -69,10 +69,13 @@ test('shows the planned character and scenery in a quiet front view', () => {
     label: 'Escena',
     scopeKey: 'auth-preview',
     loading: null,
+    transparent: true,
+    hostClassName: expect.stringContaining('stage-backdrop'),
     onUnavailable,
   });
   expect(scene.model).toMatchObject({
-    avatar: plan.avatars[0],
+    avatar: plan.avatar,
+    face: 'happy',
     animation: 'Wave',
     scopeKey: 'auth-preview',
   });
@@ -84,7 +87,7 @@ test('shows the planned character and scenery in a quiet front view', () => {
   }
 });
 
-test('waves, plays another animation and keeps changing the outfit', () => {
+test('waves and plays another animation without changing the outfit', () => {
   renderScene();
   const clips = [scene.model?.animation];
   const outfits = [scene.model?.avatar];
@@ -103,17 +106,40 @@ test('waves, plays another animation and keeps changing the outfit', () => {
     plan.extraClip,
     'Idle',
   ]);
-  expect(outfits).toEqual([0, 0, 1, 1, 2, 2].map((i) => plan.avatars[i]));
+  for (const outfit of outfits) expect(outfit).toBe(outfits[0]);
 });
 
-test('holds one static pose and outfit under reduced motion', () => {
+test('keeps the same character and scenery until the page reloads', () => {
+  let draws = 0;
+  const changing = () => ((draws += 1) * 0.137) % 1;
+  const show = () =>
+    render(
+      <PreviewScene3D
+        label="Escena"
+        random={changing}
+        onUnavailable={onUnavailable}
+      />,
+    );
+
+  const first = show();
+  const avatar = scene.model?.avatar;
+  const urls = scene.assets.map((asset) => asset.url);
+  first.unmount();
+  scene.assets = [];
+  show();
+
+  expect(scene.model?.avatar).toBe(avatar);
+  expect(scene.assets.map((asset) => asset.url)).toEqual(urls);
+});
+
+test('holds one static pose under reduced motion', () => {
   vi.stubGlobal('matchMedia', () => ({ matches: true }));
   renderScene();
   step();
   step();
 
   expect(scene.model).toMatchObject({
-    avatar: plan.avatars[0],
+    avatar: plan.avatar,
     animation: 'Idle',
   });
   expect(vi.getTimerCount()).toBe(0);

@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-26 — Welcome scene face, outfit and backdrop fixes (#149)
+
+- **Status:** completed (not visually checked)
+- **Area / files:** `src/features/world/{avatar,preview}/`, `src/features/world/world-canvas.tsx`, `src/features/profile/avatar-preview-3d.tsx`, `src/app/router/auth-layout.tsx`, `src/styles/`, `docs/`
+- **Change:** Avatars rest on a neutral face (slightly happy on the welcome scene and profile preview); public gestures are Wave, Cheer, Clap and Dance; the outfit no longer cycles and the character and scenery change only on reload; a warm gradient backdrop replaces the near-white one.
+- **Reason:** Characters looked sad because both body GLBs ship with `Sad` on; the outfit changed while the page was open; the scene's near-white clear color looked bad.
+- **Verification:** Strict TDD on the touched test files, lint and typecheck. Full suite, build, e2e and visual review not run.
+- **Next step:** Visual check of the face, backdrop and frame on `/login` and the profile preview.
+
 ## 2026-11-25 — Avatar customization rework (#149)
 
 - **Status:** completed (design not reviewed)

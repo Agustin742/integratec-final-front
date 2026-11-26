@@ -43,33 +43,23 @@ describe('planPreviewScene', () => {
     expect(new Set(plans.map((plan) => plan.sceneryId))).toEqual(
       new Set(PREVIEW_SCENERY_IDS),
     );
-    expect(new Set(plans.map((plan) => plan.avatars[0]!.bodyId)).size).toBe(2);
+    expect(new Set(plans.map((plan) => plan.avatar.bodyId)).size).toBe(2);
     expect(
-      new Set(plans.map((plan) => plan.avatars[0]!.hairId)).size,
+      new Set(plans.map((plan) => plan.avatar.hairId)).size,
     ).toBeGreaterThan(5);
   });
 
-  it('keeps one character that changes outfits', () => {
+  it('dresses one character in a single outfit with existing models', () => {
     for (const random of [seeded(3), () => 0, () => 0.999999]) {
-      const { avatars } = planPreviewScene(random);
-      expect(avatars.length).toBe(4);
-      expect(new Set(avatars.map((a) => a.topId)).size).toBe(4);
-      expect(
-        new Set(avatars.map((a) => `${a.bodyId}:${a.hairId}:${a.hairColor}`))
-          .size,
-      ).toBe(1);
-      for (const avatar of avatars) {
-        const parts = resolveAvatarParts(avatar);
-        for (const url of [parts.bodyUrl, parts.hairUrl!, parts.topUrl!]) {
-          expect(existsSync(publicFile(url))).toBe(true);
-        }
+      const parts = resolveAvatarParts(planPreviewScene(random).avatar);
+      for (const url of [parts.bodyUrl, parts.hairUrl!, parts.topUrl!]) {
+        expect(existsSync(publicFile(url))).toBe(true);
       }
     }
   });
 
-  it('picks a second body animation besides the wave', () => {
-    expect(PREVIEW_EXTRA_CLIPS).not.toContain('Wave');
-    expect(PREVIEW_EXTRA_CLIPS).not.toContain('Idle');
+  it('only gestures positively besides the wave', () => {
+    expect([...PREVIEW_EXTRA_CLIPS]).toEqual(['Cheer', 'Clap', 'Dance']);
     expect(PREVIEW_EXTRA_CLIPS).toContain(
       planPreviewScene(seeded(5)).extraClip,
     );

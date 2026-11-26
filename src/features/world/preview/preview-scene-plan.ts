@@ -1,6 +1,6 @@
 /**
- * What one visit to a public screen shows: a random character, the outfits it
- * will wear, a second animation and the scenery. Pure data over the existing
+ * What one visit to a public screen shows: a random character in one outfit, a
+ * second animation and the scenery. Pure data over the existing
  * catalogs; randomness is injected so a plan can be reproduced.
  */
 import {
@@ -16,17 +16,8 @@ import { PREVIEW_FRAME } from '../camera';
 /** Returns a number in `[0, 1)`, like `Math.random`. */
 export type RandomSource = () => number;
 
-/** Standing body clips that read well next to the wave. */
-export const PREVIEW_EXTRA_CLIPS = [
-  'Cheer',
-  'Clap',
-  'Think',
-  'Nod',
-  'Dance',
-] as const;
-
-/** Outfits per visit: bounded, so cycling never keeps downloading. */
-const WARDROBE_SIZE = 4;
+/** Positive standing gestures shown besides the wave. */
+export const PREVIEW_EXTRA_CLIPS = ['Cheer', 'Clap', 'Dance'] as const;
 
 export interface PreviewPiece {
   readonly url: string;
@@ -153,8 +144,7 @@ export const PREVIEW_SIDE_PIECES: readonly PreviewPiece[] =
 export interface PreviewScenePlan {
   readonly sceneryId: PreviewSceneryId;
   readonly pieces: readonly PreviewPiece[];
-  /** The same character in each of its outfits, in cycling order. */
-  readonly avatars: readonly Avatar[];
+  readonly avatar: Avatar;
   readonly extraClip: (typeof PREVIEW_EXTRA_CLIPS)[number];
 }
 
@@ -172,18 +162,15 @@ const pickValue = <T extends string>(
   random: RandomSource,
 ): T => pick(options, random).value;
 
-function planCharacter(random: RandomSource): Avatar[] {
+function planCharacter(random: RandomSource): Avatar {
   const bodyId = pickValue(BODY_OPTIONS, random);
-  const hairId = pickValue(hairOptionsFor(bodyId), random);
-  const hairColor = pickValue(HAIR_COLOR_OPTIONS, random);
-  const tops = [...topOptionsFor(bodyId)];
-  return Array.from({ length: WARDROBE_SIZE }, () => ({
+  return {
     bodyId,
-    hairId,
-    hairColor,
-    topId: take(tops, random).value,
+    hairId: pickValue(hairOptionsFor(bodyId), random),
+    hairColor: pickValue(HAIR_COLOR_OPTIONS, random),
+    topId: pickValue(topOptionsFor(bodyId), random),
     clothingColor: pickValue(CLOTHING_COLOR_OPTIONS, random),
-  }));
+  };
 }
 
 function planPieces(
@@ -220,7 +207,7 @@ export function planPreviewScene(random: RandomSource): PreviewScenePlan {
   return {
     sceneryId,
     pieces: planPieces(sceneryId, random),
-    avatars: planCharacter(random),
+    avatar: planCharacter(random),
     extraClip: pick(PREVIEW_EXTRA_CLIPS, random),
   };
 }

@@ -184,6 +184,17 @@ describe('AvatarModel', () => {
     expect(partOf('top')?.tints).toEqual({ AvatarTopTint: '#75B7DA' });
   });
 
+  it('composes with the requested resting face, neutral by default', async () => {
+    useLoader();
+    const view = await mount(<AvatarModel avatar={avatar} />);
+    expect(lastComposed().input).toMatchObject({ face: 'neutral' });
+
+    await act(async () => {
+      view.rerender(<AvatarModel avatar={avatar} face="happy" />);
+    });
+    expect(lastComposed().input).toMatchObject({ face: 'happy' });
+  });
+
   it('renders the body without a part that fails to load', async () => {
     useLoader([HAIR]);
     const onPartsSkipped = vi.fn();

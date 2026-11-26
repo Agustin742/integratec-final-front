@@ -54,7 +54,11 @@ test('shows the draft avatar in a 3D host named like the 2D preview', async () =
     framing: 'avatar',
     scopeKey: 'profile-avatar-preview',
   });
-  expect(world.model).toMatchObject({ avatar, animation: 'Wave' });
+  expect(world.model).toMatchObject({
+    avatar,
+    animation: 'Wave',
+    face: 'happy',
+  });
   expect(container.querySelector('[data-avatar-preview]')).toBeNull();
 });
 
