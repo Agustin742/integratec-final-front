@@ -49,6 +49,7 @@ const classroom: components['schemas']['ClassroomContextResponseDto'] = {
   chatMuted: false,
   collaborationLocked: false,
   gamesDisabled: false,
+  tutorBotSkin: 'none',
   myRole: 'STUDENT',
   capabilities: ['chat_classmates', 'list_directory', 'message_teacher'],
   availablePanels: ['chat'],

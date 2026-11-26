@@ -77,6 +77,48 @@ export function frameCamera(
 }
 
 /**
+ * Welcome scene: one character with scenery at its sides (meters). The bottom
+ * leaves the floor pieces visible.
+ */
+export const PREVIEW_FRAME = {
+  bottom: -0.35,
+  top: 2.45,
+  halfWidth: 2.6,
+} as const;
+/** Almost level: a front view that still shows the floor. */
+const PREVIEW_ELEVATION = 8;
+
+export function framePreviewCamera(
+  camera: OrthographicCamera,
+  width: number,
+  height: number,
+): void {
+  if (width <= 0 || height <= 0) return;
+  const centerY = (PREVIEW_FRAME.bottom + PREVIEW_FRAME.top) / 2;
+  const elevation = MathUtils.degToRad(PREVIEW_ELEVATION);
+  camera.position.set(
+    0,
+    centerY + 10 * Math.sin(elevation),
+    10 * Math.cos(elevation),
+  );
+  camera.up.set(0, 1, 0);
+  camera.lookAt(0, centerY, 0);
+  camera.updateMatrixWorld(true);
+  const aspect = width / height;
+  const halfHeight = (PREVIEW_FRAME.top - PREVIEW_FRAME.bottom) / 2;
+  const fittedHeight =
+    Math.max(halfHeight, PREVIEW_FRAME.halfWidth / aspect) * 1.02;
+  camera.top = fittedHeight;
+  camera.bottom = -fittedHeight;
+  camera.right = fittedHeight * aspect;
+  camera.left = -camera.right;
+  camera.near = 0.1;
+  camera.far = 50;
+  camera.zoom = 1;
+  camera.updateProjectionMatrix();
+}
+
+/**
  * Bounds of one standing avatar (meters, Y up, feet at 0) with room for hair
  * volume and swinging arms. Measured from the body and hair GLB position
  * accessors, not from a rendered check; widen them here if a part overflows.

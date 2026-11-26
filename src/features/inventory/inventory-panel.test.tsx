@@ -387,7 +387,7 @@ describe('InventoryPanel', () => {
       expect(screen.getAllByRole('radiogroup')).toHaveLength(1);
       expect(
         screen.getAllByText(inventoryMessages.empty.slotHint),
-      ).toHaveLength(3);
+      ).toHaveLength(6);
       expect(screen.getByRole('heading', { name: 'Cara' })).toBeInTheDocument();
     });
 
@@ -549,6 +549,46 @@ describe('InventoryPanel', () => {
           ).toHaveTextContent(message);
         });
         expect(store.getSlots().head).toBeNull();
+      },
+    );
+  });
+
+  describe('hand, neck and ears accessories', () => {
+    it.each([
+      ['hand', 'Mano'],
+      ['neck', 'Cuello'],
+      ['ears', 'Orejas'],
+    ] as const)(
+      'equips and unequips an item in the %s slot',
+      async (slot, label) => {
+        const store = createClassroomEquipmentStore({
+          classroomId: CLASSROOM_ID,
+          itemMetadata: { [CAP_ID]: { slot } },
+          initialPurchases: [makePurchase({ shopItemName: 'Accesorio' })],
+        });
+        mswServer.use(...store.handlers);
+
+        renderInventoryRoute();
+
+        const group = await screen.findByRole('radiogroup', { name: label });
+        const item = tile(group, 'Accesorio');
+        fireEvent.click(item);
+
+        await waitFor(() => {
+          expect(item).toHaveAttribute('aria-checked', 'true');
+        });
+        expect(store.getSlots()[slot]?.shopItemId).toBe(CAP_ID);
+
+        fireEvent.click(
+          within(slotSection(group)).getByRole('button', {
+            name: inventoryMessages.actions.unequip,
+          }),
+        );
+
+        await waitFor(() => {
+          expect(item).toHaveAttribute('aria-checked', 'false');
+        });
+        expect(store.getSlots()[slot]).toBeNull();
       },
     );
   });

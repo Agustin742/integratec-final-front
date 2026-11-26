@@ -16,6 +16,7 @@ const classroom: components['schemas']['ClassroomContextResponseDto'] = {
   chatMuted: false,
   collaborationLocked: false,
   gamesDisabled: false,
+  tutorBotSkin: 'none',
   myRole: 'STUDENT',
   capabilities: [
     'view_metrics',

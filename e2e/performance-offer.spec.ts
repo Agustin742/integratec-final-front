@@ -15,6 +15,7 @@ const classroom: components['schemas']['ClassroomContextResponseDto'] = {
   chatMuted: false,
   collaborationLocked: false,
   gamesDisabled: false,
+  tutorBotSkin: 'none',
   myRole: 'STUDENT',
   capabilities: [],
   availablePanels: [
@@ -56,6 +57,7 @@ const desksPayload: components['schemas']['ClassroomDeskMapDto'] = {
       deskIndex,
       membershipId: isMine ? '00000000-0000-4000-8000-00000000m001' : null,
       userId: isMine ? profile.id : null,
+      deskDecor: null,
     };
   }),
 };

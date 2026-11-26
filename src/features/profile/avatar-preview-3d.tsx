@@ -1,5 +1,8 @@
 import { useDeferredValue } from 'react';
 import { AvatarModel, WarmLighting, WorldCanvas } from '@/features/world';
+import type { AvatarEquipped } from '@/features/world/avatar/avatar-part-plan';
+import { useShowStep } from '@/features/world/preview/use-show-step';
+import { usePrefersReducedMotion } from '@/features/world/use-prefers-reduced-motion';
 import { describeAvatar, type Avatar } from './avatar-options';
 import { profileMessages } from './messages';
 
@@ -7,21 +10,30 @@ import { profileMessages } from './messages';
 const PREVIEW_SCOPE = 'profile-avatar-preview';
 /** Same cream as the 2D preview's tray, so the canvas reads as one surface. */
 const BACKGROUND = '#FFF9EB';
+/** A wave, then a longer rest. */
+const SHOW = ['Wave', 'Idle', 'Idle'] as const;
 
 /**
- * Keeps the previous avatar on screen while the files of a new hair or top
- * load, instead of flashing an empty stage for every option change.
+ * Keeps the previous avatar on screen while the files of a new hair, top or
+ * accessory load, instead of flashing the placeholder for every change.
  */
 function DeferredAvatar({
   avatar,
+  equipped,
+  animation,
   onBodyError,
-}: Pick<AvatarPreview3DProps, 'avatar' | 'onBodyError'>) {
+}: Pick<AvatarPreview3DProps, 'avatar' | 'equipped' | 'onBodyError'> & {
+  readonly animation: string;
+}) {
   const shown = useDeferredValue(avatar);
+  const worn = useDeferredValue(equipped);
   return (
     <AvatarModel
       avatar={shown}
+      equipped={worn}
       scopeKey={PREVIEW_SCOPE}
-      animation="Idle"
+      animation={animation}
+      face="happy"
       fallback={<AvatarPlaceholder />}
       onBodyError={onBodyError}
     />
@@ -44,6 +56,8 @@ function AvatarPlaceholder() {
 
 export interface AvatarPreview3DProps {
   readonly avatar: Avatar;
+  /** Accessories of the classroom chosen in the inventory. */
+  readonly equipped?: AvatarEquipped | undefined;
   /** WebGL cannot be used (no support, creation failed or context lost). */
   readonly onUnavailable: () => void;
   /** The body file failed, so there is nothing recognizable to draw in 3D. */
@@ -58,9 +72,13 @@ export interface AvatarPreview3DProps {
  */
 export function AvatarPreview3D({
   avatar,
+  equipped,
   onUnavailable,
   onBodyError,
 }: AvatarPreview3DProps) {
+  const reducedMotion = usePrefersReducedMotion();
+  const step = useShowStep(!reducedMotion);
+  const animation = reducedMotion ? 'Idle' : SHOW[step % SHOW.length]!;
   return (
     <WorldCanvas
       label={`${profileMessages.avatar.previewAlt} ${describeAvatar(avatar)}`}
@@ -72,7 +90,12 @@ export function AvatarPreview3D({
     >
       <color attach="background" args={[BACKGROUND]} />
       <WarmLighting />
-      <DeferredAvatar avatar={avatar} onBodyError={onBodyError} />
+      <DeferredAvatar
+        avatar={avatar}
+        equipped={equipped}
+        animation={animation}
+        onBodyError={onBodyError}
+      />
     </WorldCanvas>
   );
 }

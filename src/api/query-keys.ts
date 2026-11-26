@@ -289,7 +289,7 @@ export function ownAvatarStylesQueryKey(userId: string): ScopedQueryKey {
 }
 
 /**
- * Key of `GET /users/me/streak-and-badges`: server-confirmed study streak and
+ * Key of `GET /gamification/me`: server-confirmed study streak and
  * earned/locked badges for the authenticated user (`HU-GAM-002`).
  */
 export function ownStreakAndBadgesQueryKey(userId: string): ScopedQueryKey {

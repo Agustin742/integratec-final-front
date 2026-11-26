@@ -56,4 +56,6 @@ Across both avatars, `TShirt_NeckRib` and `SchoolSmock_Collar` top rims rise to 
 | Decoded GLB roundtrips (Blender 5.2.2 LTS)                           | All `15/15` exported GLBs pass exact 34-bone canonical rest matrices (`< 1e-4`), normalized bone weights (`<= 2` influences, max sum error `5e-7`), and `0` head/body/top hits on all `5` tested frames (`odd/artifacts/neck-ears-export.json`) |
 | Structural & budget (`test-neck-ears.mjs`, `check-asset-budget.mjs`) | Valid Draco-compressed GLBs (`14.0 KB–32.6 KB`, all `<= 1 MB`), zero animations/cameras/lights, neutral `#FFFFFF` `AvatarAccessoryTint` + `AvatarDetail`                                                                                        |
 
+**Runtime status (#149):** integrated into the avatar catalog (`src/features/world/avatar/accessory-catalog.ts`) under the `neck` and `ears` slots, rendered from synced equipped items and previewed in the shop. Fixed colors mirror the backend shop seed; equip and inventory UI is pending.
+
 Rules: [modular avatar assets](../../rules/modular-avatar-assets.md), [art direction](../../rules/art-direction.md).

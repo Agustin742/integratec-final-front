@@ -28,6 +28,21 @@ export const settingsMessages = {
       description:
         'Frená el chat de estudiantes de forma temporal. Podés volver a habilitarlo cuando quieras.',
     },
+    tutorBot: {
+      title: 'Robot tutor',
+      description: 'Cómo se ve el robot del aula en la vista 3D.',
+      legend: 'Apariencia del robot',
+      options: {
+        none: 'Original',
+        boca: 'Boca',
+        seleccion: 'Selección',
+        folklore: 'Folklore',
+        guardapolvo: 'Guardapolvo',
+        scientist: 'Ciencias',
+        graduate: 'Graduación',
+        gamer: 'Gamer',
+      },
+    },
     access: {
       title: 'Acceso e invitaciones',
       description:

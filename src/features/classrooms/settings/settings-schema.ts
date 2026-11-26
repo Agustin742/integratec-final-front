@@ -1,5 +1,9 @@
 import { z } from 'zod';
 import {
+  TUTOR_BOT_SKINS,
+  toTutorBotSkin,
+} from '@/realtime/contracts.generated';
+import {
   classroomFormSchema,
   type ClassroomDetailResponseDto,
   type UpdateClassroomPayload,
@@ -17,6 +21,7 @@ export const classroomSettingsFormSchema = classroomFormSchema
   .pick({ name: true, subject: true, adultMode: true })
   .extend({
     chatMuted: z.boolean(),
+    tutorBotSkin: z.enum(TUTOR_BOT_SKINS),
   });
 
 export type ClassroomSettingsFormInput = z.input<
@@ -30,7 +35,7 @@ export type ClassroomSettingsFormOutput = z.output<
 export function toSettingsFormValues(
   classroom: Pick<
     ClassroomDetailResponseDto,
-    'name' | 'subject' | 'adultMode' | 'chatMuted'
+    'name' | 'subject' | 'adultMode' | 'chatMuted' | 'tutorBotSkin'
   >,
 ): ClassroomSettingsFormInput {
   return {
@@ -38,16 +43,26 @@ export function toSettingsFormValues(
     subject: classroom.subject ?? '',
     adultMode: classroom.adultMode,
     chatMuted: classroom.chatMuted,
+    tutorBotSkin: toTutorBotSkin(classroom.tutorBotSkin),
   };
 }
 
+/**
+ * `previousSkin` is the skin the form started from. The skin is sent only when
+ * the user changed it, so a stored value this build does not know (read as
+ * `none`) is never overwritten by an unrelated save.
+ */
 export function toSettingsUpdatePayload(
   values: ClassroomSettingsFormOutput,
+  previousSkin?: ClassroomSettingsFormOutput['tutorBotSkin'],
 ): UpdateClassroomPayload {
   return {
     name: values.name,
     subject: values.subject === '' ? null : values.subject,
     adultMode: values.adultMode,
     chatMuted: values.chatMuted,
+    ...(values.tutorBotSkin !== previousSkin
+      ? { tutorBotSkin: values.tutorBotSkin }
+      : {}),
   };
 }

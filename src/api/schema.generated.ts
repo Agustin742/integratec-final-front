@@ -984,7 +984,7 @@ export interface paths {
         };
         /**
          * Read the authenticated student's classroom-scoped equipment state
-         * @description Returns one equipped purchase per slot (head, face, back, desk_decor) or null when the slot is empty. Classroom-scoped: purchases and equipment never cross classrooms.
+         * @description Returns one equipped purchase per slot (head, face, back, desk_decor, hand, neck, ears) or null when the slot is empty. Classroom-scoped: purchases and equipment never cross classrooms.
          */
         get: operations["EquipmentController_getEquipment"];
         put?: never;
@@ -1309,7 +1309,7 @@ export interface paths {
         };
         /**
          * Read the complete classroom desk map
-         * @description Available to enrolled students, classroom teachers and the school Owner/Admin. Includes free and expanded desks, ordered by deskIndex ascending. One unpaginated physical layout; no mutations or implicit repair. Parent-only access is excluded.
+         * @description Available to enrolled students, classroom teachers and the school Owner/Admin. Includes free and expanded desks, each with the equipped desk_decor item of its student, ordered by deskIndex ascending. One unpaginated physical layout; no mutations or implicit repair. Parent-only access is excluded.
          */
         get: operations["ClassroomDesksController_read"];
         put?: never;
@@ -1817,6 +1817,11 @@ export interface components {
              */
             schoolId?: string;
         };
+        /**
+         * @description Skin of the classroom tutor bot chosen by its staff
+         * @enum {string}
+         */
+        TutorBotSkin: "none" | "boca" | "seleccion" | "folklore" | "guardapolvo" | "scientist" | "graduate" | "gamer";
         ClassroomPetSummaryDto: {
             /**
              * @description Unique identifier of the classroom pet (UUID)
@@ -1890,6 +1895,11 @@ export interface components {
              * @example false
              */
             gamesDisabled: boolean;
+            /**
+             * @description Skin of the classroom tutor bot chosen by its staff
+             * @example none
+             */
+            tutorBotSkin: components["schemas"]["TutorBotSkin"];
             /**
              * @description Resolved role of the authenticated caller in this classroom
              * @example TEACHER
@@ -1975,6 +1985,11 @@ export interface components {
              * @example false
              */
             gamesDisabled: boolean;
+            /**
+             * @description Skin of the classroom tutor bot chosen by its staff
+             * @example none
+             */
+            tutorBotSkin: components["schemas"]["TutorBotSkin"];
             /**
              * @description Resolved role of the authenticated caller in this classroom
              * @example TEACHER
@@ -2081,6 +2096,11 @@ export interface components {
              */
             gamesDisabled: boolean;
             /**
+             * @description Skin of the classroom tutor bot chosen by its staff
+             * @example none
+             */
+            tutorBotSkin: components["schemas"]["TutorBotSkin"];
+            /**
              * @description Resolved role of the authenticated caller in this classroom
              * @example TEACHER
              * @enum {string}
@@ -2157,6 +2177,11 @@ export interface components {
              * @example false
              */
             gamesDisabled?: boolean;
+            /**
+             * @description Skin of the classroom tutor bot, free to change; `none` removes it. Pushed to the live room
+             * @example guardapolvo
+             */
+            tutorBotSkin?: components["schemas"]["TutorBotSkin"];
         };
         CreateClassroomInvitationDto: {
             /**
@@ -2914,7 +2939,7 @@ export interface components {
             description?: string | null;
         };
         /** @enum {string} */
-        EquippedSlotName: "head" | "face" | "back" | "desk_decor";
+        EquippedSlotName: "head" | "face" | "back" | "desk_decor" | "hand" | "neck" | "ears";
         EquippedSlotDto: {
             slot: components["schemas"]["EquippedSlotName"];
             /** Format: uuid */
@@ -2936,7 +2961,10 @@ export interface components {
              *       "head": null,
              *       "face": null,
              *       "back": null,
-             *       "desk_decor": null
+             *       "desk_decor": null,
+             *       "hand": null,
+             *       "neck": null,
+             *       "ears": null
              *     }
              */
             slots: {
@@ -3367,6 +3395,18 @@ export interface components {
             /** @description Avatar appearance configuration. */
             avatar: components["schemas"]["AvatarDto"];
         };
+        /** @enum {string} */
+        AppearanceSlotName: "head" | "face" | "back" | "desk_decor" | "hand" | "neck" | "ears";
+        EquippedItemPayloadDto: {
+            slot: components["schemas"]["AppearanceSlotName"];
+            /** Format: uuid */
+            shopItemId: string;
+            /** @example head_cap */
+            shopItemCode: string;
+            /** @example Blue Classroom Cap */
+            shopItemName: string;
+            kind: components["schemas"]["ShopItemKind"];
+        };
         ClassroomDeskDto: {
             /**
              * Format: uuid
@@ -3385,6 +3425,8 @@ export interface components {
              * @description Assigned student user identifier, or null for a free desk. No directory profile data.
              */
             userId: string | null;
+            /** @description The assigned student's equipped desk_decor item in this classroom, whether or not they are connected. Null for a free desk or an empty slot. */
+            deskDecor: components["schemas"]["EquippedItemPayloadDto"] | null;
         };
         ClassroomDeskMapDto: {
             /** @description Complete physical layout ordered by deskIndex ascending, including unassigned desks. Unpaginated. */

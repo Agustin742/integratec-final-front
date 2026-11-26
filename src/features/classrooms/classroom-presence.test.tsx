@@ -8,6 +8,8 @@ import type { components } from '@/api/schema.generated';
 import { fakeSession } from '@/app/router/fake-session';
 import { createAppRoutes } from '@/app/router/routes';
 import {
+  AVATAR_EMOTE_MESSAGE,
+  AVATAR_EMOTED_EVENT,
   AVATAR_INPUT_MESSAGE,
   CLOSE_CODE_ACCESS_REVOKED,
   CLOSE_CODE_TOO_MANY_CONNECTIONS,
@@ -73,6 +75,7 @@ function buildDetail(id: string, overrides: Partial<Detail> = {}): Detail {
     chatMuted: false,
     collaborationLocked: false,
     gamesDisabled: false,
+    tutorBotSkin: 'none',
     myRole: 'STUDENT',
     capabilities: ['chat_classmates', 'list_directory'],
     availablePanels: ['activities', 'chat', 'grades'],
@@ -379,6 +382,50 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
     });
   });
 
+  test('sends emotes and plays only the ones the room announces (#154)', async () => {
+    const { sdk } = setupPresenceWorkspace();
+    await waitFor(() => {
+      expect(sdk.roomFor(CLASSROOM_A)).toBeDefined();
+    });
+    const room = sdk.roomFor(CLASSROOM_A)!;
+    act(() => {
+      room.setAvatar({ userId: profile.id, role: 'STUDENT' });
+      room.setAvatar({ userId: REMOTE_STUDENT_ID, role: 'STUDENT' });
+    });
+    await waitFor(() => {
+      expect(stage.props?.canEmote).toBe(true);
+    });
+
+    act(() => {
+      stage.props?.onSendEmote?.('Clap');
+    });
+    expect(room.send).toHaveBeenCalledWith(AVATAR_EMOTE_MESSAGE, {
+      emote: 'Clap',
+    });
+    expect(stage.props?.selfEmote).toBeUndefined();
+
+    act(() => {
+      room.emitMessage(AVATAR_EMOTED_EVENT, {
+        userId: profile.id,
+        emote: 'Clap',
+      });
+      room.emitMessage(AVATAR_EMOTED_EVENT, {
+        userId: REMOTE_STUDENT_ID,
+        emote: 'Dance',
+      });
+      room.emitMessage(AVATAR_EMOTED_EVENT, {
+        userId: REMOTE_STUDENT_ID,
+        emote: 'Backflip',
+      });
+    });
+    expect(stage.props?.selfEmote?.name).toBe('Clap');
+    expect(
+      stage.props?.remoteParticipants?.find(
+        (participant) => participant.userId === REMOTE_STUDENT_ID,
+      )?.emote?.name,
+    ).toBe('Dance');
+  });
+
   test('forwards equipped accessory codes of the local and remote members to the stage', async () => {
     const { sdk } = setupPresenceWorkspace();
     await waitFor(() => {
@@ -399,7 +446,15 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
       shopItemName: shopItemCode,
       kind: 'AVATAR_ACCESSORY',
     });
-    const emptyItems = { head: null, face: null, back: null, desk_decor: null };
+    const emptyItems = {
+      head: null,
+      face: null,
+      back: null,
+      desk_decor: null,
+      hand: null,
+      neck: null,
+      ears: null,
+    };
 
     act(() => {
       room.setAvatar({
@@ -408,7 +463,11 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
         role: 'STUDENT',
         appearance: {
           baseAvatar,
-          items: { ...emptyItems, face: item('face', 'face_sunglasses') },
+          items: {
+            ...emptyItems,
+            face: item('face', 'face_sunglasses'),
+            desk_decor: item('desk_decor', 'desk_mug'),
+          },
         },
       });
       room.setAvatar({
@@ -421,6 +480,7 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
             ...emptyItems,
             head: item('head', 'head_crown'),
             back: item('back', 'back_wings'),
+            hand: item('hand', 'hand_mate'),
           },
         },
       });
@@ -431,12 +491,64 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
         head: null,
         face: 'face_sunglasses',
         back: null,
+        hand: null,
+        neck: null,
+        ears: null,
       });
       expect(
         stage.props?.remoteParticipants?.find(
           (p) => p.userId === REMOTE_STUDENT_ID,
         )?.equipped,
-      ).toEqual({ head: 'head_crown', face: null, back: 'back_wings' });
+      ).toEqual({
+        head: 'head_crown',
+        face: null,
+        back: 'back_wings',
+        hand: 'hand_mate',
+        neck: null,
+        ears: null,
+      });
+      expect(stage.props?.liveDeskDecor).toEqual(
+        new Map([
+          [profile.id, 'desk_mug'],
+          [REMOTE_STUDENT_ID, null],
+        ]),
+      );
+    });
+  });
+
+  test('dresses the bot with the REST skin until the room value arrives', async () => {
+    const { sdk } = setupPresenceWorkspace({
+      detailOverrides: () => ({ tutorBotSkin: 'graduate' }),
+    });
+    await expandPresence();
+    await waitFor(() => {
+      expect(sdk.roomFor(CLASSROOM_A)).toBeDefined();
+    });
+    const room = sdk.roomFor(CLASSROOM_A)!;
+    await waitFor(() => {
+      expect(stage.props?.tutorBotSkin).toBe('graduate');
+    });
+
+    act(() => {
+      room.setAvatar({
+        userId: profile.id,
+        displayName: profile.displayName,
+        role: 'STUDENT',
+      });
+      (room.state as unknown as { tutorBotSkin: string }).tutorBotSkin = 'boca';
+      room.emitStateChange();
+    });
+    await waitFor(() => {
+      expect(stage.props?.tutorBotSkin).toBe('boca');
+    });
+
+    act(() => {
+      (room.state as unknown as { tutorBotSkin: string }).tutorBotSkin =
+        'pirate';
+      room.emitStateChange();
+    });
+    await waitFor(() => {
+      expect(stage.props?.tutorBotSkin).toBe('none');
     });
   });
 

@@ -23,7 +23,20 @@ export const GLASS_MATERIAL = 'AvatarGlass';
 
 const GLASS_RENDER_ORDER = 1;
 
-export type AvatarPartKind = 'hair' | 'top' | 'head' | 'face' | 'back';
+/**
+ * Resting face of the body's facial morphs. The body GLBs ship with `Sad`
+ * switched on, so every composed avatar overrides it. Facial clips still
+ * drive these morphs, and the mixer restores this face when they stop.
+ */
+const RESTING_FACES = {
+  neutral: { Blink: 0, Happy: 0, Sad: 0, Angry: 0 },
+  happy: { Blink: 0, Happy: 0.4, Sad: 0, Angry: 0 },
+} as const;
+
+export type AvatarFace = keyof typeof RESTING_FACES;
+
+export type AvatarPartKind =
+  'hair' | 'top' | 'head' | 'face' | 'back' | 'hand' | 'neck' | 'ears';
 
 export interface AvatarPartInput {
   readonly key: AvatarPartKind;
@@ -48,6 +61,8 @@ export interface ComposeAvatarInput {
   readonly top?: Object3D | null;
   readonly hairColor?: string;
   readonly clothingColor?: string;
+  /** Face at rest; neutral when absent. */
+  readonly face?: AvatarFace;
 }
 
 export interface ComposedAvatar {
@@ -210,6 +225,11 @@ export function composeAvatar(input: ComposeAvatarInput): ComposedAvatar {
   const root = cloneSkeleton(body);
   root.updateMatrixWorld(true);
   const bodyBones = bonesByName(root);
+  // Only the clone changes: its influences are copied from the cached body.
+  applyMorphs(
+    [...skinnedMeshesOf(root), ...staticMeshesOf(root)],
+    RESTING_FACES[input.face ?? 'neutral'],
+  );
   const createdMaterials: Material[] = [];
   const createdSkeletons: Skeleton[] = skinnedMeshesOf(root).map(
     (mesh) => mesh.skeleton,

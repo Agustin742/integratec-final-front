@@ -19,6 +19,9 @@ export interface AvatarEquipped {
   readonly head?: string | null | undefined;
   readonly face?: string | null | undefined;
   readonly back?: string | null | undefined;
+  readonly hand?: string | null | undefined;
+  readonly neck?: string | null | undefined;
+  readonly ears?: string | null | undefined;
 }
 
 export interface PlannedPart {
@@ -35,7 +38,14 @@ export interface AvatarPartPlan {
   readonly parts: readonly PlannedPart[];
 }
 
-const ACCESSORY_SLOTS: readonly AccessorySlot[] = ['head', 'face', 'back'];
+const ACCESSORY_SLOTS: readonly AccessorySlot[] = [
+  'head',
+  'face',
+  'back',
+  'hand',
+  'neck',
+  'ears',
+];
 
 /** Unknown codes, or codes that belong to another slot, are simply not worn. */
 function wornSpec(

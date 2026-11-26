@@ -1,3 +1,4 @@
+import { skinnedGltf } from './skinned-fixture.test-utils';
 import {
   Bone,
   BufferAttribute,
@@ -263,5 +264,16 @@ describe('mergeSkinnedByMaterial', () => {
       originals.every((geo) => geo.getAttribute('position').count === 4),
     ).toBe(true);
     expect(skinned(source)).toHaveLength(2);
+  });
+});
+
+describe('meshes kept apart by name', () => {
+  it('are never merged, so a skin can hide them', () => {
+    const { scene } = skinnedGltf(3);
+
+    mergeSkinnedByMaterial(scene, new Set(['Part_0']));
+
+    expect(scene.getObjectByName('Part_0')).toBeDefined();
+    expect(scene.getObjectByName('Part_1')).toBeUndefined();
   });
 });

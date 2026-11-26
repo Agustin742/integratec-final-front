@@ -182,6 +182,7 @@ export function createClassroomDetailHandler(
     capabilities: [],
     deskCount: 0,
     pet: null,
+    tutorBotSkin: 'none',
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -596,6 +597,7 @@ export function createCreateClassroomHandler(
       chatMuted: false,
       collaborationLocked: false,
       gamesDisabled: false,
+      tutorBotSkin: 'none',
       myRole: 'TEACHER',
       capabilities: [
         'configure_classroom',
@@ -697,6 +699,7 @@ export function createUpdateClassroomHandler(
       independentTeacherId: '00000000-0000-4000-8000-000000000001',
       adultMode: body.adultMode ?? false,
       chatMuted: body.chatMuted ?? false,
+      tutorBotSkin: body.tutorBotSkin ?? 'none',
       collaborationLocked: body.collaborationLocked ?? false,
       gamesDisabled: body.gamesDisabled ?? false,
       myRole: 'TEACHER',
@@ -3427,6 +3430,7 @@ export function createClassroomContextHandler(
     chatMuted: false,
     collaborationLocked: false,
     gamesDisabled: false,
+    tutorBotSkin: 'none',
     myRole: 'STUDENT',
     capabilities: [
       'participate_activities',
@@ -3513,6 +3517,7 @@ export function createClassroomDesksHandler(
                 ? '00000000-0000-4000-8000-00000000m001'
                 : null,
               userId: isAssigned ? assignedUserId : null,
+              deskDecor: null,
             };
           });
 
@@ -6934,21 +6939,8 @@ export function createClassroomMetricsHandler(
   );
 }
 
-export interface StreakBadgePayloadItem {
-  readonly id: string;
-  readonly code: string;
-  readonly name: string;
-  readonly description: string;
-  readonly unlocked: boolean;
-  readonly unlockedAt: string | null;
-}
-
-export interface OwnStreakAndBadgesPayload {
-  readonly currentStreak: number;
-  readonly bestStreak: number;
-  readonly lastQualifiedDate: string | null;
-  readonly badges: readonly StreakBadgePayloadItem[];
-}
+export type OwnStreakAndBadgesPayload =
+  components['schemas']['GamificationSummaryDto'];
 
 export interface CreateOwnStreakAndBadgesHandlerOptions {
   readonly baseUrl?: string;
@@ -6957,21 +6949,19 @@ export interface CreateOwnStreakAndBadgesHandlerOptions {
 }
 
 export const DEFAULT_STREAK_AND_BADGES_PAYLOAD: OwnStreakAndBadgesPayload = {
-  currentStreak: 0,
-  bestStreak: 0,
-  lastQualifiedDate: null,
+  streak: { currentStreak: 0, bestStreak: 0, lastQualifyingDay: null },
   badges: [],
 };
 
 /**
- * Contract-faithful MSW handler for `GET /users/me/streak-and-badges` (`HU-GAM-002`).
+ * Contract-faithful MSW handler for `GET /gamification/me` (`HU-GAM-002`).
  */
 export function createOwnStreakAndBadgesHandler(
   options: CreateOwnStreakAndBadgesHandlerOptions = {},
 ): HttpHandler {
   const baseUrl = options.baseUrl ?? TEST_API_BASE_URL;
   const payload = options.payload ?? DEFAULT_STREAK_AND_BADGES_PAYLOAD;
-  return http.get(`${baseUrl}/users/me/streak-and-badges`, () => {
+  return http.get(`${baseUrl}/gamification/me`, () => {
     if (options.error === 'network') {
       return HttpResponse.error();
     }
@@ -8605,7 +8595,8 @@ export function createChatInboxStore(
   };
 }
 
-export type EquipmentSlotName = 'head' | 'face' | 'back' | 'desk_decor';
+export type EquipmentSlotName =
+  'head' | 'face' | 'back' | 'desk_decor' | 'hand' | 'neck' | 'ears';
 
 export interface EquipmentStoreSlotEntry {
   readonly slot: EquipmentSlotName;
@@ -8670,6 +8661,9 @@ const KNOWN_EQUIPMENT_SLOTS: readonly EquipmentSlotName[] = [
   'face',
   'back',
   'desk_decor',
+  'hand',
+  'neck',
+  'ears',
 ];
 
 function isValidEquipmentSlot(value: string): value is EquipmentSlotName {
@@ -8731,6 +8725,9 @@ export function createClassroomEquipmentStore(
     face: options.initialSlots?.face ?? null,
     back: options.initialSlots?.back ?? null,
     desk_decor: options.initialSlots?.desk_decor ?? null,
+    hand: options.initialSlots?.hand ?? null,
+    neck: options.initialSlots?.neck ?? null,
+    ears: options.initialSlots?.ears ?? null,
   };
 
   const pending: Partial<Record<EquipmentStoreOp, EquipmentStoreFailure>> = {};

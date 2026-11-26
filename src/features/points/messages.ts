@@ -51,6 +51,9 @@ export const pointsMessages = {
     errorTitle: 'No pudimos cargar tu racha ni tus medallas',
     errorDescription: 'Revisá tu conexión e intentá de nuevo.',
     retryAction: 'Reintentar',
+    streakLoading: 'Cargando tu racha…',
+    streakErrorTitle: 'No pudimos cargar tu racha',
+    streakStaleTitle: 'Racha pendiente de sincronización',
     staleTitle: 'Racha y medallas pendientes de sincronización',
     staleDescription:
       'Mostrando los últimos datos confirmados. Falló la actualización en segundo plano.',
@@ -71,11 +74,9 @@ export const pointsMessages = {
       emptyTitle: 'Todavía no tenés medallas disponibles',
       emptyDescription:
         'Cuando el servidor registre logros o medallas desbloqueables, van a aparecer acá.',
-      unlockedLabel: 'Desbloqueada',
-      lockedLabel: 'Bloqueada',
-      unlockedAtPrefix: 'Obtenida el',
-      summaryCount: (unlocked: number, total: number) =>
-        `${unlocked} de ${total} desbloqueadas`,
+      awardedAtPrefix: 'Obtenida el',
+      summaryCount: (earned: number) =>
+        earned === 1 ? '1 obtenida' : `${earned} obtenidas`,
     },
   },
 } as const;

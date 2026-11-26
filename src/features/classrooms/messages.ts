@@ -722,4 +722,16 @@ export const classroomMessages = {
         'No pudimos completar la desvinculación. Intentá nuevamente en unos segundos.',
     },
   },
+  emotes: {
+    wheelLabel: 'Gestos',
+    cooldown: 'Esperá unos segundos para repetir un gesto.',
+    sendFailed: 'No pudimos enviar el gesto.',
+    names: {
+      Wave: 'Saludar',
+      Cheer: 'Festejar',
+      Clap: 'Aplaudir',
+      Dance: 'Bailar',
+      RaiseHand: 'Levantar la mano',
+    },
+  },
 } as const;

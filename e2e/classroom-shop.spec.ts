@@ -39,6 +39,7 @@ function buildContext(role: 'STUDENT' | 'TEACHER'): ClassroomContext {
     chatMuted: false,
     collaborationLocked: false,
     gamesDisabled: false,
+    tutorBotSkin: 'none',
     myRole: role,
     capabilities:
       role === 'STUDENT'

@@ -11,9 +11,9 @@ import {
 describe('classroom kit manifest', () => {
   const entries = Object.entries(CLASSROOM_KIT_MANIFEST);
 
-  it('lists all 37 modules with unique URLs', () => {
-    expect(entries).toHaveLength(37);
-    expect(new Set(entries.map(([, url]) => url)).size).toBe(37);
+  it('lists all 44 modules with unique URLs', () => {
+    expect(entries).toHaveLength(44);
+    expect(new Set(entries.map(([, url]) => url)).size).toBe(44);
   });
 
   it('registers the ten decoration modules', () => {

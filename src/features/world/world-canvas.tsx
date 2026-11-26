@@ -16,7 +16,12 @@ import {
   WebGLRenderer,
 } from 'three';
 import { cn } from '@/lib/utils';
-import { CLASSROOM_BOUNDS, frameAvatarCamera, frameCamera } from './camera';
+import {
+  CLASSROOM_BOUNDS,
+  frameAvatarCamera,
+  frameCamera,
+  framePreviewCamera,
+} from './camera';
 import {
   DEFAULT_SCOPE,
   clearAssetCache,
@@ -25,7 +30,8 @@ import {
 import { worldMessages as copy } from './messages';
 import { WorldFallback } from './world-fallback';
 
-export type WorldFraming = 'classroom' | 'follow' | 'avatar' | 'reference';
+export type WorldFraming =
+  'classroom' | 'follow' | 'avatar' | 'preview' | 'reference';
 
 export interface WorldCanvasProps {
   children?: ReactNode;
@@ -35,7 +41,8 @@ export interface WorldCanvasProps {
   /**
    * Camera framing: the whole isometric classroom (default), a scene-owned
    * follow camera (`follow`, driven by a child such as `FollowCamera`), one
-   * standing avatar, or the small 6x4 m technical reference.
+   * standing avatar, a character with scenery at its sides (`preview`), or the
+   * small 6x4 m technical reference.
    */
   framing?: WorldFraming;
   /** Landmark role of the host; `img` suits a decorative preview. */
@@ -44,6 +51,8 @@ export interface WorldCanvasProps {
   canvasClassName?: string;
   /** Extra classes for the landmark host that wraps the canvas box. */
   hostClassName?: string;
+  /** Lets the host's CSS background show behind the scene. */
+  transparent?: boolean;
   /**
    * Centers the fallback below a floating top bar when filling a full-screen
    * host (#128).
@@ -86,6 +95,8 @@ function CameraFraming({ framing }: { framing: WorldFraming }) {
     if (camera instanceof OrthographicCamera) {
       if (framing === 'avatar')
         frameAvatarCamera(camera, size.width, size.height);
+      else if (framing === 'preview')
+        framePreviewCamera(camera, size.width, size.height);
       else if (framing === 'reference')
         frameCamera(camera, size.width, size.height);
       else frameCamera(camera, size.width, size.height, CLASSROOM_BOUNDS);
@@ -103,6 +114,7 @@ export function WorldCanvas({
   role = 'region',
   canvasClassName,
   hostClassName,
+  transparent = false,
   fill = false,
   description,
   loading,
@@ -195,7 +207,7 @@ export function WorldCanvas({
       const renderer = new WebGLRenderer({
         ...defaults,
         antialias: true,
-        alpha: false,
+        alpha: transparent,
       });
       renderer.outputColorSpace = SRGBColorSpace;
       renderer.toneMapping = ACESFilmicToneMapping;

@@ -149,6 +149,25 @@ describe('ClassroomScene', () => {
     expect(placements.some((p) => p.moduleId === 'teacher-desk')).toBe(true);
   });
 
+  test('dresses the tutor bot with the classroom skin', () => {
+    render(<ClassroomScene scopeKey="room-1" tutorBotSkin="boca" />);
+    expect(nav.botProps).toMatchObject({ skin: 'boca' });
+  });
+
+  test('draws each desk decor on top of its desk', () => {
+    render(
+      <ClassroomScene
+        scopeKey="room-1"
+        deskDecor={[{ deskIndex: 2, code: 'desk_lamp' }]}
+      />,
+    );
+    const { placements } = nav.kitProps as {
+      placements: { moduleId: string; position: number[] }[];
+    };
+    expect(placements.map((p) => p.moduleId)).toEqual(['desk-decor-lamp']);
+    expect(placements[0]?.position[1]).toBe(0.75);
+  });
+
   test('draws the door outside the kit batch, driven by the local pose', () => {
     render(<ClassroomScene scopeKey="room-1" />);
     expect(screen.getByTestId('classroom-door')).toBeInTheDocument();
