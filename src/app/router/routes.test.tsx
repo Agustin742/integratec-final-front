@@ -155,9 +155,9 @@ test.each(authPages)(
       banner.compareDocumentPosition(main) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(banner).toHaveTextContent(messages.auth.tagline);
-    // The 3D classroom model is not built yet: the panel shows a text placeholder.
+    // Without WebGL (as here) the 3D preview leaves a quiet decorative box.
     expect(banner.querySelector('svg')).toBeNull();
-    expect(banner).toHaveTextContent(messages.auth.classroomPlaceholder);
+    expect(banner.querySelector('[data-preview-fallback]')).toBeInTheDocument();
     // Future forms drop into this slot.
     expect(main.querySelector('[data-auth-slot]')).toContainElement(
       within(main).getByRole('heading', { name: title }),

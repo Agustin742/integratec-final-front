@@ -6,6 +6,7 @@ import {
   useState,
   type RefObject,
 } from 'react';
+import { toTutorBotSkin } from '@/realtime/contracts.generated';
 import {
   Link,
   Outlet,
@@ -344,13 +345,20 @@ function WorkspaceContext({
             petName={classroom.pet?.name ?? null}
             selfPose={presence.selfPose}
             selfEquipped={presence.selfEquipped}
+            liveDeskDecor={presence.liveDeskDecor}
             connectionKey={presence.connectionKey}
             frozen={presence.frozen}
             remoteParticipants={presence.remoteParticipants}
             onIntentChange={presence.sendIntent}
             npcs={presence.npcs}
+            tutorBotSkin={toTutorBotSkin(
+              presence.liveTutorBotSkin ?? classroom.tutorBotSkin,
+            )}
             resolveNpcPhrase={resolveNpcPhrase}
             onInteractNpc={presence.interactNpc}
+            canEmote={presence.canEmote}
+            onSendEmote={presence.sendEmote}
+            selfEmote={presence.selfEmote}
             onSustainedLowFps={beginPerformanceOffer}
             presenceSlot={
               <ClassroomPresencePill

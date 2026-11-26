@@ -154,3 +154,13 @@ test('defines scrollbar tokens whose thumb is discoverable on cream and pale cre
     }
   }
 });
+
+test('frames the welcome stage with a warm floor that stands out on green', () => {
+  expect(value('--stage-sky')).toBe(value('--palette-cream'));
+  const floor = luminance(value('--stage-floor'));
+  // Darker than the near-white card, so the backdrop does not glare.
+  expect(floor).toBeLessThan(luminance(value('--card')));
+  expect(
+    (floor + 0.05) / (luminance(value('--primary')) + 0.05),
+  ).toBeGreaterThanOrEqual(3);
+});

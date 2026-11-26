@@ -2,12 +2,14 @@ import type { ReactNode } from 'react';
 import type { AvatarInput } from '@/realtime';
 import { useOwnProfile } from '@/features/profile/use-own-profile';
 import { worldMessages } from '../messages';
+import type { AvatarEmotePlay } from '../avatar/avatar-model';
 import type { AvatarEquipped } from '../avatar/avatar-part-plan';
 import type { Pose } from '../movement';
 import { WorldCanvas, type WorldCanvasProps } from '../world-canvas';
 import type { NpcSpeech, NpcView, NpcViews } from '../npc/npc-view';
 import type { ClassroomInteractable } from './classroom-interactables';
 import { ClassroomScene } from './classroom-scene';
+import type { DeskDecorAssignment } from './desk-decor';
 import type { ProximityAnchor } from './proximity-tracker';
 import type { RemoteClassroomParticipant } from './remote-avatar';
 
@@ -19,6 +21,10 @@ export interface ClassroomWorldProps extends Pick<
   selfPose?: Pose | undefined;
   onAssetError?: (() => void) | undefined;
   selfEquipped?: AvatarEquipped | undefined;
+  /** Emote the local avatar is playing. */
+  selfEmote?: AvatarEmotePlay | undefined;
+  /** Decor shown on each student desk. */
+  deskDecor?: readonly DeskDecorAssignment[] | undefined;
   /** Connection epoch key that changes on join, reconnect, or drop (#37). */
   connectionKey?: string | undefined;
   /** True while the classroom freeze lock is active (#37). */
@@ -39,6 +45,8 @@ export interface ClassroomWorldProps extends Pick<
   onProximityAnchor?: ((anchor: ProximityAnchor) => void) | undefined;
   /** Synced NPC state by id (pet, tutor bot); the bot rests at home without it. */
   npcs?: NpcViews | undefined;
+  /** Skin of the tutor bot; the default bot without one. */
+  tutorBotSkin?: string | undefined;
   resolveNpcPhrase?: ((npc: NpcView) => string | undefined) | undefined;
   onNpcSpeech?: ((speech: NpcSpeech | undefined) => void) | undefined;
   onNpcSpeechAnchor?: ((anchor: ProximityAnchor) => void) | undefined;
@@ -62,6 +70,8 @@ export function ClassroomWorld({
   onAssetError,
   selfPose,
   selfEquipped,
+  selfEmote,
+  deskDecor,
   connectionKey,
   frozen,
   remoteParticipants,
@@ -75,6 +85,7 @@ export function ClassroomWorld({
   onProximityChange,
   onProximityAnchor,
   npcs,
+  tutorBotSkin,
   resolveNpcPhrase,
   onNpcSpeech,
   onNpcSpeechAnchor,
@@ -108,6 +119,8 @@ export function ClassroomWorld({
         scopeKey={scopeKey}
         selfPose={selfPose}
         selfEquipped={selfEquipped}
+        selfEmote={selfEmote}
+        deskDecor={deskDecor}
         connectionKey={connectionKey}
         frozen={frozen}
         remoteParticipants={remoteParticipants}
@@ -121,6 +134,7 @@ export function ClassroomWorld({
         onProximityChange={onProximityChange}
         onProximityAnchor={onProximityAnchor}
         npcs={npcs}
+        tutorBotSkin={tutorBotSkin}
         resolveNpcPhrase={resolveNpcPhrase}
         onNpcSpeech={onNpcSpeech}
         onNpcSpeechAnchor={onNpcSpeechAnchor}

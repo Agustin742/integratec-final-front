@@ -2,7 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Group, type Object3D } from 'three';
 import type { Avatar } from '@/features/profile/avatar-options';
-import { AvatarModel } from '../avatar/avatar-model';
+import { AvatarModel, type AvatarEmotePlay } from '../avatar/avatar-model';
 import type { AvatarEquipped } from '../avatar/avatar-part-plan';
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion';
 import type { Pose } from '../movement';
@@ -28,6 +28,8 @@ export interface LocalAvatarProps {
   avatar?: Avatar | undefined;
   /** Accessory shop codes worn in this classroom. */
   equipped?: AvatarEquipped | undefined;
+  /** Emote to play once; moving cancels it. */
+  emote?: AvatarEmotePlay | undefined;
   scopeKey?: string | undefined;
 }
 
@@ -50,6 +52,7 @@ export function LocalAvatar({
   marker,
   avatar,
   equipped,
+  emote,
   scopeKey,
 }: LocalAvatarProps) {
   const root = useMemo(() => {
@@ -106,6 +109,8 @@ export function LocalAvatar({
             equipped={equipped}
             scopeKey={scopeKey}
             animation={animationFor(moving)}
+            emote={emote}
+            emoteBlocked={moving}
             fallback={<PlaceholderBody />}
             errorFallback={<PlaceholderBody />}
           />

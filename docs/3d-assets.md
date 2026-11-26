@@ -101,3 +101,25 @@ Per `rules/documentation-and-decisions.md` and `rules/3d-world-and-camera.md`, a
 ### Recorded Exceptions
 
 None currently active. The legacy pre-`#25` uncompressed `public/models/avatars/{male,female}/body.glb` exceptions (`#91`) were retired once both bodies shipped Draco-compressed with the full `16`-clip canonical animation set ([avatar animations](art/avatar-animations.md)).
+
+## Welcome scene on the public screens
+
+`/login`, `/register`, `/password-reset` and `/invitations/accept` share one brand panel, which shows an animated front view ([`preview-scene.tsx`](../src/features/world/preview/preview-scene.tsx)). The classroom keeps its own top-down view, and the profile customization preview is separate.
+
+- **Content:** a random character from the profile catalogs, in one outfit, waves, plays one of `Cheer`, `Clap` or `Dance` (only positive gestures on public screens), rests on `Idle` and repeats. Character, outfit and scenery are drawn once per page load and change only on reload.
+- **Face:** slightly happy, like the profile preview ([resting face](art/avatar-animations.md#resting-face)).
+- **Backdrop:** a CSS gradient from a cream sky (`--stage-sky`) to a sand floor (`--stage-floor`) behind a transparent canvas, in a rounded frame on the green panel. The classroom canvas stays opaque.
+- **Scenery:** one of the five classroom theme corners behind the character, or two pieces from the hallway, schoolyard, library or lab beside it. The hallway also lays a runner rug and the schoolyard a ground tile under the character. Wide pieces are shrunk just enough to stay inside the 16:9 frame. Every page load draws again; randomness is injected through `PreviewScene`'s `random` prop.
+- **Loading:** `PreviewScene` imports no Three.js. The scene is a lazy chunk, requested only when the browser has WebGL 2. The panel box has a fixed aspect ratio, so the form never waits or moves.
+- **Fallback:** without WebGL, after a lost context, or when the chunk or the body fails, the box stays empty and decorative. A scenery piece that fails is left out.
+- **Motion:** under `prefers-reduced-motion` the character holds one `Idle` pose. The canvas renders on demand and pauses while hidden or offscreen.
+- **Resources:** the composed avatar is disposed with the scene; cached models are freed when the visitor leaves these screens.
+- **CSP:** the scenery and character models have no embedded textures. Models that do are covered by [embedded textures and the CSP](#embedded-textures-and-the-csp).
+
+## Embedded textures and the CSP
+
+`GLTFLoader` turns an embedded image into a `blob:` URL. Its default `ImageBitmapLoader` fetches that URL, which the CSP `connect-src` blocks. The shared loader in [`asset-cache.ts`](../src/features/world/asset-cache.ts) reads textures through `TextureLoader` instead: an image element, covered by `img-src 'self' data: blob:`. The policy is unchanged.
+
+## Tutor bot skins
+
+Classroom staff choose the skin in the classroom settings panel (`Robot tutor`). The value synced by the room wins over the REST one, and an unknown value shows the default bot. [`tutor-bot-skin.ts`](../src/features/world/npc/tutor-bot-skin.ts) follows the [art contract](art/tutor-bot-skins.md): it binds a copy of the skin to the bot bones by name and hides the base meshes it covers, which are therefore never merged. Taking a skin off restores them and frees the skin's own cache scope. A skin that cannot load or does not fit the rig leaves the default bot.

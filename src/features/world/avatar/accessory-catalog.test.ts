@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   ACCESSORY_CODES,
+  ACCESSORY_FIXED_COLORS,
   resolveAccessory,
   resolveHairMorphs,
   resolveHeadwearHiding,
@@ -14,7 +15,13 @@ function publicPath(url: string): string {
   return resolve(process.cwd(), 'public', url.replace(/^\//, ''));
 }
 
-function glbJson(url: string): { nodes?: { name?: string }[] } {
+interface GlbJson {
+  nodes?: { name?: string }[];
+  skins?: { joints: number[] }[];
+  materials?: { name?: string }[];
+}
+
+function glbJson(url: string): GlbJson {
   const buffer = readFileSync(publicPath(url));
   const jsonLength = buffer.readUInt32LE(12);
   return JSON.parse(buffer.subarray(20, 20 + jsonLength).toString('utf8'));
@@ -73,8 +80,8 @@ const HEAD_IDS = [
 ];
 
 describe('resolveAccessory', () => {
-  it('covers the 21 shop accessory codes', () => {
-    expect(ACCESSORY_CODES).toHaveLength(21);
+  it('covers the 40 shop accessory codes', () => {
+    expect(ACCESSORY_CODES).toHaveLength(40);
   });
 
   it.each(
@@ -104,6 +111,79 @@ describe('resolveAccessory', () => {
     );
     expect(resolveAccessory('back_rolling_backpack')?.url('male')).toBe(
       '/models/avatars/male/back-rolling-backpack.glb',
+    );
+  });
+
+  it('resolves hand items from the shared folder', () => {
+    expect(resolveAccessory('hand_magnifying_glass')?.url('female')).toBe(
+      '/models/avatars/shared/hand-magnifying-glass.glb',
+    );
+  });
+
+  it('resolves neck items per body', () => {
+    expect(resolveAccessory('neck_bow_tie')?.url('male')).toBe(
+      '/models/avatars/male/neck-bow-tie.glb',
+    );
+    expect(resolveAccessory('neck_scarf')?.url('female')).toBe(
+      '/models/avatars/female/neck-scarf.glb',
+    );
+  });
+
+  it('resolves ear items from the shared neck-prefixed files', () => {
+    expect(resolveAccessory('ears_star_earrings')).toMatchObject({
+      slot: 'ears',
+      assetId: 'star-earrings',
+    });
+    expect(resolveAccessory('ears_ear_cuffs')?.url('female')).toBe(
+      '/models/avatars/shared/neck-ear-cuffs.glb',
+    );
+  });
+
+  it('mirrors the shop seed colors of the hand, neck and ear items', () => {
+    expect(
+      Object.fromEntries(
+        Object.entries(ACCESSORY_FIXED_COLORS).filter(([code]) =>
+          /^(hand|neck|ears)_/.test(code),
+        ),
+      ),
+    ).toEqual({
+      hand_pencil: '#F7D86B',
+      hand_book: '#5B4F96',
+      hand_ruler: '#A9E7F4',
+      hand_mug: '#E66861',
+      hand_phone: '#353849',
+      hand_mate: '#AF7B52',
+      hand_magnifying_glass: '#75B7DA',
+      hand_paintbrush: '#C77DAA',
+      hand_tablet: '#62CFC7',
+      hand_trophy: '#F7D86B',
+      neck_scarf: '#E66861',
+      neck_necklace: '#B5A7D6',
+      neck_bow_tie: '#5B4F96',
+      neck_lanyard_badge: '#62CFC7',
+      neck_bandana: '#7EBA8B',
+      neck_achievement_medal: '#F7D86B',
+      ears_earrings: '#F5B5AB',
+      ears_star_earrings: '#F7D86B',
+      ears_ear_cuffs: '#B5A7D6',
+    });
+  });
+
+  it.each(
+    ACCESSORY_CODES.filter((code) => /^(hand|neck|ears)_/.test(code)).flatMap(
+      (code) => BODIES.map((body) => [code, body] as const),
+    ),
+  )('%s can be re-bound and tinted on the %s body', (code, body) => {
+    const url = resolveAccessory(code)?.url(body) ?? '';
+    const part = glbJson(url);
+    const bones = glbNodeNames(`/models/avatars/${body}/body.glb`);
+    const joints = (part.skins ?? []).flatMap((skin) =>
+      skin.joints.map((index) => part.nodes?.[index]?.name ?? ''),
+    );
+    expect(joints.length).toBeGreaterThan(0);
+    expect(joints.filter((joint) => !bones.includes(joint))).toEqual([]);
+    expect(part.materials?.map((material) => material.name)).toContain(
+      'AvatarAccessoryTint',
     );
   });
 

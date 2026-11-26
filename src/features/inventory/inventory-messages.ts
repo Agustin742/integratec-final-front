@@ -22,6 +22,9 @@ export const inventoryMessages = {
     head: 'Cabeza',
     face: 'Cara',
     back: 'Espalda',
+    hand: 'Mano',
+    neck: 'Cuello',
+    ears: 'Orejas',
     desk_decor: 'Decoración del escritorio',
   } as Readonly<Record<string, string>>,
   actions: {
@@ -68,8 +71,11 @@ export const inventoryMessages = {
   },
   profile: {
     heading: 'Inventario por aula',
-    description:
-      'Elegí una de tus aulas para ver y equipar los artículos que compraste en su tienda.',
+    classroomNote: (classroom: string) =>
+      `Estás vistiendo tu avatar en ${classroom}. Cada aula tiene sus propios accesorios.`,
+    slotsLabel: 'Parte a equipar',
+    deskShort: 'Escritorio',
+    hasEquipped: ', con algo equipado',
     classroomLabel: 'Aula',
     loading: 'Cargando tus aulas…',
     errorTitle: 'No pudimos cargar tus aulas',

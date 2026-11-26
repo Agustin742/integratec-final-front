@@ -86,6 +86,7 @@ test('student asks Study Guide Bot with citations, experiences exam lockout, and
         chatMuted: false,
         collaborationLocked: false,
         gamesDisabled: false,
+        tutorBotSkin: 'none',
         myRole: 'STUDENT',
         capabilities: ['participate_activities', 'view_metrics'],
         availablePanels: ['bot'],

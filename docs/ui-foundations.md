@@ -150,3 +150,7 @@ Screenshots of the showcase build:
 ![Dialog](assets/ui-foundations/dialog-1280.webp)
 ![Sheet](assets/ui-foundations/sheet-1280.webp)
 ![Toast](assets/ui-foundations/toast-1280.webp)
+
+## Welcome stage backdrop
+
+`--stage-sky` (palette cream) and `--stage-floor` (palette sand) feed the `stage-backdrop` utility, the soft gradient behind the [3D welcome scene](3d-assets.md#welcome-scene-on-the-public-screens).

@@ -36,6 +36,9 @@
   --tray: #efd9b4;
   --tray-hover: #f6e7c8;
   --row-hover: var(--palette-cream);
+  /* Welcome stage backdrop: cream sky fading into a sand floor. */
+  --stage-sky: var(--palette-cream);
+  --stage-floor: var(--palette-sand);
   --field-border: #a9835f;
   --input: #806348;
   /* Scrollbars: sand-brown thumb (3:1 on cream), darker on hover, no track fill. */

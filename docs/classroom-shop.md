@@ -51,6 +51,28 @@ Client-side rules (`src/features/shop/`):
   removals, and uncertain outcomes call `invalidateStudentWallet` so
   `WalletIndicator` and `WalletPanel` refresh immediately.
 
+## Item previews
+
+The catalog has no image URLs, so each card draws the real model, looked up by
+shop code (`item-preview-source.ts`):
+
+- Avatar accessories and desk decor: the model alone.
+- Hair styles and tops (`AVATAR_STYLE`): the part worn by the male body (every
+  style fits both bodies) in the default colors, framed on the part; hair keeps
+  the head in frame.
+- Anything else, or a failed render: a category illustration.
+
+`item-preview-renderer.ts` renders one job at a time on a single offscreen
+renderer into cached PNG data URLs, only for cards near the viewport. The body
+model stays loaded while the queue is busy; after 1.5 s idle the body, the
+renderer and its WebGL context are released.
+
+Other screens reuse the same thumbnails with `AvatarThumbnail`
+(`shop-item-preview.tsx`), given a style id or accessory code and a body.
+
+`item-preview-source.test.ts` mirrors the codes of the backend shop seed and
+fails if any of them has no model: update the list together with the seed.
+
 ## UI evidence
 
 Playwright captures (`e2e/classroom-shop.spec.ts`, synthetic API responses) at

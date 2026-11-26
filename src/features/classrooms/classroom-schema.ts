@@ -1,5 +1,9 @@
 import { z } from 'zod';
 import type { components, operations } from '@/api/schema.generated';
+import {
+  DEFAULT_TUTOR_BOT_SKIN,
+  TUTOR_BOT_SKINS,
+} from '@/realtime/contracts.generated';
 import { classroomMessages } from './messages';
 
 // Keep Zod v4 compatible with the strict Content-Security-Policy (FD1).
@@ -153,7 +157,13 @@ const classroomCapabilitySchema = z.enum([
   'message_teacher',
 ]);
 
+/** A skin this build does not know shows the default bot. */
+export const tutorBotSkinSchema = z
+  .enum(TUTOR_BOT_SKINS)
+  .catch(DEFAULT_TUTOR_BOT_SKIN);
+
 const classroomOwnershipFields = {
+  tutorBotSkin: tutorBotSkinSchema,
   id: z.string().min(1),
   name: z.string().min(1),
   subject: z.string().nullable(),

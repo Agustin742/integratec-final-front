@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -286,4 +286,24 @@ test('mounts the NPC speech bubble with the bot phrase from the world', async ()
   );
   act(() => onNpcSpeech(undefined));
   expect(screen.queryByTestId('npc-speech-bubble')).not.toBeInTheDocument();
+});
+
+test('hands the world the decor of each desk, preferring the synced value', async () => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+  renderStage('aula-7', {
+    liveDeskDecor: new Map([[profile.id, 'desk_plant']]),
+  });
+
+  await waitFor(() => {
+    expect(world.props.deskDecor).toEqual([
+      { deskIndex: 1, code: 'desk_plant' },
+    ]);
+  });
 });

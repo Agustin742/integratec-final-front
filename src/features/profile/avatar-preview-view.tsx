@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import type { AvatarEquipped } from '@/features/world/avatar/avatar-part-plan';
 import type { Avatar } from './avatar-options';
 import { AvatarPreview } from './avatar-preview';
 
@@ -31,6 +32,8 @@ class ChunkBoundary extends Component<
 
 export interface AvatarPreviewViewProps {
   readonly avatar: Avatar;
+  /** Accessories to wear in 3D; the 2D preview shows the base avatar only. */
+  readonly equipped?: AvatarEquipped | undefined;
 }
 
 /**
@@ -40,7 +43,10 @@ export interface AvatarPreviewViewProps {
  * only for that body, so choosing the other body tries 3D again. Failures never
  * affect the surrounding form.
  */
-export function AvatarPreviewView({ avatar }: AvatarPreviewViewProps) {
+export function AvatarPreviewView({
+  avatar,
+  equipped,
+}: AvatarPreviewViewProps) {
   const [webglFailed, setWebglFailed] = useState(false);
   const [failedBody, setFailedBody] = useState<Avatar['bodyId'] | null>(null);
   const { bodyId } = avatar;
@@ -54,6 +60,7 @@ export function AvatarPreviewView({ avatar }: AvatarPreviewViewProps) {
       <Suspense fallback={flat}>
         <AvatarPreview3D
           avatar={avatar}
+          equipped={equipped}
           onUnavailable={onUnavailable}
           onBodyError={onBodyError}
         />

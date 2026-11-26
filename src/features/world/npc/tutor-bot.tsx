@@ -16,7 +16,11 @@ import {
   type SkinnedMesh,
 } from 'three';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { evictRejectedGlbAsset, loadGlbAsset } from '../asset-cache';
+import {
+  clearAssetCache,
+  evictRejectedGlbAsset,
+  loadGlbAsset,
+} from '../asset-cache';
 import { dampYaw } from '../classroom/avatar-yaw';
 import { placeAvatar } from '../classroom/local-avatar-frame';
 import type { NpcLivePositions } from '../classroom/npc-live-position';
@@ -37,6 +41,11 @@ import {
   resolvePlayableClip,
   type BotClipPlan,
 } from './tutor-bot-clips';
+import {
+  BOT_HIDEABLE_MESHES,
+  planBotSkin,
+  wearBotSkin,
+} from './tutor-bot-skin';
 
 export const TUTOR_BOT_URL = '/models/bot/tutor-bot.glb';
 /** The GLB rests grounded; the hover base floats it a little above the floor. */
@@ -60,6 +69,8 @@ export interface TutorBotProps {
   /** Text for `reaction === 'phrase'`, resolved from the synced phrase id. */
   readonly phraseText?: string | undefined;
   readonly scopeKey?: string | undefined;
+  /** Classroom skin; absent, `none` or unknown shows the default bot. */
+  readonly skin?: string | undefined;
   /** Receives the bot's live floor position every frame (proximity, highlight). */
   readonly positions?: NpcLivePositions | undefined;
   /** Phrase to show above the bot, or undefined once it fades. */
@@ -133,6 +144,7 @@ export function TutorBot({
   npc,
   phraseText,
   scopeKey,
+  skin = 'none',
   positions,
   onSpeech,
   onSpeechAnchor,
@@ -229,7 +241,7 @@ export function TutorBot({
           if (mesh.isSkinnedMesh) skeletons.add(mesh.skeleton);
         });
         // Fewer draw calls: same-material skinned parts become one mesh.
-        mergedMeshes = mergeSkinnedByMaterial(model);
+        mergedMeshes = mergeSkinnedByMaterial(model, BOT_HIDEABLE_MESHES);
         model.traverse((node) => {
           // Skinned meshes are costly to raycast; the proxy owns picking.
           node.raycast = () => undefined;
@@ -280,6 +292,31 @@ export function TutorBot({
       setReady(false);
     };
   }, [scopeKey, holder, root, invalidate]);
+
+  useEffect(() => {
+    const model = visualRef.current?.model;
+    const plan = planBotSkin(skin);
+    if (!ready || !model || !plan) return;
+    // Own cache scope per skin, so taking it off frees its GPU resources.
+    const skinScope = `${scopeKey ?? ''}:bot-skin:${skin}`;
+    let cancelled = false;
+    let remove: (() => void) | null = null;
+    loadGlbAsset(plan.url, { scopeKey: skinScope }).then(
+      (gltf) => {
+        if (cancelled) return;
+        remove = wearBotSkin(model, gltf.scene, plan.hidden);
+        invalidate();
+      },
+      // A skin that cannot load leaves the default bot.
+      () => undefined,
+    );
+    return () => {
+      cancelled = true;
+      remove?.();
+      clearAssetCache({ scopeKey: skinScope });
+      invalidate();
+    };
+  }, [ready, skin, scopeKey, invalidate]);
 
   const { state, emote, reaction, reactionSeq } = npc;
   useEffect(() => {
