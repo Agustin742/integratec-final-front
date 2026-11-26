@@ -47,7 +47,8 @@ export const authMessages = {
     password: {
       label: 'Contraseña',
       placeholder: 'Mínimo 8 caracteres',
-      description: 'Entre 8 y 72 caracteres (máximo 72 bytes UTF-8).',
+      description:
+        'Al menos 8 caracteres. Podés usar letras, números y símbolos.',
     },
     schoolName: {
       label: 'Nombre de la escuela',
@@ -201,7 +202,8 @@ export const authMessages = {
         newPassword: {
           label: 'Contraseña nueva',
           placeholder: 'Mínimo 8 caracteres',
-          description: 'Entre 8 y 72 caracteres (máximo 72 bytes UTF-8).',
+          description:
+            'Al menos 8 caracteres. Podés usar letras, números y símbolos.',
         },
       },
       validation: {

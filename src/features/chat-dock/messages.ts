@@ -18,6 +18,13 @@ export const chatDockMessages = {
   lastMessage: (author: string, preview: string) => `${author}: ${preview}`,
   you: 'Vos',
   windowLabel: (classroomName: string) => `Chat de ${classroomName}`,
+  familiesSectionTitle: 'Familias',
+  familiesListLabel: 'Conversaciones con familias',
+  familyNoMessagesYet: 'Sin mensajes todavía',
+  familySubtitle: (childDisplayName: string, classroomName: string) =>
+    `${childDisplayName} · ${classroomName}`,
+  familyWindowLabel: (parentDisplayName: string) =>
+    `Mensajes con ${parentDisplayName}`,
   back: 'Volver a la lista de chats',
   minimize: 'Minimizar el chat',
   restore: 'Expandir el chat',

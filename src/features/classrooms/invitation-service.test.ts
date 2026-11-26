@@ -13,16 +13,20 @@ import { createApiClient } from '@/api/client';
 import { ApiError } from '@/api/errors';
 import {
   classroomInvitationsQueryKey,
+  classroomParentLinksQueryKey,
   createClassroomInvitationsPredicate,
+  createClassroomParentLinksPredicate,
   createUserScopePredicate,
 } from '@/api/query-keys';
 import {
   TEST_API_BASE_URL,
   createClassroomInvitationsHandler,
+  createClassroomParentLinksHandler,
   createCreateClassroomInvitationHandler,
   createGenerateJoinCodeHandler,
   createRevokeClassroomInvitationHandler,
   createRevokeJoinCodeHandler,
+  createUnlinkParentLinkHandler,
   type ClassroomInvitationPayload,
 } from '@/test/msw/handlers';
 import { mswServer } from '@/test/msw/server';
@@ -32,6 +36,8 @@ import {
   isAbortError,
   isUncertainWriteError,
   listClassroomInvitations,
+  listClassroomParentLinks,
+  removeClassroomParentLink,
   revokeClassroomInvitation,
   revokeClassroomJoinCode,
 } from './invitation-service';
@@ -425,5 +431,96 @@ describe('invitations query keys and service', () => {
     } catch (error) {
       expect(isAbortError(error)).toBe(true);
     }
+  });
+
+  test('scopes classroomParentLinksQueryKey and handles PARENT invitation, list, and unlink services', async () => {
+    const key = classroomParentLinksQueryKey('user-1', classroomId);
+    expect(key[0]).toEqual({
+      scope: { userId: 'user-1', classroomId, linkedChildId: null },
+      domain: 'classrooms',
+      resource: 'parent-links',
+      params: undefined,
+    });
+
+    const predicate = createClassroomParentLinksPredicate(
+      'user-1',
+      classroomId,
+    );
+    expect(predicate({ queryKey: key })).toBe(true);
+    expect(
+      predicate({
+        queryKey: classroomParentLinksQueryKey('user-2', classroomId),
+      }),
+    ).toBe(false);
+
+    let capturedBody: unknown;
+    let deletedLinkId = '';
+    mswServer.use(
+      createCreateClassroomInvitationHandler({
+        classroomId,
+        onRequest: (_req, body) => {
+          capturedBody = body;
+        },
+        resolveResponse: () => ({
+          id: '71000000-0000-4000-8000-000000000099',
+          kind: 'EMAIL',
+          targetEmail: 'tutor@example.edu.ar',
+          role: 'PARENT',
+          childId: '4e5f6a7b-0000-4000-8000-000000000009',
+          childDisplayName: 'Valentina Gómez',
+          maxUses: 1,
+          useCount: 0,
+          state: 'PENDING',
+          expiresAt: '2026-11-25T16:00:00.000Z',
+          createdAt: '2026-11-18T16:00:00.000Z',
+          token: 'parent-invite-token-1',
+        }),
+      }),
+      createClassroomParentLinksHandler({
+        classroomId,
+        items: [
+          {
+            id: '6e5f6a7b-0000-4000-8000-000000000001',
+            parentId: 'parent-1',
+            parentDisplayName: 'Laura Gómez',
+            childId: '4e5f6a7b-0000-4000-8000-000000000009',
+            childDisplayName: 'Valentina Gómez',
+            state: 'ACTIVE',
+            createdAt: '2026-11-18T12:00:00.000Z',
+          },
+        ],
+      }),
+      createUnlinkParentLinkHandler({
+        classroomId,
+        onRequest: (_req, linkId) => {
+          deletedLinkId = linkId;
+        },
+      }),
+    );
+
+    const client = createApiClient({ baseUrl: TEST_API_BASE_URL });
+    const created = await createClassroomInvitation(client, classroomId, {
+      email: 'tutor@example.edu.ar',
+      role: 'PARENT',
+      childId: '4e5f6a7b-0000-4000-8000-000000000009',
+    });
+    expect(capturedBody).toEqual({
+      email: 'tutor@example.edu.ar',
+      role: 'PARENT',
+      childId: '4e5f6a7b-0000-4000-8000-000000000009',
+    });
+    expect(created.role).toBe('PARENT');
+    expect(created.childDisplayName).toBe('Valentina Gómez');
+
+    const links = await listClassroomParentLinks(client, classroomId);
+    expect(links.items).toHaveLength(1);
+    expect(links.items[0].parentDisplayName).toBe('Laura Gómez');
+
+    await removeClassroomParentLink(
+      client,
+      classroomId,
+      '6e5f6a7b-0000-4000-8000-000000000001',
+    );
+    expect(deletedLinkId).toBe('6e5f6a7b-0000-4000-8000-000000000001');
   });
 });

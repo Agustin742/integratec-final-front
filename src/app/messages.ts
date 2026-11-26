@@ -30,6 +30,9 @@ export const messages = {
     profile: {
       title: 'Mi perfil',
     },
+    family: {
+      title: 'Área familiar',
+    },
     notFound: {
       title: 'Página no encontrada',
       description: 'La dirección que buscás no existe o fue movida.',

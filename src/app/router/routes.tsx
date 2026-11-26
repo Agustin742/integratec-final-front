@@ -166,6 +166,20 @@ export function createAppRoutes({
                       },
                     },
                     {
+                      path: 'family',
+                      lazy: {
+                        Component: async () =>
+                          (await import('../pages/family-page')).FamilyPage,
+                      },
+                    },
+                    {
+                      path: 'family/:linkId',
+                      lazy: {
+                        Component: async () =>
+                          (await import('../pages/family-page')).FamilyPage,
+                      },
+                    },
+                    {
                       // One page for the list and a selected chat: the
                       // optional segment is the selected classroom.
                       path: 'chats/:classroomId?',
@@ -206,8 +220,6 @@ export function createAppRoutes({
                     },
                   ],
                 },
-                // Reserved: a separate minimal area for parent users (extended scope)
-                // mounts as its own branch here, with its own guard.
                 ...(showcaseRoute ? [showcaseRoute] : []),
                 {
                   path: '*',

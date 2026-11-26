@@ -1,11 +1,16 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef, useState } from 'react';
+import { Controller, useWatch } from 'react-hook-form';
 import { useParams } from 'react-router';
 import { ApiError } from '@/api/errors';
 import {
   classroomDetailQueryKey,
   classroomInvitationsQueryKey,
+  classroomParentLinksQueryKey,
+  classroomRosterQueryKey,
   createClassroomInvitationsPredicate,
+  createClassroomParentLinksPredicate,
+  createClassroomRosterPredicate,
   type InvitationStateFilter,
 } from '@/api/query-keys';
 import {
@@ -29,14 +34,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/components/ui/toast';
 import { formatInstant } from '@/lib/dates';
+import { cn } from '@/lib/utils';
 import { useSessionService, useSessionSnapshot } from '@/session/provider';
 import {
   INVITATION_EMAIL_MAX_LENGTH,
   generateJoinCodeFormSchema,
   sendInvitationFormSchema,
+  toCreateClassroomInvitationPayload,
   toCreateJoinCodePayload,
   type ClassroomInvitationDto,
   type CreatedClassroomInvitationDto,
+  type EmailInvitationRole,
   type GenerateJoinCodeFormInput,
   type GenerateJoinCodeFormOutput,
   type InvitationState,
@@ -51,11 +59,19 @@ import {
   isAbortError,
   isUncertainWriteError,
   listClassroomInvitations,
+  listClassroomParentLinks,
   revokeClassroomInvitation,
   revokeClassroomJoinCode,
 } from './invitation-service';
 import { classroomMessages } from './messages';
-import { useClassroomCapabilities } from './use-classroom-capabilities';
+import { listClassroomRoster } from './roster-service';
+import { useClassroomContext } from './use-classroom-capabilities';
+
+const EMAIL_ROLE_OPTIONS: readonly EmailInvitationRole[] = [
+  'STUDENT',
+  'PARENT',
+];
+const MAX_GUARDIANS_PER_STUDENT = 2;
 
 const STATE_FILTER_OPTIONS: readonly InvitationStateFilter[] = [
   'PENDING',
@@ -113,6 +129,13 @@ function isBadRequestApiError(error: unknown): boolean {
   );
 }
 
+function isConflictApiError(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    (error.kind === 'conflict' || error.status === 409)
+  );
+}
+
 function buildInvitationAcceptUrl(token: string): string {
   const path = `/invitations/accept?token=${encodeURIComponent(token)}`;
   if (
@@ -165,7 +188,7 @@ export function ClassroomInvitationsPanel({
   const resolvedClassroomId = propClassroomId ?? params.classroomId ?? '';
   const snapshot = useSessionSnapshot();
   const userId = snapshot.status === 'authenticated' ? snapshot.user.id : null;
-  const capabilities = useClassroomCapabilities(resolvedClassroomId);
+  const context = useClassroomContext(resolvedClassroomId);
   const messages = classroomMessages.invitations;
 
   if (resolvedClassroomId.trim() === '' || userId === null) {
@@ -178,12 +201,12 @@ export function ClassroomInvitationsPanel({
     );
   }
 
-  if (capabilities.status === 'pending') {
+  if (context.status === 'pending') {
     return <LoadingState label={messages.list.loading} skeletonLines={3} />;
   }
 
-  if (capabilities.status === 'error') {
-    if (isNotFoundApiError(capabilities.error)) {
+  if (context.status === 'error') {
+    if (isNotFoundApiError(context.error)) {
       return (
         <ErrorState
           headingLevel="h3"
@@ -192,7 +215,7 @@ export function ClassroomInvitationsPanel({
         />
       );
     }
-    if (isForbiddenApiError(capabilities.error)) {
+    if (isForbiddenApiError(context.error)) {
       return (
         <ErrorState
           headingLevel="h3"
@@ -210,7 +233,7 @@ export function ClassroomInvitationsPanel({
     );
   }
 
-  if (!capabilities.can('invite_members')) {
+  if (!context.classroom.capabilities.includes('invite_members')) {
     return (
       <ErrorState
         headingLevel="h3"
@@ -225,6 +248,7 @@ export function ClassroomInvitationsPanel({
       key={`${userId}:${resolvedClassroomId}`}
       userId={userId}
       classroomId={resolvedClassroomId}
+      adultMode={context.classroom.adultMode}
     />
   );
 }
@@ -232,11 +256,13 @@ export function ClassroomInvitationsPanel({
 interface ClassroomInvitationsContentProps {
   readonly userId: string;
   readonly classroomId: string;
+  readonly adultMode: boolean;
 }
 
 function ClassroomInvitationsContent({
   userId,
   classroomId,
+  adultMode,
 }: ClassroomInvitationsContentProps) {
   const { client } = useSessionService();
   const queryClient = useQueryClient();
@@ -244,6 +270,7 @@ function ClassroomInvitationsContent({
 
   const joinCodeHeadingId = useId();
   const emailHeadingId = useId();
+  const emailRoleGroupId = useId();
   const listHeadingId = useId();
   const filterGroupLabelId = useId();
 
@@ -340,6 +367,13 @@ function ClassroomInvitationsContent({
     staleTime: 0,
   });
 
+  const parentLinksQuery = useQuery({
+    queryKey: classroomParentLinksQueryKey(userId, classroomId),
+    queryFn: ({ signal }) =>
+      listClassroomParentLinks(client, classroomId, { signal }),
+    staleTime: 0,
+  });
+
   useEffect(() => {
     if (!invitationsQuery.isError) {
       return;
@@ -380,7 +414,42 @@ function ClassroomInvitationsContent({
     schema: sendInvitationFormSchema,
     defaultValues: {
       email: '',
+      role: 'STUDENT',
+      childId: '',
     },
+  });
+
+  const watchedEmailRole = useWatch({
+    control: emailForm.control,
+    name: 'role',
+  });
+  const effectiveEmailRole: EmailInvitationRole = adultMode
+    ? 'STUDENT'
+    : watchedEmailRole;
+
+  useEffect(() => {
+    if (adultMode && watchedEmailRole !== 'STUDENT') {
+      emailForm.setValue('role', 'STUDENT', { shouldDirty: false });
+      emailForm.setValue('childId', '', { shouldDirty: false });
+      emailForm.clearErrors('childId');
+    }
+  }, [adultMode, emailForm, watchedEmailRole]);
+
+  const activeStudentsQuery = useQuery({
+    queryKey: classroomRosterQueryKey(userId, classroomId, {
+      page: 1,
+      pageSize: 100,
+      state: 'ACTIVE',
+    }),
+    queryFn: ({ signal }) =>
+      listClassroomRoster(
+        client,
+        classroomId,
+        { page: 1, pageSize: 100, state: 'ACTIVE' },
+        { signal },
+      ),
+    enabled: !adultMode && effectiveEmailRole === 'PARENT',
+    staleTime: 0,
   });
 
   const hasKnownActiveJoinCode =
@@ -470,10 +539,13 @@ function ClassroomInvitationsContent({
         createInviteAbortRef.current = controller;
 
         try {
+          const payload = toCreateClassroomInvitationPayload(values, {
+            adultMode,
+          });
           const created = await createClassroomInvitation(
             client,
             classroomId,
-            values.email,
+            payload,
             { signal: controller.signal },
           );
           if (!isMountedRef.current || controller.signal.aborted) {
@@ -483,7 +555,11 @@ function ClassroomInvitationsContent({
           setLinkCopyFailed(false);
           setTokenCopyFailed(false);
           setCreatedInvitation(created);
-          emailForm.reset({ email: '' });
+          emailForm.reset({
+            email: '',
+            role: adultMode ? 'STUDENT' : values.role,
+            childId: '',
+          });
           setLiveAnnouncement(
             `${messages.email.createdTitle}. ${messages.email.createdDescription}`,
           );
@@ -506,6 +582,26 @@ function ClassroomInvitationsContent({
               queryKey: classroomDetailQueryKey(userId, classroomId),
               exact: true,
             });
+          } else if (isConflictApiError(error)) {
+            void queryClient.invalidateQueries({
+              queryKey: classroomDetailQueryKey(userId, classroomId),
+              exact: true,
+            });
+            void queryClient.invalidateQueries({
+              predicate: createClassroomInvitationsPredicate(
+                userId,
+                classroomId,
+              ),
+            });
+            void queryClient.invalidateQueries({
+              predicate: createClassroomParentLinksPredicate(
+                userId,
+                classroomId,
+              ),
+            });
+            void queryClient.invalidateQueries({
+              predicate: createClassroomRosterPredicate(userId, classroomId),
+            });
           } else if (isUncertainWriteError(error)) {
             void queryClient.invalidateQueries({
               predicate: createClassroomInvitationsPredicate(
@@ -521,7 +617,7 @@ function ClassroomInvitationsContent({
           }
         }
       },
-      { knownFields: ['email'] },
+      { knownFields: ['email', 'role', 'childId'] },
     );
 
   const handleRevokeJoinCode = async (): Promise<void> => {
@@ -773,6 +869,43 @@ function ClassroomInvitationsContent({
     createdInvitation !== null
       ? buildInvitationAcceptUrl(createdInvitation.token)
       : null;
+
+  const isParentLinksForbidden =
+    parentLinksQuery.isError && isForbiddenApiError(parentLinksQuery.error);
+  const isParentLinksNotFound =
+    parentLinksQuery.isError && isNotFoundApiError(parentLinksQuery.error);
+  const isParentLinksRevoked = isParentLinksForbidden || isParentLinksNotFound;
+  const parentLinksData = isParentLinksRevoked
+    ? undefined
+    : parentLinksQuery.data;
+  const activeParentLinks =
+    parentLinksData?.items.filter((link) => link.state === 'ACTIVE') ?? [];
+
+  const activeGuardianCountByChildId = new Map<string, number>();
+  for (const link of activeParentLinks) {
+    activeGuardianCountByChildId.set(
+      link.childId,
+      (activeGuardianCountByChildId.get(link.childId) ?? 0) + 1,
+    );
+  }
+
+  const activeStudents = activeStudentsQuery.data?.items ?? [];
+  const getStudentGuardianCount = (
+    studentUserId: string,
+    fallbackGuardians: readonly { readonly state: 'ACTIVE' | 'INACTIVE' }[],
+  ): number => {
+    if (parentLinksData !== undefined) {
+      return activeGuardianCountByChildId.get(studentUserId) ?? 0;
+    }
+    return fallbackGuardians.filter((g) => g.state === 'ACTIVE').length;
+  };
+  const allStudentsAtGuardianCap =
+    activeStudents.length > 0 &&
+    activeStudents.every(
+      (student) =>
+        getStudentGuardianCount(student.userId, student.guardians) >=
+        MAX_GUARDIANS_PER_STUDENT,
+    );
 
   return (
     <div className="min-w-0 space-y-6 pt-2">
@@ -1031,31 +1164,190 @@ function ClassroomInvitationsContent({
             {messages.email.heading}
           </h3>
           <p className="text-sm text-pretty text-muted-foreground">
-            {messages.email.description}
+            {adultMode
+              ? messages.email.adultModeDescription
+              : messages.email.description}
           </p>
         </div>
 
-        <div className="min-w-0 space-y-2 rounded-xl bg-tray/50 p-3">
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="font-medium text-foreground">
-              {messages.email.roleLabel}:
-            </span>
-            <Badge variant="secondary">{messages.email.roleValue}</Badge>
+        {adultMode ? (
+          <div className="min-w-0 space-y-2 rounded-xl bg-tray/50 p-3">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="font-medium text-foreground">
+                {messages.email.roleLabel}:
+              </span>
+              <Badge variant="secondary">{messages.email.roleValue}</Badge>
+            </div>
+            <p className="text-xs text-pretty text-muted-foreground">
+              {messages.email.adultModeNotice}
+            </p>
+            <p className="text-xs text-pretty text-muted-foreground">
+              {messages.email.nonDisclosureNote}
+            </p>
           </div>
-          <p className="text-xs text-pretty text-muted-foreground">
-            {messages.email.nonDisclosureNote}
-          </p>
-        </div>
+        ) : (
+          <div className="min-w-0 space-y-2 rounded-xl bg-tray/50 p-3">
+            <p className="text-xs text-pretty text-muted-foreground">
+              {messages.email.nonDisclosureNote}
+            </p>
+          </div>
+        )}
 
         <form
           onSubmit={(event) => void handleEmailSubmit(event)}
           noValidate
           className="min-w-0 space-y-4"
         >
+          {!adultMode && (
+            <fieldset className="min-w-0 space-y-2">
+              <legend className="text-sm font-medium text-foreground">
+                {messages.email.roleLegend}
+              </legend>
+              <Controller
+                control={emailForm.control}
+                name="role"
+                render={({ field }) => (
+                  <div className="flex flex-wrap gap-2">
+                    {EMAIL_ROLE_OPTIONS.map((roleOption) => {
+                      const isSelected = field.value === roleOption;
+                      const radioId = `${emailRoleGroupId}-${roleOption}`;
+                      return (
+                        <div key={roleOption} className="relative">
+                          <input
+                            id={radioId}
+                            type="radio"
+                            name={field.name}
+                            value={roleOption}
+                            checked={isSelected}
+                            disabled={isSendingEmail}
+                            onBlur={field.onBlur}
+                            onChange={() => {
+                              field.onChange(roleOption);
+                              emailForm.clearErrors('root.serverError');
+                              if (roleOption === 'STUDENT') {
+                                emailForm.setValue('childId', '', {
+                                  shouldDirty: false,
+                                });
+                                emailForm.clearErrors('childId');
+                              }
+                            }}
+                            className="peer sr-only"
+                          />
+                          <label
+                            htmlFor={radioId}
+                            className={cn(
+                              'inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border-2 px-3.5 py-2 text-sm font-semibold motion-safe:transition-colors peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring peer-disabled:cursor-not-allowed peer-disabled:opacity-60',
+                              isSelected
+                                ? 'border-primary bg-tray/80 text-foreground'
+                                : 'border-edge bg-card text-muted-foreground hover:bg-tray/45',
+                            )}
+                          >
+                            {messages.email.roles[roleOption]}
+                          </label>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              />
+            </fieldset>
+          )}
+
+          {!adultMode && effectiveEmailRole === 'PARENT' && (
+            <div className="min-w-0 space-y-2">
+              {activeStudentsQuery.isPending && (
+                <p className="text-sm text-muted-foreground">
+                  {messages.email.childLoading}
+                </p>
+              )}
+
+              {activeStudentsQuery.isError && (
+                <Alert variant="destructive" role="alert">
+                  <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+                    <span>{messages.email.childError}</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void activeStudentsQuery.refetch()}
+                      className="min-h-11"
+                    >
+                      {messages.email.childRetry}
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {activeStudentsQuery.data !== undefined &&
+                activeStudents.length === 0 && (
+                  <Alert variant="info" role="status">
+                    <AlertDescription>
+                      {messages.email.childEmptyNotice}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+              {activeStudentsQuery.data !== undefined &&
+                activeStudents.length > 0 && (
+                  <>
+                    <FormField
+                      control={emailForm.control}
+                      name="childId"
+                      label={messages.email.childLabel}
+                      description={messages.email.childDescription}
+                    >
+                      {(fieldProps) => (
+                        <select
+                          {...fieldProps}
+                          disabled={isSendingEmail}
+                          className="flex min-h-11 w-full rounded-xl border border-edge bg-card px-3.5 py-2 text-base text-foreground shadow-inset focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <option value="">
+                            {messages.email.childPlaceholder}
+                          </option>
+                          {activeStudents.map((student) => {
+                            const guardianCount = getStudentGuardianCount(
+                              student.userId,
+                              student.guardians,
+                            );
+                            const atCap =
+                              guardianCount >= MAX_GUARDIANS_PER_STUDENT;
+                            return (
+                              <option
+                                key={student.userId}
+                                value={student.userId}
+                                disabled={atCap}
+                              >
+                                {messages.email.childOptionLabel(
+                                  student.displayName,
+                                  guardianCount,
+                                )}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      )}
+                    </FormField>
+                    {allStudentsAtGuardianCap && (
+                      <Alert variant="warning" role="status">
+                        <AlertDescription>
+                          {messages.email.childAllAtCapNotice}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </>
+                )}
+            </div>
+          )}
+
           <FormField
             control={emailForm.control}
             name="email"
-            label={messages.email.emailLabel}
+            label={
+              effectiveEmailRole === 'PARENT'
+                ? messages.email.parentEmailLabel
+                : messages.email.emailLabel
+            }
             description={messages.email.emailDescription}
           >
             {(fieldProps) => (
@@ -1064,7 +1356,11 @@ function ClassroomInvitationsContent({
                 type="email"
                 autoComplete="off"
                 maxLength={INVITATION_EMAIL_MAX_LENGTH}
-                placeholder={messages.email.emailPlaceholder}
+                placeholder={
+                  effectiveEmailRole === 'PARENT'
+                    ? messages.email.parentEmailPlaceholder
+                    : messages.email.emailPlaceholder
+                }
                 disabled={isSendingEmail}
               />
             )}
@@ -1079,7 +1375,12 @@ function ClassroomInvitationsContent({
           <Button
             type="submit"
             busy={isSendingEmail}
-            disabled={isSendingEmail}
+            disabled={
+              isSendingEmail ||
+              (effectiveEmailRole === 'PARENT' &&
+                activeStudentsQuery.data !== undefined &&
+                (activeStudents.length === 0 || allStudentsAtGuardianCap))
+            }
             className="min-h-11"
           >
             {isSendingEmail
@@ -1295,10 +1596,21 @@ function ClassroomInvitationsContent({
                         <Badge variant="outline">
                           {messages.list.kinds[invitation.kind]}
                         </Badge>
+                        <Badge variant="secondary">
+                          {messages.list.roles[invitation.role]}
+                        </Badge>
                       </div>
 
+                      {invitation.role === 'PARENT' &&
+                        invitation.childDisplayName !== null && (
+                          <p className="text-xs font-medium text-foreground">
+                            {messages.list.forStudentLabel(
+                              invitation.childDisplayName,
+                            )}
+                          </p>
+                        )}
+
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                        <span>{classroomMessages.roles[invitation.role]}</span>
                         <span>
                           {messages.list.usesLabel(
                             invitation.useCount,

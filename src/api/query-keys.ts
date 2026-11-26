@@ -535,6 +535,54 @@ export function createClassroomInvitationsPredicate(
   };
 }
 
+/**
+ * Key of `GET /classrooms/{id}/parent-links`: active parent-child guardian
+ * links for one classroom, scoped by `userId` and `classroomId`
+ * (`rules/state-management.md`).
+ */
+export function classroomParentLinksQueryKey(
+  userId: string,
+  classroomId: string,
+): ScopedQueryKey {
+  return createScopedQueryKey(
+    { userId, classroomId },
+    'classrooms',
+    'parent-links',
+  );
+}
+
+/**
+ * Predicate matching every classroom parent-links query entry owned by
+ * `userId` and `classroomId`.
+ */
+export function createClassroomParentLinksPredicate(
+  userId: string,
+  classroomId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedClassroomId = normalizeRequiredText(
+    classroomId,
+    'classroomId',
+  );
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; classroomId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.classroomId === normalizedClassroomId &&
+      segment.domain === 'classrooms' &&
+      segment.resource === 'parent-links'
+    );
+  };
+}
+
 export type ActivitySortOrder = 'dueAt' | 'createdAt' | '-dueAt' | '-createdAt';
 export type ActivityStateFilter = 'DRAFT' | 'PUBLISHED';
 
@@ -1707,6 +1755,154 @@ export function createClassroomEquipmentPredicate(
       segment.scope?.classroomId === normalizedClassroomId &&
       segment.domain === 'equipment' &&
       segment.resource === 'state'
+    );
+  };
+}
+
+export interface FamilyReportCardQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+}
+
+export interface NormalizedFamilyReportCardQueryParams {
+  readonly linkId: string;
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+/**
+ * Key of `GET /me/parent-links`: active parent-child links for the
+ * authenticated user, scoped by `userId` (`rules/state-management.md`).
+ */
+export function familyLinksQueryKey(userId: string): ScopedQueryKey {
+  return createScopedQueryKey({ userId }, 'family', 'links');
+}
+
+/**
+ * Key of `GET /me/family-threads`: active parent-teacher messaging threads
+ * across staff classrooms for the authenticated user, scoped by `userId`
+ * (`rules/state-management.md`).
+ */
+export function staffFamilyThreadsQueryKey(userId: string): ScopedQueryKey {
+  return createScopedQueryKey({ userId }, 'family', 'staff-threads');
+}
+
+/**
+ * Key of `GET /me/parent-links/{linkId}/report-card`: a linked child's
+ * paginated report card and participation summary, scoped by `userId` and
+ * `linkedChildId` (`linkId`) so switching children or accounts reads an
+ * isolated cache entry (`rules/state-management.md`, `rules/classrooms-and-roles.md`).
+ */
+export function familyReportCardQueryKey(
+  userId: string,
+  linkId: string,
+  params: FamilyReportCardQueryParams = {},
+): ScopedQueryKey<NormalizedFamilyReportCardQueryParams> {
+  const normalizedLinkId = normalizeRequiredText(linkId, 'linkId');
+  const normalizedParams = Object.freeze({
+    linkId: normalizedLinkId,
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 20, 1, 100),
+  });
+  return createScopedQueryKey(
+    { userId, linkedChildId: normalizedLinkId },
+    'family',
+    'report-card',
+    normalizedParams,
+  );
+}
+
+/**
+ * Predicate matching every family report card query entry owned by `userId`
+ * and `linkId`. Used to clear stale pages on terminal `403`/`404` responses.
+ */
+export function createFamilyReportCardPredicate(
+  userId: string,
+  linkId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedLinkId = normalizeRequiredText(linkId, 'linkId');
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; linkedChildId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.linkedChildId === normalizedLinkId &&
+      segment.domain === 'family' &&
+      segment.resource === 'report-card'
+    );
+  };
+}
+
+export interface ParentLinkMessagesQueryParams {
+  readonly page?: number;
+  readonly pageSize?: number;
+}
+
+export interface NormalizedParentLinkMessagesQueryParams {
+  readonly linkId: string;
+  readonly page: number;
+  readonly pageSize: number;
+}
+
+/**
+ * Key of `GET /parent-links/{linkId}/messages`: paginated chronological
+ * private messages for one parent-teacher thread, scoped by `userId` and
+ * `linkedChildId` (`linkId`) so switching children, dialogs, or accounts reads
+ * an isolated cache entry (`rules/state-management.md`).
+ */
+export function parentLinkMessagesQueryKey(
+  userId: string,
+  linkId: string,
+  params: ParentLinkMessagesQueryParams = {},
+): ScopedQueryKey<NormalizedParentLinkMessagesQueryParams> {
+  const normalizedLinkId = normalizeRequiredText(linkId, 'linkId');
+  const normalizedParams = Object.freeze({
+    linkId: normalizedLinkId,
+    page: clampListParam(params.page, 1, 1, 10_000),
+    pageSize: clampListParam(params.pageSize, 30, 1, 50),
+  });
+  return createScopedQueryKey(
+    { userId, linkedChildId: normalizedLinkId },
+    'family',
+    'messages',
+    normalizedParams,
+  );
+}
+
+/**
+ * Predicate matching every parent-link messages query entry owned by `userId`
+ * and `linkId`. Used on message creation, uncertain-write reconciliation, and
+ * terminal `403`/`404` cleanup.
+ */
+export function createParentLinkMessagesPredicate(
+  userId: string,
+  linkId: string,
+): (query: { readonly queryKey: readonly unknown[] }) => boolean {
+  const normalizedUserId = normalizeRequiredText(userId, 'userId');
+  const normalizedLinkId = normalizeRequiredText(linkId, 'linkId');
+  return (query) => {
+    const first = query.queryKey[0];
+    if (typeof first !== 'object' || first === null) {
+      return false;
+    }
+    const segment = first as {
+      scope?: { userId?: unknown; linkedChildId?: unknown };
+      domain?: unknown;
+      resource?: unknown;
+    };
+    return (
+      segment.scope?.userId === normalizedUserId &&
+      segment.scope?.linkedChildId === normalizedLinkId &&
+      segment.domain === 'family' &&
+      segment.resource === 'messages'
     );
   };
 }

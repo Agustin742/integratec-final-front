@@ -306,7 +306,7 @@ export interface paths {
         put?: never;
         /**
          * Issue an email invitation to join a classroom
-         * @description Issues a single-use email invitation for the specified classroom and schedules asynchronous email delivery via the transactional outbox. Restricted to teaching staff (School Owner/Admin or the classroom Teacher). Completely preserves non-disclosure (never reveals whether the email exists).
+         * @description Issues a single-use email invitation (STUDENT or PARENT) for the specified classroom and schedules asynchronous email delivery via the transactional outbox. Parent invitations require childId of an active student, are rejected when adultMode is enabled, and enforce the maximum of 2 active guardians per student. Restricted to teaching staff (School Owner/Admin or the classroom Teacher). Completely preserves non-disclosure (never reveals whether the email exists).
          */
         post: operations["ClassroomsController_createInvitation"];
         delete?: never;
@@ -359,6 +359,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/classrooms/{id}/parent-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List active parent-child guardian links for a classroom
+         * @description Returns all active ParentLink records for the specified classroom. Restricted to classroom staff (School Owner/Admin or the classroom Teacher).
+         */
+        get: operations["ClassroomsController_listParentLinks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/classrooms/{id}/parent-links/{linkId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Logically unlink a guardian from a student in a classroom
+         * @description Marks the ParentLink as INACTIVE while preserving historical messages and records. Idempotent if already inactive. Restricted to classroom staff.
+         */
+        delete: operations["ClassroomsController_unlinkParentLink"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/classrooms": {
         parameters: {
             query?: never;
@@ -389,8 +429,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Accept an email invitation to join a classroom
-         * @description Atomically binds the authenticated user account to the classroom specified in the email invitation and assigns an available desk. Idempotent: re-accepting by an already enrolled student succeeds and returns the existing desk without error.
+         * Accept an email invitation to join a classroom as student or guardian
+         * @description Atomically accepts a single-use STUDENT or PARENT email invitation. For STUDENT invitations, creates/reactivates classroom membership and assigns an available desk. For PARENT invitations, verifies adultMode is off, student is active, self-link is prevented, and the 2-guardian cap is respected, then creates/reactivates a ParentLink without creating a classroom membership or desk. Idempotent for already-active members and guardians.
          */
         post: operations["InvitationsController_accept"];
         delete?: never;
@@ -766,7 +806,7 @@ export interface paths {
         put?: never;
         /**
          * Grade a file submission
-         * @description Classroom staff (`OWNER`, `ADMIN`, or assigned `TEACHER`) only. Assigns a 0-100 score and visible feedback (`1-5000` characters) to an ungraded `FILE` submission, computes server-weighted points (`round(score * typeWeight * activity.weightMultiplier)`), credits the points ledger atomically when points > 0, and records a student-only `grade_posted` notification. Returns `409` if already graded or not a `FILE` activity, `403` for classroom students or linked parents, and `404` for out-of-scope actors.
+         * @description Classroom staff (`OWNER`, `ADMIN`, or assigned `TEACHER`) only. Assigns a 0-100 score and visible feedback (`1-5000` characters) to an ungraded `FILE` submission, computes server-weighted points (`round(score * typeWeight * activity.weightMultiplier)`), credits the points ledger atomically when points > 0, and records `grade_posted` notifications for the student and any active linked parents when adult mode is off. Returns `409` if already graded or not a `FILE` activity, `403` for classroom students or linked parents, and `404` for out-of-scope actors.
          */
         post: operations["SubmissionGradesController_grade"];
         delete?: never;
@@ -774,7 +814,7 @@ export interface paths {
         head?: never;
         /**
          * Regrade an existing submission grade
-         * @description Classroom staff (`OWNER`, `ADMIN`, or assigned `TEACHER`) only. Uses optimistic concurrency (`version`) to update score and feedback, appends a `GradeRevision` row, applies a compensating ledger entry (or initial earning from 0) when weighted points change, and records a student-only `grade_posted` notification. Returns `409` on stale `version` or if a negative delta would drive student points below zero.
+         * @description Classroom staff (`OWNER`, `ADMIN`, or assigned `TEACHER`) only. Uses optimistic concurrency (`version`) to update score and feedback, appends a `GradeRevision` row, applies a compensating ledger entry (or initial earning from 0) when weighted points change, and records `grade_posted` notifications for the student and any active linked parents when adult mode is off. Returns `409` on stale `version` or if a negative delta would drive student points below zero.
          */
         patch: operations["SubmissionGradesController_regrade"];
         trace?: never;
@@ -969,6 +1009,90 @@ export interface paths {
          */
         put: operations["EquipmentController_setSlot"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/parent-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List active parent-child links for the authenticated user
+         * @description Returns all active parent links for the authenticated user whose classroom (and owning school, if any) is live and whose linked child is still an active enrolled student. Links in adult-mode classrooms are included with `adultMode: true` so clients can display them as disabled while adult mode is active. Ordered by `createdAt` ascending, then `id` ascending.
+         */
+        get: operations["FamilyController_listMyParentLinks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/parent-links/{linkId}/report-card": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a linked child's report card and participation metrics
+         * @description Parent-only read view (HU-ACT-006) scoped to one active parent link. Reuses the same graded-activity report card and participation metrics as the student view. Returns `404` for malformed UUIDs, foreign or inactive links, deleted classrooms/schools, or removed students (strict anti-enumeration), and `403` while the classroom is in adult education mode.
+         */
+        get: operations["FamilyController_getChildReportCard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/family-threads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List active parent-teacher messaging threads for staff classrooms
+         * @description Returns all active parent-child messaging threads across live, non-adult-mode classrooms where the authenticated user holds a staff role (`TEACHER`, `SCHOOL_OWNER`, or `SCHOOL_ADMIN`), including the latest visible message preview. Ordered by `lastMessageAt DESC NULLS LAST`, then `createdAt ASC`, then `id ASC`. Returns `{ items: [] }` without error for students, parents, or users without staff classrooms.
+         */
+        get: operations["FamilyController_listMyFamilyThreads"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/parent-links/{linkId}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List private messages for a parent-teacher thread
+         * @description Returns paginated visible messages for one active parent-child link, ordered chronologically (`createdAt ASC, id ASC`) for natural conversation reading. Accessible only to the linked parent and classroom staff (teacher, school admin, or school owner). Returns `404` for malformed UUIDs, inactive links, deleted classrooms/schools, removed students, or any other caller including the linked student (strict anti-enumeration), and `403` while the classroom is in adult education mode.
+         */
+        get: operations["ParentLinkMessagesController_listMessages"];
+        put?: never;
+        /**
+         * Send a private message in a parent-teacher thread
+         * @description Persists a new plain-text message bound to one active parent-child link (`classroomId: null`). Accessible only to the linked parent and classroom staff (teacher, school admin, or school owner). Returns `404` for malformed UUIDs, inactive links, deleted classrooms/schools, removed students, or any other caller including the linked student (strict anti-enumeration), and `403` while the classroom is in adult education mode.
+         */
+        post: operations["ParentLinkMessagesController_createMessage"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2066,11 +2190,17 @@ export interface components {
              */
             email: string;
             /**
-             * @description Classroom role for the invitee. Only STUDENT is supported; teacher invitations are out of scope for classroom invitations.
+             * @description Classroom role for the invitee (STUDENT or PARENT). Teacher invitations belong to the school-teacher invitation flow.
              * @default STUDENT
              * @enum {string}
              */
-            role: "STUDENT";
+            role: "STUDENT" | "PARENT";
+            /**
+             * Format: uuid
+             * @description UUID of the enrolled student to link when role is PARENT. Must be omitted when role is STUDENT.
+             * @example 4e5f6a7b-0000-4000-8000-000000000009
+             */
+            childId?: string;
         };
         CreatedClassroomInvitationResponseDto: {
             /** @description Invitation UUID */
@@ -2086,7 +2216,14 @@ export interface components {
              * @description Assigned role upon joining
              * @enum {string}
              */
-            role: "OWNER" | "ADMIN" | "TEACHER" | "STUDENT";
+            role: "OWNER" | "ADMIN" | "TEACHER" | "STUDENT" | "PARENT";
+            /**
+             * Format: uuid
+             * @description Linked student user UUID when role is PARENT, null otherwise
+             */
+            childId?: Record<string, never> | null;
+            /** @description Linked student display name when role is PARENT, null otherwise */
+            childDisplayName?: Record<string, never> | null;
             /** @description Maximum allowed uses, null if unlimited */
             maxUses?: Record<string, never> | null;
             /** @description Number of times this invitation has been used */
@@ -2126,7 +2263,14 @@ export interface components {
              * @description Assigned role upon joining
              * @enum {string}
              */
-            role: "OWNER" | "ADMIN" | "TEACHER" | "STUDENT";
+            role: "OWNER" | "ADMIN" | "TEACHER" | "STUDENT" | "PARENT";
+            /**
+             * Format: uuid
+             * @description Linked student user UUID when role is PARENT, null otherwise
+             */
+            childId?: Record<string, never> | null;
+            /** @description Linked student display name when role is PARENT, null otherwise */
+            childDisplayName?: Record<string, never> | null;
             /** @description Maximum allowed uses, null if unlimited */
             maxUses?: Record<string, never> | null;
             /** @description Number of times this invitation has been used */
@@ -2174,7 +2318,7 @@ export interface components {
              * @default STUDENT
              * @enum {string}
              */
-            role: "OWNER" | "ADMIN" | "TEACHER" | "STUDENT";
+            role: "OWNER" | "ADMIN" | "TEACHER" | "STUDENT" | "PARENT";
             /** @description Maximum uses, null if unlimited */
             maxUses?: Record<string, never> | null;
             /**
@@ -2198,12 +2342,77 @@ export interface components {
              */
             createdAt: string;
         };
+        ClassroomParentLinkDto: {
+            /**
+             * Format: uuid
+             * @description ParentLink UUID
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Guardian user UUID
+             */
+            parentId: string;
+            /** @description Guardian display name */
+            parentDisplayName: string;
+            /**
+             * Format: uuid
+             * @description Linked student user UUID
+             */
+            childId: string;
+            /** @description Linked student display name */
+            childDisplayName: string;
+            /**
+             * @description Current link state
+             * @enum {string}
+             */
+            state: "ACTIVE" | "INACTIVE";
+            /**
+             * Format: date-time
+             * @description Creation timestamp
+             */
+            createdAt: string;
+        };
+        ClassroomParentLinksResponseDto: {
+            /** @description Active parent links for the classroom */
+            items: components["schemas"]["ClassroomParentLinkDto"][];
+        };
         AcceptInvitationDto: {
             /**
              * @description Opaque token received via invitation email
              * @example 4f7e2d9a8c1b3e5f7a9d0c2e4b6a8f1d3c5e7b9a0c2e4f6a8b0d2e4f6a8b0c2e
              */
             token: string;
+        };
+        AcceptInvitationResponseDto: {
+            /** @description Classroom UUID */
+            classroomId: string;
+            /**
+             * Format: uuid
+             * @description Created or existing classroom membership UUID (null for PARENT invitations)
+             */
+            membershipId: Record<string, never> | null;
+            /**
+             * @description Role granted by the accepted invitation
+             * @enum {string}
+             */
+            role: "STUDENT" | "PARENT";
+            /** @description Assigned desk for STUDENT invitations; null for PARENT invitations */
+            desk: components["schemas"]["AssignedDeskDto"] | null;
+            /** @description 1-based index of the assigned desk for STUDENT invitations; null for PARENT invitations */
+            deskIndex: Record<string, never> | null;
+            /**
+             * Format: uuid
+             * @description Linked student user UUID for PARENT invitations; null for STUDENT invitations
+             */
+            childId: Record<string, never> | null;
+            /**
+             * Format: uuid
+             * @description Created or existing ParentLink UUID for PARENT invitations; null for STUDENT invitations
+             */
+            parentLinkId: Record<string, never> | null;
+            /** @description True if the caller already held an active membership or parent link (idempotent retry) */
+            alreadyMember: boolean;
         };
         NotificationDto: {
             /** Format: uuid */
@@ -2769,6 +2978,200 @@ export interface components {
              * @example 00000000-0000-4000-8000-000000000101
              */
             shopItemId?: string | null;
+        };
+        FamilyLinkDto: {
+            /**
+             * Format: uuid
+             * @description ParentLink UUID.
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Classroom UUID.
+             */
+            classroomId: string;
+            /** @description Classroom display name. */
+            classroomName: string;
+            /** @description Classroom subject or description, if configured. */
+            classroomSubject: string | null;
+            /**
+             * Format: uuid
+             * @description Owning school UUID, or null for an independent-teacher classroom.
+             */
+            schoolId: string | null;
+            /** @description Whether the classroom is currently in adult education mode. Existing links remain visible so clients can indicate that parent actions are disabled while adult mode is active. */
+            adultMode: boolean;
+            /**
+             * Format: uuid
+             * @description Linked student user UUID.
+             */
+            childId: string;
+            /** @description Linked student display name. */
+            childDisplayName: string;
+            /**
+             * Format: date-time
+             * @description Link creation timestamp (UTC ISO-8601).
+             */
+            createdAt: string;
+        };
+        FamilyLinksResponseDto: {
+            /** @description Active parent links where the classroom and school are live and the child is an active enrolled student, ordered by createdAt ascending then id ascending. */
+            items: components["schemas"]["FamilyLinkDto"][];
+        };
+        ReportCardItemDto: {
+            /**
+             * Format: uuid
+             * @description Graded activity UUID.
+             */
+            activityId: string;
+            /** @description Activity title frozen at grading time; later edits do not change it. */
+            activityTitle: string;
+            /**
+             * @description Activity type.
+             * @enum {string}
+             */
+            activityType: "TP" | "EXAM";
+            /** @description Activity maxScore (0-100) frozen at grading time; later edits do not change it. */
+            maxScore: number;
+            /** @description Awarded score (0..maxScore). */
+            score: number;
+            /** @description Written feedback left by the grader. */
+            feedback: string;
+            /** @description Net credited weighted points for this grade. */
+            pointsAwarded: number;
+            /** @description Whether the submission was late. */
+            isLate: boolean;
+            /**
+             * Format: date-time
+             * @description Submission instant (UTC).
+             */
+            submittedAt: string;
+            /**
+             * Format: date-time
+             * @description Latest grading instant (UTC).
+             */
+            gradedAt: string;
+        };
+        StudentParticipationSummaryDto: {
+            /** @description Sum of connected seconds across all recorded UTC days. */
+            connectedSeconds: number;
+            /** @description Sum of raw submission events across all recorded UTC days. */
+            submissionCount: number;
+            /** @description Sum of classroom chat messages sent across all recorded UTC days. */
+            messageCount: number;
+            /** @description Number of graded submissions to published non-deleted activities. */
+            gradedCount: number;
+            /** @description Number of submitted but not yet graded submissions to published non-deleted activities. */
+            ungradedCount: number;
+            /** @description Number of published non-deleted activities without a submission yet. */
+            pendingCount: number;
+            /** @description Mean percentage score (0-100, rounded to 2 decimals) across graded published activities with maxScore > 0, or null when none are graded. */
+            averageScorePercent: number | null;
+        };
+        FamilyReportCardResponseDto: {
+            /** @description Verified active parent-child link summary. */
+            link: components["schemas"]["FamilyLinkDto"];
+            /** @description Graded published activities for the linked child, latest grading first. */
+            items: components["schemas"]["ReportCardItemDto"][];
+            /** @description Current 1-based page number. */
+            page: number;
+            /** @description Page size. */
+            pageSize: number;
+            /** @description Total number of graded published activities for the linked child. */
+            total: number;
+            /** @description Aggregated participation and grade progress totals for the linked child. */
+            metrics: components["schemas"]["StudentParticipationSummaryDto"];
+        };
+        StaffFamilyThreadDto: {
+            /**
+             * Format: uuid
+             * @description ParentLink UUID.
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description Classroom UUID.
+             */
+            classroomId: string;
+            /** @description Classroom display name. */
+            classroomName: string;
+            /**
+             * Format: uuid
+             * @description Linked parent user UUID.
+             */
+            parentId: string;
+            /** @description Current display name of the linked parent. */
+            parentDisplayName: string;
+            /**
+             * Format: uuid
+             * @description Linked student user UUID.
+             */
+            childId: string;
+            /** @description Current display name of the linked student. */
+            childDisplayName: string;
+            /** @description Latest visible message body in this thread, or null if no messages exist yet. */
+            lastMessageBody: string | null;
+            /**
+             * Format: date-time
+             * @description UTC ISO-8601 timestamp of the latest visible message, or null if none.
+             */
+            lastMessageAt: string | null;
+            /**
+             * @description Role of the author of the latest visible message (`PARENT` or `STAFF`), or null if none.
+             * @enum {string|null}
+             */
+            lastMessageAuthorRole: "PARENT" | "STAFF" | null;
+        };
+        StaffFamilyThreadsResponseDto: {
+            /** @description Active family threads ordered by `lastMessageAt DESC NULLS LAST`, then `createdAt ASC`, then `id ASC`. Empty when the authenticated user has no staff classrooms. */
+            items: components["schemas"]["StaffFamilyThreadDto"][];
+        };
+        ParentLinkMessageDto: {
+            /**
+             * Format: uuid
+             * @description Message UUID.
+             */
+            id: string;
+            /**
+             * Format: uuid
+             * @description ParentLink UUID this message belongs to.
+             */
+            parentLinkId: string;
+            /**
+             * Format: uuid
+             * @description Author user UUID.
+             */
+            authorId: string;
+            /** @description Current display name of the message author. */
+            authorDisplayName: string;
+            /**
+             * @description Whether the author is the linked parent (`PARENT`) or classroom staff (`STAFF`).
+             * @enum {string}
+             */
+            authorRole: "PARENT" | "STAFF";
+            /** @description Trimmed plain text message body, never interpreted as HTML. */
+            body: string;
+            /**
+             * Format: date-time
+             * @description Server-assigned UTC creation timestamp (ISO-8601).
+             */
+            createdAt: string;
+        };
+        ParentLinkMessagesResponseDto: {
+            /** @description Verified active parent-child link summary. */
+            link: components["schemas"]["FamilyLinkDto"];
+            /** @description Visible messages in this parent-link thread, ordered chronologically (`createdAt ASC, id ASC`). */
+            items: components["schemas"]["ParentLinkMessageDto"][];
+            /** @description Current 1-based page number. */
+            page: number;
+            /** @description Page size. */
+            pageSize: number;
+            /** @description Total number of visible messages in this thread. */
+            total: number;
+        };
+        CreateParentLinkMessageDto: {
+            /** @description Plain text message body; 1–2000 characters after trimming. Tabs and line breaks are allowed; NUL and unsafe C0/C1 control characters are rejected. Never interpreted as HTML. */
+            body: string;
         };
         StreakSummaryDto: {
             /** @description Consecutive qualifying local days whose chain is still alive (the last one is today or yesterday). A bare login never changes it. */
@@ -3369,40 +3772,6 @@ export interface components {
         };
         CreateForumPostDto: {
             body: string;
-        };
-        ReportCardItemDto: {
-            /**
-             * Format: uuid
-             * @description Graded activity UUID.
-             */
-            activityId: string;
-            /** @description Activity title frozen at grading time; later edits do not change it. */
-            activityTitle: string;
-            /**
-             * @description Activity type.
-             * @enum {string}
-             */
-            activityType: "TP" | "EXAM";
-            /** @description Activity maxScore (0-100) frozen at grading time; later edits do not change it. */
-            maxScore: number;
-            /** @description Awarded score (0..maxScore). */
-            score: number;
-            /** @description Written feedback left by the grader. */
-            feedback: string;
-            /** @description Net credited weighted points for this grade. */
-            pointsAwarded: number;
-            /** @description Whether the submission was late. */
-            isLate: boolean;
-            /**
-             * Format: date-time
-             * @description Submission instant (UTC).
-             */
-            submittedAt: string;
-            /**
-             * Format: date-time
-             * @description Latest grading instant (UTC).
-             */
-            gradedAt: string;
         };
         DailyMetricDto: {
             /**
@@ -4224,7 +4593,7 @@ export interface operations {
                     "application/json": components["schemas"]["CreatedClassroomInvitationResponseDto"];
                 };
             };
-            /** @description Validation failed on email or role. */
+            /** @description Validation failed on email, role, or childId. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -4251,8 +4620,17 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Classroom does not exist or caller has no relationship with it. */
+            /** @description Classroom does not exist, caller has no relationship with it, or target student is not active in this classroom. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Classroom is in adult education mode, student already has 2 active guardians, or a duplicate pending parent invitation already exists. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4432,6 +4810,106 @@ export interface operations {
             };
         };
     };
+    ClassroomsController_listParentLinks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active parent-child guardian links in the classroom. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassroomParentLinksResponseDto"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Caller is a student or parent without classroom staff authority. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Classroom does not exist or caller has no relationship with it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ClassroomsController_unlinkParentLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Classroom UUID */
+                id: string;
+                /** @description ParentLink UUID to deactivate */
+                linkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Parent link deactivated (or already inactive); no response body. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Caller is a student or parent without classroom staff authority. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Classroom or parent link does not exist in this classroom. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
     MeClassroomsController_listMyClassrooms: {
         parameters: {
             query?: {
@@ -4501,16 +4979,16 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Classroom membership established and desk assigned. */
+            /** @description Classroom membership (STUDENT) or guardian link (PARENT) established. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JoinClassroomResponseDto"];
+                    "application/json": components["schemas"]["AcceptInvitationResponseDto"];
                 };
             };
-            /** @description Invitation token is malformed, expired, or already used. */
+            /** @description Invitation token is malformed, expired, revoked, or already used. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -4537,7 +5015,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
-            /** @description Concurrent invitation acceptance conflict. */
+            /** @description Adult mode enabled, student no longer enrolled, self-link attempted, 2-guardian cap reached, or concurrent invitation acceptance conflict. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -6786,6 +7264,255 @@ export interface operations {
             };
             /** @description Per-user equipment change rate limit exceeded. */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    FamilyController_listMyParentLinks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active parent-child links for the authenticated user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FamilyLinksResponseDto"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    FamilyController_getChildReportCard: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Items per page. */
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                /** @description ParentLink UUID */
+                linkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The linked child's report card and participation metrics. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FamilyReportCardResponseDto"];
+                };
+            };
+            /** @description Invalid pagination parameters (`page`, `pageSize`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Parent viewing is disabled while the classroom is in adult education mode. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Malformed, nonexistent, inactive, or inaccessible parent link. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    FamilyController_listMyFamilyThreads: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active family messaging threads for the authenticated staff user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffFamilyThreadsResponseDto"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ParentLinkMessagesController_listMessages: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number. */
+                page?: number;
+                /** @description Messages per page (1..50, default 30). */
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                /** @description ParentLink UUID */
+                linkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated chronological messages for the parent-teacher thread. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParentLinkMessagesResponseDto"];
+                };
+            };
+            /** @description Invalid pagination parameters (`page`, `pageSize`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Parent messaging is disabled while the classroom is in adult education mode. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Malformed, nonexistent, inactive, or inaccessible parent link. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    ParentLinkMessagesController_createMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ParentLink UUID */
+                linkId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateParentLinkMessageDto"];
+            };
+        };
+        responses: {
+            /** @description The newly created parent-teacher message. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParentLinkMessageDto"];
+                };
+            };
+            /** @description Invalid message body (empty, overlong, or unsafe control characters). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Missing, malformed, expired, or revoked access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Parent messaging is disabled while the classroom is in adult education mode. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Malformed, nonexistent, inactive, or inaccessible parent link. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

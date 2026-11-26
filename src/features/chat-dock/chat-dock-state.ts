@@ -2,11 +2,13 @@ import { useEffect, useReducer } from 'react';
 
 /**
  * Where the floating chat dock is: whether the chat list is expanded and
- * which classroom conversation (at most ONE) is open or minimized.
+ * which conversation (at most ONE classroom chat OR ONE family thread) is open
+ * or minimized.
  */
 export interface ChatDockState {
   readonly listOpen: boolean;
   readonly conversationId: string | null;
+  readonly familyLinkId: string | null;
   readonly minimized: boolean;
 }
 
@@ -14,6 +16,7 @@ export type ChatDockAction =
   | { readonly type: 'toggleList' }
   | { readonly type: 'closeList' }
   | { readonly type: 'openConversation'; readonly classroomId: string }
+  | { readonly type: 'openFamilyThread'; readonly familyLinkId: string }
   | { readonly type: 'minimize' }
   | { readonly type: 'restore' }
   | { readonly type: 'closeConversation' }
@@ -22,6 +25,7 @@ export type ChatDockAction =
 export const INITIAL_CHAT_DOCK_STATE: ChatDockState = {
   listOpen: false,
   conversationId: null,
+  familyLinkId: null,
   minimized: false,
 };
 
@@ -38,18 +42,37 @@ export function chatDockReducer(
       return {
         ...state,
         conversationId: action.classroomId,
+        familyLinkId: null,
+        minimized: false,
+      };
+    case 'openFamilyThread':
+      return {
+        ...state,
+        conversationId: null,
+        familyLinkId: action.familyLinkId,
         minimized: false,
       };
     case 'minimize':
-      return state.conversationId === null || state.minimized
+      return (state.conversationId === null && state.familyLinkId === null) ||
+        state.minimized
         ? state
         : { ...state, minimized: true };
     case 'restore':
       return state.minimized ? { ...state, minimized: false } : state;
     case 'closeConversation':
-      return { ...state, conversationId: null, minimized: false };
+      return {
+        ...state,
+        conversationId: null,
+        familyLinkId: null,
+        minimized: false,
+      };
     case 'backToList':
-      return { listOpen: true, conversationId: null, minimized: false };
+      return {
+        listOpen: true,
+        conversationId: null,
+        familyLinkId: null,
+        minimized: false,
+      };
   }
 }
 
@@ -68,10 +91,18 @@ function readStoredState(userId: string): ChatDockState {
       typeof value.conversationId === 'string' && value.conversationId !== ''
         ? value.conversationId
         : null;
+    const familyLinkId =
+      conversationId === null &&
+      typeof value.familyLinkId === 'string' &&
+      value.familyLinkId !== ''
+        ? value.familyLinkId
+        : null;
+    const hasActiveWindow = conversationId !== null || familyLinkId !== null;
     return {
       listOpen: value.listOpen === true,
       conversationId,
-      minimized: conversationId !== null && value.minimized === true,
+      familyLinkId,
+      minimized: hasActiveWindow && value.minimized === true,
     };
   } catch {
     return INITIAL_CHAT_DOCK_STATE;

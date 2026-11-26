@@ -31,9 +31,12 @@ import {
   createClassroomDetailHandler,
   createClassroomInvitationsHandler,
   createClassroomInvitationsStore,
+  createClassroomParentLinksHandler,
   createClassroomRosterHandler,
   type ClassroomDetailPayload,
   type ClassroomInvitationPayload,
+  type ClassroomParentLinkPayload,
+  type RosterStudentPayload,
 } from '@/test/msw/handlers';
 
 vi.setConfig({ testTimeout: 20_000 });
@@ -188,6 +191,7 @@ describe('ClassroomInvitationsPanel (#32)', () => {
 
     mswServer.use(
       createStaffDetailHandler(),
+      createClassroomParentLinksHandler({ classroomId, items: [] }),
       createClassroomInvitationsHandler({
         classroomId,
         error: {
@@ -207,6 +211,7 @@ describe('ClassroomInvitationsPanel (#32)', () => {
 
     mswServer.use(
       createStaffDetailHandler(),
+      createClassroomParentLinksHandler({ classroomId, items: [] }),
       createClassroomInvitationsHandler({
         classroomId,
         error: {
@@ -659,5 +664,175 @@ describe('ClassroomInvitationsPanel (#32)', () => {
     });
     expect(window.sessionStorage.length).toBe(0);
     expect(window.localStorage.length).toBe(0);
+  });
+
+  test('supports PARENT invitations with active student selector, 2-guardian cap UI, 409 handling, and role/student badges', async () => {
+    const studentOne: RosterStudentPayload = {
+      membershipId: 'mem-1',
+      userId: '4e5f6a7b-0000-4000-8000-000000000009',
+      displayName: 'Valentina Gómez',
+      state: 'ACTIVE',
+      deletedAt: null,
+      guardians: [
+        { id: 'parent-1', displayName: 'Laura Gómez', state: 'ACTIVE' },
+      ],
+    };
+    const studentAtCap: RosterStudentPayload = {
+      membershipId: 'mem-2',
+      userId: '4e5f6a7b-0000-4000-8000-000000000010',
+      displayName: 'Tomás Fernández',
+      state: 'ACTIVE',
+      deletedAt: null,
+      guardians: [
+        { id: 'parent-2', displayName: 'Marta Fernández', state: 'ACTIVE' },
+        { id: 'parent-3', displayName: 'Diego Fernández', state: 'ACTIVE' },
+      ],
+    };
+    const initialParentLinks: ClassroomParentLinkPayload[] = [
+      {
+        id: 'link-1',
+        parentId: 'parent-1',
+        parentDisplayName: 'Laura Gómez',
+        childId: studentOne.userId,
+        childDisplayName: studentOne.displayName,
+        state: 'ACTIVE',
+        createdAt: '2026-11-18T12:00:00.000Z',
+      },
+      {
+        id: 'link-2',
+        parentId: 'parent-2',
+        parentDisplayName: 'Marta Fernández',
+        childId: studentAtCap.userId,
+        childDisplayName: studentAtCap.displayName,
+        state: 'ACTIVE',
+        createdAt: '2026-11-18T12:01:00.000Z',
+      },
+      {
+        id: 'link-3',
+        parentId: 'parent-3',
+        parentDisplayName: 'Diego Fernández',
+        childId: studentAtCap.userId,
+        childDisplayName: studentAtCap.displayName,
+        state: 'ACTIVE',
+        createdAt: '2026-11-18T12:02:00.000Z',
+      },
+    ];
+
+    const capturedBodies: unknown[] = [];
+    const store = createClassroomInvitationsStore({
+      classroomId,
+      initialInvitations: [],
+      initialParentLinks,
+      studentNamesById: {
+        [studentOne.userId]: studentOne.displayName,
+        [studentAtCap.userId]: studentAtCap.displayName,
+      },
+      onCreateInvitationRequest: (_request, body) => {
+        capturedBodies.push(body);
+      },
+    });
+    mswServer.use(
+      createStaffDetailHandler({ adultMode: false }),
+      createClassroomRosterHandler({
+        classroomId,
+        items: [studentOne, studentAtCap],
+      }),
+      ...store.handlers,
+    );
+
+    const { container } = renderInvitationsPanel();
+
+    const parentRadio = await screen.findByRole('radio', {
+      name: copy.email.roles.PARENT,
+    });
+    fireEvent.click(parentRadio);
+
+    const childSelect = (await screen.findByLabelText(
+      copy.email.childLabel,
+    )) as HTMLSelectElement;
+    const optionOne = within(childSelect).getByRole('option', {
+      name: copy.email.childOptionLabel(studentOne.displayName, 1),
+    }) as HTMLOptionElement;
+    const optionAtCap = within(childSelect).getByRole('option', {
+      name: copy.email.childOptionLabel(studentAtCap.displayName, 2),
+    }) as HTMLOptionElement;
+
+    expect(optionOne.disabled).toBe(false);
+    expect(optionAtCap.disabled).toBe(true);
+
+    // Client validation requires choosing a student for PARENT invitations.
+    const parentEmailInput = screen.getByLabelText(copy.email.parentEmailLabel);
+    fireEvent.change(parentEmailInput, {
+      target: { value: 'carlos.tutor@example.edu.ar' },
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: copy.email.submitAction }),
+    );
+    expect(
+      await screen.findByText(copy.email.validation.childRequired),
+    ).toBeVisible();
+
+    // Server 409 conflict displays centralized es-AR message without raw server text.
+    fireEvent.change(childSelect, { target: { value: studentOne.userId } });
+    store.failNextCreateInvitation({
+      status: 409,
+      body: {
+        code: 'CONFLICT',
+        message: 'RAW_BACKEND_SECRET_409_TEXT',
+        correlationId: 'corr-parent-409',
+      },
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: copy.email.submitAction }),
+    );
+    expect(await screen.findByText(copy.email.errors.conflict)).toBeVisible();
+    expect(
+      screen.queryByText(/RAW_BACKEND_SECRET_409_TEXT/),
+    ).not.toBeInTheDocument();
+
+    // Confirmed 201 creates PARENT invitation with childId and displays role + child in list.
+    fireEvent.click(
+      screen.getByRole('button', { name: copy.email.submitAction }),
+    );
+    expect(
+      await screen.findByRole('heading', { name: copy.email.createdTitle }),
+    ).toBeVisible();
+    expect(capturedBodies).toContainEqual({
+      email: 'carlos.tutor@example.edu.ar',
+      role: 'PARENT',
+      childId: studentOne.userId,
+    });
+    expect(
+      await screen.findByText(
+        copy.list.forStudentLabel(studentOne.displayName),
+      ),
+    ).toBeVisible();
+
+    await expectAccessible(container);
+  });
+
+  test('hides parent role option in adultMode and shows adult mode informational notice', async () => {
+    const store = createClassroomInvitationsStore({
+      classroomId,
+      adultMode: true,
+      initialInvitations: [],
+      initialParentLinks: [],
+    });
+    mswServer.use(
+      createStaffDetailHandler({ adultMode: true }),
+      ...store.handlers,
+    );
+
+    const { container } = renderInvitationsPanel();
+
+    expect(await screen.findByText(copy.email.adultModeNotice)).toBeVisible();
+    expect(
+      screen.queryByRole('radio', { name: copy.email.roles.PARENT }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: copy.parentLinks.heading }),
+    ).not.toBeInTheDocument();
+
+    await expectAccessible(container);
   });
 });

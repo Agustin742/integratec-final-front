@@ -15,3 +15,5 @@ export function Input({ className, type = 'text', ...props }: InputProps) {
     />
   );
 }
+
+export { PasswordInput, type PasswordInputProps } from './password-input';
