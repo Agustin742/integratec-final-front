@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-25 — Review fixes for the welcome scene, desk map and bot skins (#149)
+
+- **Status:** completed
+- **Area / files:** `src/features/world/preview/`, `src/features/world/npc/`, `src/features/classrooms/{desks,settings}/`, `src/realtime/client.test.ts`, `docs/3d-assets.md`
+- **Change:** Wide side pieces are shrunk to fit the 16:9 frame; an unexpected `deskDecor` value only empties its own desk. Added coverage for every character model and for clearing a synced desk decor. Parts a bot skin hides now stay unmerged although they load as groups, and settings send the skin only when changed.
+- **Reason:** Review findings: cut-off scenery, one bad desk failing the whole map, skins not hiding the real bot parts and unrelated saves resetting an unknown skin.
+- **Verification:** Touched tests, lint and typecheck. Not checked visually.
+- **Next step:** F5 customization rework.
+
 ## 2026-11-25 — Tutor bot skins and selector (#149)
 
 - **Status:** completed (not visually checked)

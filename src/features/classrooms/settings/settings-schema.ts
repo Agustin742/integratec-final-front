@@ -47,14 +47,22 @@ export function toSettingsFormValues(
   };
 }
 
+/**
+ * `previousSkin` is the skin the form started from. The skin is sent only when
+ * the user changed it, so a stored value this build does not know (read as
+ * `none`) is never overwritten by an unrelated save.
+ */
 export function toSettingsUpdatePayload(
   values: ClassroomSettingsFormOutput,
+  previousSkin?: ClassroomSettingsFormOutput['tutorBotSkin'],
 ): UpdateClassroomPayload {
   return {
     name: values.name,
     subject: values.subject === '' ? null : values.subject,
     adultMode: values.adultMode,
     chatMuted: values.chatMuted,
-    tutorBotSkin: values.tutorBotSkin,
+    ...(values.tutorBotSkin !== previousSkin
+      ? { tutorBotSkin: values.tutorBotSkin }
+      : {}),
   };
 }

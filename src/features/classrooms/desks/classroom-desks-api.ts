@@ -36,7 +36,8 @@ const classroomDeskSchema: z.ZodType<ClassroomDeskDto> = z.object({
   deskIndex: z.number().int().min(1),
   membershipId: z.string().min(1).nullable(),
   userId: z.string().min(1).nullable(),
-  deskDecor: deskDecorSchema.nullable().default(null),
+  // One unexpected value must not lose the map: that desk shows no decor.
+  deskDecor: deskDecorSchema.nullable().default(null).catch(null),
 });
 
 export const classroomDeskMapSchema: z.ZodType<ClassroomDeskMapDto> = z.object({

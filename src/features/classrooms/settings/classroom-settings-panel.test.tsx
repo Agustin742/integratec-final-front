@@ -142,6 +142,29 @@ describe('ClassroomSettingsPanel', () => {
     });
   });
 
+  it('never overwrites a skin it does not know when staff change something else', async () => {
+    const bodies: UpdateClassroomRequestPayload[] = [];
+    mswServer.use(
+      createUpdateClassroomHandler({
+        onRequest: (_request, _id, body) => {
+          bodies.push(body);
+        },
+      }),
+    );
+    renderSettings({
+      detail: {
+        tutorBotSkin: 'pirate' as ClassroomDetailPayload['tutorBotSkin'],
+      },
+    });
+
+    fireEvent.change(await nameField(), { target: { value: 'Física 5to A' } });
+    fireEvent.click(saveButton());
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ name: 'Física 5to A' });
+    expect(bodies[0]).not.toHaveProperty('tutorBotSkin');
+  });
+
   it('validates the name inline and does not send an invalid body', async () => {
     const onRequest = vi.fn();
     mswServer.use(createUpdateClassroomHandler({ onRequest }));

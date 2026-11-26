@@ -11,6 +11,7 @@ import {
   topOptionsFor,
   type Avatar,
 } from '@/features/profile/avatar-options';
+import { PREVIEW_FRAME } from '../camera';
 
 /** Returns a number in `[0, 1)`, like `Math.random`. */
 export type RandomSource = () => number;
@@ -33,7 +34,10 @@ export interface PreviewPiece {
   readonly scale: number;
 }
 
-/** `[file, half width in meters, scale]`; tall pieces are scaled into frame. */
+/**
+ * `[file, half width in meters, scale]`; tall pieces are scaled into frame, and
+ * wide ones are shrunk further by `placeSide`.
+ */
 type SidePiece = readonly [string, number, number?];
 
 interface Space {
@@ -122,6 +126,30 @@ const SIDE_Z = -0.6;
 /** Theme corners are 0.98 m deep and stand behind the character. */
 const THEME_Z = -0.95;
 
+/** Stands a piece beside the character, shrunk only if it would be cut off. */
+function placeSide(
+  folder: string,
+  [file, halfWidth, scale = 1]: SidePiece,
+  side: -1 | 1,
+): PreviewPiece {
+  const widest = (PREVIEW_FRAME.halfWidth - SIDE_CLEARANCE) / (2 * halfWidth);
+  const fitted = Math.min(scale, widest);
+  return {
+    url: spaceUrl(folder, file),
+    position: [side * (SIDE_CLEARANCE + halfWidth * fitted), 0, SIDE_Z],
+    scale: fitted,
+  };
+}
+
+/** Every side piece on both sides, as a plan would place it. */
+export const PREVIEW_SIDE_PIECES: readonly PreviewPiece[] =
+  Object.values<Space>(SPACES).flatMap((space) =>
+    space.sides.flatMap((piece) => [
+      placeSide(space.folder, piece, -1),
+      placeSide(space.folder, piece, 1),
+    ]),
+  );
+
 export interface PreviewScenePlan {
   readonly sceneryId: PreviewSceneryId;
   readonly pieces: readonly PreviewPiece[];
@@ -173,14 +201,9 @@ function planPieces(
   }
   const space: Space = SPACES[sceneryId as SpaceId];
   const pool = [...space.sides];
-  const sides = [-1, 1].map((side): PreviewPiece => {
-    const [file, halfWidth, scale = 1] = take(pool, random);
-    return {
-      url: spaceUrl(space.folder, file),
-      position: [side * (SIDE_CLEARANCE + halfWidth * scale), 0, SIDE_Z],
-      scale,
-    };
-  });
+  const sides = ([-1, 1] as const).map((side) =>
+    placeSide(space.folder, take(pool, random), side),
+  );
   if (!space.floor) return sides;
   return [
     ...sides,

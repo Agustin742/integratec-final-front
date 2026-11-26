@@ -26,6 +26,25 @@ function hasMorphTargets(mesh: SkinnedMesh): boolean {
 type Attribute = BufferAttribute | InterleavedBufferAttribute;
 
 /**
+ * True when the mesh or a node above it is named in `keep`: a part with
+ * several primitives loads as a named group of suffixed meshes.
+ */
+function isKept(
+  mesh: Object3D,
+  root: Object3D,
+  keep: ReadonlySet<string>,
+): boolean {
+  for (
+    let node: Object3D | null = mesh;
+    node && node !== root;
+    node = node.parent
+  ) {
+    if (keep.has(node.name)) return true;
+  }
+  return false;
+}
+
+/**
  * The geometry as it is drawn: a material without any texture never samples
  * uv, so parts that differ only by an unused uv set can still be merged. The
  * returned geometry shares the source buffers (nothing is copied or mutated).
@@ -83,8 +102,9 @@ interface Candidate {
  * node name and index), array-material meshes, and any group that cannot be
  * merged cleanly. Source geometries are shared with the cached GLB and are
  * never mutated; the merged geometries are new and are returned so the owner
- * can dispose them. Call it before the raycast/culling flags are set. Meshes
- * named in `keep` also stay apart, so they can be hidden by name later.
+ * can dispose them. Call it before the raycast/culling flags are set. Parts
+ * named in `keep` (a mesh or its group) also stay apart, so they can be hidden
+ * by name later.
  */
 export function mergeSkinnedByMaterial(
   root: Object3D,
@@ -95,7 +115,7 @@ export function mergeSkinnedByMaterial(
   root.traverse((node) => {
     const mesh = node as SkinnedMesh;
     if (!mesh.isSkinnedMesh || Array.isArray(mesh.material)) return;
-    if (hasMorphTargets(mesh) || keep.has(mesh.name)) return;
+    if (hasMorphTargets(mesh) || isKept(mesh, root, keep)) return;
     const geometry = drawnGeometry(mesh, hasTexture(mesh.material as Material));
     const key = mergeKey(mesh, geometry);
     const members = groups.get(key);

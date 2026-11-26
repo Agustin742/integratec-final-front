@@ -83,6 +83,30 @@ describe('classroomDeskMapSchema and fetchClassroomDesks', () => {
     expect(parsed.items.map((item) => item.deskDecor)).toEqual([decor, null]);
   });
 
+  test.each([
+    ['an unknown kind', { kind: 'HOLOGRAM' }],
+    ['an empty name', { shopItemName: '' }],
+    ['another slot', { slot: 'head' }],
+  ])('shows no decor, keeping the map, for %s', (_case, patch) => {
+    const [first, second] = makeDesksPayload().items;
+    const decor = {
+      slot: 'desk_decor',
+      shopItemId: '00000000-0000-4000-8000-000000000301',
+      shopItemCode: 'desk_mug',
+      shopItemName: 'Taza de escritorio',
+      kind: 'DESK_UPGRADE',
+    };
+
+    const parsed = classroomDeskMapSchema.parse({
+      items: [
+        { ...first, deskDecor: { ...decor, ...patch } },
+        { ...second, deskDecor: decor },
+      ],
+    });
+
+    expect(parsed.items.map((item) => item.deskDecor)).toEqual([null, decor]);
+  });
+
   test('forwards AbortSignal cleanly without swallowing AbortError', async () => {
     const controller = new AbortController();
     const client = createApiClient({

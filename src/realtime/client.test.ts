@@ -1255,3 +1255,51 @@ describe('synced tutor bot skin', () => {
     client.dispose();
   });
 });
+
+describe('synced desk decor', () => {
+  it('follows a participant who only has desk_decor, until it is cleared', async () => {
+    const { auth } = createFakeAuth('valid-token');
+    const sdk = createFakeSdk();
+    const room = new FakeRoom({ classroomId: CLASSROOM_A });
+    room.setAvatar('decor-user', { displayName: 'Valentina', role: 'STUDENT' });
+    const appearance = (
+      items: Record<string, unknown>,
+    ): Record<string, unknown> => ({
+      bodyId: 'female',
+      hairId: 'afro',
+      topId: 'hoodie',
+      hairColor: '#AF6D63',
+      clothingColor: '#7EBA8B',
+      items,
+    });
+    const synced = room.state.avatars.get('decor-user') as unknown as Omit<
+      Avatar,
+      'appearance'
+    > & { appearance?: unknown };
+    setLooseAppearance(
+      synced,
+      appearance({
+        desk_decor: { slot: 'desk_decor', shopItemCode: 'desk_lamp' },
+      }),
+    );
+    sdk.setJoinHandler(async () => room);
+    const client = createClassroomRealtimeClient({
+      auth,
+      realtimeUrl: 'wss://realtime.example.invalid',
+      createSdkClient: sdk.createSdkClient,
+    });
+    const avatar = () =>
+      client.getSnapshot().participants.get('decor-user')?.avatar;
+
+    await client.connect(CLASSROOM_A);
+    expect(avatar()?.deskDecorCode).toBe('desk_lamp');
+    expect(avatar()?.equipped).toBeUndefined();
+
+    setLooseAppearance(synced, appearance({}));
+    room.emitStateChange();
+
+    expect(avatar()).toBeDefined();
+    expect(avatar()?.deskDecorCode).toBeUndefined();
+    client.dispose();
+  });
+});

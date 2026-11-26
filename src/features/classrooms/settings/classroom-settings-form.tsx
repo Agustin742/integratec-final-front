@@ -121,7 +121,10 @@ export function ClassroomSettingsForm({
         const saved = await updateClassroom(
           client,
           classroomId,
-          toSettingsUpdatePayload(values),
+          toSettingsUpdatePayload(
+            values,
+            form.formState.defaultValues?.tutorBotSkin,
+          ),
           { signal: controller.signal },
         );
         if (controller.signal.aborted) {
