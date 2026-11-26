@@ -101,3 +101,15 @@ Per `rules/documentation-and-decisions.md` and `rules/3d-world-and-camera.md`, a
 ### Recorded Exceptions
 
 None currently active. The legacy pre-`#25` uncompressed `public/models/avatars/{male,female}/body.glb` exceptions (`#91`) were retired once both bodies shipped Draco-compressed with the full `16`-clip canonical animation set ([avatar animations](art/avatar-animations.md)).
+
+## Welcome scene on the public screens
+
+`/login`, `/register`, `/password-reset` and `/invitations/accept` share one brand panel, which shows an animated front view ([`src/features/world/preview/`](../src/features/world/preview/)). The classroom keeps its own top-down view, and the profile customization preview is separate.
+
+- **Content:** a random character from the profile catalogs waves, plays one of `Cheer`, `Clap`, `Think`, `Nod` or `Dance`, rests on `Idle` and repeats; it changes outfit every second step. Each visit draws four outfits once, so cycling never keeps downloading.
+- **Scenery:** one of the five classroom theme corners behind the character, or two pieces from the hallway, schoolyard, library or lab beside it. Every page load draws again; randomness is injected through `PreviewScene`'s `random` prop.
+- **Loading:** `PreviewScene` imports no Three.js. The scene is a lazy chunk, requested only when the browser has WebGL 2. The panel box has a fixed aspect ratio, so the form never waits or moves.
+- **Fallback:** without WebGL, after a lost context, or when the chunk or the body fails, the box stays empty and decorative. A scenery piece that fails is left out.
+- **Motion:** under `prefers-reduced-motion` the character holds one `Idle` pose and one outfit. The canvas renders on demand and pauses while hidden or offscreen.
+- **Resources:** composed outfits are disposed on every change; cached models are freed when the visitor leaves these screens.
+- **CSP:** only models without embedded textures are used, because textures load through `blob:` fetches that `connect-src` blocks. A unit test checks the scenery and character files.

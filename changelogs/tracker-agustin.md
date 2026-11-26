@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-25 — Animated 3D welcome scene on the public screens (#149)
+
+- **Status:** completed (not visually checked)
+- **Area / files:** `src/features/world/preview/`, `src/features/world/{camera,world-canvas}.ts*`, `src/app/router/auth-layout.tsx`, `docs/{3d-assets,routing}.md`
+- **Change:** The auth layout's placeholder is now a front view with a random character that waves, animates and changes outfits beside random scenery, lazy-loaded with a quiet fallback.
+- **Reason:** Preview areas had no 3D scene.
+- **Verification:** Strict TDD on the touched test files, lint, typecheck, build and `security:check`. Full suite, e2e and visual review not run.
+- **Next step:** Visual review of framing and scenery positions at 1280px and 360px.
+
 ## 2026-11-25 — Desk decor on each student's desk (#149)
 
 - **Status:** completed (not visually checked)

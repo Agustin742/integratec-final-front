@@ -17,6 +17,7 @@ import {
   frameCamera,
   MAX_FOLLOW_DT,
   WORLD_BOUNDS,
+  framePreviewCamera,
 } from './camera';
 import { CLASSROOM_LAYOUT } from '@/realtime';
 
@@ -301,4 +302,37 @@ describe('follow camera', () => {
       expect(frustum.halfHeight).toBeGreaterThan(0);
     },
   );
+});
+
+describe('framePreviewCamera', () => {
+  test('looks at the scene from the front, only slightly from above', () => {
+    const camera = new OrthographicCamera();
+    framePreviewCamera(camera, 640, 360);
+    const direction = camera.getWorldDirection(new Vector3());
+
+    expect(camera.position.x).toBe(0);
+    expect(camera.position.z).toBeGreaterThan(0);
+    expect(direction.z).toBeLessThan(-0.95);
+    expect(direction.y).toBeLessThan(0);
+  });
+
+  test.each([
+    [640, 360],
+    [320, 240],
+    [1200, 400],
+  ])('fits the character and its sides in %ix%i', (width, height) => {
+    const camera = new OrthographicCamera();
+    framePreviewCamera(camera, width, height);
+
+    for (const point of [
+      new Vector3(-2.4, 0, 0),
+      new Vector3(2.4, 0, 0),
+      new Vector3(0, 2.3, 0),
+      new Vector3(0, -0.2, 0),
+    ]) {
+      const projected = point.project(camera);
+      expect(Math.abs(projected.x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(projected.y)).toBeLessThanOrEqual(1);
+    }
+  });
 });
