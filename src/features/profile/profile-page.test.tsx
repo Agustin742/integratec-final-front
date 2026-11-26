@@ -881,11 +881,35 @@ describe('Profile customization', () => {
     );
   });
 
-  test('a locked style leads to the shop', async () => {
-    await renderProfile(
-      createOwnProfileStore({
-        ownedPaidStyles: [{ styleType: 'hair', styleId: 'dreads' }],
+  const oneOwnedStyle = () =>
+    createOwnProfileStore({
+      ownedPaidStyles: [{ styleType: 'hair', styleId: 'dreads' }],
+    });
+
+  test('a locked style leads to the shop of the student classroom', async () => {
+    await renderProfile(oneOwnedStyle());
+    mswServer.use(
+      createClassroomListHandler({
+        items: [
+          {
+            id: CLASSROOM_ID,
+            name: 'Aula de prueba',
+            subject: null,
+            schoolId: null,
+            independentTeacherId: '00000000-0000-4000-8000-000000000001',
+            adultMode: false,
+            chatMuted: false,
+            collaborationLocked: false,
+            gamesDisabled: false,
+            tutorBotSkin: 'none',
+            myRole: 'STUDENT',
+            capabilities: [],
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
       }),
+      createClassroomDetailHandler(CLASSROOM_ID, { myRole: 'STUDENT' }),
     );
     await waitForProfile();
     openTab('Pelo');
@@ -894,7 +918,20 @@ describe('Profile customization', () => {
       await screen.findByRole('link', {
         name: copy.avatar.shopLinkLabel('Mohicano suave'),
       }),
-    ).toHaveAttribute('href', '/');
+    ).toHaveAttribute('href', `/classrooms/${CLASSROOM_ID}/panels/shop`);
+  });
+
+  test('without a student classroom a locked style stays locked and links nowhere', async () => {
+    await renderProfile(oneOwnedStyle());
+    await waitForProfile();
+    openTab('Pelo');
+
+    expect(
+      await within(group('Peinado')).findByRole('radio', {
+        name: `Mohicano suave, ${copy.avatar.styleLockedLabel}`,
+      }),
+    ).toBeDisabled();
+    expect(within(group('Peinado')).queryByRole('link')).toBeNull();
   });
 
   test('ends with the streak and the account email, without medals', async () => {

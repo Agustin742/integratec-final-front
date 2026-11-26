@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-26 — Locked styles without a classroom shop (#149)
+
+- **Status:** completed
+- **Area / files:** `src/features/profile/`
+- **Change:** Locked hair and top cards only link to the shop when there is a student classroom; otherwise they stay locked without a link.
+- **Reason:** The link led to the home page for teachers, users without a classroom, and while the list was loading or had failed.
+- **Verification:** Strict TDD; profile page tests, lint, typecheck, prettier.
+- **Next step:** None.
+
 ## 2026-11-26 — Emote wheel focus and announcements (#149)
 
 - **Status:** completed

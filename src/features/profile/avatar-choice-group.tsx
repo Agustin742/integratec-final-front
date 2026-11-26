@@ -23,7 +23,7 @@ export interface AvatarChoiceGroupProps<TValue extends string> {
   readonly disabled?: boolean;
   /** Picture of an option; without it the options are color swatches. */
   readonly renderPicture?: (option: AvatarOption<TValue>) => ReactNode;
-  /** Where a locked option leads. */
+  /** Where a locked option leads; without it a locked option has no link. */
   readonly shopHref?: string;
   readonly className?: string;
 }
@@ -31,7 +31,7 @@ export interface AvatarChoiceGroupProps<TValue extends string> {
 /**
  * Native radio group (arrow keys move and select, Tab enters and leaves) drawn
  * as picture cards or color swatches, always with a visible name. A locked
- * option stays a disabled radio and the whole card links to the shop.
+ * option stays a disabled radio and, given a shop, the whole card links to it.
  */
 export function AvatarChoiceGroup<TValue extends string>({
   legend,
@@ -43,7 +43,7 @@ export function AvatarChoiceGroup<TValue extends string>({
   error,
   disabled = false,
   renderPicture,
-  shopHref = '/',
+  shopHref,
   className,
 }: AvatarChoiceGroupProps<TValue>) {
   const errorId = useId();
@@ -163,7 +163,7 @@ export function AvatarChoiceGroup<TValue extends string>({
                   {copy.chosen}
                 </span>
               )}
-              {locked && (
+              {locked && shopHref !== undefined && (
                 <Link
                   to={shopHref}
                   aria-label={copy.shopLinkLabel(option.label)}
@@ -176,7 +176,9 @@ export function AvatarChoiceGroup<TValue extends string>({
                 </Link>
               )}
               {/* Keeps the name clear of the link strip laid over the card. */}
-              {locked && <span aria-hidden="true" className="h-6" />}
+              {locked && shopHref !== undefined && (
+                <span aria-hidden="true" className="h-6" />
+              )}
             </div>
           );
         })}

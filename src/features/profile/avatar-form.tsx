@@ -207,7 +207,7 @@ export function AvatarForm({
 
   const shopHref = classrooms.activeId
     ? `/classrooms/${classrooms.activeId}/panels/shop`
-    : '/';
+    : undefined;
   const wornFrom = equipped
     ? classrooms.items.find(({ id }) => id === classrooms.activeId)?.name
     : undefined;
