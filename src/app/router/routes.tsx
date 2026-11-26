@@ -63,6 +63,16 @@ export function createAppRoutes({
       ErrorBoundary: RootErrorBoundary,
       children: [
         {
+          // Public fullscreen 16:9 pitch presentation outside AuthLayout and AppShell.
+          path: 'pitch',
+          ErrorBoundary: RouteErrorBoundary,
+          HydrateFallback: AppHydrateFallback,
+          lazy: {
+            Component: async () =>
+              (await import('@/features/pitch/pitch-deck-page')).PitchDeckPage,
+          },
+        },
+        {
           // Public layout route: split screen with no navigation, for every
           // account screen. Its own error boundary keeps the layout mounted.
           Component: AuthLayout,
