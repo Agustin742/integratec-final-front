@@ -1,4 +1,5 @@
 import {
+  BufferAttribute,
   BufferGeometry,
   Float32BufferAttribute,
   Group,
@@ -7,7 +8,6 @@ import {
   Quaternion,
   SkinnedMesh,
   Vector3,
-  type BufferAttribute,
   type InterleavedBufferAttribute,
   type Material,
   type Object3D,
@@ -57,6 +57,19 @@ type AnyAttribute = BufferAttribute | InterleavedBufferAttribute;
 
 /** Copies an attribute into a plain Float32 one (de-quantizes, de-interleaves). */
 function toFloat32(attribute: AnyAttribute): Float32BufferAttribute {
+  if (
+    !(
+      'isInterleavedBufferAttribute' in attribute &&
+      attribute.isInterleavedBufferAttribute
+    ) &&
+    attribute.array instanceof Float32Array &&
+    !attribute.normalized
+  ) {
+    return new Float32BufferAttribute(
+      attribute.array.slice(),
+      attribute.itemSize,
+    );
+  }
   const { count, itemSize } = attribute;
   const array = new Float32Array(count * itemSize);
   for (let i = 0; i < count; i += 1) {
@@ -76,7 +89,15 @@ function bakeGeometry(source: BufferGeometry, matrix: Matrix4): BufferGeometry {
   for (const [name, attribute] of Object.entries(source.attributes)) {
     geometry.setAttribute(name, toFloat32(attribute));
   }
-  if (source.index) geometry.setIndex(Array.from(source.index.array));
+  if (source.index) {
+    geometry.setIndex(
+      new BufferAttribute(
+        source.index.array.slice(),
+        source.index.itemSize,
+        source.index.normalized,
+      ),
+    );
+  }
   geometry.applyMatrix4(matrix);
   return geometry;
 }
@@ -153,14 +174,15 @@ const materialLabel = (material: Material): string =>
  * across modules. Named materials that look the same (same colour, finish and
  * transparency) are one material even under different names, because each GLB
  * family ships its own copy of the palette; the first instance wins. Unnamed
- * materials are only shared when they are the same object.
+ * materials and materials without a supported appearance key are only shared
+ * when they are the same object.
  */
 function materialKey(material: Material): string {
   if (!material.name) return materialLabel(material);
   const appearance = threeMaterialAppearanceKey(material);
   return appearance
     ? `${material.type}|${appearance}`
-    : `${material.type}:${material.name}`;
+    : `${material.type}:#${material.uuid}`;
 }
 
 /** Keeps the first name as is and numbers later duplicates (`#2`, `#3`, ...). */

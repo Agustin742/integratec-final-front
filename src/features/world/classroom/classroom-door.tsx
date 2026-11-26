@@ -2,7 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef, useState } from 'react';
 import { Group, Mesh, type Material, type Object3D } from 'three';
 import { CLASSROOM_LAYOUT } from '@/realtime';
-import { loadGlbAsset } from '../asset-cache';
+import { evictRejectedGlbAsset, loadGlbAsset } from '../asset-cache';
 import type { Pose } from '../movement';
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion';
 import {
@@ -20,6 +20,8 @@ export interface ClassroomDoorProps {
   scopeKey?: string | undefined;
   /** Receives the built group once the model is ready (tests, debugging). */
   onReady?: ((group: Group) => void) | undefined;
+  /** Fired when loading `door.glb` fails so the scene can recover its proxy. */
+  onError?: ((error: unknown) => void) | undefined;
 }
 
 interface FadeableMaterial extends Material {
@@ -87,14 +89,17 @@ export function ClassroomDoor({
   poseRef,
   scopeKey,
   onReady,
+  onError,
 }: ClassroomDoorProps) {
   const reducedMotion = usePrefersReducedMotion();
   const invalidate = useThree((state) => state.invalidate);
   const [visual, setVisual] = useState<DoorVisual | null>(null);
   const opacityRef = useRef(1);
   const onReadyRef = useRef(onReady);
+  const onErrorRef = useRef(onError);
   useEffect(() => {
     onReadyRef.current = onReady;
+    onErrorRef.current = onError;
   });
 
   useEffect(() => {
@@ -108,7 +113,11 @@ export function ClassroomDoor({
         setVisual(built);
         onReadyRef.current?.(built.group);
       },
-      () => undefined,
+      (error: unknown) => {
+        if (cancelled) return;
+        evictRejectedGlbAsset(getKitModuleUrl('door'), scopeKey);
+        onErrorRef.current?.(error);
+      },
     );
     return () => {
       cancelled = true;

@@ -1,4 +1,3 @@
-import { TextureLoader } from 'three';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import vm from 'node:vm';
@@ -7,16 +6,21 @@ import {
   Bone,
   BoxGeometry,
   Group,
+  ImageBitmapLoader,
   Mesh,
   MeshStandardMaterial,
   Skeleton,
   SkinnedMesh,
   Texture,
+  TextureLoader,
   WebGLRenderTarget,
   type WebGLRenderer,
 } from 'three';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
-import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import {
+  GLTFLoader,
+  type GLTF,
+} from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from '@/test/render';
@@ -77,6 +81,108 @@ describe('asset-cache & GlbAsset', () => {
     expect(DRACO_DECODER_PATH).toBe('/decoders/draco/');
     expect(KTX2_TRANSCODER_PATH).toBe('/decoders/basis/');
     expect(loader.dracoLoader).toBeTruthy();
+  });
+
+  it('uses TextureLoader for embedded GLB images even when ImageBitmap is available', async () => {
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
+      'base64',
+    );
+    const json = JSON.stringify({
+      asset: { version: '2.0' },
+      scene: 0,
+      scenes: [{ nodes: [] }],
+      buffers: [{ byteLength: png.length }],
+      bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: png.length }],
+      images: [{ bufferView: 0, mimeType: 'image/png' }],
+      textures: [{ source: 0 }],
+    });
+    const jsonChunk = Buffer.from(json.padEnd(Math.ceil(json.length / 4) * 4));
+    const binaryLength = Math.ceil(png.length / 4) * 4;
+    const glb = new ArrayBuffer(12 + 8 + jsonChunk.length + 8 + binaryLength);
+    const header = new DataView(glb);
+    header.setUint32(0, 0x46546c67, true); // glTF magic
+    header.setUint32(4, 2, true);
+    header.setUint32(8, glb.byteLength, true);
+    header.setUint32(12, jsonChunk.length, true);
+    header.setUint32(16, 0x4e4f534a, true); // JSON chunk
+    new Uint8Array(glb, 20, jsonChunk.length).set(jsonChunk);
+    const binaryOffset = 20 + jsonChunk.length;
+    header.setUint32(binaryOffset, binaryLength, true);
+    header.setUint32(binaryOffset + 4, 0x004e4942, true); // BIN chunk
+    new Uint8Array(glb, binaryOffset + 8, png.length).set(png);
+
+    const blobUrl = 'blob:https://integratec.test/embedded-image';
+    const createObjectURL = vi.fn(() => blobUrl);
+    const revokeObjectURL = vi.fn();
+    const texture = new Texture<HTMLImageElement>();
+    const textureLoad = vi
+      .spyOn(TextureLoader.prototype, 'load')
+      .mockImplementation((_url, onLoad) => {
+        onLoad?.(texture);
+        return texture;
+      });
+    const bitmapLoad = vi
+      .spyOn(ImageBitmapLoader.prototype, 'load')
+      .mockImplementation((_url, onLoad) => {
+        // Only the image-decoding boundary is synthetic; GLTF parsing is real.
+        onLoad?.({ width: 1, height: 1, close: vi.fn() } as ImageBitmap);
+      });
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 Chrome/130.0.0.0 Safari/537.36',
+    );
+    vi.stubGlobal('createImageBitmap', vi.fn());
+    vi.stubGlobal(
+      'URL',
+      class extends URL {
+        static createObjectURL = createObjectURL;
+        static revokeObjectURL = revokeObjectURL;
+      },
+    );
+
+    try {
+      // GLTF exposes parser.getDependency for lazy resources. Request the
+      // embedded texture through that public hook, without inspecting storage
+      // or requiring unrelated mesh geometry in this loader-selection fixture.
+      const loadEmbeddedTexture = async (
+        loader: GLTFLoader,
+      ): Promise<Texture> => {
+        const parsed = await loader.parseAsync(glb, '');
+        return parsed.parser.getDependency('texture', 0);
+      };
+
+      // Control: prove this environment would take Three's ImageBitmap path
+      // without our configuration, rather than silently falling back in jsdom.
+      const upstreamTexture = await loadEmbeddedTexture(new GLTFLoader());
+      expect(bitmapLoad).toHaveBeenCalledExactlyOnceWith(
+        blobUrl,
+        expect.any(Function),
+        undefined,
+        expect.any(Function),
+      );
+      expect(textureLoad).not.toHaveBeenCalled();
+      upstreamTexture.dispose();
+      bitmapLoad.mockClear();
+      createObjectURL.mockClear();
+      revokeObjectURL.mockClear();
+
+      const configuredTexture = await loadEmbeddedTexture(
+        createConfiguredGltfLoader(),
+      );
+      expect(configuredTexture).toBe(texture);
+      expect(textureLoad).toHaveBeenCalledExactlyOnceWith(
+        blobUrl,
+        expect.any(Function),
+        undefined,
+        expect.any(Function),
+      );
+      expect(bitmapLoad).not.toHaveBeenCalled();
+      expect(createObjectURL).toHaveBeenCalledExactlyOnceWith(expect.any(Blob));
+      expect(revokeObjectURL).toHaveBeenCalledExactlyOnceWith(blobUrl);
+    } finally {
+      texture.dispose();
+      vi.unstubAllGlobals();
+    }
   });
 
   it('fetches and parses the same GLB URL only once across concurrent and repeated loads', async () => {
@@ -393,22 +499,5 @@ describe('asset-cache & GlbAsset', () => {
     expect(screen.queryByTestId('flaky-error')).not.toBeInTheDocument();
     expect(loadAsync).toHaveBeenCalledTimes(2);
     expect(getAssetCacheSize()).toBe(1);
-  });
-});
-
-describe('embedded textures under the CSP', () => {
-  it('load through an image element even where ImageBitmap exists', async () => {
-    // ImageBitmapLoader fetches the `blob:` URL, which `connect-src` blocks.
-    vi.stubGlobal('createImageBitmap', () => Promise.resolve({}));
-    const loader = createConfiguredGltfLoader();
-
-    const gltf = await loader.parseAsync(
-      JSON.stringify({ asset: { version: '2.0' } }),
-      '',
-    );
-
-    expect(gltf.parser.textureLoader).toBeInstanceOf(TextureLoader);
-    vi.unstubAllGlobals();
-    clearAssetCache({ disposeDecoders: true });
   });
 });

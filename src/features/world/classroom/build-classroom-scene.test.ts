@@ -318,6 +318,25 @@ describe('placeholders', () => {
   });
 });
 
+describe('asset recovery', () => {
+  test('reveals only the door proxy on failure and hides it when cleared', () => {
+    const scene = build();
+    const door = meshes(named(scene.root, 'classroom-door'))[0]!;
+    const desk = named(scene.root, 'student-desks') as Mesh;
+    const originalMaterial = door.material as Material;
+    expect(originalMaterial.visible).toBe(false);
+
+    scene.setFailedModules(new Set(['door']));
+    expect((door.material as Material).visible).toBe(true);
+    expect(door.material).not.toBe(originalMaterial);
+    expect((desk.material as Material).visible).toBe(false);
+
+    scene.setFailedModules(new Set());
+    expect((door.material as Material).visible).toBe(false);
+    expect((desk.material as Material).visible).toBe(false);
+  });
+});
+
 describe('materials, budgets and disposal', () => {
   test('is matte, unshadowed and well under the draw-call and triangle budgets', () => {
     const { root } = build();

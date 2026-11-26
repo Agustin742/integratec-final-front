@@ -11,14 +11,16 @@ import {
   type AnimationAction,
   type AnimationClip,
   type Object3D,
+  type Skeleton,
   type SkinnedMesh,
 } from 'three';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { loadGlbAsset } from '../asset-cache';
+import { evictRejectedGlbAsset, loadGlbAsset } from '../asset-cache';
 import { placeAvatar } from '../classroom/local-avatar-frame';
 import type { NpcLivePositions } from '../classroom/npc-live-position';
 import type { Pose } from '../movement';
 import { usePrefersReducedMotion } from '../use-prefers-reduced-motion';
+import { createIdleInvalidator } from './idle-invalidator';
 import { mergeSkinnedByMaterial } from './merge-skinned-by-material';
 import { advanceNpc } from './npc-frame';
 import { PET_NPC_ID, type NpcView } from './npc-view';
@@ -57,6 +59,8 @@ export interface ClassroomPetProps {
   readonly positions?: NpcLivePositions | undefined;
   /** Fired once the model is loaded (tests, debugging). */
   readonly onReady?: ((handle: ClassroomPetHandle) => void) | undefined;
+  /** Fired when loading the pet GLB fails so the scene can surface recovery. */
+  readonly onError?: ((error: unknown) => void) | undefined;
 }
 
 interface PetVisual {
@@ -191,9 +195,11 @@ export function ClassroomPet({
   scopeKey,
   positions,
   onReady,
+  onError,
 }: ClassroomPetProps) {
   const reducedMotion = usePrefersReducedMotion();
   const invalidate = useThree((state) => state.invalidate);
+  const frameloop = useThree((state) => state.frameloop);
   // The mixer's `finished` listener outlives renders; it reads the live value.
   const reducedMotionRef = useRef(reducedMotion);
   useEffect(() => {
@@ -243,8 +249,10 @@ export function ClassroomPet({
     rotation: npc.rotation,
   });
   const onReadyRef = useRef(onReady);
+  const onErrorRef = useRef(onError);
   useEffect(() => {
     onReadyRef.current = onReady;
+    onErrorRef.current = onError;
   });
   const visualRef = useRef<PetVisual | null>(null);
   const motionRef = useRef<MotionState>({ resolved: IDLE_PLAN, elapsed: 0 });
@@ -252,13 +260,29 @@ export function ClassroomPet({
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    if (ready && !reducedMotion && frameloop === 'demand') invalidate();
+  }, [ready, reducedMotion, frameloop, invalidate]);
+
+  const idleInvalidator = useMemo(
+    () => createIdleInvalidator(invalidate),
+    [invalidate],
+  );
+  useEffect(() => () => idleInvalidator.dispose(), [idleInvalidator]);
+
+  useEffect(() => {
     let cancelled = false;
+    const skeletons = new Set<Skeleton>();
     let mergedMeshes: readonly SkinnedMesh[] = [];
     let built: PetVisual | null = null;
     loadGlbAsset(PET_URL, scopeKey === undefined ? {} : { scopeKey }).then(
       (gltf) => {
         if (cancelled) return;
         const model = cloneSkeleton(gltf.scene);
+        // Retain private skeletons even when merging detaches their meshes.
+        model.traverse((node) => {
+          const mesh = node as SkinnedMesh;
+          if (mesh.isSkinnedMesh) skeletons.add(mesh.skeleton);
+        });
         // Fewer draw calls: same-material skinned parts become one mesh.
         mergedMeshes = mergeSkinnedByMaterial(model);
         model.traverse((node) => {
@@ -291,7 +315,11 @@ export function ClassroomPet({
         setReady(true);
         onReadyRef.current?.({ group: root });
       },
-      () => undefined,
+      (error: unknown) => {
+        if (cancelled) return;
+        evictRejectedGlbAsset(PET_URL, scopeKey);
+        onErrorRef.current?.(error);
+      },
     );
     return () => {
       cancelled = true;
@@ -300,6 +328,7 @@ export function ClassroomPet({
         built.mixer.uncacheRoot(built.model);
         holder.remove(built.model);
         for (const merged of mergedMeshes) merged.geometry.dispose();
+        for (const skeleton of skeletons) skeleton.dispose();
       }
       visualRef.current = null;
       setReady(false);
@@ -420,7 +449,18 @@ export function ClassroomPet({
       (procedural && !reducedMotion) ||
       liftRef.current !== liftGoal
     ) {
-      invalidate();
+      // Resting idle and sleep loops are cosmetic: cap their cadence so the
+      // demand canvas does not render at the display rate. Walking, one-shots
+      // and the lift easing stay full rate.
+      const restingLoop =
+        (effective === 'idle' || effective === 'sleep') &&
+        liftRef.current === liftGoal &&
+        visual.fading.length === 0;
+      if (restingLoop) {
+        idleInvalidator.request();
+      } else {
+        invalidate();
+      }
     }
   });
 

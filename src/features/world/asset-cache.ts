@@ -134,12 +134,16 @@ export function createConfiguredGltfLoader(
   loader.setDRACOLoader(draco);
   loader.setKTX2Loader(ktx2);
   loader.setMeshoptDecoder(MeshoptDecoder);
-  // Embedded textures are `blob:` URLs. The default `ImageBitmapLoader`
-  // fetches them, which the CSP `connect-src` blocks; an image element falls
-  // under `img-src`, which already allows `blob:`.
+  // Embedded GLB images (bufferView) are turned into temporary `blob:` URLs.
+  // Three's default ImageBitmapLoader fetches `blob:` via `fetch()`, which
+  // violates strict `connect-src`; TextureLoader loads via `<img>`, allowed
+  // by `img-src 'self' data: blob:`.
   loader.register((parser) => {
-    parser.textureLoader = new TextureLoader(parser.options.manager);
-    return { name: 'AULA_csp_image_textures' };
+    const textureLoader = new TextureLoader(parser.options.manager);
+    textureLoader.setCrossOrigin(parser.options.crossOrigin);
+    textureLoader.setRequestHeader(parser.options.requestHeader);
+    parser.textureLoader = textureLoader;
+    return { name: 'CSP_SAFE_TEXTURE_LOADER' };
   });
   return loader;
 }
