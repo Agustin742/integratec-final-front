@@ -61,6 +61,7 @@
 - **Change:** Added the `hand`, `neck` and `ears` slots to the avatar catalog (19 items, colors mirroring the shop seed), the part plan and the synced equipped codes; the shop preview now resolves every accessory from that catalog by shop code, tints only `AvatarAccessoryTint` and poses skinned meshes.
 - **Reason:** The merged assets are unused and shop accessory previews fail; back counterpart integratec-final-back#154.
 - **Next step:** Equip and inventory UI (entry above).
+
 ## 2026-11-25 — Study guide bot material contract fix
 
 - **Status:** completed (pending push, CI and review)
