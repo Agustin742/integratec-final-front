@@ -5,8 +5,11 @@ import {
   Box3,
   Group,
   Mesh,
+  MeshBasicMaterial,
   MeshStandardMaterial,
+  Texture,
   Vector3,
+  type Material,
   type Object3D,
 } from 'three';
 import { describe, expect, it, vi } from 'vitest';
@@ -15,15 +18,19 @@ import type { ClassroomKitModuleId } from './classroom-kit-manifest';
 import { countBatchedDrawCalls, estimateKitDrawCalls } from './kit-draw-calls';
 import type { KitPlacement } from './kit-placement';
 
-function material(name: string, color = 'red', transparent = false) {
-  const m = new MeshStandardMaterial({ color, transparent });
+/** Named materials get a colour derived from the name, so they differ unless a test says otherwise. */
+function material(name: string, color?: string, transparent = false) {
+  const m = new MeshStandardMaterial({
+    color:
+      color ??
+      `hsl(${String(((name.charCodeAt(0) || 0) * 37) % 360)}, 70%, 50%)`,
+    transparent,
+  });
   m.name = name;
   return m;
 }
 
-function moduleScene(
-  parts: readonly { name: string; material: MeshStandardMaterial }[],
-) {
+function moduleScene(parts: readonly { name: string; material: Material }[]) {
   const scene = new Group();
   const geometries: BoxGeometry[] = [];
   parts.forEach((part, index) => {
@@ -101,6 +108,129 @@ describe('buildBatchedKit', () => {
 
     expect(built.meshes).toHaveLength(1);
     expect(built.meshes[0]?.material).toBe(first);
+  });
+
+  it('merges differently named materials that look the same', () => {
+    const a = moduleScene([
+      { name: 'a', material: material('FurnWood', 'brown') },
+    ]);
+    const b = moduleScene([
+      { name: 'b', material: material('DecWood', 'brown') },
+    ]);
+    const c = moduleScene([
+      { name: 'c', material: material('DecPaint', 'teal') },
+    ]);
+    const built = buildBatchedKit(
+      modules([
+        ['board', a.scene],
+        ['cabinet', b.scene],
+        ['bookshelf', c.scene],
+      ]),
+      [
+        place('board', [0, 0, 0]),
+        place('cabinet', [2, 0, 0]),
+        place('bookshelf', [4, 0, 0]),
+      ],
+    );
+    expect(built.meshes).toHaveLength(2);
+    const wood = built.meshes.find((m) => m.name.endsWith(':FurnWood'));
+    expect(wood?.geometry.getAttribute('position').count).toBe(48);
+    expect(wood?.userData).toEqual({ kitModuleIds: ['board', 'cabinet'] });
+  });
+
+  it.each([
+    ['unsupported', () => new MeshBasicMaterial({ color: 'red' })],
+    ['textured', () => new MeshStandardMaterial({ map: new Texture() })],
+  ] as const)(
+    'preserves distinct same-named %s materials and their geometry while batching supported appearances',
+    (_kind, createMaterial) => {
+      const first = createMaterial();
+      const second = createMaterial();
+      first.name = second.name = 'Shared';
+      const supported = material('SupportedA', 'brown');
+      const a = moduleScene([
+        { name: 'a', material: first },
+        { name: 'plain-a', material: supported },
+      ]);
+      const b = moduleScene([
+        { name: 'b', material: second },
+        { name: 'plain-b', material: material('SupportedB', 'brown') },
+      ]);
+      const built = buildBatchedKit(
+        modules([
+          ['board', a.scene],
+          ['cabinet', b.scene],
+        ]),
+        [
+          place('board', [0, 0, 0]),
+          place('board', [4, 0, 0]),
+          place('cabinet', [8, 0, 0]),
+        ],
+      );
+
+      expect(built.meshes).toHaveLength(3);
+      expect(countBatchedDrawCalls(built.group)).toBe(3);
+      for (const [source, vertices, minX, maxX, moduleIds] of [
+        [first, 48, -0.5, 4.5, ['board']],
+        [second, 24, 7.5, 8.5, ['cabinet']],
+        [supported, 72, -0.5, 8.5, ['board', 'cabinet']],
+      ] as const) {
+        const mesh = built.meshes.find((entry) => entry.material === source);
+        expect(mesh).toBeDefined();
+        const positions = mesh!.geometry.getAttribute('position');
+        expect(positions.count).toBe(vertices);
+        const bounds = new Box3().setFromBufferAttribute(
+          positions as BufferAttribute,
+        );
+        expect(bounds.min.x).toBeCloseTo(minX);
+        expect(bounds.max.x).toBeCloseTo(maxX);
+        expect(mesh!.userData).toEqual({ kitModuleIds: moduleIds });
+      }
+      expect(new Set(built.meshes.map((mesh) => mesh.name)).size).toBe(3);
+      built.dispose();
+    },
+  );
+
+  it('keeps same-coloured materials apart when vertex colours or alpha test differ', () => {
+    const plain = material('Plain', 'brown');
+    const vertex = material('Vertex', 'brown');
+    vertex.vertexColors = true;
+    const cutout = material('Cutout', 'brown');
+    cutout.alphaTest = 0.5;
+    const built = buildBatchedKit(
+      modules([
+        ['board', moduleScene([{ name: 'a', material: plain }]).scene],
+        ['cabinet', moduleScene([{ name: 'b', material: vertex }]).scene],
+        ['bookshelf', moduleScene([{ name: 'c', material: cutout }]).scene],
+      ]),
+      [
+        place('board', [0, 0, 0]),
+        place('cabinet', [2, 0, 0]),
+        place('bookshelf', [4, 0, 0]),
+      ],
+    );
+    expect(built.meshes).toHaveLength(3);
+  });
+
+  it('gives every batch mesh a unique name even when two materials share a name', () => {
+    const built = buildBatchedKit(
+      modules([
+        [
+          'board',
+          moduleScene([{ name: 'a', material: material('Same', 'red') }]).scene,
+        ],
+        [
+          'cabinet',
+          moduleScene([{ name: 'b', material: material('Same', 'blue') }])
+            .scene,
+        ],
+      ]),
+      [place('board', [0, 0, 0]), place('cabinet', [2, 0, 0])],
+    );
+    const names = built.meshes.map((m) => m.name);
+    expect(names).toHaveLength(2);
+    expect(new Set(names).size).toBe(2);
+    expect(names[0]).toBe('kit:batch:MeshStandardMaterial:Same');
   });
 
   it('does not merge unnamed materials that are different instances', () => {

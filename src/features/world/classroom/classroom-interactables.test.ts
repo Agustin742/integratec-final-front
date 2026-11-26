@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { CLASSROOM_LAYOUT } from '@/realtime';
+import { CLASSROOM_LAYOUT, deriveNpcHomes } from '@/realtime';
 import { buildClassroomScene } from './build-classroom-scene';
 import {
   deriveClassroomInteractables,
@@ -14,12 +14,23 @@ const floor: InteractableObjectNode = {
   parent: null,
 };
 
+describe('the pet interactable', () => {
+  test('starts at the pet home, the bed cushion where the server puts it', () => {
+    const pet = indexClassroomInteractables(
+      deriveClassroomInteractables(CLASSROOM_LAYOUT),
+    ).get('pet')!;
+    const home = deriveNpcHomes(CLASSROOM_LAYOUT).pet;
+    expect(pet.worldPosition[0]).toBeCloseTo(home.x, 5);
+    expect(pet.worldPosition[2]).toBeCloseTo(home.z, 5);
+  });
+});
+
 describe('deriveClassroomInteractables', () => {
   const interactables = deriveClassroomInteractables(CLASSROOM_LAYOUT);
   const byId = indexClassroomInteractables(interactables);
 
   test('covers all 3 interaction classes and maps each object to its intended target', () => {
-    expect(interactables).toHaveLength(20);
+    expect(interactables).toHaveLength(23);
     expect(byId.get('board')).toMatchObject({
       type: 'board',
       interactionClass: 'opens_panel',
@@ -42,9 +53,26 @@ describe('deriveClassroomInteractables', () => {
     });
     expect(byId.get('tutor-bot')).toMatchObject({
       type: 'tutor-bot',
+      interactionClass: 'npc',
+      npcId: 'tutorBot',
+    });
+    expect(byId.get('tutor-bot')?.panelKey).toBeUndefined();
+    expect(byId.get('bot-station')).toMatchObject({
+      type: 'bot-station',
       interactionClass: 'opens_panel',
       panelKey: 'bot',
     });
+    expect(byId.get('chat-computer')).toMatchObject({
+      type: 'chat-computer',
+      interactionClass: 'opens_panel',
+      panelKey: 'chat',
+    });
+    expect(byId.get('report-card-stand')).toMatchObject({
+      type: 'report-card-stand',
+      interactionClass: 'opens_panel',
+      panelKey: 'grades',
+    });
+    expect(byId.get('report-card-stand')?.deskIndex).toBeUndefined();
     expect(byId.get('teacher-desk')).toMatchObject({
       type: 'teacher-desk',
       interactionClass: 'opens_panel',
@@ -52,7 +80,8 @@ describe('deriveClassroomInteractables', () => {
     });
     expect(byId.get('pet')).toMatchObject({
       type: 'pet',
-      interactionClass: 'decorative',
+      interactionClass: 'npc',
+      npcId: 'pet',
     });
     expect(byId.get('pet')?.panelKey).toBeUndefined();
     expect(byId.get('entrance')).toMatchObject({
@@ -75,10 +104,61 @@ describe('deriveClassroomInteractables', () => {
     const pet = byId.get('pet')!;
     const bot = byId.get('tutor-bot')!;
     expect(pet.id).not.toBe(bot.id);
-    expect(pet.interactionClass).toBe('decorative');
-    expect(bot.interactionClass).toBe('opens_panel');
-    expect(bot.panelKey).toBe('bot');
+    expect(pet.interactionClass).toBe('npc');
+    expect(pet.npcId).toBe('pet');
+    expect(bot.interactionClass).toBe('npc');
+    expect(bot.npcId).toBe('tutorBot');
+    expect(bot.panelKey).toBeUndefined();
     expect(pet.worldPosition).not.toEqual(bot.worldPosition);
+  });
+});
+
+describe('bot station', () => {
+  test('is separate from the tutor bot and sits at its own prop spec', () => {
+    const byId = indexClassroomInteractables(
+      deriveClassroomInteractables(CLASSROOM_LAYOUT),
+    );
+    const station = byId.get('bot-station')!;
+    const bot = byId.get('tutor-bot')!;
+    expect(station.id).not.toBe(bot.id);
+    expect(station.worldPosition).not.toEqual(bot.worldPosition);
+    expect(station.panelKey).toBe('bot');
+    expect(bot.panelKey).toBeUndefined();
+  });
+
+  test('resolves a hit on its proxy to the bot-station interactable', () => {
+    const byId = indexClassroomInteractables(
+      deriveClassroomInteractables(CLASSROOM_LAYOUT),
+    );
+    const built = buildClassroomScene(CLASSROOM_LAYOUT);
+    const station = built.root.getObjectByName('classroom-bot-station')!;
+    expect(
+      resolveInteractableHit(
+        [{ object: station.children[0] as unknown as InteractableObjectNode }],
+        byId,
+      )?.id,
+    ).toBe('bot-station');
+    built.dispose();
+  });
+});
+
+describe('chat computer and report card stand', () => {
+  test.each([
+    ['chat-computer', 'classroom-chat-computer'],
+    ['report-card-stand', 'classroom-report-card-stand'],
+  ])('resolves a hit on the %s proxy', (id, name) => {
+    const byId = indexClassroomInteractables(
+      deriveClassroomInteractables(CLASSROOM_LAYOUT),
+    );
+    const built = buildClassroomScene(CLASSROOM_LAYOUT);
+    const group = built.root.getObjectByName(name)!;
+    expect(
+      resolveInteractableHit(
+        [{ object: group.children[0] as unknown as InteractableObjectNode }],
+        byId,
+      )?.id,
+    ).toBe(id);
+    built.dispose();
   });
 });
 
@@ -163,8 +243,6 @@ describe('resolveInteractableHit', () => {
         ['classroom-shelf', 'shelf'],
         ['classroom-bulletin-board', 'bulletin-board'],
         ['classroom-shop', 'shop'],
-        ['classroom-pet', 'pet'],
-        ['classroom-tutor-bot', 'tutor-bot'],
       ] as const;
 
       for (const [objectName, expectedId] of placeholderNames) {
@@ -181,6 +259,28 @@ describe('resolveInteractableHit', () => {
           Math.abs(group.position.z - interactable.worldPosition[2]),
         ).toBeLessThanOrEqual(0.2);
       }
+
+      const station = built.root.getObjectByName('classroom-bot-station')!;
+      expect(
+        resolveInteractableHit([{ object: station.children[0]! }], byId)?.id,
+      ).toBe('bot-station');
+      // Walk-up target is the floor in front of the prop, not its centre.
+      expect(byId.get('bot-station')!.worldPosition[0]).toBeGreaterThan(
+        station.position.x + 0.6,
+      );
+
+      const door = built.root.getObjectByName('classroom-door')!;
+      expect(
+        resolveInteractableHit([{ object: door.children[0]! }], byId)?.id,
+      ).toBe('entrance');
+      expect(door.position.x).toBeCloseTo(
+        byId.get('entrance')!.worldPosition[0],
+      );
+      expect(byId.get('entrance')!.worldPosition).toEqual([
+        0,
+        0,
+        CLASSROOM_LAYOUT.bounds.maxZ + 0.05,
+      ]);
 
       const entrance = built.root.getObjectByName('entrance')!;
       expect(resolveInteractableHit([{ object: entrance }], byId)?.id).toBe(

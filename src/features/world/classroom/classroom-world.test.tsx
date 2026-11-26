@@ -120,7 +120,6 @@ test('forwards interactable state and callbacks to ClassroomScene', () => {
       scopeKey="aula-1"
       highlightedInteractableId="board"
       ownDeskIndex={3}
-      petReactionNonce={2}
       interactionLocked={true}
       onHoverInteractable={onHoverInteractable}
       onSelectInteractable={onSelectInteractable}
@@ -129,7 +128,6 @@ test('forwards interactable state and callbacks to ClassroomScene', () => {
   expect(canvas.sceneProps).toMatchObject({
     highlightedInteractableId: 'board',
     ownDeskIndex: 3,
-    petReactionNonce: 2,
     interactionLocked: true,
     onHoverInteractable,
     onSelectInteractable,

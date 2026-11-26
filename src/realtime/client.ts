@@ -11,10 +11,17 @@ import {
   CLOSE_REASON_ACCESS_REVOKED,
   CLOSE_REASON_TOO_MANY_CONNECTIONS,
   CLOSE_REASON_VERIFICATION_UNAVAILABLE,
+  NPC_INTERACT_MESSAGE,
+  npcInteractSchema,
   type AvatarInput,
   type ClassroomJoinOptions,
 } from './contracts.generated';
 import { ClassroomState } from './room-state.generated';
+import {
+  type NpcState,
+  type NpcReaction,
+  type NpcView,
+} from '@/features/world/npc/npc-view';
 
 z.config({ jitless: true });
 
@@ -92,6 +99,8 @@ export interface RealtimeSnapshot {
   readonly reason: RealtimeFailureReason | null;
   readonly message: string | null;
   readonly participants: ReadonlyMap<string, RealtimeParticipant>;
+  /** Synced pet and tutor bot, keyed by NPC id. */
+  readonly npcs: ReadonlyMap<string, NpcView>;
   readonly controls: RealtimeClassroomControls;
 }
 
@@ -143,6 +152,8 @@ export interface ClassroomRealtimeClient {
   connect(classroomId: string): Promise<boolean>;
   disconnect(): Promise<void>;
   sendAvatarInput(input: AvatarInput): boolean;
+  /** Asks the server to react to this member pressing E at an NPC. */
+  interactNpc(npcId: string): boolean;
   onMessage<T>(
     type: string,
     schema: z.ZodType<T>,
@@ -158,6 +169,15 @@ interface RegisteredMessageHandler {
 
 const MAX_SEEN_EVENT_IDS = 500;
 const EMPTY_PARTICIPANTS: ReadonlyMap<string, RealtimeParticipant> = new Map();
+const EMPTY_NPCS: ReadonlyMap<string, NpcView> = new Map();
+const NPC_STATES: readonly string[] = [
+  'idle',
+  'walking',
+  'emote',
+  'sleeping',
+  'reacting',
+];
+const NPC_REACTIONS: readonly string[] = ['', 'greet', 'askForPets', 'phrase'];
 const DEFAULT_CONTROLS: RealtimeClassroomControls = Object.freeze({
   frozen: false,
 });
@@ -244,8 +264,16 @@ function readParticipantAppearance(
   return equipped ? Object.freeze({ ...base, equipped }) : base;
 }
 
+/** Reads one slot from a synced `MapSchema`/`Map` (`get`) or a plain record. */
+function readSlot(items: Record<string, unknown>, slot: string): unknown {
+  const getter = (items as { get?: unknown }).get;
+  return typeof getter === 'function'
+    ? (getter as (key: string) => unknown).call(items, slot)
+    : items[slot];
+}
+
 function readItemCode(items: Record<string, unknown>, slot: string) {
-  const item = items[slot];
+  const item = readSlot(items, slot);
   if (typeof item !== 'object' || item === null) {
     return null;
   }
@@ -296,6 +324,40 @@ function readParticipants(
         rotation: toFiniteCoordinate(avatar.rotation, previous?.rotation ?? 0),
         status: avatar.status,
         ...(appearance ? { avatar: appearance } : {}),
+      }),
+    );
+  });
+  return next;
+}
+
+function readNpcs(
+  state: ClassroomState | undefined,
+  previousNpcs?: ReadonlyMap<string, NpcView>,
+): ReadonlyMap<string, NpcView> {
+  if (!state?.npcs) {
+    return EMPTY_NPCS;
+  }
+  const next = new Map<string, NpcView>();
+  state.npcs.forEach((npc, key) => {
+    const id = npc.id || key;
+    const previous = previousNpcs?.get(id);
+    next.set(
+      id,
+      Object.freeze({
+        id,
+        x: toFiniteCoordinate(npc.x, previous?.x ?? 0),
+        z: toFiniteCoordinate(npc.z, previous?.z ?? 0),
+        rotation: toFiniteCoordinate(npc.rotation, previous?.rotation ?? 0),
+        state: (NPC_STATES.includes(npc.state)
+          ? npc.state
+          : 'idle') as NpcState,
+        emote: npc.emote ?? '',
+        reaction: (NPC_REACTIONS.includes(npc.reaction)
+          ? npc.reaction
+          : '') as NpcReaction,
+        phraseId: Number.isInteger(npc.phraseId) ? npc.phraseId : -1,
+        reactionSeq: Number.isFinite(npc.reactionSeq) ? npc.reactionSeq : 0,
+        reactingSessionId: npc.reactingSessionId ?? '',
       }),
     );
   });
@@ -469,6 +531,7 @@ export function createClassroomRealtimeClient(
     reason: null,
     message: null,
     participants: EMPTY_PARTICIPANTS,
+    npcs: EMPTY_NPCS,
     controls: DEFAULT_CONTROLS,
   });
 
@@ -487,8 +550,13 @@ export function createClassroomRealtimeClient(
     promise: Promise<boolean>;
   } | null = null;
 
-  function publish(next: Omit<RealtimeSnapshot, 'presenceUncertain'>): void {
+  function publish(
+    next: Omit<RealtimeSnapshot, 'presenceUncertain' | 'npcs'> & {
+      npcs?: RealtimeSnapshot['npcs'];
+    },
+  ): void {
     snapshot = Object.freeze({
+      npcs: EMPTY_NPCS,
       ...next,
       presenceUncertain: next.status !== 'connected',
     });
@@ -598,6 +666,7 @@ export function createClassroomRealtimeClient(
       reason: null,
       message: null,
       participants: readParticipants(room.state),
+      npcs: readNpcs(room.state),
       controls: readControls(room.state),
     });
 
@@ -613,6 +682,7 @@ export function createClassroomRealtimeClient(
         reason: snapshot.reason,
         message: snapshot.message,
         participants: readParticipants(state, snapshot.participants),
+        npcs: readNpcs(state, snapshot.npcs),
         controls: readControls(state),
       });
     });
@@ -659,6 +729,7 @@ export function createClassroomRealtimeClient(
         reason: null,
         message: realtimeMessages.reconnecting,
         participants: snapshot.participants,
+        npcs: snapshot.npcs,
         controls: DEFAULT_CONTROLS,
       });
 
@@ -972,6 +1043,17 @@ export function createClassroomRealtimeClient(
         return false;
       }
       activeRoom.send(AVATAR_INPUT_MESSAGE, parsed.data);
+      return true;
+    },
+    interactNpc(npcId) {
+      if (disposed || snapshot.status !== 'connected' || !activeRoom) {
+        return false;
+      }
+      const parsed = npcInteractSchema.safeParse({ npcId });
+      if (!parsed.success) {
+        return false;
+      }
+      activeRoom.send(NPC_INTERACT_MESSAGE, parsed.data);
       return true;
     },
     onMessage(type, schema, handler) {

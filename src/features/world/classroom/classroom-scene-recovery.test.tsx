@@ -18,6 +18,9 @@ vi.mock('./use-classroom-navigation', () => ({
     marker: { object: new Group() },
   }),
 }));
+vi.mock('../npc/classroom-pet', () => ({ ClassroomPet: () => null }));
+vi.mock('../npc/tutor-bot', () => ({ TutorBot: () => null }));
+vi.mock('./classroom-door', () => ({ ClassroomDoor: () => null }));
 vi.mock('./local-avatar', () => ({ LocalAvatar: () => null }));
 vi.mock('./follow-camera', () => ({ FollowCamera: () => null }));
 vi.mock('./proximity-tracker', () => ({ ProximityTracker: () => null }));

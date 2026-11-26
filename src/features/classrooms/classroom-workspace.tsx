@@ -42,6 +42,7 @@ import {
 } from './performance-offer-store';
 import { useClassroomContext } from './use-classroom-capabilities';
 import { useClassroomContextEvents } from './use-classroom-context-events';
+import { resolveNpcPhrase } from '../world/npc/npc-phrases';
 import { useClassroomPresence } from './use-classroom-presence';
 import { classroomPanelCatalog } from './panels/classroom-panel-catalog';
 import {
@@ -347,6 +348,9 @@ function WorkspaceContext({
             frozen={presence.frozen}
             remoteParticipants={presence.remoteParticipants}
             onIntentChange={presence.sendIntent}
+            npcs={presence.npcs}
+            resolveNpcPhrase={resolveNpcPhrase}
+            onInteractNpc={presence.interactNpc}
             onSustainedLowFps={beginPerformanceOffer}
             presenceSlot={
               <ClassroomPresencePill

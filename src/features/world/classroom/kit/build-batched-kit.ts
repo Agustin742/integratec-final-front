@@ -1,4 +1,5 @@
 import {
+  BufferAttribute,
   BufferGeometry,
   Float32BufferAttribute,
   Group,
@@ -7,13 +8,13 @@ import {
   Quaternion,
   SkinnedMesh,
   Vector3,
-  type BufferAttribute,
   type InterleavedBufferAttribute,
   type Material,
   type Object3D,
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { ClassroomKitModuleId } from './classroom-kit-manifest';
+import { threeMaterialAppearanceKey } from './kit-material-key';
 import { groupPlacementsByModule, type KitPlacement } from './kit-placement';
 
 export interface BatchedKit {
@@ -56,6 +57,19 @@ type AnyAttribute = BufferAttribute | InterleavedBufferAttribute;
 
 /** Copies an attribute into a plain Float32 one (de-quantizes, de-interleaves). */
 function toFloat32(attribute: AnyAttribute): Float32BufferAttribute {
+  if (
+    !(
+      'isInterleavedBufferAttribute' in attribute &&
+      attribute.isInterleavedBufferAttribute
+    ) &&
+    attribute.array instanceof Float32Array &&
+    !attribute.normalized
+  ) {
+    return new Float32BufferAttribute(
+      attribute.array.slice(),
+      attribute.itemSize,
+    );
+  }
   const { count, itemSize } = attribute;
   const array = new Float32Array(count * itemSize);
   for (let i = 0; i < count; i += 1) {
@@ -75,7 +89,15 @@ function bakeGeometry(source: BufferGeometry, matrix: Matrix4): BufferGeometry {
   for (const [name, attribute] of Object.entries(source.attributes)) {
     geometry.setAttribute(name, toFloat32(attribute));
   }
-  if (source.index) geometry.setIndex(Array.from(source.index.array));
+  if (source.index) {
+    geometry.setIndex(
+      new BufferAttribute(
+        source.index.array.slice(),
+        source.index.itemSize,
+        source.index.normalized,
+      ),
+    );
+  }
   geometry.applyMatrix4(matrix);
   return geometry;
 }
@@ -135,20 +157,39 @@ function mergeBucket(parts: BufferGeometry[]): BufferGeometry[] {
 
 interface Bucket {
   readonly key: string;
+  /** Readable name of the first material in the bucket, used for the mesh name. */
+  readonly label: string;
   readonly material: Material;
   readonly parts: BufferGeometry[];
   readonly moduleIds: Set<ClassroomKitModuleId>;
 }
 
-/**
- * GlTF files each carry their own material objects, so identity is useless
- * across modules: same type + name is the same material (the first instance
- * wins). Unnamed materials are only shared when they are the same object.
- */
-function materialKey(material: Material): string {
-  return material.name
+const materialLabel = (material: Material): string =>
+  material.name
     ? `${material.type}:${material.name}`
     : `${material.type}:#${material.uuid}`;
+
+/**
+ * GlTF files each carry their own material objects, so identity is useless
+ * across modules. Named materials that look the same (same colour, finish and
+ * transparency) are one material even under different names, because each GLB
+ * family ships its own copy of the palette; the first instance wins. Unnamed
+ * materials and materials without a supported appearance key are only shared
+ * when they are the same object.
+ */
+function materialKey(material: Material): string {
+  if (!material.name) return materialLabel(material);
+  const appearance = threeMaterialAppearanceKey(material);
+  return appearance
+    ? `${material.type}|${appearance}`
+    : `${material.type}:#${material.uuid}`;
+}
+
+/** Keeps the first name as is and numbers later duplicates (`#2`, `#3`, ...). */
+function uniqueName(name: string, used: Map<string, number>): string {
+  const count = (used.get(name) ?? 0) + 1;
+  used.set(name, count);
+  return count === 1 ? name : `${name}#${String(count)}`;
 }
 
 /**
@@ -196,6 +237,7 @@ export function buildBatchedKit(
       if (!bucket) {
         bucket = {
           key,
+          label: materialLabel(source.material),
           material: source.material,
           parts: [],
           moduleIds: new Set(),
@@ -216,13 +258,14 @@ export function buildBatchedKit(
   const meshes: Mesh[] = [];
   const owned: BufferGeometry[] = [];
   const allModuleIds = new Set<ClassroomKitModuleId>();
+  const usedNames = new Map<string, number>();
 
   for (const bucket of buckets.values()) {
     const kitModuleIds = [...bucket.moduleIds].sort();
     for (const id of kitModuleIds) allModuleIds.add(id);
     for (const geometry of mergeBucket(bucket.parts)) {
       const mesh = new Mesh(geometry, bucket.material);
-      mesh.name = kitBatchMeshName(bucket.key);
+      mesh.name = uniqueName(kitBatchMeshName(bucket.label), usedNames);
       mesh.userData = { kitModuleIds };
       // Static: the room never moves, so skip per-frame matrix updates.
       mesh.matrixAutoUpdate = false;

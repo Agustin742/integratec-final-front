@@ -27,6 +27,14 @@ export {
   type InteractablePointerEvent,
   type InteractionClass,
 } from './classroom/classroom-interactables';
+export {
+  TUTOR_BOT_NPC_ID,
+  type NpcReaction,
+  type NpcSpeech,
+  type NpcState,
+  type NpcView,
+  type NpcViews,
+} from './npc/npc-view';
 export { WarmLighting } from './world-lighting';
 export { WorldReference } from './world-reference';
 export { GlbAsset, type GlbAssetProps } from './glb-asset';

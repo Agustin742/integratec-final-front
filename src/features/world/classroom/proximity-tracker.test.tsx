@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { applyFollowCamera } from '../camera';
 import type { Pose } from '../movement';
 import type { ClassroomInteractable } from './classroom-interactables';
+import { createNpcLivePositions } from './npc-live-position';
 import { ProximityTracker } from './proximity-tracker';
 
 const frame = vi.hoisted(() => ({
@@ -137,6 +138,40 @@ describe('ProximityTracker', () => {
     tick();
     expect(onChange).toHaveBeenLastCalledWith('shop');
     view.unmount();
+    expect(onChange).toHaveBeenLastCalledWith(undefined);
+  });
+
+  test('follows a moving NPC instead of its catalog position', () => {
+    const bot: ClassroomInteractable = {
+      id: 'tutor-bot',
+      type: 'tutor-bot',
+      interactionClass: 'npc',
+      npcId: 'tutorBot',
+      worldPosition: [-5.6, 0, 1.05],
+      footprint: [0.6, 0.6],
+      beaconHeight: 1.3,
+    };
+    const poseRef = { current: { x: 3, z: 1, rotation: 0 } };
+    const npcPositions = createNpcLivePositions();
+    const onChange = vi.fn();
+    render(
+      <ProximityTracker
+        poseRef={poseRef}
+        interactables={[bot]}
+        npcPositions={npcPositions}
+        onChange={onChange}
+        onAnchor={undefined}
+      />,
+    );
+    tick();
+    expect(onChange).not.toHaveBeenCalled();
+
+    npcPositions.set('tutorBot', { x: 3.5, z: 1 });
+    tick();
+    expect(onChange).toHaveBeenLastCalledWith('tutor-bot');
+
+    npcPositions.set('tutorBot', { x: -5.6, z: 1.05 });
+    tick();
     expect(onChange).toHaveBeenLastCalledWith(undefined);
   });
 });

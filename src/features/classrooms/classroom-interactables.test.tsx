@@ -31,7 +31,6 @@ const worldMock = vi.hoisted(() => ({
   latestProps: null as null | {
     highlightedInteractableId?: string;
     ownDeskIndex?: number | null;
-    petReactionNonce?: number;
     interactionLocked?: boolean;
     onHoverInteractable?: (id: string | undefined) => void;
     onSelectInteractable?: (interactable: ClassroomInteractable) => void;
@@ -46,7 +45,6 @@ vi.mock('../world', () => ({
     scopeKey?: string;
     highlightedInteractableId?: string;
     ownDeskIndex?: number | null;
-    petReactionNonce?: number;
     interactionLocked?: boolean;
     onHoverInteractable?: (id: string | undefined) => void;
     onSelectInteractable?: (interactable: ClassroomInteractable) => void;
@@ -465,7 +463,7 @@ describe('Classroom interactables HUD and 3D intent wiring (#38)', () => {
     ).toBeVisible();
   });
 
-  test('keeps the decorative pet clickable in the world without a HUD button or hint strip', async () => {
+  test('selecting the pet hands the interaction to the realtime layer, with no panel, HUD button or local greeting', async () => {
     const { container } = setup({ petName: 'Michi' });
     await screen.findByTestId('world-mock');
 
@@ -476,27 +474,17 @@ describe('Classroom interactables HUD and 3D intent wiring (#38)', () => {
       screen.queryByTestId('classroom-active-target'),
     ).not.toBeInTheDocument();
 
-    const initialNonce = worldMock.latestProps?.petReactionNonce ?? 0;
     act(() => {
       worldMock.latestProps?.onSelectInteractable?.(
         interactablesById.get('pet')!,
       );
     });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(worldMock.latestProps?.petReactionNonce).toBe(initialNonce + 1);
     expect(
       screen.getByTestId('classroom-interactable-status'),
-    ).toHaveTextContent('Michi te saluda desde su rincón.');
+    ).toBeEmptyDOMElement();
 
     await expectAccessible(container);
-
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Asistente de estudio' }),
-    );
-    expect(
-      await screen.findByRole('dialog', { name: 'Asistente de estudio' }),
-    ).toBeVisible();
-    expect(worldMock.latestProps?.petReactionNonce).toBe(initialNonce + 1);
   });
 
   test('keeps an empty live status region by default so nothing visible sits at the bottom', async () => {
@@ -825,16 +813,19 @@ describe('Immersive 3D classroom layout (#128)', () => {
   });
 });
 
-describe('Pet greeting auto-dismiss (#128)', () => {
+describe('Decorative greeting auto-dismiss (#128)', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
 
+  // The pet is a synced NPC now; a decorative object keeps the local greeting.
   function pickPet() {
+    const decorative: ClassroomInteractable = {
+      ...interactablesById.get('pet')!,
+      interactionClass: 'decorative',
+    };
     act(() => {
-      worldMock.latestProps?.onSelectInteractable?.(
-        interactablesById.get('pet')!,
-      );
+      worldMock.latestProps?.onSelectInteractable?.(decorative);
     });
   }
 

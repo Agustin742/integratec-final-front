@@ -6,6 +6,9 @@ export const BACKEND_ARTIFACT_PATHS: Readonly<{
   contracts: string;
   realtimeState: string;
   realtimeAvatar: string;
+  realtimeNpc: string;
+  realtimeAppearance: string;
+  realtimeEquippedItem: string;
 }>;
 
 export const FRONTEND_OUTPUT_PATHS: Readonly<{
@@ -13,6 +16,9 @@ export const FRONTEND_OUTPUT_PATHS: Readonly<{
   contracts: string;
   realtimeState: string;
   realtimeAvatar: string;
+  realtimeNpc: string;
+  realtimeAppearance: string;
+  realtimeEquippedItem: string;
 }>;
 
 export const GENERATED_HEADER: string;
