@@ -625,6 +625,7 @@ export const classroomMessages = {
   emotes: {
     wheelLabel: 'Gestos',
     cooldown: 'Esperá unos segundos para repetir un gesto.',
+    sendFailed: 'No pudimos enviar el gesto.',
     names: {
       Wave: 'Saludar',
       Cheer: 'Festejar',

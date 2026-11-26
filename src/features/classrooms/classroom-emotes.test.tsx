@@ -114,4 +114,41 @@ describe('ClassroomEmotes (#154)', () => {
     });
     expect(choice('Saludar')).toHaveAttribute('aria-disabled', 'false');
   });
+
+  it('keeps focus when an empty area of the wheel is pressed', () => {
+    setup();
+    pressSpace();
+    expect(wheel()).toHaveClass('pointer-events-auto');
+    expect(fireEvent.mouseDown(wheel()!)).toBe(false);
+    expect(fireEvent.mouseDown(choice('Saludar'))).toBe(true);
+  });
+
+  it('announces the cooldown through a live region mounted beforehand', () => {
+    setup();
+    const status = screen.getByRole('status');
+    expect(status).toBeEmptyDOMElement();
+    pressSpace();
+    fireEvent.click(choice('Bailar'));
+    pressSpace();
+    expect(screen.getByRole('status')).toBe(status);
+    expect(status).toHaveTextContent(
+      'Esperá unos segundos para repetir un gesto.',
+    );
+  });
+
+  it('reports a failed send for a short time', () => {
+    vi.useFakeTimers();
+    const { onSelect } = setup();
+    onSelect.mockReturnValue(false);
+    const status = screen.getByRole('status');
+    pressSpace();
+    fireEvent.click(choice('Bailar'));
+    expect(wheel()).not.toBeInTheDocument();
+    expect(status).toHaveTextContent('No pudimos enviar el gesto.');
+
+    act(() => {
+      vi.advanceTimersByTime(4000);
+    });
+    expect(status).toBeEmptyDOMElement();
+  });
 });

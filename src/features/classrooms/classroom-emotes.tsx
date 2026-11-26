@@ -76,6 +76,8 @@ const FOCUS_RING =
 const CARD =
   'pointer-events-auto border border-edge bg-card/90 font-display text-sm font-semibold text-card-foreground shadow-panel backdrop-blur-md hover:bg-card';
 
+const SEND_FAILURE_MS = 3500;
+
 /** Distance from the wheel centre to each choice, which leaves the avatar visible. */
 const RADIUS_REM = 7;
 
@@ -102,6 +104,7 @@ export interface ClassroomEmotesProps {
 export function ClassroomEmotes({ available, onSelect }: ClassroomEmotesProps) {
   const [open, setOpen] = useState(false);
   const [coolingDown, setCoolingDown] = useState(false);
+  const [sendFailed, setSendFailed] = useState(false);
   const wheelRef = useRef<HTMLDivElement>(null);
   const invokerRef = useRef<HTMLElement | null>(null);
 
@@ -116,11 +119,21 @@ export function ClassroomEmotes({ available, onSelect }: ClassroomEmotesProps) {
     return () => window.clearTimeout(timer);
   }, [coolingDown]);
 
+  useEffect(() => {
+    if (!sendFailed) return;
+    const timer = window.setTimeout(
+      () => setSendFailed(false),
+      SEND_FAILURE_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [sendFailed]);
+
   const openWheel = () => {
     invokerRef.current =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
+    setSendFailed(false);
     setOpen(true);
   };
 
@@ -154,12 +167,21 @@ export function ClassroomEmotes({ available, onSelect }: ClassroomEmotesProps) {
 
   useEffect(() => {
     if (!open) return;
-    wheelRef.current?.querySelector('button')?.focus();
+    const wheel = wheelRef.current;
+    wheel?.querySelector('button')?.focus();
+    // A press between choices must not drop focus: the keys are bound to them.
+    const keepFocus = (event: MouseEvent) => {
+      if (!(event.target as Element).closest('button')) event.preventDefault();
+    };
+    wheel?.addEventListener('mousedown', keepFocus);
     const onPointerDown = (event: PointerEvent) => {
       if (!wheelRef.current?.contains(event.target as Node)) setOpen(false);
     };
     window.addEventListener('pointerdown', onPointerDown);
-    return () => window.removeEventListener('pointerdown', onPointerDown);
+    return () => {
+      wheel?.removeEventListener('mousedown', keepFocus);
+      window.removeEventListener('pointerdown', onPointerDown);
+    };
   }, [open]);
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
@@ -194,48 +216,55 @@ export function ClassroomEmotes({ available, onSelect }: ClassroomEmotesProps) {
   const pick = (emote: AvatarEmote) => {
     if (coolingDown) return;
     if (onSelect(emote)) setCoolingDown(true);
+    else setSendFailed(true);
     closeWheel();
   };
 
-  if (!open) return null;
+  const status =
+    open && coolingDown ? copy.cooldown : sendFailed ? copy.sendFailed : '';
 
   return (
-    <div className="fixed inset-0 z-20 flex items-center justify-center">
-      <div
-        ref={wheelRef}
-        role="dialog"
-        aria-label={copy.wheelLabel}
-        className="relative size-76 motion-safe:animate-dialog-in"
-      >
-        {AVATAR_EMOTES.map((emote, index) => (
-          <button
-            key={emote}
-            type="button"
-            aria-disabled={coolingDown}
-            onClick={() => pick(emote)}
-            onKeyDown={handleKeyDown}
-            style={slotPosition(index)}
-            className={cn(
-              CARD,
-              FOCUS_RING,
-              'motion-colors absolute flex size-20 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-1 rounded-full p-1 text-center text-xs leading-tight aria-disabled:cursor-not-allowed aria-disabled:opacity-50',
-            )}
+    <>
+      {open && (
+        <div className="fixed inset-0 z-20 flex items-center justify-center">
+          <div
+            ref={wheelRef}
+            role="dialog"
+            aria-label={copy.wheelLabel}
+            className="pointer-events-auto relative size-76 motion-safe:animate-dialog-in"
           >
-            <EmoteIcon icon={emote} />
-            {copy.names[emote]}
-          </button>
-        ))}
-        <p
-          role="status"
-          className={cn(
-            coolingDown
-              ? 'pointer-events-none absolute inset-x-0 -bottom-6 mx-auto w-max max-w-full rounded-xl bg-card px-3 py-1 text-center text-xs text-card-foreground shadow-panel'
-              : 'sr-only',
-          )}
-        >
-          {coolingDown ? copy.cooldown : ''}
-        </p>
-      </div>
-    </div>
+            {AVATAR_EMOTES.map((emote, index) => (
+              <button
+                key={emote}
+                type="button"
+                aria-disabled={coolingDown}
+                onClick={() => pick(emote)}
+                onKeyDown={handleKeyDown}
+                style={slotPosition(index)}
+                className={cn(
+                  CARD,
+                  FOCUS_RING,
+                  'motion-colors absolute flex size-20 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-1 rounded-full p-1 text-center text-xs leading-tight aria-disabled:cursor-not-allowed aria-disabled:opacity-50',
+                )}
+              >
+                <EmoteIcon icon={emote} />
+                {copy.names[emote]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* Mounted while empty so screen readers announce what arrives. */}
+      <p
+        role="status"
+        className={cn(
+          status
+            ? 'pointer-events-none fixed inset-x-0 bottom-[calc(50%-11rem)] z-20 mx-auto w-max max-w-full rounded-xl bg-card px-3 py-1 text-center text-xs text-card-foreground shadow-panel'
+            : 'sr-only',
+        )}
+      >
+        {status}
+      </p>
+    </>
   );
 }

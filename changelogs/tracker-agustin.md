@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-26 — Emote wheel focus and announcements (#149)
+
+- **Status:** completed
+- **Area / files:** `src/features/classrooms/`
+- **Change:** Pressing a gap of the wheel keeps focus; one always-mounted live region announces the cooldown and a short-lived send failure.
+- **Reason:** Keyboard controls stopped working after a gap press, and screen readers missed the status.
+- **Verification:** Strict TDD; emote tests, lint, typecheck, prettier.
+- **Next step:** Visual check of the status position and of presses inside the wheel.
+
 ## 2026-11-26 — Remove the on-screen gestures button (#149)
 
 - **Status:** completed
