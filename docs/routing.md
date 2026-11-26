@@ -161,7 +161,7 @@ It shows loading while pending, forbidden when the server did not grant the capa
 
 The app is served at the domain root (no `basename`) and uses browser history, so opening `/login` or `/dev/ui` directly requests that path from the host. The host must rewrite paths without a file extension to `/index.html` with status 200. On AWS Amplify Hosting this is the rewrite rule:
 
-- Source: `</^[^.]+$|\.(?!(css|gif|ico|jpg|js|png|txt|svg|woff|woff2|ttf|map|json|webp|wasm)$)([^.]+$)/>`
+- Source: `</^[^.]+$|\.(?!(css|gif|glb|ico|jpg|js|png|txt|svg|woff|woff2|ttf|map|json|webp|wasm)$)([^.]+$)/>`
 - Target: `/index.html`
 - Type: `200 (Rewrite)`
 

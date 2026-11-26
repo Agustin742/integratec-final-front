@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-26 — Serve 3D models from the hosted front
+
+- **Status:** completed, not yet applied
+- **Area / files:** `docs/routing.md`
+- **Change:** The documented Amplify rewrite rule now excludes `glb`.
+- **Reason:** The hosted site answered `.glb` requests with `index.html`.
+- **Verification:** Matches the backend Terraform rule.
+- **Next step:** Apply the backend change and request a model from the published site.
+
 ## 2026-11-26 — Show tutor bot skin server errors (#149)
 
 - **Status:** completed
