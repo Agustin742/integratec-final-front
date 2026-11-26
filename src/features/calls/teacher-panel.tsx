@@ -94,9 +94,9 @@ export function TeacherPanel({
   const [announcement, setAnnouncement] = useState('');
   const students = participants.filter(isStudent);
 
-  const act = (action: CallModerate, message: string) => {
+  const act = (action: CallModerate) => {
     onModerate(action);
-    setAnnouncement(message);
+    setAnnouncement(copy.moderationRequestedAnnouncement);
   };
 
   return (
@@ -112,22 +112,12 @@ export function TeacherPanel({
           <SwitchRow
             label={copy.focusMode}
             checked={focusMode}
-            onChange={(value) =>
-              act(
-                { action: 'focus-mode', value },
-                value ? copy.focusOnAnnouncement : copy.focusOffAnnouncement,
-              )
-            }
+            onChange={(value) => act({ action: 'focus-mode', value })}
           />
           <SwitchRow
             label={copy.allowSelfUnmute}
             checked={allowSelfUnmute}
-            onChange={(value) =>
-              act(
-                { action: 'allow-self-unmute', value },
-                value ? copy.allowOnAnnouncement : copy.allowOffAnnouncement,
-              )
-            }
+            onChange={(value) => act({ action: 'allow-self-unmute', value })}
           />
         </div>
         <Button
@@ -137,7 +127,7 @@ export function TeacherPanel({
           onClick={() => {
             onModerate({ action: 'mute-all' });
             onModerate({ action: 'allow-self-unmute', value: false });
-            setAnnouncement(copy.mutedAllAnnouncement);
+            setAnnouncement(copy.moderationRequestedAnnouncement);
           }}
         >
           <MicOffIcon />
@@ -179,14 +169,8 @@ export function TeacherPanel({
                     }
                     onClick={() =>
                       p.forcedMuted
-                        ? act(
-                            { action: 'unmute', targetUserId: p.userId },
-                            copy.unmutedOneAnnouncement(p.displayName),
-                          )
-                        : act(
-                            { action: 'mute', targetUserId: p.userId },
-                            copy.mutedOneAnnouncement(p.displayName),
-                          )
+                        ? act({ action: 'unmute', targetUserId: p.userId })
+                        : act({ action: 'mute', targetUserId: p.userId })
                     }
                   >
                     {p.forcedMuted ? copy.unmuteAction : copy.muteAction}

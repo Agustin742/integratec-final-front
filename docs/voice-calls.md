@@ -11,7 +11,7 @@ Status: implemented and covered by unit and component tests with fake WebRTC and
 - **Speaking indicator.** While someone speaks, their tile gets a glowing border and the avatar's head nods gently, driven by the voice volume. There is no lip-sync.
 - **Emotes.** A bar offers `wave`, `happy`, `sad`, `angry`, `think` and `celebrate`. The emote plays on the sender's avatar for every participant for a few seconds, then returns to idle. The female body lacks some body clips, so it reuses the male clips (same skeleton) plus face morphs.
 - **Controls bar.** Mute or unmute, emotes, and leave. A participant force-muted by a moderator cannot unmute while self-unmute is disallowed.
-- **Teacher panel** (moderators only: owner, admin, teacher). Mute all, mute or unmute one participant, allow or deny self-unmute, end the call for everyone, and toggle focus mode.
+- **Teacher panel** (moderators only: owner, admin, teacher). Mute all, mute or unmute one participant, allow or deny self-unmute, end the call for everyone, and toggle focus mode. Action feedback announces a request only; switches and participant state change only with authoritative server snapshots. The current signaling contract has no per-command acknowledgment, so unchanged state cannot distinguish a delayed request from a silent rejection.
 - **Focus mode.** While it is on during a class call, students cannot move in the 3D world and the world is hidden for them. Moderators are never affected.
 - **1:1 ring.** The callee sees an incoming-call prompt (accept or decline) on any page of the app that has their classroom connection; the caller sees a ringing state until the peer answers, declines, or the ring times out.
 

@@ -46,6 +46,8 @@ export const callMessages = {
   panel: {
     title: 'Controles de la clase',
     muteAll: 'Silenciar a todos',
+    moderationRequestedAnnouncement:
+      'Solicitaste un cambio de moderación. El estado depende de la confirmación del servidor.',
     mutedAllAnnouncement: 'Silenciaste a todos los alumnos.',
     allowSelfUnmute: 'Permitir que activen su micrófono',
     focusMode: 'Modo foco: ocultar el aula 3D a los alumnos',
