@@ -80,7 +80,7 @@ export const classroomMessages = {
     loadError: 'No pudimos verificar el mapa de pupitres del aula.',
   },
   interactables: {
-    petDefaultName: 'Mascota del aula',
+    petDefaultName: 'Michi',
     petGreeting: (petName: string) => `${petName} te saluda desde su rincón.`,
     panelDenied: 'No tenés acceso a este panel en esta aula.',
     foreignDesk:
@@ -100,12 +100,15 @@ export const classroomMessages = {
       shelf: 'Abrir material',
       'bulletin-board': 'Abrir avisos',
       shop: 'Abrir tienda',
-      'tutor-bot': 'Abrir asistente de estudio',
+      'tutor-bot': 'Hablar con el bot',
+      'bot-station': 'Abrir asistente de estudio',
+      'chat-computer': 'Abrir el chat',
+      'report-card-stand': 'Abrir calificaciones',
       'teacher-desk': 'Ver integrantes',
       'student-desk': 'Abrir calificaciones',
       entrance: 'Salir del aula',
     },
-    petAction: (petName: string) => `Saludar a ${petName}`,
+    petAction: (petName: string) => `Acariciar a ${petName}`,
     announce: (action: string) => `Objeto cercano: ${action}.`,
   },
   performanceOffer: {

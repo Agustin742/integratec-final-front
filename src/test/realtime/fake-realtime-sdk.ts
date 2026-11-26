@@ -8,6 +8,7 @@ import type {
   RealtimeSdkClientLike,
 } from '@/realtime/client';
 import { Avatar } from '@/realtime/avatar.generated';
+import { Npc } from '@/realtime/npc.generated';
 import { ClassroomState } from '@/realtime/room-state.generated';
 
 type MessageListener = (type: string, payload: unknown) => void;
@@ -63,12 +64,13 @@ function cloneAppearance(source: FakeAvatarAppearance): FakeAvatarAppearance {
   return { ...source };
 }
 
-/** Plain data bypasses the typed schema setter, mimicking legacy payload shapes. */
-function setPlainAppearance(avatar: object, value: FakeAvatarAppearance): void {
+/** The server schema types appearance; tests feed looser shapes by shadowing the accessor. */
+function setLooseAppearance(avatar: object, value: unknown): void {
   Object.defineProperty(avatar, 'appearance', {
     value,
-    configurable: true,
     writable: true,
+    configurable: true,
+    enumerable: true,
   });
 }
 
@@ -85,9 +87,9 @@ function cloneAvatarInto(
   copy.z = source.z;
   copy.rotation = source.rotation;
   copy.status = source.status;
-  const sourceAppearance = (source as FakeAvatarRecord).appearance;
+  const sourceAppearance = (source as unknown as FakeAvatarRecord).appearance;
   if (sourceAppearance) {
-    setPlainAppearance(copy, cloneAppearance(sourceAppearance));
+    setLooseAppearance(copy, cloneAppearance(sourceAppearance));
   }
   target.set(key, copy as unknown as Avatar);
 }
@@ -158,11 +160,29 @@ export class FakeRealtimeRoom implements RealtimeRoomLike<ClassroomState> {
     avatar.rotation = input.rotation ?? existing?.rotation ?? 0;
     avatar.status = input.status ?? existing?.status ?? 'online';
     if (input.appearance !== undefined) {
-      setPlainAppearance(avatar, cloneAppearance(input.appearance));
+      setLooseAppearance(avatar, cloneAppearance(input.appearance));
     }
     this.state.avatars.set(input.userId, avatar as unknown as Avatar);
     this.emitStateChange();
     return avatar as unknown as Avatar;
+  }
+
+  setNpc(id: string, patch: Partial<Omit<Npc, 'id'>> = {}): Npc {
+    const npc = this.state.npcs.get(id) ?? new Npc();
+    npc.id = id;
+    npc.x = patch.x ?? npc.x ?? 0;
+    npc.z = patch.z ?? npc.z ?? 0;
+    npc.rotation = patch.rotation ?? npc.rotation ?? 0;
+    npc.state = patch.state ?? npc.state ?? 'idle';
+    npc.emote = patch.emote ?? npc.emote ?? '';
+    npc.reaction = patch.reaction ?? npc.reaction ?? '';
+    npc.phraseId = patch.phraseId ?? npc.phraseId ?? -1;
+    npc.reactionSeq = patch.reactionSeq ?? npc.reactionSeq ?? 0;
+    npc.reactingSessionId =
+      patch.reactingSessionId ?? npc.reactingSessionId ?? '';
+    this.state.npcs.set(id, npc);
+    this.emitStateChange();
+    return npc;
   }
 
   removeAvatar(userId: string): void {

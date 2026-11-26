@@ -1,5 +1,5 @@
 import { MathUtils, OrthographicCamera, Vector3 } from 'three';
-import { CLASSROOM_LAYOUT } from '../../realtime/contracts.generated';
+import { CLASSROOM_LAYOUT } from '../../realtime/classroom-layout';
 
 // World convention: 1 unit = 1 meter, Y up, ground at Y = 0.
 // Features inside this reference framing must stay within these bounds.

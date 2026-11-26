@@ -1,5 +1,19 @@
 # Tracker — Luis
 
+## 2026-11-25 — Student registration invitation loop fix and /reset-password route alias (#120)
+
+- **Status:** completed (branch `fix/120-student-registration-loop` off `origin/develop`; verified lint, typecheck, targeted Vitest, production build, security check, Prettier, and docs checks; ready for PR).
+- **Area / files:** `src/api/schema.generated.ts`, `src/session/controller.ts`, `src/session/controller.test.ts`, `src/features/auth/messages.ts`, `src/features/auth/register-schema.ts`, `src/features/auth/register-form.tsx`, `src/features/auth/register-page.test.tsx`, `src/app/router/fake-session.ts`, `src/app/router/routes.tsx`, `src/app/router/routes.test.tsx`, `src/test/msw/handlers.ts`, `e2e/auth-session.spec.ts`, and this tracker.
+- **Change:**
+  1. Synchronized OpenAPI client contracts (`src/api/schema.generated.ts`) with backend PR #143 (`RegisterRequestDto.path` supporting `'INVITEE'` and `RegisterResponseDto` returning optional `session?: TokenPairResponseDto`).
+  2. Added `adoptSession(pair: TokenPair): Promise<LoginResult>` to `SessionController` (`src/session/controller.ts`) and fake session mock (`src/app/router/fake-session.ts`) to immediately install tokens in memory/storage and verify profile via `GET /users/me` without requiring re-authentication via `/auth/login`.
+  3. Added `INVITEE` option to registration choices, schemas, and Spanish messages (`src/features/auth/*`), rendering standard registration fields (without `schoolName`), displaying an informational invitation notice, and automatically adopting the returned session to navigate to `?next=` upon 201 Created.
+  4. Added `/reset-password` route alias redirecting to `/password-reset` with full query string and hash preservation (`src/app/router/routes.tsx`), preventing 404s when users access `/reset-password?token=...`.
+  5. Updated test coverage in `src/session/controller.test.ts`, `src/features/auth/register-page.test.tsx`, `src/app/router/routes.test.tsx`, `src/test/msw/handlers.ts`, and `e2e/auth-session.spec.ts`.
+- **Reason:** Resolve student registration loop after clicking "Crear cuenta" from `/invitations/accept` and fix 404s on `/reset-password` links (#120).
+- **Verification:** Windows verification: `pnpm.cmd lint` (0 errors), `pnpm.cmd typecheck`, targeted Vitest suites across `controller.test.ts`, `register-page.test.tsx`, and `routes.test.tsx` (81/81 passed, 0 skipped), production build `pnpm.cmd build` (739 modules transformed), `pnpm.cmd security:check` (passed, CSP enforced), `prettier --end-of-line auto --check` on touched files, and `python scripts/ci/check_docs.py` (123 files passed).
+- **Next step:** Commit with conventional commit, push branch `fix/120-student-registration-loop`, and open pull request referencing issue #120.
+
 ## 2026-11-24 — UI polish pass PR #133 review fixes and develop merge (#131)
 
 - **Status:** completed (merged `origin/develop` (`be3417a` -> `a9da06c`), resolved all PR #133 review blockers, verified lint, typecheck, targeted Vitest, production/E2E builds, security check, Playwright desktop/mobile E2E, Prettier, and docs checks on `feat/131-ui-polish-pass`; full Ubuntu CI suite runs on push).

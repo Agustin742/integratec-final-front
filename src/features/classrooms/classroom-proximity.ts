@@ -20,6 +20,7 @@ export function canTargetByProximity(
 ): boolean {
   if (interactable.interactionClass === 'direct_transition') return false;
   if (interactable.interactionClass === 'decorative') return true;
+  if (interactable.interactionClass === 'npc') return true;
   if (!interactable.panelKey || !canOpenPanel(interactable.panelKey)) {
     return false;
   }

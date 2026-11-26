@@ -55,16 +55,17 @@ Define how the Three.js scene is built, framed, loaded, and released inside the 
 
 The budget is conservative for school hardware (decision FD8, approved by Agustin on 2026-11-02; see the [technical justification](../docs/technical-justification.md#fd8-3d-performance-budget)). The numbers are limits to verify, not measured results.
 
-| Measure | Limit |
-|---|---|
-| Frame rate | Target 30 fps on integrated GPUs and 60 fps on mid-range machines |
-| Draw calls on screen | At most 100 |
-| Triangles on screen | At most 200k |
-| Avatar GLB | At most 1 MB |
+| Measure              | Limit                                                             |
+| -------------------- | ----------------------------------------------------------------- |
+| Frame rate           | Target 30 fps on integrated GPUs and 60 fps on mid-range machines |
+| Draw calls on screen | At most 100                                                       |
+| Triangles on screen  | At most 200k                                                      |
+| Avatar GLB           | At most 1 MB                                                      |
 | Full classroom scene | At most 8 MB compressed: Draco or meshopt geometry, KTX2 textures |
-| GPU memory | At most 256 MB |
+| GPU memory           | At most 256 MB                                                    |
 
 - **MUST:** Scene and asset changes stay within the table; a change that needs to exceed it **MUST** record an exception per [Documentation and decisions](./documentation-and-decisions.md).
+- **Known recorded exception:** The current modular classroom scene (`#135` / `#138`) exceeds the triangle limit under the approved, scoped FD8 exception (2026-11-25, optimization deferred and subject to a review condition); see the [technical justification](../docs/technical-justification.md#fd8-3d-performance-budget).
 - **MUST:** When the device cannot sustain the frame-rate target, measured at runtime, the client automatically **offers** the 2D Classic Mode ([Classrooms, roles, and permissions](./classrooms-and-roles.md)); the user **MAY** decline and keep the 3D scene. The offer **MUST NOT** switch modes without the user's choice.
 
 ## Raycast and selection

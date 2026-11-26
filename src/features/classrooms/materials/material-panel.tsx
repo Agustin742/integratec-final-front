@@ -28,9 +28,10 @@ import type {
   BotAllowedMaterialListDto,
 } from './material-bot-schema';
 import {
+  disableClassroomBotMaterial,
+  enableClassroomBotMaterial,
   isUncertainBotMaterialError,
   listClassroomBotMaterials,
-  setClassroomBotMaterialEnabled,
 } from './material-bot-service';
 import { MaterialBotToggleSlot } from './material-bot-toggle';
 import {
@@ -225,7 +226,7 @@ function MaterialPanelContent({
         return false;
       }
       const hasPending = currentQuery.state.data?.items.some(
-        (entry) => entry.indexingStatus === 'pending',
+        (entry) => entry.indexState === 'PENDING',
       );
       return hasPending ? 4000 : false;
     },
@@ -312,13 +313,20 @@ function MaterialPanelContent({
       await queryClient.cancelQueries({
         predicate: createClassroomBotMaterialsPredicate(userId, classroomId),
       });
-      const confirmed = await setClassroomBotMaterialEnabled(
-        client,
-        classroomId,
-        material.id,
-        { enabled: nextEnabled },
-        { signal },
-      );
+      // `null` once the server confirmed the material is no longer allowed.
+      let confirmed: BotAllowedMaterialDto | null = null;
+      if (nextEnabled) {
+        confirmed = await enableClassroomBotMaterial(
+          client,
+          classroomId,
+          material.id,
+          { signal },
+        );
+      } else {
+        await disableClassroomBotMaterial(client, classroomId, material.id, {
+          signal,
+        });
+      }
       if (signal?.aborted) return;
 
       await queryClient.cancelQueries({
@@ -329,29 +337,33 @@ function MaterialPanelContent({
       queryClient.setQueryData<BotAllowedMaterialListDto>(
         classroomBotMaterialsQueryKey(userId, classroomId),
         (previous) => {
-          const existing = previous?.items ?? [];
-          const withoutCurrent = existing.filter(
-            (entry) => entry.materialId !== confirmed.materialId,
+          const others = (previous?.items ?? []).filter(
+            (entry) => entry.materialId !== material.id,
           );
-          return {
-            items: [...withoutCurrent, confirmed],
-          };
+          return { items: confirmed ? [...others, confirmed] : others };
         },
       );
 
-      setActionNotice({
-        kind: 'success',
-        title: confirmed.botEnabled
-          ? materialMessages.list.bot.confirmedEnabledTitle
-          : materialMessages.list.bot.confirmedDisabledTitle,
-        description: confirmed.botEnabled
-          ? materialMessages.list.bot.confirmedEnabledDescription(
-              material.filename,
-            )
-          : materialMessages.list.bot.confirmedDisabledDescription(
-              material.filename,
-            ),
-      });
+      const copyBot = materialMessages.list.bot;
+      if (!confirmed) {
+        setActionNotice({
+          kind: 'success',
+          title: copyBot.confirmedDisabledTitle,
+          description: copyBot.confirmedDisabledDescription(material.filename),
+        });
+      } else if (confirmed.indexState === 'FAILED') {
+        setActionNotice({
+          kind: 'error',
+          title: copyBot.indexFailedTitle,
+          description: copyBot.indexFailedDescription(material.filename),
+        });
+      } else {
+        setActionNotice({
+          kind: 'success',
+          title: copyBot.confirmedEnabledTitle,
+          description: copyBot.confirmedEnabledDescription(material.filename),
+        });
+      }
     } catch (error) {
       if (isAbortError(error)) {
         return;

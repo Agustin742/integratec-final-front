@@ -83,7 +83,7 @@ const LEFT_PANELS: readonly FloatingPanelItem[] = [
 
 const RIGHT_PANELS: readonly FloatingPanelItem[] = [
   { key: 'members', targetId: 'teacher-desk' },
-  { key: 'bot', targetId: 'tutor-bot' },
+  { key: 'bot', targetId: 'bot-station' },
   { key: 'shop', targetId: 'shop' },
   { key: 'settings', targetId: undefined },
 ];

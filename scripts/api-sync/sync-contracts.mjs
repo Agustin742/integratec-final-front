@@ -10,14 +10,15 @@ export const BACKEND_ARTIFACT_PATHS = Object.freeze({
   contracts: 'packages/contracts/src/index.ts',
   realtimeState: 'packages/contracts/src/realtime/generated/ClassroomState.ts',
   realtimeAvatar: 'packages/contracts/src/realtime/generated/Avatar.ts',
-  realtimeAvatarAppearance:
-    'packages/contracts/src/realtime/generated/AvatarAppearance.ts',
-  realtimeEquippedItemView:
-    'packages/contracts/src/realtime/generated/EquippedItemView.ts',
   realtimeCallState: 'packages/contracts/src/realtime/generated/CallState.ts',
   realtimeCallParticipant:
     'packages/contracts/src/realtime/generated/CallParticipant.ts',
   realtimeCallContracts: 'packages/contracts/src/index.ts',
+  realtimeNpc: 'packages/contracts/src/realtime/generated/Npc.ts',
+  realtimeAppearance:
+    'packages/contracts/src/realtime/generated/AvatarAppearance.ts',
+  realtimeEquippedItem:
+    'packages/contracts/src/realtime/generated/EquippedItemView.ts',
 });
 
 export const FRONTEND_OUTPUT_PATHS = Object.freeze({
@@ -25,11 +26,12 @@ export const FRONTEND_OUTPUT_PATHS = Object.freeze({
   contracts: 'src/realtime/contracts.generated.ts',
   realtimeState: 'src/realtime/room-state.generated.ts',
   realtimeAvatar: 'src/realtime/avatar.generated.ts',
-  realtimeAvatarAppearance: 'src/realtime/avatar-appearance.generated.ts',
-  realtimeEquippedItemView: 'src/realtime/equipped-item-view.generated.ts',
   realtimeCallState: 'src/realtime/call-state.generated.ts',
   realtimeCallParticipant: 'src/realtime/call-participant.generated.ts',
   realtimeCallContracts: 'src/realtime/call-contracts.generated.ts',
+  realtimeNpc: 'src/realtime/npc.generated.ts',
+  realtimeAppearance: 'src/realtime/avatar-appearance.generated.ts',
+  realtimeEquippedItem: 'src/realtime/equipped-item-view.generated.ts',
 });
 
 export const GENERATED_HEADER = [
@@ -493,15 +495,28 @@ export async function syncContracts(options = {}) {
       artifactPath: artifactPaths.realtimeAvatar,
       relativeOutputPath: outputPaths.realtimeAvatar,
     },
+    {
+      kind: 'realtimeNpc',
+      label: 'Realtime Colyseus NPC schema types',
+      artifactPath: artifactPaths.realtimeNpc,
+      relativeOutputPath: outputPaths.realtimeNpc,
+    },
+    {
+      kind: 'realtimeAppearance',
+      label: 'Realtime Colyseus avatar appearance schema types',
+      artifactPath: artifactPaths.realtimeAppearance,
+      relativeOutputPath: outputPaths.realtimeAppearance,
+    },
+    {
+      kind: 'realtimeEquippedItem',
+      label: 'Realtime Colyseus equipped item schema types',
+      artifactPath: artifactPaths.realtimeEquippedItem,
+      relativeOutputPath: outputPaths.realtimeEquippedItem,
+    },
   ];
 
-  // Schemas nested inside the room states; synced when the backend has them, silently skipped otherwise.
+  // Call-specific schemas and contracts; synced when the backend has them, silently skipped otherwise.
   const nestedSchemaTargets = [
-    {
-      kind: 'realtimeAvatarAppearance',
-      label: 'Avatar appearance schema types',
-    },
-    { kind: 'realtimeEquippedItemView', label: 'Equipped item schema types' },
     { kind: 'realtimeCallState', label: 'Call room-state schema types' },
     { kind: 'realtimeCallParticipant', label: 'Call participant schema types' },
     {

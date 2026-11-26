@@ -39,7 +39,7 @@ vi.mock('../world', () => ({
 
 afterEach(() => vi.unstubAllGlobals());
 
-const PANEL_KEYS = ['activities', 'shop', 'grades', 'members'];
+const PANEL_KEYS = ['activities', 'shop', 'grades', 'members', 'chat'];
 const registry = PANEL_KEYS.map((key) => ({
   key,
   title: `Panel ${key}`,
@@ -134,11 +134,11 @@ describe('proximity prompt', () => {
     expect(screen.queryByRole('button', { name: /Abrir tienda/ })).toBeNull();
   });
 
-  test('the pet reads as a greeting with its name', async () => {
+  test('the pet reads as a caress with its name', async () => {
     renderStage();
     await nearTo('pet');
     expect(
-      screen.getByRole('button', { name: /Saludar a Michi/ }),
+      screen.getByRole('button', { name: /Acariciar a Michi/ }),
     ).toBeInTheDocument();
   });
 
@@ -264,6 +264,22 @@ describe('E key', () => {
   });
 });
 
+describe('chat computer and report card stand', () => {
+  test.each([
+    ['chat-computer', /Abrir el chat/, 'Panel chat'],
+    ['report-card-stand', /Abrir calificaciones/, 'Panel grades'],
+  ])(
+    '%s opens its panel with E, without an owned desk',
+    async (id, action, title) => {
+      renderStage();
+      await nearTo(id);
+      expect(screen.getByRole('button', { name: action })).toBeInTheDocument();
+      pressE();
+      expect(await screen.findByRole('dialog', { name: title })).toBeVisible();
+    },
+  );
+});
+
 describe('availability and highlight', () => {
   test('only reachable objects can be proximity targets', async () => {
     renderStage();
@@ -281,7 +297,18 @@ describe('availability and highlight', () => {
       });
     expect(isTarget('shop')).toBe(true);
     expect(
-      isTarget('pet', { type: 'pet', interactionClass: 'decorative' }),
+      isTarget('pet', {
+        type: 'pet',
+        interactionClass: 'npc',
+        npcId: 'pet',
+      }),
+    ).toBe(true);
+    expect(
+      isTarget('tutor-bot', {
+        type: 'tutor-bot',
+        interactionClass: 'npc',
+        npcId: 'tutorBot',
+      }),
     ).toBe(true);
     expect(
       isTarget('entrance', {

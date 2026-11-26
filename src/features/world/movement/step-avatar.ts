@@ -1,6 +1,7 @@
 import {
   AVATAR_SPEED_UNITS_PER_SECOND,
   type ClassroomLayout,
+  type LayoutBox,
 } from '@/realtime';
 
 /** Avatar placement on the floor plane. `rotation` is `atan2(x, z)` of the last non-zero input. */
@@ -31,19 +32,19 @@ const clamp = (value: number, min: number, max: number): number =>
 
 /**
  * Whether an avatar centre may stand at (x, z): inside the walls and clear of every obstacle.
- * Mirrors the server `isWalkable` (apps/realtime), so local prediction and authority agree.
+ * Desks and floor props block alike. Mirrors the server `isWalkable` (apps/realtime), so local prediction and authority agree.
  */
 export function isWalkable(
   layout: ClassroomLayout,
   x: number,
   z: number,
 ): boolean {
-  const { bounds, avatarRadius: r, obstacles } = layout;
+  const { bounds, avatarRadius: r, obstacles, props } = layout;
   if (x < bounds.minX + r || x > bounds.maxX - r) return false;
   if (z < bounds.minZ + r || z > bounds.maxZ - r) return false;
-  return !obstacles.some(
-    (o) => x > o.minX - r && x < o.maxX + r && z > o.minZ - r && z < o.maxZ + r,
-  );
+  const blocks = (o: LayoutBox) =>
+    x > o.minX - r && x < o.maxX + r && z > o.minZ - r && z < o.maxZ + r;
+  return !obstacles.some(blocks) && !props.some(blocks);
 }
 
 /**

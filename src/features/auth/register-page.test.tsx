@@ -829,29 +829,61 @@ describe('RegisterPage (/register)', () => {
     expect(requestCount).toBe(1);
   });
 
-  test('INVITATION choice hides registration inputs and navigates to /invitations/accept without API call', async () => {
-    let networkCalls = 0;
+  test('INVITEE choice shows registration inputs and notice, and auto-authenticates into ?next= destination upon 201', async () => {
+    let receivedBody: unknown;
     mswServer.use(
-      http.post(`${TEST_API_BASE_URL}/auth/register`, () => {
-        networkCalls += 1;
-        return HttpResponse.json({}, { status: 201 });
+      createRegisterHandler({
+        onRequest: (_req, body) => {
+          receivedBody = body;
+        },
+        response: {
+          path: 'INVITEE',
+          session: {
+            accessToken: 'session-access-token',
+            refreshToken: 'session-refresh-token',
+            tokenType: 'Bearer',
+            expiresIn: 900,
+          },
+        },
+      }),
+      http.get(`${TEST_API_BASE_URL}/users/me`, () => {
+        return HttpResponse.json({
+          id: 'user-test-1',
+          email: 'lucas@example.com',
+          displayName: 'Lucas Alumno',
+          avatar: {
+            bodyId: 'male',
+            hairId: 'afro',
+            topId: 'hoodie',
+            hairColor: '#6C4D48',
+            clothingColor: '#5B4F96',
+          },
+        });
       }),
     );
 
-    const { container, router } = renderRegisterRoute('/register');
+    const { container, router } = renderRegisterRoute(
+      '/register?next=%2Finvitations%2Faccept%3Ftoken%3Dtest-token',
+    );
     const main = await findMainRegion();
 
     fireEvent.click(
       within(main).getByRole('radio', {
-        name: new RegExp(authMessages.paths.options.INVITATION.title, 'i'),
+        name: new RegExp(authMessages.paths.options.INVITEE.title, 'i'),
       }),
     );
 
     expect(
-      within(main).queryByLabelText(authMessages.fields.email.label),
-    ).not.toBeInTheDocument();
+      within(main).getByLabelText(authMessages.fields.displayName.label),
+    ).toBeInTheDocument();
     expect(
-      within(main).queryByRole('button', { name: authMessages.actions.submit }),
+      within(main).getByLabelText(authMessages.fields.email.label),
+    ).toBeInTheDocument();
+    expect(
+      within(main).getByLabelText(authMessages.fields.password.label),
+    ).toBeInTheDocument();
+    expect(
+      within(main).queryByLabelText(authMessages.fields.schoolName.label),
     ).not.toBeInTheDocument();
     expect(
       within(main).getByText(authMessages.invitationNotice.heading),
@@ -859,16 +891,33 @@ describe('RegisterPage (/register)', () => {
 
     await expectAccessible(container);
 
-    const invitationLink = within(main).getByRole('link', {
-      name: authMessages.invitationNotice.cta,
-    });
-    expect(invitationLink).toHaveAttribute('href', '/invitations/accept');
+    fireEvent.change(
+      within(main).getByLabelText(authMessages.fields.displayName.label),
+      { target: { value: 'Lucas Alumno' } },
+    );
+    fireEvent.change(
+      within(main).getByLabelText(authMessages.fields.email.label),
+      { target: { value: 'lucas@example.com' } },
+    );
+    fireEvent.change(
+      within(main).getByLabelText(authMessages.fields.password.label),
+      { target: { value: 'ClaveSegura123' } },
+    );
 
-    fireEvent.click(invitationLink);
+    fireEvent.click(
+      within(main).getByRole('button', { name: authMessages.actions.submit }),
+    );
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/invitations/accept');
+      expect(router.state.location.search).toBe('?token=test-token');
     });
-    expect(networkCalls).toBe(0);
+
+    expect(receivedBody).toEqual({
+      path: 'INVITEE',
+      displayName: 'Lucas Alumno',
+      email: 'lucas@example.com',
+      password: 'ClaveSegura123',
+    });
   });
 });

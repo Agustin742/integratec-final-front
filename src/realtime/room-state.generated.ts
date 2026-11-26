@@ -11,6 +11,7 @@
 
 import { Schema, type, ArraySchema, MapSchema, SetSchema, type DataChange } from '@colyseus/schema';
 import { Avatar } from './avatar.generated';
+import { Npc } from './npc.generated';
 
 export class ClassroomState extends Schema {
   @type('string') public classroomId!: string;
@@ -18,4 +19,5 @@ export class ClassroomState extends Schema {
   @type({ map: Avatar }) public avatars: MapSchema<Avatar> = new MapSchema<Avatar>();
   @type('boolean') public classCallActive!: boolean;
   @type('boolean') public focusMode!: boolean;
+  @type({ map: Npc }) public npcs: MapSchema<Npc> = new MapSchema<Npc>();
 }

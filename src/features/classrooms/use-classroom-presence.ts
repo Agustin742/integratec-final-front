@@ -15,6 +15,7 @@ import {
 import type { components } from '@/api/schema.generated';
 import type { Avatar } from '@/features/profile/avatar-options';
 import type { Pose, RemoteClassroomParticipant } from '@/features/world';
+import type { NpcView } from '@/features/world/npc/npc-view';
 import {
   realtimeMessages,
   useClassroomRealtime,
@@ -36,6 +37,7 @@ type CachedDirectoryMembers = {
 
 const EMPTY_AVATARS = new Map<string, Avatar>();
 const EMPTY_PARTICIPANTS: readonly RealtimeParticipant[] = [];
+const EMPTY_NPCS: ReadonlyMap<string, NpcView> = new Map();
 const EMPTY_REMOTE_PARTICIPANTS: readonly RemoteClassroomParticipant[] = [];
 
 function toValidAvatar(raw: unknown): Avatar | undefined {
@@ -66,8 +68,12 @@ export interface ClassroomPresence {
   readonly selfEquipped: RealtimeEquippedCodes | undefined;
   readonly participants: readonly RealtimeParticipant[];
   readonly remoteParticipants: readonly RemoteClassroomParticipant[];
+  /** Synced pet and tutor bot; empty without a live connection. */
+  readonly npcs: ReadonlyMap<string, NpcView>;
   readonly reconnect: () => Promise<boolean>;
   readonly sendIntent: (intent: AvatarInput) => void;
+  /** Asks the server to react to E / click on an NPC (`npc:interact`). */
+  readonly interactNpc: (npcId: string) => void;
 }
 
 /**
@@ -511,6 +517,19 @@ export function useClassroomPresence({
     [frozen, lostAccess, mode, realtime.status, sendAvatarInput],
   );
 
+  const { interactNpc: sendNpcInteract } = realtime;
+  const interactNpc = useCallback(
+    (npcId: string) => {
+      if (lostAccess || realtime.status !== 'connected' || frozen) {
+        return;
+      }
+      sendNpcInteract(npcId);
+    },
+    [frozen, lostAccess, realtime.status, sendNpcInteract],
+  );
+
+  const npcs = hasPresenceParticipants ? realtime.npcs : EMPTY_NPCS;
+
   const isIdle =
     !lostAccess &&
     realtime.status === 'disconnected' &&
@@ -540,5 +559,7 @@ export function useClassroomPresence({
     remoteParticipants,
     reconnect: realtime.reconnect,
     sendIntent,
+    npcs,
+    interactNpc,
   };
 }

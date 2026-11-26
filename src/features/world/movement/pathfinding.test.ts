@@ -75,6 +75,7 @@ describe('findPath', () => {
         { minX: 3, maxX: 7, minZ: 3, maxZ: 3.5 },
         { minX: 3, maxX: 7, minZ: 6.5, maxZ: 7 },
       ],
+      props: [],
       spawnPoints: [{ x: 1, z: 1 }],
     };
     expect(isWalkable(ring, 5, 5)).toBe(true);
@@ -111,7 +112,7 @@ describe('findPath', () => {
     const path = findPath(
       layout,
       { x: -6, z: 5 },
-      { x: 6, z: -5.5 },
+      { x: 6, z: -3.5 },
       { cellSize: 0.5 },
     );
     expect(path).not.toBeNull();

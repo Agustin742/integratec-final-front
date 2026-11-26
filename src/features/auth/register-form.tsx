@@ -1,7 +1,11 @@
 import { useEffect, useId, useRef, useState, type MouseEvent } from 'react';
 import { Controller, useWatch } from 'react-hook-form';
-import { Link, useSearchParams } from 'react-router';
-import { buildAuthReturnHref, LOGIN_PATH } from '@/app/router/return-target';
+import { Link, useNavigate, useSearchParams } from 'react-router';
+import {
+  buildAuthReturnHref,
+  LOGIN_PATH,
+  readReturnTarget,
+} from '@/app/router/return-target';
 import {
   FormField,
   FormRootError,
@@ -27,8 +31,6 @@ import {
 } from './register-schema';
 import { registerAccount } from './register-service';
 
-const INVITATION_ACCEPT_PATH = '/invitations/accept';
-
 const primaryCtaLinkClass =
   'inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-primary px-5 py-2.5 font-display text-base font-semibold text-primary-foreground [--key:var(--key-primary)] key-bevel motion-press focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-ring';
 
@@ -37,7 +39,8 @@ export interface RegisterFormProps {
 }
 
 export function RegisterForm({ title }: RegisterFormProps) {
-  const { client } = useSessionService();
+  const { client, controller } = useSessionService();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [confirmed, setConfirmed] = useState<RegisterResponseDto | null>(null);
 
@@ -83,10 +86,6 @@ export function RegisterForm({ title }: RegisterFormProps) {
   );
 
   const loginHref = buildAuthReturnHref(LOGIN_PATH, searchParams);
-  const invitationHref = buildAuthReturnHref(
-    INVITATION_ACCEPT_PATH,
-    searchParams,
-  );
 
   const onValid = async (values: RegisterFormOutput): Promise<void> => {
     const dto = toRegisterRequestDto(values);
@@ -97,6 +96,14 @@ export function RegisterForm({ title }: RegisterFormProps) {
         shouldTouch: false,
         shouldValidate: false,
       });
+      if (response.session) {
+        const result = await controller.adoptSession(response.session);
+        if (result.ok) {
+          const destination = readReturnTarget(searchParams);
+          navigate(destination, { replace: true });
+          return;
+        }
+      }
       setConfirmed(response);
     } catch (error) {
       // Never retain plaintext passwords in React state after any failure.
@@ -179,6 +186,15 @@ export function RegisterForm({ title }: RegisterFormProps) {
                     </dd>
                     <dd className="text-muted-foreground">
                       {`${authMessages.confirmed.schoolTimeZonePrefix} ${confirmed.school.timeZone}`}
+                    </dd>
+                  </>
+                ) : confirmed.path === 'INVITEE' ? (
+                  <>
+                    <dd className="font-semibold text-foreground">
+                      {authMessages.paths.options.INVITEE.title}
+                    </dd>
+                    <dd className="text-muted-foreground">
+                      {authMessages.paths.options.INVITEE.description}
                     </dd>
                   </>
                 ) : (
@@ -301,8 +317,8 @@ export function RegisterForm({ title }: RegisterFormProps) {
           />
         </fieldset>
 
-        {selectedPath === 'INVITATION' ? (
-          <div className="space-y-4">
+        <div className="space-y-4">
+          {selectedPath === 'INVITEE' && (
             <Alert
               variant="info"
               role="region"
@@ -315,96 +331,87 @@ export function RegisterForm({ title }: RegisterFormProps) {
                 {authMessages.invitationNotice.body}
               </AlertDescription>
             </Alert>
-            <Link
-              to={invitationHref}
-              onClick={handleLeaveWithGuard}
-              className={primaryCtaLinkClass}
-            >
-              {authMessages.invitationNotice.cta}
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <FormRootError
-              form={form}
-              headingLevel="h3"
-              title={authMessages.errors.rootTitle}
-            />
+          )}
 
+          <FormRootError
+            form={form}
+            headingLevel="h3"
+            title={authMessages.errors.rootTitle}
+          />
+
+          <FormField
+            control={form.control}
+            name="displayName"
+            label={authMessages.fields.displayName.label}
+            description={authMessages.fields.displayName.description}
+          >
+            {(fieldProps) => (
+              <Input
+                {...fieldProps}
+                type="text"
+                autoComplete="name"
+                placeholder={authMessages.fields.displayName.placeholder}
+              />
+            )}
+          </FormField>
+
+          <FormField
+            control={form.control}
+            name="email"
+            label={authMessages.fields.email.label}
+            description={authMessages.fields.email.description}
+          >
+            {(fieldProps) => (
+              <Input
+                {...fieldProps}
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                placeholder={authMessages.fields.email.placeholder}
+              />
+            )}
+          </FormField>
+
+          <FormField
+            control={form.control}
+            name="password"
+            label={authMessages.fields.password.label}
+            description={authMessages.fields.password.description}
+          >
+            {(fieldProps) => (
+              <Input
+                {...fieldProps}
+                type="password"
+                autoComplete="new-password"
+                placeholder={authMessages.fields.password.placeholder}
+              />
+            )}
+          </FormField>
+
+          {selectedPath === 'SCHOOL' && (
             <FormField
               control={form.control}
-              name="displayName"
-              label={authMessages.fields.displayName.label}
-              description={authMessages.fields.displayName.description}
+              name="schoolName"
+              label={authMessages.fields.schoolName.label}
+              description={authMessages.fields.schoolName.description}
             >
               {(fieldProps) => (
                 <Input
                   {...fieldProps}
                   type="text"
-                  autoComplete="name"
-                  placeholder={authMessages.fields.displayName.placeholder}
+                  autoComplete="organization"
+                  placeholder={authMessages.fields.schoolName.placeholder}
                 />
               )}
             </FormField>
+          )}
 
-            <FormField
-              control={form.control}
-              name="email"
-              label={authMessages.fields.email.label}
-              description={authMessages.fields.email.description}
-            >
-              {(fieldProps) => (
-                <Input
-                  {...fieldProps}
-                  type="email"
-                  inputMode="email"
-                  autoComplete="email"
-                  placeholder={authMessages.fields.email.placeholder}
-                />
-              )}
-            </FormField>
-
-            <FormField
-              control={form.control}
-              name="password"
-              label={authMessages.fields.password.label}
-              description={authMessages.fields.password.description}
-            >
-              {(fieldProps) => (
-                <Input
-                  {...fieldProps}
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder={authMessages.fields.password.placeholder}
-                />
-              )}
-            </FormField>
-
-            {selectedPath === 'SCHOOL' && (
-              <FormField
-                control={form.control}
-                name="schoolName"
-                label={authMessages.fields.schoolName.label}
-                description={authMessages.fields.schoolName.description}
-              >
-                {(fieldProps) => (
-                  <Input
-                    {...fieldProps}
-                    type="text"
-                    autoComplete="organization"
-                    placeholder={authMessages.fields.schoolName.placeholder}
-                  />
-                )}
-              </FormField>
-            )}
-
-            <Button type="submit" busy={isSubmitting} className="w-full">
-              {isSubmitting
-                ? authMessages.actions.submitting
-                : authMessages.actions.submit}
-            </Button>
-          </div>
-        )}
+          <Button type="submit" busy={isSubmitting} className="w-full">
+            {isSubmitting
+              ? authMessages.actions.submitting
+              : authMessages.actions.submit}
+          </Button>
+        </div>
       </form>
 
       <p className="border-t border-edge pt-4 text-center text-sm text-muted-foreground">

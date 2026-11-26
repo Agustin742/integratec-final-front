@@ -204,6 +204,12 @@ export const materialMessages = {
       loadErrorNotice:
         'No pudimos consultar qué materiales tiene habilitados el asistente. Podés reintentar.',
       retryLoadAction: 'Reintentar estado del asistente',
+      retryIndexAction: 'Reintentar indexación',
+      retryIndexLabel: (filename: string) =>
+        `Reintentar indexación de «${filename}»`,
+      indexFailedTitle: 'No pudimos indexar el material',
+      indexFailedDescription: (filename: string) =>
+        `«${filename}» quedó habilitado, pero el asistente todavía no puede usarlo. Podés reintentar la indexación.`,
       confirmedEnabledTitle: 'Material habilitado para el asistente',
       confirmedEnabledDescription: (filename: string) =>
         `El servidor confirmó la habilitación de «${filename}» para el asistente de estudio.`,
@@ -218,6 +224,8 @@ export const materialMessages = {
           'No encontramos este material o el aula ya no está disponible.',
         uncertain:
           'No pudimos confirmar si el cambio se guardó en el servidor. Verificá el estado actual antes de reintentar.',
+        cleanupPending:
+          'El material ya quedó excluido del asistente, pero la limpieza de su índice quedó pendiente.',
         unexpected:
           'Ocurrió un error inesperado al actualizar el estado del material para el asistente.',
       },

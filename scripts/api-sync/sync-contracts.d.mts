@@ -6,11 +6,12 @@ export const BACKEND_ARTIFACT_PATHS: Readonly<{
   contracts: string;
   realtimeState: string;
   realtimeAvatar: string;
-  realtimeAvatarAppearance: string;
-  realtimeEquippedItemView: string;
   realtimeCallState: string;
   realtimeCallParticipant: string;
   realtimeCallContracts: string;
+  realtimeNpc: string;
+  realtimeAppearance: string;
+  realtimeEquippedItem: string;
 }>;
 
 export const FRONTEND_OUTPUT_PATHS: Readonly<{
@@ -18,10 +19,12 @@ export const FRONTEND_OUTPUT_PATHS: Readonly<{
   contracts: string;
   realtimeState: string;
   realtimeAvatar: string;
-  realtimeAvatarAppearance: string;
-  realtimeEquippedItemView: string;
   realtimeCallState: string;
   realtimeCallParticipant: string;
+  realtimeCallContracts: string;
+  realtimeNpc: string;
+  realtimeAppearance: string;
+  realtimeEquippedItem: string;
 }>;
 
 export const GENERATED_HEADER: string;
@@ -92,8 +95,6 @@ export function generateOpenApiTypes(
   openApiDocument: Record<string, unknown>,
   artifactPath?: string,
 ): Promise<string>;
-
-export function extractCallContracts(rawSource: string): string | null;
 
 export function extractCallContracts(rawSource: string): string | null;
 

@@ -26,6 +26,25 @@ export function fakeSession(
       releasePrivateState: () => {},
       initialize,
       login: vi.fn(),
+      adoptSession: vi.fn(async () => {
+        snapshot = {
+          status: 'authenticated',
+          user: {
+            id: '00000000-0000-4000-8000-000000000001',
+            email: 'user@example.test',
+            displayName: 'Test User',
+            avatar: {
+              bodyId: 'male',
+              hairId: 'afro',
+              topId: 'hoodie',
+              hairColor: '#6C4D48',
+              clothingColor: '#5B4F96',
+            },
+          },
+        };
+        listeners.forEach((listener) => listener());
+        return { ok: true, cleanupFailed: false };
+      }),
       logout: vi.fn(),
     },
   } as unknown as SessionService;

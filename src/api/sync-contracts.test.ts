@@ -186,7 +186,7 @@ describe('sync-contracts', () => {
         FRONTEND_OUTPUT_PATHS.openapi,
         FRONTEND_OUTPUT_PATHS.contracts,
       ]);
-      expect(firstResult.warnings).toHaveLength(2);
+      expect(firstResult.warnings).toHaveLength(5);
       expect(firstResult.warnings[0]).toContain(
         BACKEND_ARTIFACT_PATHS.realtimeState,
       );
@@ -246,6 +246,32 @@ describe('sync-contracts', () => {
       );
     });
 
+    it('reads the NPC, appearance and equipped item schemas from the backend (#138)', () => {
+      expect(BACKEND_ARTIFACT_PATHS.realtimeNpc).toBe(
+        'packages/contracts/src/realtime/generated/Npc.ts',
+      );
+      expect(FRONTEND_OUTPUT_PATHS.realtimeNpc).toBe(
+        'src/realtime/npc.generated.ts',
+      );
+      expect(FRONTEND_OUTPUT_PATHS.realtimeAppearance).toBe(
+        'src/realtime/avatar-appearance.generated.ts',
+      );
+      expect(FRONTEND_OUTPUT_PATHS.realtimeEquippedItem).toBe(
+        'src/realtime/equipped-item-view.generated.ts',
+      );
+    });
+
+    it('rewrites every relative generated schema import to its synced file (#138)', () => {
+      const out = formatPulledTypeArtifact(
+        "import { Avatar } from './Avatar';\nimport { Npc } from './Npc';\nimport { AvatarAppearance } from './AvatarAppearance';\nimport { EquippedItemView } from './EquippedItemView';\n",
+        'x.ts',
+      );
+      expect(out).toContain("from './avatar.generated'");
+      expect(out).toContain("from './npc.generated'");
+      expect(out).toContain("from './avatar-appearance.generated'");
+      expect(out).toContain("from './equipped-item-view.generated'");
+    });
+
     it('syncs Colyseus room-state and avatar artifacts and rewrites relative ./Avatar import', async () => {
       const backendDir = await createTempDir('backend-with-realtime-');
       const frontendDir = await createTempDir('frontend-with-realtime-');
@@ -268,6 +294,16 @@ describe('sync-contracts', () => {
       await mkdir(path.dirname(contractsFile), { recursive: true });
       await mkdir(path.dirname(realtimeStateFile), { recursive: true });
       await mkdir(path.dirname(realtimeAvatarFile), { recursive: true });
+      for (const key of [
+        'realtimeNpc',
+        'realtimeAppearance',
+        'realtimeEquippedItem',
+      ] as const) {
+        await writeFile(
+          path.join(backendDir, BACKEND_ARTIFACT_PATHS[key]),
+          'export class Extra {}\n',
+        );
+      }
 
       await writeFile(openApiFile, JSON.stringify(SAMPLE_OPENAPI));
       await writeFile(contractsFile, SAMPLE_CONTRACTS_TS);
@@ -292,6 +328,9 @@ describe('sync-contracts', () => {
           FRONTEND_OUTPUT_PATHS.contracts,
           FRONTEND_OUTPUT_PATHS.realtimeState,
           FRONTEND_OUTPUT_PATHS.realtimeAvatar,
+          FRONTEND_OUTPUT_PATHS.realtimeNpc,
+          FRONTEND_OUTPUT_PATHS.realtimeAppearance,
+          FRONTEND_OUTPUT_PATHS.realtimeEquippedItem,
         ],
       );
 
@@ -356,6 +395,13 @@ describe('sync-contracts', () => {
       await seed(BACKEND_ARTIFACT_PATHS.contracts, SAMPLE_CONTRACTS_TS);
       await seed(BACKEND_ARTIFACT_PATHS.realtimeState, 'export class A {}\n');
       await seed(BACKEND_ARTIFACT_PATHS.realtimeAvatar, 'export class B {}\n');
+      for (const key of [
+        'realtimeNpc',
+        'realtimeAppearance',
+        'realtimeEquippedItem',
+      ] as const) {
+        await seed(BACKEND_ARTIFACT_PATHS[key], 'export class Nested {}\n');
+      }
       await seed(
         BACKEND_ARTIFACT_PATHS.realtimeCallState,
         "import { CallParticipant } from './CallParticipant';\nexport class CallState {}\n",
@@ -368,7 +414,11 @@ describe('sync-contracts', () => {
       const result = await syncContracts({ backendDir, rootDir: frontendDir });
 
       expect(result.warnings).toEqual([]);
-      expect(result.syncedFiles.map((item) => item.relativeOutputPath)).toEqual(
+      const outputPaths = result.syncedFiles.map(
+        (item) => item.relativeOutputPath,
+      );
+      expect(new Set(outputPaths).size).toBe(outputPaths.length);
+      expect(outputPaths).toEqual(
         expect.arrayContaining([
           FRONTEND_OUTPUT_PATHS.realtimeCallState,
           FRONTEND_OUTPUT_PATHS.realtimeCallParticipant,
