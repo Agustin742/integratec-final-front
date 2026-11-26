@@ -31,6 +31,13 @@ export {
   type UseClassroomRealtimeResult,
 } from './use-classroom-realtime';
 export {
+  AVATAR_EMOTE_COOLDOWN_MS,
+  AVATAR_EMOTE_MESSAGE,
+  AVATAR_EMOTED_EVENT,
+  AVATAR_EMOTES,
+  avatarEmoteSchema,
+  type AvatarEmote,
+  type AvatarEmoted,
   AVATAR_INPUT_MESSAGE,
   AVATAR_STATUSES,
   AVATAR_SPEED_UNITS_PER_SECOND,

@@ -5,9 +5,16 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
   type ReactNode,
 } from 'react';
-import { AnimationClip, AnimationMixer, type AnimationAction } from 'three';
+import {
+  AnimationClip,
+  AnimationMixer,
+  LoopOnce,
+  LoopRepeat,
+  type AnimationAction,
+} from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Avatar } from '@/features/profile/avatar-options';
 import { evictRejectedGlbAsset, readCachedGlbAsset } from '../asset-cache';
@@ -23,6 +30,12 @@ import {
 /** Blend time between two body clips; short so starting to move feels instant. */
 export const AVATAR_CROSSFADE_SECONDS = 0.2;
 
+/** One request to play a clip once; a new `seq` (above 0) plays it again. */
+export interface AvatarEmotePlay {
+  readonly name: string;
+  readonly seq: number;
+}
+
 export interface AvatarModelProps {
   readonly avatar: Avatar;
   /** Equipped accessories by slot (shop item codes), for this classroom. */
@@ -33,6 +46,10 @@ export interface AvatarModelProps {
   readonly scale?: number | readonly [number, number, number];
   /** Clip name in the body GLB (for example `Idle`); static when absent. */
   readonly animation?: string;
+  /** Clip played once over `animation`, which resumes afterwards. */
+  readonly emote?: AvatarEmotePlay | undefined;
+  /** True while the avatar moves: cancels the current emote for good. */
+  readonly emoteBlocked?: boolean;
   /** Face at rest; neutral when absent. */
   readonly face?: AvatarFace;
   /** Rendered inside the scene while the files load. */
@@ -113,6 +130,8 @@ function LoadedAvatar({
   rotation,
   scale,
   animation,
+  emote,
+  emoteBlocked = false,
   face = 'neutral',
   onPartsSkipped,
 }: Omit<AvatarModelProps, 'fallback' | 'errorFallback' | 'onBodyError'>) {
@@ -207,10 +226,22 @@ function LoadedAvatar({
   const actionRef = useRef<AnimationAction | null>(null);
   /** True while a clip is playing and may advance (never under reduced motion). */
   const advancingRef = useRef(false);
+  /** Request the running action plays, 0 for the base clip. */
+  const playingSeqRef = useRef(0);
+  /** Last emote that finished or was cancelled; it never plays again. */
+  const [doneSeq, setDoneSeq] = useState(0);
+  if (emote && emoteBlocked && doneSeq !== emote.seq) setDoneSeq(emote.seq);
+  const activeEmote =
+    emote && !emoteBlocked && emote.seq !== doneSeq ? emote : undefined;
+  const emoteName = activeEmote?.name;
+  const emoteSeq = activeEmote?.seq ?? 0;
   useEffect(() => {
     const mixer = new AnimationMixer(composed.root);
     mixerRef.current = mixer;
+    const onFinished = () => setDoneSeq(playingSeqRef.current);
+    mixer.addEventListener('finished', onFinished);
     return () => {
+      mixer.removeEventListener('finished', onFinished);
       mixer.stopAllAction();
       mixer.uncacheRoot(composed.root);
       mixerRef.current = null;
@@ -225,11 +256,17 @@ function LoadedAvatar({
   useEffect(() => {
     const mixer = mixerRef.current;
     if (!mixer) return;
-    const name = resolveClip(animation, clipNames);
-    const clip = name
-      ? AnimationClip.findByName(bodyGltf.animations, name)
+    const emoteClip = emoteName
+      ? AnimationClip.findByName(bodyGltf.animations, emoteName)
       : null;
+    const name = resolveClip(animation, clipNames);
+    const clip =
+      emoteClip ??
+      (name ? AnimationClip.findByName(bodyGltf.animations, name) : null);
     const previous = actionRef.current;
+    const seq = emoteClip ? emoteSeq : 0;
+    const restarted = seq !== playingSeqRef.current;
+    playingSeqRef.current = seq;
     if (!clip) {
       mixer.stopAllAction();
       actionRef.current = null;
@@ -238,24 +275,39 @@ function LoadedAvatar({
       return;
     }
     const next = mixer.clipAction(clip);
-    if (next === previous) {
+    next.setLoop(emoteClip ? LoopOnce : LoopRepeat, Infinity);
+    next.clampWhenFinished = emoteClip !== null;
+    // Under reduced motion nothing advances, so an emote is a still mid-clip
+    // pose that lasts as long as the clip would.
+    let stillTimer: number | undefined;
+    const holdStill = () => {
+      if (!emoteClip || !reducedMotion) return;
+      mixer.update(clip.duration / 2);
+      stillTimer = window.setTimeout(
+        () => setDoneSeq(seq),
+        clip.duration * 1000,
+      );
+    };
+    const stopTimer = () => window.clearTimeout(stillTimer);
+    if (next === previous && !restarted) {
       const wasAdvancing = advancingRef.current;
       advancingRef.current = !reducedMotion;
       if (wasAdvancing && reducedMotion) {
         mixer.stopAllAction();
         next.reset().play();
         mixer.update(0);
+        holdStill();
         invalidate();
       } else if (!wasAdvancing && !reducedMotion) {
         invalidate();
       }
-      return;
+      return stopTimer;
     }
-    if (previous && !reducedMotion) {
-      next.enabled = true;
+    if (previous && previous !== next && !reducedMotion) {
+      // `reset` also unpauses a clip left clamped on its last frame.
+      next.reset();
       next.setEffectiveTimeScale(1);
       next.setEffectiveWeight(1);
-      next.time = 0;
       previous.crossFadeTo(next, AVATAR_CROSSFADE_SECONDS, false);
       next.play();
     } else {
@@ -267,8 +319,19 @@ function LoadedAvatar({
     // that is allowed keeps advancing it.
     mixer.update(0);
     advancingRef.current = !reducedMotion;
+    holdStill();
     invalidate();
-  }, [animation, reducedMotion, bodyGltf, clipNames, composed, invalidate]);
+    return stopTimer;
+  }, [
+    animation,
+    emoteName,
+    emoteSeq,
+    reducedMotion,
+    bodyGltf,
+    clipNames,
+    composed,
+    invalidate,
+  ]);
   // A `demand` loop stops once nothing invalidates it (hidden tab, offscreen
   // host), so an active clip asks for its next frame and for the first frame
   // after the loop resumes.

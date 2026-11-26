@@ -1,5 +1,14 @@
 # Tracker — Agustin
 
+## 2026-11-26 — Avatar emotes in the 3D classroom (#149)
+
+- **Status:** completed (not visually checked)
+- **Area / files:** `src/features/classrooms/`, `src/features/world/{avatar,classroom}/`, `src/realtime/`, `docs/realtime-client.md`
+- **Change:** Space or a button opens a wheel with five gestures (Wave, Cheer, Clap, Dance, RaiseHand); the room announces them to everyone and each avatar plays the clip once. Moving cancels it; the contract constants mirror `packages/contracts`.
+- **Reason:** Members can express themselves in the live classroom.
+- **Verification:** Strict TDD; touched test files, lint and typecheck. No full suite, build, e2e or visual review.
+- **Next step:** Visual check with two users against the backend that has `avatar:emote`.
+
 ## 2026-11-26 — Profile streak uses the real gamification route (#149)
 
 - **Status:** completed

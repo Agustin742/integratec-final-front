@@ -603,4 +603,93 @@ describe('AvatarModel', () => {
       expect(frame.invalidate).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe('emotes (#154)', () => {
+    beforeEach(() => {
+      useLoader([], ['Idle', 'Wave']);
+    });
+    const wave = { name: 'Wave', seq: 1 };
+    const playedClips = (play: { mock: { contexts: unknown[] } }) =>
+      play.mock.contexts.map(
+        (action) => (action as AnimationAction).getClip().name,
+      );
+
+    async function mountIdle(emoteBlocked = false) {
+      const view = await mount(
+        <AvatarModel avatar={avatar} animation="Idle" />,
+      );
+      const play = vi.spyOn(AnimationAction.prototype, 'play');
+      const update = (emote?: typeof wave, blocked = emoteBlocked) =>
+        act(async () => {
+          view.rerender(
+            <AvatarModel
+              avatar={avatar}
+              animation="Idle"
+              emote={emote}
+              emoteBlocked={blocked}
+            />,
+          );
+        });
+      return { play, update };
+    }
+
+    it('plays the clip once, keeps the loop running and returns to the base clip', async () => {
+      mockReducedMotion(false);
+      const { play, update } = await mountIdle();
+      await update(wave);
+      expect(playedClips(play)).toEqual(['Wave']);
+      frame.invalidate.mockClear();
+      act(() => tick(0.5));
+      expect(frame.invalidate).toHaveBeenCalled();
+      await act(async () => tick(0.6));
+      expect(playedClips(play)).toEqual(['Wave', 'Idle']);
+      await update(wave);
+      expect(playedClips(play)).toEqual(['Wave', 'Idle']);
+    });
+
+    it('plays the same emote again for a new request', async () => {
+      mockReducedMotion(false);
+      const { play, update } = await mountIdle();
+      await update(wave);
+      await act(async () => tick(1.1));
+      await update({ name: 'Wave', seq: 2 });
+      expect(playedClips(play)).toEqual(['Wave', 'Idle', 'Wave']);
+    });
+
+    it('is cancelled by moving and does not resume afterwards', async () => {
+      mockReducedMotion(false);
+      const { play, update } = await mountIdle();
+      await update(wave);
+      await update(wave, true);
+      expect(playedClips(play)).toEqual(['Wave', 'Idle']);
+      await update(wave, false);
+      expect(playedClips(play)).toEqual(['Wave', 'Idle']);
+    });
+
+    it('ignores an emote the body has no clip for', async () => {
+      mockReducedMotion(false);
+      const { play, update } = await mountIdle();
+      await update({ name: 'Dance', seq: 1 });
+      expect(playedClips(play)).toEqual([]);
+    });
+
+    it('holds a still pose for the clip duration under prefers-reduced-motion', async () => {
+      mockReducedMotion(true);
+      const { play, update } = await mountIdle();
+      vi.useFakeTimers();
+      try {
+        await update(wave);
+        expect(playedClips(play)).toEqual(['Wave']);
+        frame.invalidate.mockClear();
+        act(() => tick(0.5));
+        expect(frame.invalidate).not.toHaveBeenCalled();
+        await act(async () => {
+          vi.advanceTimersByTime(1000);
+        });
+        expect(playedClips(play)).toEqual(['Wave', 'Idle']);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
 });

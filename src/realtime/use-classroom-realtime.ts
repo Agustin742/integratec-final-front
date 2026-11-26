@@ -3,6 +3,7 @@ import { useSessionService, useSessionSnapshot } from '@/session/provider';
 import type { ClassroomRealtimeLease } from './classroom-realtime-manager';
 import { useClassroomRealtimeManager } from './classroom-realtime-provider';
 import {
+  avatarEmotedSchema,
   createClassroomRealtimeClient,
   realtimeMessages,
   type ClassroomRealtimeClient,
@@ -12,7 +13,12 @@ import {
   type RealtimeSnapshot,
 } from './client';
 import type { NpcView } from '@/features/world/npc/npc-view';
-import type { AvatarInput } from './contracts.generated';
+import {
+  AVATAR_EMOTED_EVENT,
+  type AvatarEmote,
+  type AvatarEmoted,
+  type AvatarInput,
+} from './contracts.generated';
 
 const EMPTY_PARTICIPANTS: ReadonlyMap<string, RealtimeParticipant> = new Map();
 const EMPTY_NPCS: ReadonlyMap<string, NpcView> = new Map();
@@ -38,12 +44,15 @@ export interface UseClassroomRealtimeOptions {
   readonly enabled?: boolean;
   readonly realtimeUrl?: string;
   readonly createSdkClient?: (endpoint: string) => RealtimeSdkClientLike;
+  /** Each `avatar:emoted` of the room; ephemeral, never part of the snapshot. */
+  readonly onEmote?: (event: AvatarEmoted) => void;
 }
 
 export interface UseClassroomRealtimeResult extends RealtimeSnapshot {
   readonly reconnect: () => Promise<boolean>;
   readonly sendAvatarInput: (input: AvatarInput) => boolean;
   readonly interactNpc: (npcId: string) => boolean;
+  readonly sendEmote: (emote: AvatarEmote) => boolean;
 }
 
 /**
@@ -58,6 +67,7 @@ export function useClassroomRealtime({
   enabled = true,
   realtimeUrl,
   createSdkClient,
+  onEmote,
 }: UseClassroomRealtimeOptions): UseClassroomRealtimeResult {
   const { controller } = useSessionService();
   const session = useSessionSnapshot();
@@ -77,6 +87,17 @@ export function useClassroomRealtime({
   const clientRef = useRef<ClassroomRealtimeClient | null>(null);
   const leaseRef = useRef<ClassroomRealtimeLease | null>(null);
   const leaseUnsubscribeRef = useRef<(() => void) | null>(null);
+  const onEmoteRef = useRef(onEmote);
+  useEffect(() => {
+    onEmoteRef.current = onEmote;
+  }, [onEmote]);
+  const listenToEmotes = useCallback(
+    (client: ClassroomRealtimeClient) =>
+      client.onMessage(AVATAR_EMOTED_EVENT, avatarEmotedSchema, (event) =>
+        onEmoteRef.current?.(event),
+      ),
+    [],
+  );
   const activeScopeRef = useRef<{
     readonly classroomId: string;
     readonly userId: string;
@@ -101,6 +122,7 @@ export function useClassroomRealtime({
       });
       clientRef.current = client;
 
+      const stopEmotes = listenToEmotes(client);
       const unsubscribe = client.subscribe(() => {
         setOwnedSnapshot({
           ownerUserId: sessionUserId,
@@ -112,6 +134,7 @@ export function useClassroomRealtime({
       return () => {
         activeScopeRef.current = null;
         unsubscribe();
+        stopEmotes();
         if (clientRef.current === client) {
           clientRef.current = null;
         }
@@ -158,7 +181,12 @@ export function useClassroomRealtime({
           snapshot: lease.client.getSnapshot(),
         });
       };
-      leaseUnsubscribeRef.current = lease.client.subscribe(syncFromLease);
+      const unsubscribe = lease.client.subscribe(syncFromLease);
+      const stopEmotes = listenToEmotes(lease.client);
+      leaseUnsubscribeRef.current = () => {
+        unsubscribe();
+        stopEmotes();
+      };
       queueMicrotask(syncFromLease);
     }
 
@@ -179,6 +207,7 @@ export function useClassroomRealtime({
     controller,
     createSdkClient,
     hasCustomOverride,
+    listenToEmotes,
     manager,
     realtimeUrl,
     sessionUserId,
@@ -215,10 +244,21 @@ export function useClassroomRealtime({
         snapshot: lease.client.getSnapshot(),
       });
     };
-    leaseUnsubscribeRef.current = lease.client.subscribe(syncFromLease);
+    const unsubscribe = lease.client.subscribe(syncFromLease);
+    const stopEmotes = listenToEmotes(lease.client);
+    leaseUnsubscribeRef.current = () => {
+      unsubscribe();
+      stopEmotes();
+    };
     syncFromLease();
     return lease.client.connect(activeClassroomId);
-  }, [activeClassroomId, hasCustomOverride, manager, sessionUserId]);
+  }, [
+    activeClassroomId,
+    hasCustomOverride,
+    listenToEmotes,
+    manager,
+    sessionUserId,
+  ]);
 
   const sendAvatarInput = useCallback(
     (input: AvatarInput) => {
@@ -240,6 +280,16 @@ export function useClassroomRealtime({
     [activeClassroomId],
   );
 
+  const sendEmote = useCallback(
+    (emote: AvatarEmote) => {
+      if (activeClassroomId === null || !clientRef.current) {
+        return false;
+      }
+      return clientRef.current.sendEmote(emote);
+    },
+    [activeClassroomId],
+  );
+
   const visibleSnapshot =
     activeClassroomId === null ||
     sessionUserId === null ||
@@ -254,5 +304,6 @@ export function useClassroomRealtime({
     reconnect,
     sendAvatarInput,
     interactNpc,
+    sendEmote,
   };
 }

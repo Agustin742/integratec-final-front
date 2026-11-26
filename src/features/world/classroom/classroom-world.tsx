@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { AvatarInput } from '@/realtime';
 import { useOwnProfile } from '@/features/profile/use-own-profile';
 import { worldMessages } from '../messages';
+import type { AvatarEmotePlay } from '../avatar/avatar-model';
 import type { AvatarEquipped } from '../avatar/avatar-part-plan';
 import type { Pose } from '../movement';
 import { WorldCanvas, type WorldCanvasProps } from '../world-canvas';
@@ -20,6 +21,8 @@ export interface ClassroomWorldProps extends Pick<
   selfPose?: Pose | undefined;
   onAssetError?: (() => void) | undefined;
   selfEquipped?: AvatarEquipped | undefined;
+  /** Emote the local avatar is playing. */
+  selfEmote?: AvatarEmotePlay | undefined;
   /** Decor shown on each student desk. */
   deskDecor?: readonly DeskDecorAssignment[] | undefined;
   /** Connection epoch key that changes on join, reconnect, or drop (#37). */
@@ -67,6 +70,7 @@ export function ClassroomWorld({
   onAssetError,
   selfPose,
   selfEquipped,
+  selfEmote,
   deskDecor,
   connectionKey,
   frozen,
@@ -115,6 +119,7 @@ export function ClassroomWorld({
         scopeKey={scopeKey}
         selfPose={selfPose}
         selfEquipped={selfEquipped}
+        selfEmote={selfEmote}
         deskDecor={deskDecor}
         connectionKey={connectionKey}
         frozen={frozen}

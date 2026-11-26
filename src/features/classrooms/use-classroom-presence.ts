@@ -15,10 +15,14 @@ import {
 import type { components } from '@/api/schema.generated';
 import type { Avatar } from '@/features/profile/avatar-options';
 import type { Pose, RemoteClassroomParticipant } from '@/features/world';
+import type { AvatarEmotePlay } from '@/features/world/avatar/avatar-model';
 import type { NpcView } from '@/features/world/npc/npc-view';
 import {
+  AVATAR_EMOTE_COOLDOWN_MS,
   realtimeMessages,
   useClassroomRealtime,
+  type AvatarEmote,
+  type AvatarEmoted,
   type AvatarInput,
   type RealtimeConnectionStatus,
   type RealtimeFailureReason,
@@ -39,6 +43,7 @@ const EMPTY_AVATARS = new Map<string, Avatar>();
 const EMPTY_PARTICIPANTS: readonly RealtimeParticipant[] = [];
 const EMPTY_NPCS: ReadonlyMap<string, NpcView> = new Map();
 const EMPTY_REMOTE_PARTICIPANTS: readonly RemoteClassroomParticipant[] = [];
+const EMPTY_EMOTES: ReadonlyMap<string, AvatarEmotePlay> = new Map();
 
 function toValidAvatar(raw: unknown): Avatar | undefined {
   const parsed = avatarSchema.safeParse(raw);
@@ -78,6 +83,11 @@ export interface ClassroomPresence {
   readonly sendIntent: (intent: AvatarInput) => void;
   /** Asks the server to react to E / click on an NPC (`npc:interact`). */
   readonly interactNpc: (npcId: string) => void;
+  /** Whether an emote can be sent: live 3D classroom, not frozen. */
+  readonly canEmote: boolean;
+  readonly sendEmote: (emote: AvatarEmote) => boolean;
+  /** Emote the room announced for the local member, while it lasts. */
+  readonly selfEmote: AvatarEmotePlay | undefined;
 }
 
 /**
@@ -107,9 +117,44 @@ export function useClassroomPresence({
   const isLatchedLostAccess =
     scopeKey !== '' && lostAccessState?.scopeKey === scopeKey;
 
+  const [emotes, setEmotes] = useState(EMPTY_EMOTES);
+  const emoteSeqRef = useRef(0);
+  const emoteTimersRef = useRef(new Set<number>());
+  const onEmote = useCallback(
+    ({ userId: emoterId, emote }: AvatarEmoted) => {
+      if (mode !== '3d') return;
+      const seq = ++emoteSeqRef.current;
+      setEmotes((current) =>
+        new Map(current).set(emoterId, { name: emote, seq }),
+      );
+      // Kept no longer than the cooldown (every clip is shorter), so an
+      // avatar mounted later never replays an old emote.
+      const timer = window.setTimeout(() => {
+        emoteTimersRef.current.delete(timer);
+        setEmotes((current) => {
+          if (current.get(emoterId)?.seq !== seq) return current;
+          const next = new Map(current);
+          next.delete(emoterId);
+          return next;
+        });
+      }, AVATAR_EMOTE_COOLDOWN_MS);
+      emoteTimersRef.current.add(timer);
+    },
+    [mode],
+  );
+  useEffect(() => {
+    const timers = emoteTimersRef.current;
+    return () => {
+      for (const timer of timers) window.clearTimeout(timer);
+      timers.clear();
+      setEmotes(EMPTY_EMOTES);
+    };
+  }, [mode, scopeKey]);
+
   const realtime = useClassroomRealtime({
     classroomId,
     enabled: enabled && !isLatchedLostAccess,
+    onEmote,
   });
 
   const isLiveLostAccess =
@@ -483,11 +528,13 @@ export function useClassroomPresence({
         rotation: participant.rotation,
         avatar: resolvedAvatar,
         equipped: participant.avatar?.equipped,
+        emote: emotes.get(participant.userId),
       });
     });
     return remotes;
   }, [
     directoryAvatars,
+    emotes,
     hasPresenceParticipants,
     realtime.participants,
     userId,
@@ -554,6 +601,15 @@ export function useClassroomPresence({
     [frozen, lostAccess, realtime.status, sendNpcInteract],
   );
 
+  const canEmote =
+    !lostAccess && !frozen && mode === '3d' && realtime.status === 'connected';
+  const { sendEmote: sendRoomEmote } = realtime;
+  const sendEmote = useCallback(
+    (emote: AvatarEmote) => canEmote && sendRoomEmote(emote),
+    [canEmote, sendRoomEmote],
+  );
+  const selfEmote = userId !== null ? emotes.get(userId) : undefined;
+
   const npcs = hasPresenceParticipants ? realtime.npcs : EMPTY_NPCS;
 
   const isIdle =
@@ -591,5 +647,8 @@ export function useClassroomPresence({
       ? realtime.tutorBotSkin
       : undefined,
     interactNpc,
+    canEmote,
+    sendEmote,
+    selfEmote,
   };
 }

@@ -622,4 +622,17 @@ export const classroomMessages = {
         'No pudimos revocar la invitación. Intentá nuevamente en unos segundos.',
     },
   },
+  emotes: {
+    openWheel: 'Abrir ruleta de gestos',
+    triggerLabel: 'Gestos',
+    wheelLabel: 'Gestos',
+    cooldown: 'Esperá unos segundos para repetir un gesto.',
+    names: {
+      Wave: 'Saludar',
+      Cheer: 'Festejar',
+      Clap: 'Aplaudir',
+      Dance: 'Bailar',
+      RaiseHand: 'Levantar la mano',
+    },
+  },
 } as const;

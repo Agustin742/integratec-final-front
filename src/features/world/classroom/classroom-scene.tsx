@@ -35,6 +35,7 @@ import { FollowCamera } from './follow-camera';
 import { InteractableHighlight } from './interactable-highlight';
 import { ClassroomKit } from './kit/classroom-kit';
 import type { ClassroomKitModuleId } from './kit/classroom-kit-manifest';
+import type { AvatarEmotePlay } from '../avatar/avatar-model';
 import { LocalAvatar } from './local-avatar';
 import { createNpcLivePositions } from './npc-live-position';
 import { ProximityTracker, type ProximityAnchor } from './proximity-tracker';
@@ -55,6 +56,7 @@ export interface ClassroomSceneProps {
   selfPose?: Pose | undefined;
   /** Accessory shop codes the local member wears in this classroom. */
   selfEquipped?: AvatarEquipped | undefined;
+  selfEmote?: AvatarEmotePlay | undefined;
   /** Decor shown on each student desk. */
   deskDecor?: readonly DeskDecorAssignment[] | undefined;
   /** Connection epoch key that changes on join/reconnect/drop (#37). */
@@ -112,6 +114,7 @@ export function ClassroomScene({
   onAssetError,
   selfPose,
   selfEquipped,
+  selfEmote,
   deskDecor,
   connectionKey,
   frozen = false,
@@ -319,6 +322,7 @@ export function ClassroomScene({
         marker={marker.object}
         avatar={avatar}
         equipped={selfEquipped}
+        emote={selfEmote}
         scopeKey={scopeKey}
       />
       {/* After LocalAvatar so its frame callback sees the freshly stepped pose. */}
@@ -342,6 +346,7 @@ export function ClassroomScene({
           }}
           avatar={participant.avatar}
           equipped={participant.equipped}
+          emote={participant.emote}
           scopeKey={scopeKey}
         />
       ))}

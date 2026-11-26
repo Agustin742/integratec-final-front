@@ -8,6 +8,8 @@ import type { components } from '@/api/schema.generated';
 import { fakeSession } from '@/app/router/fake-session';
 import { createAppRoutes } from '@/app/router/routes';
 import {
+  AVATAR_EMOTE_MESSAGE,
+  AVATAR_EMOTED_EVENT,
   AVATAR_INPUT_MESSAGE,
   CLOSE_CODE_ACCESS_REVOKED,
   CLOSE_CODE_TOO_MANY_CONNECTIONS,
@@ -378,6 +380,50 @@ describe('Classroom real-time presence & remote avatars (#37)', () => {
     expect(room.send).toHaveBeenCalledWith(NPC_INTERACT_MESSAGE, {
       npcId: 'tutorBot',
     });
+  });
+
+  test('sends emotes and plays only the ones the room announces (#154)', async () => {
+    const { sdk } = setupPresenceWorkspace();
+    await waitFor(() => {
+      expect(sdk.roomFor(CLASSROOM_A)).toBeDefined();
+    });
+    const room = sdk.roomFor(CLASSROOM_A)!;
+    act(() => {
+      room.setAvatar({ userId: profile.id, role: 'STUDENT' });
+      room.setAvatar({ userId: REMOTE_STUDENT_ID, role: 'STUDENT' });
+    });
+    await waitFor(() => {
+      expect(stage.props?.canEmote).toBe(true);
+    });
+
+    act(() => {
+      stage.props?.onSendEmote?.('Clap');
+    });
+    expect(room.send).toHaveBeenCalledWith(AVATAR_EMOTE_MESSAGE, {
+      emote: 'Clap',
+    });
+    expect(stage.props?.selfEmote).toBeUndefined();
+
+    act(() => {
+      room.emitMessage(AVATAR_EMOTED_EVENT, {
+        userId: profile.id,
+        emote: 'Clap',
+      });
+      room.emitMessage(AVATAR_EMOTED_EVENT, {
+        userId: REMOTE_STUDENT_ID,
+        emote: 'Dance',
+      });
+      room.emitMessage(AVATAR_EMOTED_EVENT, {
+        userId: REMOTE_STUDENT_ID,
+        emote: 'Backflip',
+      });
+    });
+    expect(stage.props?.selfEmote?.name).toBe('Clap');
+    expect(
+      stage.props?.remoteParticipants?.find(
+        (participant) => participant.userId === REMOTE_STUDENT_ID,
+      )?.emote?.name,
+    ).toBe('Dance');
   });
 
   test('forwards equipped accessory codes of the local and remote members to the stage', async () => {

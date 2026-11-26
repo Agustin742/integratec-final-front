@@ -356,6 +356,9 @@ function WorkspaceContext({
             )}
             resolveNpcPhrase={resolveNpcPhrase}
             onInteractNpc={presence.interactNpc}
+            canEmote={presence.canEmote}
+            onSendEmote={presence.sendEmote}
+            selfEmote={presence.selfEmote}
             onSustainedLowFps={beginPerformanceOffer}
             presenceSlot={
               <ClassroomPresencePill

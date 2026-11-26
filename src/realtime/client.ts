@@ -2,6 +2,9 @@ import { Client } from '@colyseus/sdk';
 import { z } from 'zod';
 import { getPublicConfig } from '../config/public-config';
 import {
+  AVATAR_EMOTE_MESSAGE,
+  AVATAR_EMOTES,
+  avatarEmoteSchema,
   AVATAR_INPUT_MESSAGE,
   avatarInputSchema,
   CLASSROOM_ROOM_NAME,
@@ -13,6 +16,8 @@ import {
   CLOSE_REASON_VERIFICATION_UNAVAILABLE,
   NPC_INTERACT_MESSAGE,
   npcInteractSchema,
+  type AvatarEmote,
+  type AvatarEmoted,
   type AvatarInput,
   type ClassroomJoinOptions,
 } from './contracts.generated';
@@ -38,6 +43,12 @@ export const realtimeMessages = {
     'No se pudo verificar el acceso en este momento. Podés reintentar.',
   connectionFailed: 'No se pudo conectar con el aula en vivo.',
 } as const;
+
+/** Incoming `avatar:emoted`; unlisted emotes are ignored. */
+export const avatarEmotedSchema: z.ZodType<AvatarEmoted> = z.object({
+  userId: z.string().min(1),
+  emote: z.enum(AVATAR_EMOTES),
+});
 
 export type RealtimeConnectionStatus =
   | 'connecting'
@@ -161,6 +172,8 @@ export interface ClassroomRealtimeClient {
   sendAvatarInput(input: AvatarInput): boolean;
   /** Asks the server to react to this member pressing E at an NPC. */
   interactNpc(npcId: string): boolean;
+  /** Asks the server to play an emote on this member's avatar. */
+  sendEmote(emote: AvatarEmote): boolean;
   onMessage<T>(
     type: string,
     schema: z.ZodType<T>,
@@ -1084,6 +1097,18 @@ export function createClassroomRealtimeClient(
         return false;
       }
       activeRoom.send(NPC_INTERACT_MESSAGE, parsed.data);
+      return true;
+    },
+    sendEmote(emote) {
+      if (disposed || snapshot.status !== 'connected' || !activeRoom) {
+        return false;
+      }
+      // An unlisted payload would close the connection (4002).
+      const parsed = avatarEmoteSchema.safeParse({ emote });
+      if (!parsed.success) {
+        return false;
+      }
+      activeRoom.send(AVATAR_EMOTE_MESSAGE, parsed.data);
       return true;
     },
     onMessage(type, schema, handler) {

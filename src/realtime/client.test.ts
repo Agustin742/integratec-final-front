@@ -6,6 +6,10 @@ import { AvatarAppearance } from './avatar-appearance.generated';
 import { EquippedItemView } from './equipped-item-view.generated';
 import { Npc } from './npc.generated';
 import {
+  AVATAR_EMOTE_COOLDOWN_MS,
+  AVATAR_EMOTE_MESSAGE,
+  AVATAR_EMOTED_EVENT,
+  AVATAR_EMOTES,
   AVATAR_INPUT_MESSAGE,
   CLASSROOM_ROOM_NAME,
   CLOSE_CODE_ACCESS_REVOKED,
@@ -715,6 +719,38 @@ describe('createClassroomRealtimeClient (#23)', () => {
     ]);
     expect(client.interactNpc('dragon')).toBe(false);
     expect(room.sentMessages).toHaveLength(1);
+
+    client.dispose();
+  });
+
+  it('sends only a listed avatar emote while connected (#154)', async () => {
+    const { auth } = createFakeAuth('valid-token');
+    const sdk = createFakeSdk();
+    const room = new FakeRoom({ classroomId: CLASSROOM_A });
+    sdk.setJoinHandler(async () => room);
+    const client = createClassroomRealtimeClient({
+      auth,
+      realtimeUrl: 'wss://realtime.example.invalid',
+      createSdkClient: sdk.createSdkClient,
+    });
+
+    expect(AVATAR_EMOTES).toEqual([
+      'Wave',
+      'Cheer',
+      'Clap',
+      'Dance',
+      'RaiseHand',
+    ]);
+    expect(AVATAR_EMOTE_MESSAGE).toBe('avatar:emote');
+    expect(AVATAR_EMOTED_EVENT).toBe('avatar:emoted');
+    expect(AVATAR_EMOTE_COOLDOWN_MS).toBe(3000);
+    expect(client.sendEmote('Wave')).toBe(false);
+    await client.connect(CLASSROOM_A);
+    expect(client.sendEmote('Wave')).toBe(true);
+    expect(client.sendEmote('Backflip' as 'Wave')).toBe(false);
+    expect(room.sentMessages).toEqual([
+      { type: AVATAR_EMOTE_MESSAGE, payload: { emote: 'Wave' } },
+    ]);
 
     client.dispose();
   });
