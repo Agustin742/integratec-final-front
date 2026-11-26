@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toast';
-import { useClassroomContext } from '@/features/classrooms/use-classroom-capabilities';
 import { useCalls } from './call-provider';
 import { PhoneIcon } from './call-icons';
 import { callMessages } from './call-messages';
@@ -67,6 +66,8 @@ export function IncomingCallListener({
 export function ClassCallButton(props: {
   readonly classroomId: string;
   readonly classroomName: string;
+  /** Derived from the workspace's confirmed classroom capabilities. */
+  readonly canStart: boolean;
   readonly appearance?: 'rail' | 'tile';
   readonly className?: string;
 }) {
@@ -79,20 +80,18 @@ function ClassCallButtonContent({
   calls,
   classroomId,
   classroomName,
+  canStart,
   appearance,
   className,
 }: {
   readonly calls: NonNullable<ReturnType<typeof useCalls>>;
   readonly classroomId: string;
   readonly classroomName: string;
+  readonly canStart: boolean;
   readonly appearance?: 'rail' | 'tile';
   readonly className?: string;
 }) {
-  const context = useClassroomContext(classroomId);
   const { classCallActive } = useClassroomCallSignals(classroomId);
-  const canStart =
-    context.status === 'ready' &&
-    context.classroom.capabilities.includes('moderate_chat');
   return (
     <ClassCallButtonView
       canStart={canStart}

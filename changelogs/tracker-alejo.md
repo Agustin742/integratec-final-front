@@ -1,5 +1,13 @@
 # Tracker — Alejo
 
+## 2026-11-26 — PR145 corrections and call UI evidence (#141)
+
+- **Status:** in-progress
+- **Area / files:** `src/features/calls/`, classroom retry integration, `docs/voice-calls.md`, call UI evidence.
+- **Change:** Removed the redundant call-entry classroom query by reusing confirmed workspace capabilities in both modes. Retry RED reproduced (2 expected / 3 received); showcase build, typecheck and workspace E2E 24/24 now pass; independent container tests 9/9 and static review pass. Moderation announcement correction and call screenshots remain in progress.
+- **Reason:** Address verified audit findings on PR145 without merging develop or splitting the PR.
+- **Next step:** Reproduce each defect, apply focused fixes with tests, capture call UI, and run independent verification. Seven merge conflicts are explicitly deferred; no push authorized.
+
 ## 2026-11-25 — Avatar Character Animations (16 wishlist clips on male & female body.glb)
 
 - **Status:** completed (committed locally on `feat/avatar-animations` in `odd/worktrees/avatar-animations`; not pushed)

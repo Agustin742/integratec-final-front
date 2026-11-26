@@ -316,6 +316,7 @@ function WorkspaceContext({
     <ClassCallButton
       classroomId={classroomId}
       classroomName={classroom.name}
+      canStart={classroom.capabilities.includes('moderate_chat')}
       appearance="rail"
       className={PANEL_BUTTON_CLASS}
     />
@@ -324,6 +325,7 @@ function WorkspaceContext({
     <ClassCallButton
       classroomId={classroomId}
       classroomName={classroom.name}
+      canStart={classroom.capabilities.includes('moderate_chat')}
       appearance="tile"
     />
   );
